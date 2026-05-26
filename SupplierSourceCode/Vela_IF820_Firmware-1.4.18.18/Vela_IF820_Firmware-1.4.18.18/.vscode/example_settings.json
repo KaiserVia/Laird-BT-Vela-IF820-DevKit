@@ -1,0 +1,6 @@
+{
+  "mini_driver": "${workspaceFolder}/files/v1.4.18.18_int-ant_int-lpo/minidriver-20820A1-uart-patchram.hex",
+  "ezserial_firmware": "${workspaceFolder}/files/v1.4.18.18_int-ant_int-lpo/20251116_ezserial_app_VELA-IF820-INT-ANT-INT-LPO_141818_v1.4.18.18_download.hex",
+  "ezserial_hcd_firmware": "${workspaceFolder}/files/v1.4.18.18_int-ant_int-lpo/20251116_ezserial_app_VELA-IF820-INT-ANT-INT-LPO_141818_v1.4.18.18_download.hcd",
+  "comport_BT900_device1": "/dev/cu.usbserial-AL04XL61"
+}

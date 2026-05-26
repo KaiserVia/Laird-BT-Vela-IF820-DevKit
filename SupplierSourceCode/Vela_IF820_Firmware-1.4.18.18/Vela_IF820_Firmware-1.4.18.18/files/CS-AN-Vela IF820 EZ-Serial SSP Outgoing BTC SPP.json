@@ -1,0 +1,143 @@
+{
+    "groups": [
+        {
+            "commands": [
+                {
+                    "command": "/ping",
+                    "description": "module responding?",
+                    "uuid": "{53d2a274-fc3f-4df5-9283-1a25868e2274}"
+                },
+                {
+                    "command": "/rfac",
+                    "description": "factory default",
+                    "uuid": "{90b0a431-2576-481c-bdd0-d8ee93eea979}"
+                },
+                {
+                    "command": "/ping",
+                    "description": "module responding",
+                    "uuid": "{b42a8eda-70b3-4254-8d09-ffef1cc79eac}"
+                },
+                {
+                    "command": "/scfg",
+                    "description": "store config",
+                    "uuid": "{64bf19af-b090-4984-b8cb-aed1873d144a}"
+                },
+                {
+                    "command": "/rbt",
+                    "description": "reboot",
+                    "uuid": "{d180d231-3e33-4e17-91d6-57cbfa27e167}"
+                },
+                {
+                    "command": "gsbp",
+                    "description": "get security settings",
+                    "uuid": "{fd0462b9-3cee-4ff2-9f5d-241153a42705}"
+                }
+            ],
+            "name": "Outgoing Just Works Config",
+            "uuid": "{a267c144-96c2-4f19-b9b0-6e97da7228b5}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/ping",
+                    "description": "module responding",
+                    "uuid": "{da16d61d-ee1e-4136-81db-773a8f88a5b3}"
+                },
+                {
+                    "command": "/rfac",
+                    "description": "factory default",
+                    "uuid": "{c8c0c5bc-0b63-4e4f-a09c-3c91c550e3b5}"
+                },
+                {
+                    "command": "spem,m=0",
+                    "description": "uart echo off",
+                    "uuid": "{12dfb1bd-dcb3-4f59-8d3f-bbad53b1c923}"
+                },
+                {
+                    "command": "ssbp,m=51,b=0,k=10,p=0,i=00,f=01",
+                    "description": "SSP with MITM, display only",
+                    "uuid": "{366e9e16-4c59-4c7f-8a7f-4fcee4ee779b}"
+                },
+                {
+                    "command": "/scfg",
+                    "description": "store config",
+                    "uuid": "{a2d39762-fe3c-4a98-9459-acc9189d820a}"
+                },
+                {
+                    "command": "/rbt",
+                    "description": "reboot",
+                    "uuid": "{ced7c007-70d1-4918-aeba-76c84589ca39}"
+                },
+                {
+                    "command": "gsbp",
+                    "description": "get security settings",
+                    "uuid": "{dc339915-e376-45f3-a402-6aca94d85e8b}"
+                }
+            ],
+            "name": "Outgoing IOCAP config",
+            "uuid": "{c4264686-6edb-4a5b-916a-49ce17d8d7a9}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/bti,d=14,f=0",
+                    "description": "start inquiry",
+                    "uuid": "{a6fcef40-a8e0-42fb-a096-2d9554115e30}"
+                },
+                {
+                    "command": "/btix",
+                    "description": "end inquiry (optional)",
+                    "uuid": "{0796d4f1-df37-4d78-9a5f-ef61fdac4945}"
+                },
+                {
+                    "command": "/btc, a=0016a4001591,t=1",
+                    "description": "connect to address (enter address from inquiry)",
+                    "uuid": "{49a8ddd6-3157-4955-8239-b7410f78a732}"
+                },
+                {
+                    "command": "data from IF820",
+                    "description": "text data to be sent",
+                    "uuid": "{611397ed-ad83-4187-8531-64e58c25d03c}"
+                },
+                {
+                    "command": "more data from IF820",
+                    "description": "more text data to be sent",
+                    "uuid": "{bd4e65d9-f697-4abe-b8f5-d67f72b3b479}"
+                }
+            ],
+            "name": "Outgoing Just Works Connection",
+            "uuid": "{069c995d-6ca3-4901-96cd-bffebe8d05d4}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/bti,d=14,f=0",
+                    "description": "start inquiry",
+                    "uuid": "{895c629a-6ea8-4af0-a8fe-3b08a73a97a4}"
+                },
+                {
+                    "command": "/btix",
+                    "description": "end inquiry (optional)",
+                    "uuid": "{04701704-ecc9-42b1-9d37-720632efea3d}"
+                },
+                {
+                    "command": "/btc,a=0016a4001591,t=1",
+                    "description": "connect to address (enter address found in inquiry)",
+                    "uuid": "{d6314018-4484-4c34-a3be-8c01d4030335}"
+                },
+                {
+                    "command": "data from IF820",
+                    "description": "text data to be sent",
+                    "uuid": "{23fedea9-0a2d-4fd1-8def-7435dfc2c0a5}"
+                },
+                {
+                    "command": "more date from IF820",
+                    "description": "more text data to be sent",
+                    "uuid": "{34bd8aa6-0066-41e6-aa19-f7370cdb518c}"
+                }
+            ],
+            "name": "Outgoing IOCAP Connection",
+            "uuid": "{e1b589db-92db-49bb-a519-6578744b627c}"
+        }
+    ]
+}

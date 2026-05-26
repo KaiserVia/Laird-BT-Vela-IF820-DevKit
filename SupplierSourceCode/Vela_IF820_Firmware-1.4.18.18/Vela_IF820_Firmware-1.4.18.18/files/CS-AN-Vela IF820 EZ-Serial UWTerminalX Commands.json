@@ -1,0 +1,673 @@
+{
+    "groups": [
+        {
+            "commands": [
+                {
+                    "command": "sppm,m=0",
+                    "description": "Set Text protocol",
+                    "uuid": "{d45860ac-c4ca-4462-96e6-25576488224e}"
+                },
+                {
+                    "command": "sppm,m=1",
+                    "description": "Set Binary  protocol\n",
+                    "uuid": "{2ff87d54-99c1-4d66-a077-498dc5af225b}"
+                },
+                {
+                    "command": "gppm",
+                    "description": "Get Parse Mode\n",
+                    "uuid": "{d5e7aa64-8324-4855-a393-255db38b1b70}"
+                },
+                {
+                    "command": "spem,m=0\n",
+                    "description": "Disable Echo\n",
+                    "uuid": "{abe4c08a-c985-4c39-8435-41ef2ef12513}"
+                },
+                {
+                    "command": "spem,m=1\n",
+                    "description": "Enable Echo\n",
+                    "uuid": "{e1070f15-7ea9-4994-b659-47c786354ddc}"
+                },
+                {
+                    "command": "gpem\n",
+                    "description": "Get echo mode\n",
+                    "uuid": "{788641ca-a5e0-4345-86b6-408ad58fc9e6}"
+                }
+            ],
+            "name": "Protocol",
+            "uuid": "{e1b589db-92db-49bb-a519-6578744b627c}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/ping\n",
+                    "description": "Ping",
+                    "uuid": "{dc670e08-8015-4b5c-92eb-c14b89f4bf8e}"
+                },
+                {
+                    "command": "/rbt\n",
+                    "description": "reboot",
+                    "uuid": "{ea1013e1-db9a-4b76-a280-94548d3b2ec9}"
+                },
+                {
+                    "command": "/dump,t=0\n",
+                    "description": "dump config",
+                    "uuid": "{9bf24491-6693-4c9d-96e8-eb65dca0d0ca}"
+                },
+                {
+                    "command": "/scfg\n",
+                    "description": "store config",
+                    "uuid": "{1a84e279-8bc1-4642-a431-dc0438bd3f78}"
+                },
+                {
+                    "command": "/rfac\n",
+                    "description": "factory default",
+                    "uuid": "{5cdcc836-e089-4391-aa42-59d321289574}"
+                },
+                {
+                    "command": "/qfv\n",
+                    "description": "query firmware",
+                    "uuid": "{3d2e2685-9da2-4c7a-9652-762b2ba78b7c}"
+                },
+                {
+                    "command": "/qrnd\n",
+                    "description": "random number",
+                    "uuid": "{19753ba5-b7d9-40cf-9ff0-a7d911f6c6d5}"
+                },
+                {
+                    "command": "/wud,o=0,m=0,d=ffff\n",
+                    "description": "write user data",
+                    "uuid": "{be4b2325-f990-4d75-9710-9e2a57896f96}"
+                },
+                {
+                    "command": "/rud,o=0,m=0,l=4\n",
+                    "description": "read user data",
+                    "uuid": "{68a3a81e-8145-48a6-9a08-0d08b39f4611}"
+                },
+                {
+                    "command": "sba,a=000000000000\n",
+                    "description": "set bluetooth address",
+                    "uuid": "{032da0f1-d17c-45c8-933d-698af7bd5dd9}"
+                },
+                {
+                    "command": "gba",
+                    "description": "get bluetooth address",
+                    "uuid": "{510a7527-e278-4fe2-a14e-2cf22ebc2377}"
+                },
+                {
+                    "command": "sslp,l=0,t=0\n",
+                    "description": "set sleep parameters",
+                    "uuid": "{882e117a-4fec-446a-bf8b-f04a088af1b8}"
+                },
+                {
+                    "command": "gslp\n",
+                    "description": "get sleep parameters",
+                    "uuid": "{5752c845-cdce-407f-8794-1d7e448b1d44}"
+                },
+                {
+                    "command": "stxp,p=7\n",
+                    "description": "set tx power",
+                    "uuid": "{28adf5cb-66d9-42d8-b520-fcac54d19142}"
+                },
+                {
+                    "command": "gtxp\n",
+                    "description": "get tx power",
+                    "uuid": "{972706c0-e03c-4c8b-8ba6-ff759f215923}"
+                },
+                {
+                    "command": "st,i=1\n",
+                    "description": "set transport",
+                    "uuid": "{f9c1dad2-9979-4d94-9c32-65493ea33913}"
+                },
+                {
+                    "command": "gt\n",
+                    "description": "get transport",
+                    "uuid": "{60a0e689-3048-47b5-8981-a44e7c1496ce}"
+                },
+                {
+                    "command": "stu,b=1c200,f=1,d=8,p=0,s=1\n",
+                    "description": "set UART parameters",
+                    "uuid": "{b584f1c3-c26f-4627-a886-1e63f9434a9e}"
+                },
+                {
+                    "command": "gtu,t=0\n",
+                    "description": "get UART parameters",
+                    "uuid": "{b2358c2c-6709-4dd2-99a1-3583e9759fea}"
+                }
+            ],
+            "name": "System",
+            "uuid": "{d388de55-f562-4329-adfc-1e4a83a1e3ee}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/c,a=1076364D344a,t=0\n",
+                    "description": "Connect",
+                    "uuid": "{8938a6bd-0ff2-48d8-a0b7-8b6e6c674a5f}"
+                },
+                {
+                    "command": "/cx\n",
+                    "description": "Cancel Connection\n",
+                    "uuid": "{db40e4c5-f5d8-4ebb-bf62-9fc3d84cdc70}"
+                },
+                {
+                    "command": "/ucp,i=6,l=0,o=a\n",
+                    "description": "Update Connection Parameters\n",
+                    "uuid": "{73ebe405-fcd6-48e0-bc77-9799630e641d}"
+                },
+                {
+                    "command": "/dis\n",
+                    "description": "disconnect\n",
+                    "uuid": "{34c75213-e759-4926-b32c-6e35f1377696}"
+                },
+                {
+                    "command": "/wla,a=aabbccddeeff,t=0\n",
+                    "description": "Add Whitelist Entry\n",
+                    "uuid": "{cf7e22c6-398f-4fd6-9987-dc2e8f32e85e}"
+                },
+                {
+                    "command": "/wld,a=aabbccddeeff,t=0\n",
+                    "description": "Delete Whitelist Entry\n",
+                    "uuid": "{0f180329-ff50-4c78-8613-d39bf018192b}"
+                },
+                {
+                    "command": "/a,t=3,c=7,h=20,d=0,\n",
+                    "description": "Start Adv\n",
+                    "uuid": "{c47cb172-059d-44a2-84a8-8923aeab3dec}"
+                },
+                {
+                    "command": "/ax\n",
+                    "description": "Stop Adv\n",
+                    "uuid": "{d3e2be51-8a56-4075-a38e-3412f3a3722c}"
+                },
+                {
+                    "command": "/s,i=100,w=100,a=1,d=1,o=0\n",
+                    "description": "Start Scan\n",
+                    "uuid": "{b558b9a5-8d46-4b70-aa22-d318f1c1cd0f}"
+                },
+                {
+                    "command": "/sx\n",
+                    "description": "Stop Scan\n",
+                    "uuid": "{c6853c23-e537-4d41-bedc-c332b84914be}"
+                },
+                {
+                    "command": "/qpa\n",
+                    "description": "Query Peer\n",
+                    "uuid": "{5bae4bab-a783-4f9c-b66d-08dae8f83a65}"
+                },
+                {
+                    "command": "/qss\n",
+                    "description": "Query RSSI\n",
+                    "uuid": "{7db17000-2417-4bcf-b404-d97a091b5cbf}"
+                },
+                {
+                    "command": "/qwl\n",
+                    "description": "Query Whitelist\n",
+                    "uuid": "{4ff00747-7979-4fc8-a61b-dbeaec161d1c}"
+                },
+                {
+                    "command": "sdn,t=0,n=Mark BLE\n",
+                    "description": "Set BLE Device Name\n",
+                    "uuid": "{196119c7-a975-4282-8022-0fd3730ee006}"
+                },
+                {
+                    "command": "sdn,t=1,n=Mark BTC\n",
+                    "description": "Set BTC Device Name\n",
+                    "uuid": "{0b443114-97c3-4efd-bc2d-e384ffa4b90a}"
+                },
+                {
+                    "command": "gdn,t=0\n",
+                    "description": "Get BLE Device Name\n",
+                    "uuid": "{89424fbe-4df4-4a82-99f6-72147a370023}"
+                },
+                {
+                    "command": "gdn,t=1\n",
+                    "description": "Get BTC Device Name\n",
+                    "uuid": "{44103849-01fe-4610-bd47-e0e9c6535a08}"
+                },
+                {
+                    "command": "sda,a=0\n",
+                    "description": "Set Appearance\n",
+                    "uuid": "{66822da2-e8c0-468c-9886-ae27b1e7056e}"
+                },
+                {
+                    "command": "gda\n",
+                    "description": "Get Appearance\n",
+                    "uuid": "{c7add252-4ea2-4ef0-9880-0beba7810f70}"
+                },
+                {
+                    "command": "sad,d=aabbccddeeff1234567890\n",
+                    "description": "Set ADV Data\n",
+                    "uuid": "{d79e28a4-3742-4c02-8840-362939da72f7}"
+                },
+                {
+                    "command": "gad\n",
+                    "description": "Get ADV Data\n",
+                    "uuid": "{5f0e122d-a087-4886-acc3-2812af841d84}"
+                },
+                {
+                    "command": "ssrd,d=aabbccddeeff1234567890\n",
+                    "description": "Set Scan Reponse Data\n",
+                    "uuid": "{fc0d376b-aaf2-4dac-b109-f22e7c432fd7}"
+                },
+                {
+                    "command": "gsrd\n",
+                    "description": "Get Scan Response Data\n",
+                    "uuid": "{09a7a881-7c64-4150-b587-400f3555e427}"
+                },
+                {
+                    "command": "sap,t=3,c=7\n",
+                    "description": "Set ADV Parameters\n",
+                    "uuid": "{2bd838f7-925d-44a3-b1fc-00262a41265d}"
+                },
+                {
+                    "command": "gap\n",
+                    "description": "Get ADV Parameters\n",
+                    "uuid": "{3c3348a6-38d2-41d0-b350-c22b1ea3e836}"
+                },
+                {
+                    "command": "ssp,a=1,f=0,d=1,o=20\n",
+                    "description": "Set Scan Parameters\n",
+                    "uuid": "{f999c88d-4904-4bcf-8cb5-3f59bf96bc40}"
+                },
+                {
+                    "command": "gsp\n",
+                    "description": "Get Scan Parameters\n",
+                    "uuid": "{820abcec-36a7-4497-bdef-997317fe9f36}"
+                },
+                {
+                    "command": "scp,i=6,l=0,0=64,v=100,w=100,m=0\n",
+                    "description": "Set Connection Parameters\n",
+                    "uuid": "{d2263ded-d0cf-4f3c-a476-501bf6eb52cb}"
+                },
+                {
+                    "command": "gcp\n",
+                    "description": "Get Connection Parameters\n",
+                    "uuid": "{545d7e99-472f-4057-8461-ae6764652e5f}"
+                }
+            ],
+            "name": "GAP",
+            "uuid": "{86b7ca63-b6da-4769-a0c3-bda60fa0f415}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/drs\n",
+                    "description": "Discover Services\n",
+                    "uuid": "{b249e3d7-b669-4688-bdd5-40a53dc4b948}"
+                },
+                {
+                    "command": "/drc\n",
+                    "description": "Discover Characteristics\n",
+                    "uuid": "{f32732a3-878c-47c3-a0e1-b0b79e46499b}"
+                },
+                {
+                    "command": "/drd\n",
+                    "description": "Discover  Descriptors\n",
+                    "uuid": "{b8890f46-212b-4305-a2e7-5ae7fbe75611}"
+                },
+                {
+                    "command": "/rrh,h=0015\n",
+                    "description": "Read Handle\n",
+                    "uuid": "{0e46970d-2ffe-483f-ae3a-d586115484f0}"
+                },
+                {
+                    "command": "/wrh,h=0015,t=0,d=ff\n",
+                    "description": "Write Handle\n",
+                    "uuid": "{3c22989f-0018-4aff-a0c1-c8965de300a8}"
+                },
+                {
+                    "command": "/ci\n",
+                    "description": "Confirm Indication (/ci)\n",
+                    "uuid": "{675938d7-b41b-4b61-a3f9-43f6a772b27c}"
+                },
+                {
+                    "command": "SGCP,f=1\n",
+                    "description": "Set Parameters\n",
+                    "uuid": "{a2c7e0bc-2ed2-4bc2-952f-f1b62b6994f5}"
+                },
+                {
+                    "command": "GGCP\n",
+                    "description": "Get Parameters\n",
+                    "uuid": "{d22b2494-7c15-4c08-8544-6dab4e8646aa}"
+                }
+            ],
+            "name": "GATT Server",
+            "uuid": "{39b99752-cc22-44e0-9029-3591bfbf610e}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/dls\n",
+                    "description": "Discover local services\n",
+                    "uuid": "{e98c88d3-9fe0-4892-b9f4-8d5bf22ad893}"
+                },
+                {
+                    "command": "/dlc\n",
+                    "description": "Discover local characteristics\n",
+                    "uuid": "{22586fec-a69f-4b34-b0bc-d9be2d6a18b6}"
+                },
+                {
+                    "command": "/dld\n",
+                    "description": "Discover local descriptors\n",
+                    "uuid": "{48a42483-3a17-4dc6-857c-4973b84c2675}"
+                },
+                {
+                    "command": "/cac,t=1,p=0,l=1,d=0\n",
+                    "description": "Create Attribute\n",
+                    "uuid": "{14d02d05-1610-4935-9c78-5f566ab56afa}"
+                },
+                {
+                    "command": "/cad,h=0016\n",
+                    "description": "Delete Attribute\n",
+                    "uuid": "{505932fb-92f1-4346-b1dd-e92e37091e7c}"
+                },
+                {
+                    "command": "/vgdb\n",
+                    "description": "Validate db\n",
+                    "uuid": "{9a3a397f-1e12-46fa-aef1-e1fc434244ee}"
+                },
+                {
+                    "command": "/sgdb\n",
+                    "description": "Store DB\n",
+                    "uuid": "{6b316708-38fe-4ef9-9eb1-8ed146e2e539}"
+                },
+                {
+                    "command": "/dgdb,f=1\n",
+                    "description": "Dump db\n",
+                    "uuid": "{8e0cf2e6-fc51-4339-9af2-64d58973c19f}"
+                },
+                {
+                    "command": "/rlh,h=0016\n",
+                    "description": "Read Handle\n",
+                    "uuid": "{43321ae1-1ffb-4b58-93ee-374bdff2da43}"
+                },
+                {
+                    "command": "/wlh,h=0016,d=ff\n",
+                    "description": "Write Handle\n",
+                    "uuid": "{fe9ea29f-70e4-46bd-abeb-51af834697df}"
+                },
+                {
+                    "command": "/nh,h=0016,d=ff\n",
+                    "description": "Notify Handle\n",
+                    "uuid": "{89fabc3d-a4ff-416a-860e-3212e0807618}"
+                },
+                {
+                    "command": "/ih,h=0016,d=ff\n",
+                    "description": "Indicate Handle\n",
+                    "uuid": "{b9e14455-4dad-404d-b1c8-aca41211aeee}"
+                },
+                {
+                    "command": "/wrr,r=0\n",
+                    "description": "Send writereq response\n",
+                    "uuid": "{c7da901f-5d4b-408b-9a61-722d31dd684f}"
+                },
+                {
+                    "command": "sgsp,f=01\n",
+                    "description": "Set Parameters\n",
+                    "uuid": "{aa36c591-a4dc-4959-99b7-7defb03a6378}"
+                },
+                {
+                    "command": "ggsp\n",
+                    "description": "Get Parameters\n",
+                    "uuid": "{7bdeec0c-a55b-4e95-8c78-281afb905b9d}"
+                }
+            ],
+            "name": "GATT Client",
+            "uuid": "{4c5c0176-e424-4d2c-bd6c-1f811e90f42b}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/qb\n",
+                    "description": "Query Bonds\n",
+                    "uuid": "{85daeadf-87be-4b73-bbd0-d5fa93b1356a}"
+                },
+                {
+                    "command": "/bd,a=aabbccddeeff,t=0\n",
+                    "description": "delete Bond\n",
+                    "uuid": "{c64794c5-7094-43e3-9c17-fa851ded3228}"
+                },
+                {
+                    "command": "/p,c=1,m=0,b=0,k=10,p=0\n",
+                    "description": "Pair\n",
+                    "uuid": "{3ee00f4c-64fc-44fb-98d3-d8b60e332f62}"
+                },
+                {
+                    "command": "sprv,m=04\n",
+                    "description": "Set Privacy Mode\n",
+                    "uuid": "{10110a15-ade9-421e-ba73-f358514880a3}"
+                },
+                {
+                    "command": "gprv\n",
+                    "description": "Get Privacy Mode\n",
+                    "uuid": "{ce0b75c6-6791-49c7-90d6-6247482230f1}"
+                },
+                {
+                    "command": "ssbp,m=00,b=0,k=10,p=0,i=3,f=01\n",
+                    "description": "Set Security Parameters\n",
+                    "uuid": "{14e1e1f5-2411-472d-a24a-e8671dff04ea}"
+                },
+                {
+                    "command": "gsbp\n",
+                    "description": "Get Security Parameters (gsbp)\n",
+                    "uuid": "{44886444-4c64-42ab-871a-5ec6a91ada0e}"
+                },
+                {
+                    "command": "sfpk,p=0\n",
+                    "description": "Set Fixed Passkey\n",
+                    "uuid": "{5c75ccfc-c9df-4cf6-ae9d-bf75071619aa}"
+                },
+                {
+                    "command": "gfpk\n",
+                    "description": "Get Fixed Passkey\n",
+                    "uuid": "{e57af5a4-028a-4255-98fd-ac9cf38e410e}"
+                },
+                {
+                    "command": "sbtpin,p=0000\n",
+                    "description": "Set BTC Pin Code \n",
+                    "uuid": "{c5b5681f-45fb-4546-b6d9-da93489662aa}"
+                },
+                {
+                    "command": "gbtpin\n",
+                    "description": "Get Pin Code\n",
+                    "uuid": "{1d57870f-862b-48dc-a89f-0be2f87b6e68}"
+                },
+                {
+                    "command": "/btpin,c=1,p=0000\n",
+                    "description": "Send Pin Request Response (btpin)\n",
+                    "uuid": "{36db852b-a72d-41d2-a9e2-46d4a80e3ed9}"
+                }
+            ],
+            "name": "SMP",
+            "uuid": "{0870937b-b536-4ca7-8643-51abfb0ee3f7}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/qadc,n=0,r=0\n",
+                    "description": "Query ADC\n",
+                    "uuid": "{c24a0411-e545-452e-844c-e0ff4e454783}"
+                },
+                {
+                    "command": "siod,p=0,c=0,l=0,o=0\n",
+                    "description": "Set Drive\n",
+                    "uuid": "{5430edfe-7cc0-4510-9bb9-500b005247fa}"
+                },
+                {
+                    "command": "giod,p=0,o=0\n",
+                    "description": "Get drive\n",
+                    "uuid": "{aafab417-ca2f-4c75-b319-29d098d014e0}"
+                },
+                {
+                    "command": "siol,p=0,l=0\n",
+                    "description": "Set Logic\n",
+                    "uuid": "{9a14ff7e-7356-416c-9a02-c9a373802fd0}"
+                },
+                {
+                    "command": "giol,p=0,l=0\n",
+                    "description": "Get Logic\n",
+                    "uuid": "{0ba154ab-9c76-4eab-a1ec-ee816fabe109}"
+                },
+                {
+                    "command": "spwm,n=0,e=0,d=0,s=0,p=0,c=0\n",
+                    "description": "Set Pwm Mode\n",
+                    "uuid": "{adff1191-8cce-40e4-b5f3-570b072e5b82}"
+                },
+                {
+                    "command": "gpwm,n=0\n",
+                    "description": "Get PWM Mode\n",
+                    "uuid": "{9e742d69-cbc5-47b6-ba2f-8cb8eb6305e7}"
+                }
+            ],
+            "name": "GPIO",
+            "uuid": "{b14c4847-0857-4363-882c-c290acc1ca26}"
+        },
+        {
+            "commands": [
+                {
+                    "command": ".cysppstart\n",
+                    "description": "Start\n",
+                    "uuid": "{a9d19103-670b-4284-ae2e-06172e66ae58}"
+                },
+                {
+                    "command": ".cysppsp,e=2,g=0,c=0131,l=0,m=0,p=1,s=0,f=2\n",
+                    "description": "Set Parameters\n",
+                    "uuid": "{86c666e8-c7ff-43fb-8764-af2701d53f1c}"
+                },
+                {
+                    "command": ".cysppgp\n",
+                    "description": "Get Parameters\n",
+                    "uuid": "{03126e15-9de8-4980-815e-ec29d1ad2570}"
+                },
+                {
+                    "command": ".cysppsk,m=1,w=5,l=14,e=0d\n",
+                    "description": "Set Packetisation\n",
+                    "uuid": "{0c64d14b-ac68-490e-a3bc-177b2dfa9f52}"
+                },
+                {
+                    "command": ".cysppgk\n",
+                    "description": "Get Packetisation\n",
+                    "uuid": "{f662ceb9-eda7-4617-99b0-00c63478782b}"
+                }
+            ],
+            "name": "CYSPP",
+            "uuid": "{88b3a928-155d-4712-8637-f093e43b0b8f}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/bti,d=14,f=0\n",
+                    "description": "Start Inquiry\n",
+                    "uuid": "{dfa264f5-ded2-47eb-b636-b6c2c5406d45}"
+                },
+                {
+                    "command": "/btix\n",
+                    "description": "Cancel Inquiry\n",
+                    "uuid": "{002d6750-def4-4825-a186-6f3acd69d7ef}"
+                },
+                {
+                    "command": "/btqn,a=aabbccddeeff\n",
+                    "description": "Query Name\n",
+                    "uuid": "{ed4036fa-efea-452d-9fd0-3207937a4c1d}"
+                },
+                {
+                    "command": "/btc,a=aabbccddeeff,t=1\n",
+                    "description": "Connect\n",
+                    "uuid": "{40a4f0a8-76ab-4fda-bea3-56101297f974}"
+                },
+                {
+                    "command": "/btcx\n",
+                    "description": "Cancel Connect\n",
+                    "uuid": "{d62a0f3c-cec4-48a0-b2ef-eaabcabf2b5a}"
+                },
+                {
+                    "command": "/btdis,c=0\n",
+                    "description": "Disconnect\n",
+                    "uuid": "{6848b793-0de2-4642-82c1-b9cb07fa281a}"
+                },
+                {
+                    "command": "/btqc\n",
+                    "description": "Query Connections\n",
+                    "uuid": "{9dddff57-6655-4234-adab-8b520d56bc76}"
+                },
+                {
+                    "command": "/btqpa,c=0\n",
+                    "description": "Query Peer Address\n",
+                    "uuid": "{260f3b59-944e-41fa-8788-bc1268f5925f}"
+                },
+                {
+                    "command": "/btqss,a=aabbccddeeff,\n",
+                    "description": "Query RSSI\n",
+                    "uuid": "{69827020-61c4-484d-99ca-54f7254c5306}"
+                },
+                {
+                    "command": "sbtp,t=7d00,d=2,c=1,f=0,s=2,v=0,n=0\n",
+                    "description": "Set Parameters\n",
+                    "uuid": "{3060330f-01f2-4699-9fc8-d327c3480bfe}"
+                },
+                {
+                    "command": "gbtp\n",
+                    "description": "Get Parameters\n",
+                    "uuid": "{3e02687f-a8eb-43a2-9ee1-f4422b09e1fd}"
+                },
+                {
+                    "command": "sbtdc,c=0000\n",
+                    "description": "Set Device Class\n",
+                    "uuid": "{b3bc13b4-43f5-4235-8f5c-7bd1ba1972e0}"
+                },
+                {
+                    "command": "gbtdc\n",
+                    "description": "Get Device Class\n",
+                    "uuid": "{b8515e68-8c3c-495e-a79c-1acfd7ddfa8c}"
+                }
+            ],
+            "name": "BT",
+            "uuid": "{16f9bff7-6994-4976-bf6e-32dbbd7c0f69}"
+        },
+        {
+            "commands": [
+                {
+                    "command": ".spps,c=0,d=FFFFFFFF\n",
+                    "description": "Send Command\n",
+                    "uuid": "{4c455565-dffa-4df0-85fe-8b152d5895a1}"
+                },
+                {
+                    "command": ".sppsc,n=2\n",
+                    "description": "Set Config\n",
+                    "uuid": "{f3ab7aaf-295c-4fbd-860f-bcb5eafec6a3}"
+                },
+                {
+                    "command": ".sppgc\n",
+                    "description": "Get Config\n",
+                    "uuid": "{30cbf0c8-fb41-4d2b-9bf1-260f0e11c60b}"
+                }
+            ],
+            "name": "SPP",
+            "uuid": "{dbd7b386-71af-41e6-8d59-046c8e996b1e}"
+        },
+        {
+            "commands": [
+            ],
+            "name": "Custom1",
+            "uuid": "{3e231ba1-399d-435b-868c-6ac835eb367b}"
+        },
+        {
+            "commands": [
+            ],
+            "name": "Custom2",
+            "uuid": "{7f6e2545-5fa0-4eea-b84c-b00aee07819f}"
+        },
+        {
+            "commands": [
+            ],
+            "name": "Custom3",
+            "uuid": "{648b4673-64a3-4e23-9449-2dfc5aa69387}"
+        },
+        {
+            "commands": [
+            ],
+            "name": "Custom4",
+            "uuid": "{6bab310e-9b15-4ed5-acf1-0208abef42d2}"
+        }
+    ]
+}

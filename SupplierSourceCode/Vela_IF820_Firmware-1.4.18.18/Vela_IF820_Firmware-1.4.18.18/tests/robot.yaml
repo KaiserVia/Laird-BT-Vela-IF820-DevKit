@@ -1,0 +1,34 @@
+tasks:
+  Run All Tests:
+    shell: python -m robot --report NONE --outputdir output --logtitle "Vela IF820 EZ-Serial Tests" 01_system_commands.robot 10_if820_ble.robot 20_if820_cyspp.robot 30_spp_VelaIF820-VelaIF820.robot 40_cyspp_BT900-VelaIF820.robot 50_spp_VelalF820-BT900.robot 60_spp_BT900-VelalF820.robot
+
+  IF820 BLE Central and Peripheral Tests:
+    shell: python -m robot --report NONE --outputdir output --logtitle "IF820 BLE" 10_if820_ble.robot
+
+  IF820 Module Manufacturing Test:
+    shell: python -m robot -T -L DEBUG:INFO --report NONE --outputdir mfg_output --logtitle "IF820 Manufacturing Test" 98_if820_mfg_test.robot
+
+  Ping Test:
+    robotTaskName: Ping
+
+  Soft Reboot:
+    robotTaskName: Reboot
+
+  Factory Reset:
+    robotTaskName: Factory Reset
+
+condaConfigFile: conda.yaml
+
+environmentConfigs:
+  - conda.yaml
+
+artifactsDir: output
+
+PATH:
+  - ..
+PYTHONPATH:
+  - ..
+  - ../common_lib
+
+ignoreFiles:
+  - ../.gitignore

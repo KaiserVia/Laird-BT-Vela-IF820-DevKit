@@ -1,0 +1,6 @@
+hci==0.0.8
+intelhex==2.3.0
+pyinstaller==6.18.0
+pyocd==0.42.0
+pyserial==3.5
+wxPython==4.2.4

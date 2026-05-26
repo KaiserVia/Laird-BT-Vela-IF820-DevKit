@@ -1,0 +1,103 @@
+{
+    "groups": [
+        {
+            "commands": [
+                {
+                    "command": "/ping",
+                    "description": "module responding?",
+                    "uuid": "{a3f164ee-dbf9-450f-9a9b-120ea1e92d9e}"
+                },
+                {
+                    "command": "/rfac",
+                    "description": "factory default",
+                    "uuid": "{1e29a99a-2ed1-4128-882b-964e5406c729}"
+                },
+                {
+                    "command": "/scfg",
+                    "description": "store config",
+                    "uuid": "{014b9b01-c6a1-45ff-ab8e-36f75b355143}"
+                },
+                {
+                    "command": "/rbt",
+                    "description": "reboot",
+                    "uuid": "{a82ae324-e0ae-4c34-8e6f-18dd61775c1f}"
+                },
+                {
+                    "command": "gsbp",
+                    "description": "get security settings",
+                    "uuid": "{2284e9a9-004f-4cdb-bbeb-4c3def2d6474}"
+                }
+            ],
+            "name": "Incoming Just Works config",
+            "uuid": "{c4264686-6edb-4a5b-916a-49ce17d8d7a9}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/ping",
+                    "description": "module responding",
+                    "uuid": "{0ecae6b1-84c8-461e-9e9f-531c8ff330ff}"
+                },
+                {
+                    "command": "/rfac\t",
+                    "description": "factory default",
+                    "uuid": "{86714904-25e2-444d-a9ff-f5d0c4634b0e}"
+                },
+                {
+                    "command": "ssbp,m=51,b=0,k=10,p=0,i=00,f=01",
+                    "description": "set security parameters",
+                    "uuid": "{8ffbd7f2-ba10-43d5-8838-1f3f6653340e}"
+                },
+                {
+                    "command": "/scfg\t",
+                    "description": "store config",
+                    "uuid": "{9a2d65be-25c3-4fb9-a5c8-7a482ff9910b}"
+                },
+                {
+                    "command": "/rbt",
+                    "description": "reboot",
+                    "uuid": "{fb700da7-14fd-41b5-8096-7cf46d345de6}"
+                },
+                {
+                    "command": "gsbp\t",
+                    "description": "get security parameters",
+                    "uuid": "{a9a0ec1c-ccf9-44c3-ab88-7a0f75369810}"
+                }
+            ],
+            "name": "Incomming IOCAP Config",
+            "uuid": "{5615680b-f233-44ba-bd5b-8a45fedf3a57}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "data from IF820",
+                    "description": "send data from IF820",
+                    "uuid": "{97959c3e-3b83-4c18-8896-fa088406ec10}"
+                },
+                {
+                    "command": "more data from IF820",
+                    "description": "send more data from IF820",
+                    "uuid": "{34b1e567-1bcf-409c-a27c-1bc0593d3ecd}"
+                }
+            ],
+            "name": "Incomming Just Works Connection",
+            "uuid": "{eabdf5b8-bdd7-4abf-92d0-0b77dc71b011}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "data from IF820",
+                    "description": "data sent from IF820",
+                    "uuid": "{e7f2a402-47cb-4eb3-b32a-ca76ffa54cb1}"
+                },
+                {
+                    "command": "more data from IF820",
+                    "description": "more data sent from IF820",
+                    "uuid": "{97a6d3fb-3fba-41e9-ac25-012fb4006bce}"
+                }
+            ],
+            "name": "Incomming IOCAP Connection",
+            "uuid": "{679e523e-0847-4d6e-a2f2-76a6998147a7}"
+        }
+    ]
+}

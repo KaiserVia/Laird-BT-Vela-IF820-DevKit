@@ -1,0 +1,56 @@
+name: Build Host Tools
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest]
+        python-version: ["3.14"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          token: ${{secrets.RFPROS_TOKEN}}
+          submodules: recursive
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build flasher tools
+        run: |
+          python -m PyInstaller if820_flasher_cli.spec
+          python -m PyInstaller if820_flasher_gui.spec
+
+      - name: Get version
+        id: get_version
+        run: |
+            $version = python -c "import if820_flasher_cli; print(if820_flasher_cli.VERSION)"
+            echo "CLI_VERSION=$version" >> $env:GITHUB_OUTPUT
+            $version = python -c "import if820_flasher_gui; print(if820_flasher_gui.VERSION)"
+            echo "GUI_VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: if820_flasher_cli-${{ runner.os }}-v${{ steps.get_version.outputs.CLI_VERSION }}
+          path: dist/if820_flasher_cli*
+
+      - name: Upload GUI artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: if820_flasher_gui-${{ runner.os }}-v${{ steps.get_version.outputs.GUI_VERSION }}
+          path: dist/if820_flasher_gui*

@@ -1,0 +1,81 @@
+{
+    "groups": [
+        {
+            "commands": [
+                {
+                    "command": "/ping",
+                    "description": "module responding",
+                    "uuid": "{a88a6d9f-9afc-4216-9881-371f29c9c07b}"
+                },
+                {
+                    "command": "/rfac",
+                    "description": "factory default",
+                    "uuid": "{65ee6f00-9930-424d-82ff-0fb6139717d8}"
+                },
+                {
+                    "command": "/ping",
+                    "description": "module responding",
+                    "uuid": "{4859e5f3-84d9-441a-83a9-e7fc4f7897f4}"
+                },
+                {
+                    "command": "gbtpin",
+                    "description": "get current PION",
+                    "uuid": "{bd1044e7-25aa-4664-a74d-052e4260b11a}"
+                },
+                {
+                    "command": "sbtpin,p=31323334",
+                    "description": "set new PIN",
+                    "uuid": "{c24ce623-ac9d-4229-b24b-7a99631b7955}"
+                },
+                {
+                    "command": "gbtpin",
+                    "description": "check new PIN",
+                    "uuid": "{686eccd0-48f0-4d08-ac96-9191aa6a674d}"
+                },
+                {
+                    "command": "/scfg",
+                    "description": "store config",
+                    "uuid": "{ab9d1502-8fa0-45a4-86ba-020b0fce9984}"
+                },
+                {
+                    "command": "/rbt",
+                    "description": "reboot",
+                    "uuid": "{82607f35-6602-421b-9df7-85f4fc72d12d}"
+                }
+            ],
+            "name": "Outgoing Config",
+            "uuid": "{a267c144-96c2-4f19-b9b0-6e97da7228b5}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "/bti,d=14,f=0",
+                    "description": "start inquiry",
+                    "uuid": "{a025c282-3097-4b9b-8541-b1309836368a}"
+                },
+                {
+                    "command": "/btix",
+                    "description": "end inquiry (optional)",
+                    "uuid": "{ef86a85c-7dd5-482b-9944-e1492544b88d}"
+                },
+                {
+                    "command": "/btc,A=0016A40499CB,t=1",
+                    "description": "connect to address (fron inquiry scan)",
+                    "uuid": "{16e9e440-18da-45d1-9a2c-5ae9780bde43}"
+                },
+                {
+                    "command": "text data fro IF820",
+                    "description": "data to be sent",
+                    "uuid": "{198ed942-19a9-4d3f-80c3-78f5198bd0d1}"
+                },
+                {
+                    "command": "more text data from IF820",
+                    "description": "more text data to be sent",
+                    "uuid": "{7cee9420-2ba1-44ed-ae77-02d62ff22201}"
+                }
+            ],
+            "name": "Outgoing Connection",
+            "uuid": "{c4264686-6edb-4a5b-916a-49ce17d8d7a9}"
+        }
+    ]
+}

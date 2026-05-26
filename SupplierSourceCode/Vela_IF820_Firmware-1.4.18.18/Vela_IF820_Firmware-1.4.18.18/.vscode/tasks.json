@@ -1,0 +1,154 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Flash EZ-Serial [no chip erase]",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "if820_flasher_cli.py",
+                "-f",
+                "${config:ezserial_firmware}",
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Flash EZ-Serial [with chip erase]",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/if820_flasher_cli.py",
+                "-f",
+                "${config:ezserial_firmware}",
+                "-ce"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Flash EZ-Serial HCD firmware",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/if820_flasher_cli.py",
+                "-f",
+                "${config:ezserial_hcd_firmware}",
+                "-ce"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run chip erase",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/if820_flasher_cli.py",
+                "-ce"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run BLE Sample",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/sample_${input:ble_sample}.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run CYSPP IF820 -> IF820",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/sample_cyspp_IF820-IF820.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run CYSPP BT900 -> IF820",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/sample_cyspp_BT900-IF820.py",
+                "-cc",
+                "${config:comport_BT900_device1}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run CYSPP IF820 -> BT900",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/sample_cyspp_IF820-BT900.py",
+                "-cp",
+                "${config:comport_BT900_device1}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run SPP IF820 -> IF820",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/sample_spp_IF820-IF820.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run SPP IF820 -> BT900",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/sample_spp_IF820-BT900.py",
+                "-cp",
+                "${config:comport_BT900_device1}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Run SPP BT900 -> IF820",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/sample_spp_BT900-IF820.py",
+                "-cc",
+                "${config:comport_BT900_device1}",
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Ping",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "sample_ping.py"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Reboot Loop",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "sample_reboot_loop.py"
+            ],
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "ble_sample",
+            "description": "The name of the BLE sample to run",
+            "type": "pickString",
+            "options": [
+                "advertiser",
+                "custom_gatt",
+                "advertiser_tx_power",
+            ],
+            "default": "advertiser",
+        },
+    ]
+}

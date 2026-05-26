@@ -1,0 +1,61 @@
+{
+    "groups": [
+        {
+            "commands": [
+                {
+                    "command": "/ping",
+                    "description": "module responding",
+                    "uuid": "{d0d96f92-7497-4338-9c43-e9adaad4af29}"
+                },
+                {
+                    "command": "/rfac",
+                    "description": "factory default",
+                    "uuid": "{c138ef9c-e426-445f-b769-51d356806637}"
+                },
+                {
+                    "command": "/ping",
+                    "description": "module responding?",
+                    "uuid": "{58186657-6e74-4253-aac9-783755ed50aa}"
+                },
+                {
+                    "command": "gbtpin",
+                    "description": "get current PIN",
+                    "uuid": "{59bd66ad-172a-4c22-a248-28580dc60f43}"
+                },
+                {
+                    "command": "sbtpin,p=31323334",
+                    "description": "set new PIN",
+                    "uuid": "{7c6c7e25-3418-4104-844c-a7c79220f820}"
+                },
+                {
+                    "command": "/scfg",
+                    "description": "store config",
+                    "uuid": "{283836c2-5652-4ded-a41c-2cac617db790}"
+                },
+                {
+                    "command": "/rbt",
+                    "description": "reboot",
+                    "uuid": "{2b416c68-7960-4e49-a5c6-73e0fefdde3d}"
+                }
+            ],
+            "name": "Incoming Config",
+            "uuid": "{c4264686-6edb-4a5b-916a-49ce17d8d7a9}"
+        },
+        {
+            "commands": [
+                {
+                    "command": "text data from IF820",
+                    "description": "text data from IF820",
+                    "uuid": "{33747ac7-9203-4db1-b209-228b87de57e8}"
+                },
+                {
+                    "command": "more text data from IF820",
+                    "description": "more text data from IF820",
+                    "uuid": "{9da0f004-cd15-43b6-abed-90aad353ba28}"
+                }
+            ],
+            "name": "Incoming Conection",
+            "uuid": "{2fb6f68a-bb77-4c68-980f-40e27c696c3e}"
+        }
+    ]
+}
