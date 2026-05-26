@@ -15,7 +15,7 @@ import textwrap
 import os
 import sys
 sys.path.append('./common_lib/libraries')
-from If820Board import If820Board
+from If820Board import If820Board, IF820_FW_CFG
 from HciProgrammer import HciProgrammer
 
 LOG_MODULE_HCI_PORT = 'hci_port'
@@ -72,11 +72,11 @@ if __name__ == '__main__':
     if com_port:
         input("Ensure the board is in HCI download mode and press enter to continue...")
         p = HciProgrammer(mini_driver, com_port,
-                          HciProgrammer.HCI_DEFAULT_BAUDRATE, chip_erase)
+                          HciProgrammer.HCI_DEFAULT_BAUDRATE, chip_erase, IF820_FW_CFG)
         if args.debug:
             logging.getLogger(LOG_MODULE_HCI_PORT).setLevel(logging.DEBUG)
         p.program_firmware(
-            HciProgrammer.HCI_FLASH_FIRMWARE_BAUDRATE, firmware, chip_erase)
+            IF820_FW_CFG.hci_flash_baudrate, firmware, chip_erase, IF820_FW_CFG)
     else:
         boards = If820Board.get_connected_boards()
         if len(boards) == 0:
