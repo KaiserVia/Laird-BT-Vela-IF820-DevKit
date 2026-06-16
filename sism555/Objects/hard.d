@@ -1,0 +1,15 @@
+.\objects\hard.o: hard.c
+.\objects\hard.o: hard.h
+.\objects\hard.o: alilpc.h
+.\objects\hard.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h
+.\objects\hard.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h
+.\objects\hard.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stdint.h
+.\objects\hard.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmInstr.h
+.\objects\hard.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmFunc.h
+.\objects\hard.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h
+.\objects\hard.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h
+.\objects\hard.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stddef.h
+.\objects\hard.o: btio.h
+.\objects\hard.o: ramcode.h
+.\objects\hard.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
+.\objects\hard.o: sictxt.h

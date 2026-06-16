@@ -1,0 +1,458 @@
+Release Datei für Steuersoftware Viasis 3003M bzw. 3004
+
+Hardware: 	Viasis 3003M Hauptplatine Revision ab H6, Funkmodem Platine SIS3003M-GSM-GPS-MODUL_V6, LED Platine LED-3004LV-A
+Prozessor:	LPC1766 Firma NXP
+
+Upload Methode: a) Erstprogrammierung mit Flash programmer software Flash Magic
+		zusammen mit Hexdatei *.hex
+		b) Reprogrammierung über USB client Schnittstelle (USB-stick), erfolgt
+		automatisch wenn sich korrekte Seriennummer-Firmware Datei (z. B. 12SC0001.BIN)
+		oder Globaldatei (SC_ALL.BIN) beim Einstecken auf dem USB Stick im Viasis Ordner befindet.
+		c) Reprogrammierung über serielle Schnittstelle RS232, BT, USB Host über
+		Menü-Schnittstelle Testfunktionen - CTRL U
+
+Firmware Version 5.00 vom 25.6.2019
+Hardware: siehe oben
+Erstversion der viacloud fähigen viasis Firmware.
+Was noch fehlt ist die viaspeedcam Unterstützung.
+Programmdateien:
+- sism500_d-f-i.BIN und .HEX, deutsch, französisch, italienische Sprachversion
+- Sism500_d-f-i_kry.BIN und .HEX, dto. Sprachversion für Krycer OEM
+- Sism500_d-f-pl.BIN und .HEX, deutsch, französisch, polnische Sprachversion
+- Sism500_e-f-nl.BIN und .HEX, englisch, französisch, holländische Sprachversion
+- Sism500_e-f-nl_kry.BIN und .HEX, dto. Sprachversion für Krycer OEM
+- Sism500_e-f-nl_pol.BIN und .HEX, dto. Sprachversion für POL BV OEM
+- Sism500_e-f-slo.BIN und .HEX, englisch, französisch, slowenische Sprachversion
+- Sism500_e-es-pt.BIN und .HEX, englisch, spanisch und portugiesische Sprache
+
+Firmware Version 5.01 vom 23.9.2019
+Hardware: siehe oben
+- mit viaspeedcam Unterstützung, Aktivierung im Werkmenü  
+- TLS Zertifikatsaustausch
+- default MQTT-Server: cloud.viatraffic.com
+- Wiederholung der UC15 Erkennung bei Fehler beim Programmstart erweitert
+- MQTT-Nachrichten-Empfang in MQTT Connect Task verlagert
+
+Firmware Version 5.02 vom 30.10.2019
+Hardware: siehe oben
+- Verhalten bei GSM Verbindungsfehlern und Abbrüchen geändert.
+  Modem wird konsequenter abgeschaltet.
+- Fehlerbearbeitung erweitert, bei Fehlern mit Zustandwert, wird
+  bei Terminalverbindung zusätzlich ein Zustandwert ausgegeben z. B. I2C device error 22
+- Änderung am 4.11.2019 Gerät startet im Online Modus bei viaspeedcam Aktivierung
+
+Programmdateien wie unter 5.00
+
+Firmware Version 5.03 vom 29.11.2019
+Hardware: siehe oben
+Erweiterung: 
+- Firmware Update aus der Cloud ist möglich (Bug, siehe Version 5.08)
+- Aktivierung des Online Messmodus bei viaspeedcam viasis PLUS erst nach 'T' Zeitabfrage - verhindert
+  Matrix Controller Fehler 1100 wenn Zeitabfrage durch Online Messmodus nicht beantwortet wird.
+Bugbereinigung ohne Änderung der Versionsnummer am 5.12.2019
+- Debug Terminal GSM Funkmodem (und GPS, BT)  erzeugt lokales Echo, keine korrekte
+AT Befehlseingabe möglich. Keine Kundenfunktion - daher kein Versionsupdate.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.04 vom 06.01.2020
+Hardware: siehe oben
+Änderung: 
+- Identische Ein- und Ausschaltzeit für das GSM Funkmodem wird nicht mehr angenommen
+Bugbereinigung:
+- viasis meldeten sich nach dem Einschalten nicht zuverlässig in der cloud an
+- Mehrfach Speicher voll Alarm Emails und SMS unterbunden
+Programmdateien wie unter 5.00
+Achtung; Beim Update dieser Firmware Version 5.04 müssen nach dem Update die Messdaten unbedingt 
+manuell gelöscht werden, dies geschieht nicht automatisch. Sonst können im viacloud Betrieb 
+ungültige Messdaten (tatsächlich vom Firmware Update überschrieben) eingeliefert werden.
+
+Firmware Version 5.05 vom 31.01.2020
+Hardware: siehe oben, keine Änderung
+Bugbereinigung - Batterie-Spannungsmessung wird bei Unterspannung fortgeführt
+Zeitzonen Management geändert
+a) Bewertung von Zeit-/Datumseingaben auf Sommerzeit, setzen fp.sz (Sommerzeitflag) nur noch
+bei aktivierter Sommer-/Winterzeitumstellung. (für nicht cloud verwalteten Betrieb)
+b) Automatische Anpassung des Zeitzonenoffsets fp.utc nur bei aktivierter Sommer-/Winterzeitumstellung 
+Programmdateien wie unter 5.00 
+
+Firmware Version 5.06 vom 19.02.2020
+Hardware: siehe oben, keine Änderung
+Bugbereinigung - Ist der beim Abschalten gesicherte Parameterblock im externen Flash fehlerhaft, wird
+beim Einschalten, die beim letzten Einschalten im Prozessor gesicherte Parameterblock Kopie verwendet.
+Dieser Parameterblock enthält veraltete Messdatenzeiger des letzten Einschaltens. Bei 230V und Solar-
+betrieb können dadurch erhebliche Differenzen zwischen MQTT Versandzeiger und veraltetem Messdatenzeiger
+entstehen und ungültige Messdaten in die viacloud eingeliefert werden. Im Falle eines ungültigen 
+Parameterblocks wird jetzt der veraltete Messdatenzeiger mit einer ständig aktuellen Sicherungskopie des 
+Messdatenzeigers im NV SRAM des CPU RTC Blocks beim Einschalten ersetzt. 
+Programmdateien wie unter 5.00 
+
+
+Firmware Version 5.07 vom 03.03.2020
+Hardware: siehe oben, keine Änderung
+Änderung:	Im MQTT-Serverbetrieb erfolgt keine Protokollierung und Ausgabe des Fehler 11 = Speicher voll.
+Im Cloud Betrieb wird der Speicher nie geleert, daher erfolgen nach Erreichen des Vollzustands, überflüssige
+und störende Protokollmeldungen die auch in die viacloud übermittelt und dort protokolliert werden.
+Programmdateien wie unter 5.00 
+
+Firmware Version 5.08 vom 30.04.2020
+Hardware: siehe oben
+Bugbereinigung: 
+- Firmware Update aus der Cloud funktioniert jetzt und
+ist mit viacloud getestet, Bugs beim Firmware Update in 
+Versionen 5.03 bis 5.07 sind behoben.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.09 vom 07.05.2020
+Hardware: siehe oben
+Bugbereinigung:
+- Sicherungskopie der CPU Flash Parameter wurden nicht bei jedem Einschalten aktualisiert. 
+Alte Einstellungsstände tauchten bei fehlerhaftem Lesen des Atmel Flash wieder auf. 
+Programmdateien wie unter 5.00
+
+Firmware Version 5.10 vom 26.05.2020
+Hardware: siehe oben
+Bugbereinigung:
+Feste Paketgröße für MQTT-Messdatenversand programmiert, da vereinzelt die Paketgröße und der
+Interval/Echzeitdatenmodus nach Firmware-Updates auf Null gesetzt waren und in Folge beim
+ersten Datenversand mit Paketgröße=0 ein Watchdog reset auftritt und das Gerät damit aus der 
+viacloud verschwindet und nicht wieder anmeldet.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.12 vom 24.06.2020
+Hardware: siehe oben
+Bugbereinigung: Nach Watchdog reset wird der Betrieb normal fortgesetzt. Im Betrieb in der viacloud
+melden sich die Geräte nach einem Watchdog reset wieder an.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.13 vom 17.07.2020
+Hardware: siehe oben
+Bugbereinigung: Bei einem MQTT Kommunikationsfehler wird beim Verbindungsabbruch ein Flag nicht zurück 
+gesetzt das die Wiederherstellung der MQTT Verbindung blockiert.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.14 vom 30.07.2020
+Hardware: siehe oben
+Bugbereinigung: Wiederverbindungen bei abgebrochenen Verbindungen funktionierte nicht sicher.
+Watchdog Reset Bearbeitung geändert.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.16 vom 03.09.2020
+Hardware: siehe oben
+Änderungen: Maßnahmen zur Verbesserung der Programmstabilität
+Anzeige Interrupt während Datenspeicherung gesperrt
+Programmdateien wie unter 5.00
+
+Firmware Version 5.17 vom 18.09.2020
+Hardware: siehe oben
+Änderungen: Maßnahmen zur Verbesserung der Programmstabilität
+Anzeige Interrupt während Anzeige-Refresh des Hauptprogramms gesperrt
+Programmdateien wie unter 5.00
+
+Firmware Version 5.18 vom 22.10.2020
+Hardware: siehe oben
+Bei Funkmodem Verbindungsabbruch wurden Daten- und Parameterversand
+nicht schnell genug beendet, was zu einem Watchdog Reset führen kann.
+Speicher/Versandzeiger wurden beim Firmware Update von nachgerüsteten 
+Hauptplatinen nicht korrekt initialisiert, Geräte sendeten keine Daten
+in die viacloud. Daher recompile der 5.18 Version am 14.10.20 ohne
+Versionsänderung.
+Richtige Versionsnummer 5.18 statt 2.18 am 22.10.20 compiliert
+Programmdateien wie unter 5.00
+
+
+Firmware Version 5.19 vom 30.10.2020
+Hardware: siehe oben
+Probleme nach Verbindungsabbrüchen während Datenversand behoben, MQTT Verbindung
+wird geschlossen, Modem abgeschaltet. Verbindung nach 3 Minuten erst wieder ausfgebaut.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.20 vom 18.11.2020
+Hardware: siehe oben
+Änderung: Auf Kundenwunsch folgt auf Viasis Anzeige 188 und Batteriespannung die Anzeige Smiley 
+gut = kein Startfehler oder Smiley traurig = Einschaltfehler, z. B BT, GSM, GPS Funkmodem nicht 
+gefunden, I2C Fehler aller Art oder auch Werkinitialiserung (da diese im Normalbetrieb nicht vorkommen 
+sollte).
+Programmdateien wie unter 5.00
+
+Firmware Version 5.21 vom 24.11.2020
+Hardware: siehe oben
+Bugbereinigung:	Schließen der MQTT-Verbindung bei schlechten Verbindungen und sehr langsamer Datenübertragung 
+funktioniert nicht korrekt.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.22 vom 11.12.2020
+Hardware: siehe oben
+Bugbereinigung:	Probleme bei Verbindungsabbrüchen 
+Programmdateien wie unter 5.00
+
+
+Firmware Version 5.23 vom 11.02.2021
+Hardware: siehe oben
+Änderungen:
+- Bugbereinigung: Bei Einstellung täglicher Email Versand funktionierte der Menü zurück Aufruf nicht.
+		  Nachträgliche Änderung der e-cz-sl Version am 16.03.2021, nachdem bei der Symbolgruppen 		  	  Neudefinition im Menü ein Löschen des Symbolnamens in der nächsten Symbolgruppe 		 		  verursachte.	
+- Änderungen: 	Stündliche Überprüfung und Auslesen des I2C Schnittstellenexpanders
+		Bei MQTT-Server Betrieb Anahme eines GSM dial in Calls gesperrt.
+		Für den MQTT Connect wird fix die Seriennummer und secret für MQTT user und pass verwendet
+Programmdateien wie unter 5.00 
+
+Firmware Version 5.24 vom 31.03.2021
+Hardware: siehe oben
+Änderungen:	- Schnellere Einlieferung von Offline gespeicherten Daten (30k/min statt 5k/min) ohne
+		Unterbrechung(Disconnect/Connect) der MQTT-Verbindung.
+		- gsmpower() wird nur noch aus Haupthtread aufgerufen, bzw. ist der Aufruf bei aktivem Thread                 blockiert.
+		- Schnellere Beendigung des MQTT-Connect Thread bei gescheitertem/Modem blockiertem Connect
+Programmdateien wie unter 5.00
+
+Firmware Version 5.25 vom 13.04.2021
+Hardware: siehe oben
+- Erweiterung:	Abfrage der ICCID Nummer der SIM Karte wird unterstützt
+Programmdateien wie unter 5.00	
+
+Firmware Version 5.26 vom 10.05.2021
+Hardware: siehe oben
+Änderungen: 
+- Prüfung von Registrierungs- und MQTT-Thread auf vollständigen letzten Durchlauf. Ggf. Neustart
+der Threads bei unvollständiger Ausführung
+- Bluetooth Verbindung Zeitlimit von 90 Minuten eingeführt
+Programmdateien wie unter 5.00 
+
+Firmware Version 5.27 vom 10.06.2021
+Hardware: siehe oben
+Änderungen: 
+- Erweiterte Debug Protokoll Funktionen geändert
+- Stündliche Abfrage I2C Interface Expander entfernt
+Bugbereinigung
+- Alle I2C Zugriffe aus Routinen entfernt, die in Threads benutzt werden. Diese könnten die
+Ursache für Programmabstürze(Watchdog Error) und I2C Busblockaden gewesen sein.
+- Im offline Datenversand korrekte Abmeldung (wieder-) hergestellt
+
+Firmware Version 5.28 vom 27.07.2021
+Hardware: siehe oben
+Bugbereinigung:
+ - Readline Routine geändert. Eingaben in den Textfeldern(apn, euser, server, ...) konnten nachfolgende
+Textfelder löschen.
+Programmdateien wie unter 5.00
+
+Firmware Versionsupdate 5.28 am 11.08.2021
+Erweiterung der implementierten Debug Funktionen um Level 5 (Neustart GPS Positionsbestimmung nach
+Fehler 701 GPS Fix Time Error, d.h. GPS Abschaltung nach 60min Positionsbestimmung ohne Erfolg, wird
+aufgehoben und GPS Messung wieder aktiviert) und Level 6 (Inaktive GPS Interface Typ 2 können wie im
+Werkmenü im cloud Betrieb aktiviert werden). GPS Intervall wird jetzt im versteckten radio menu mit 
+<STRG> F Aufruf mit ausgegeben.
+Da diese Funktionen keinerlei Relevanz für den übrigen Betrieb haben und bei fehlender Implementierung
+durch einen erneuten Update aktiviert werden können, gibt es keine neue Versionsnummer.
+
+Firmware Version 5.29 vom 17.09.2021
+Hardware: siehe oben
+Änderung: Aufgrund häufiger auftretender Fehler beim Lesen/Speichern von Parametern und Messdaten (-0;55;55;55...
+wurde ein größere Einschaltverzögerung zum Auslesen gespeicherter Parameter und Daten eingebaut und ein
+häufigere Wiederholung beim fehlerhaftem Lesen des Flash.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.30 vom 17.12.2021
+Hardware: siehe oben
+Erweiterung: 
+1. Unterstützung des Quectel GSM/LTE Funkmodems EG91, das Quectel UC15 wird weiter unterstützt, das Quectel M10 nicht mehr
+Da die GPS Funktion des EG91EX im Vergleich zum L70 schlechter funktioniert, wird das GPS Modul L70 trotzdem immer bestückt sein
+2. Die im neuen viacloud release gesendeten CRC Prüfsummen werden zur Prüfung ausgespielter Parameter und PLUS Daten verwendet
+3. Bugbereinigung: Es werden UTC Zeitoffsetwerte aus der cloud von -11 bis +14 angenommen (Neuseeland und Tonga + Sommerzeit)
+4. Neue Debug Funktionen werden unterstützt
+5. Bugbereinigung multiple Messungen pro Sekunde/schnelle Anzeigewechsel, die als Folge von Störungen die auf den Schnittstellen
+Expander einwirken, sind behoben.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.31 vom 07.02.2022
+Hardware: siehe oben
+Bugbereinigung:
+- Mit dem EG91 kommt es aufgrund des CPU-Sleeps zu kurzem Rücksetzen der EG91 power key Leitung.
+Zwischen Setzen der Simpin und GSM-Registrierung, verliert das EG91 den Registrierungsstatus wieder.
+Erweiterung: Automatischer Netzwerkscanmodus im Funknetzmenü auswählbar
+Programmdateien wie unter 5.00
+
+Firmware Version 5.32 vom 04.03.2022
+Bugbereinigung: Version 5.31 kann ggü. Vorgängerversionen im offline Messmodus eine um 25%
+erhöhte Stromaufnahme bei Geräten ohne Funkmodembetrieb haben, da der CPU Sleep nicht immer aktiviert wird.
+Erweiterte Auswertung der Funknetz Registrierung (CREG, CGREG, CEREG)
+Programmdateien wie unter 5.00
+
+Firmware Version 5.33 vom 04.04.2022
+Bugbereinigung: Bei 5.32 wird nach Setzen/Abfragen der Pinnummer im Funkmodemmenü, die DTR Leitung falsch als Eingang umkonfiguriert.
+Bei nachfolgender Konfiguration des SMTP Servers bzw. der Email wird auch wenn alles korrekt läuft, immer Server/Email Fehler ausgegeben.
+Änderung: Timeouts für Registrierungsstatus durch langsameren Abfragezyklus erhöht
+Programmdateien wie unter 5.00
+
+Firmware Version 5.33 vom 06.04.2022
+Bugbereinigung: Aufgrund von Funkmodem Startnachrichten die den Xmodem Transfer korrumpieren, scheiterte immer der Upload der 1. Zertifikatsdatei 
+im "Werkmenü - Component tests - Upload files to modem"
+Erweiterung: Für Produktion im Werkmenü - Component tests - LED Check für eine schnelle Funktionsprüfung aller LED hinzugefügt
+Da keine Kundenrelevanz beider Änderungen gibts keine neue Versionsnummer.
+
+Firmware Version 5.34 vom 27.04.2022
+Änderung: 
+Aufgrund von Kundenbeschwerden wg. sehr schlechter Erfassung von Fahrzeugen bei Regen und Gegenverkehr
+wurden die Verstärkereinstellungen und die max. Fehlertoleranz von gemessenen Dopplerperioden im Messpuffer
+geändert.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.35 vom 17.05.2022
+Änderungen:
+- Aufgrund von Debugging Tests von Watchdog reset Ereignissen ergibt sich die Notwendigkeit, die I2C Bausteine nach einem Watchdog Reset neu zu initialisieren,
+da der Registerinhalt insbesondere des IC37 PCA nach Reinitialisierung des I2C Busses korrumpiert ist.
+- Die MQTT Verbindungs-Thread Terminierung und Neuerstellung wurde entfernt, da aufgrund der Verlängerung der Verbindungstimeouts (APN und GPRS) bei schlechten
+Funkverbindungen kein Ergebnis vor dem nächsten Threadstart erreicht wurde. D. h. eine schlechte Funkverbindung wurde dann nicht abgebrochen und der Aufbau der
+GPRS/MQTT Verbindung in der Verbindungszeit immer wieder versucht.
+- Änderung der MQTT-Messdatensimulation - Umstellung von historischen auf aktuelle Zeitwerte - damit der Test zusammen mit dem Echtzeitmodus der cloud benutzt
+werden kann.
+
+Programmdateien wie unter 5.00
+
+Firmware Version 5.35 vom 05.07.2022
+-Keine Änderung der Versionsnummer, da Änderungen nicht kundenrelevant
+Ergänzungen für Produktion:
+- Sicherungsabfrage vor Schaltgruppendefinition eingefügt
+- 10.0 zweifarbige Anzeige ins LED Produktionstestmenü eingefügt
+
+Firmware Version 5.35 vom 04.08.2022
+-Keine Änderung der Versionsnummer, da Änderungen nicht kundenrelevant
+- Anzeige der Zahlen 18.8, 111, 10.0 in LED_check() auf Wunsch der Produktion auf
+zweifarbige Anzeige geändert.
+
+Firmware Version 5.35 vom 31.08.2022
+-Keine Änderung der Versionsnummer, da Änderungen eigentlich nicht kundenrelevant
+Änderung für Produktion:
+Bei Bluetooth und USB Verbindung funktioniert die Matrixanzeige aus dem Viamatrix Menü
+heraus. Die dem Matrix-Controller zugeführte PWM wird jetzt immer weiter geführt.
+
+Firmware Version 5.36 vom 16.09.2022
+Änderung: Alle 24h um 3:15 Nachts wird die CPU rebooted. Im Protokoll wird die Meldung Reboot eingetragen.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.37 vom 24.11.2022
+Änderung: Intervall der Statusmeldungen in cloud Verbindungen von 5 auf 4 Minuten gesetzt.
+Damit kommt es nicht mehr zu einem Leerlaufverbindungs-Timout der Datamobile APN Server bei UMTS und LTE Verbindungen.
+Neuverbindungs-Wartezeit nach MQTT Kommunikationsfehlern auf 1 Minute gesetzt.
+Bei Einschalten der erweiterten Cloud Debug Protokollierun wird mit Tname quittiert, OEM und Sprachvarianten können identifiziert werden.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.37 vom 03.03.2022
+Erweiterung: Cloud Debug Kommando 199 zur Deaktivierung von USB implementiert
+
+Firmware Version 5.38 vom 26.07.2023
+Erweiterungen/Änderungen:
+- Unterstützung für neue GPS-Module LC76F und LC76G eingebaut, da GPS Modul L70 von Quectel abgekündigt wurde. LC76 wird als GPS Typ 4 (fp.gps) erkannt.
+- Unterstützung für internes GPS Modul (vormals GPS Typ 3 = fp.gps) des EG91EXGA entfernt, da Empfangsempfindlichkeit zu schlecht.
+- Unterstützung für L70 an UART1 (fp.gps=1) und an UART2 (fp.gps=2) bleibt unverändert
+- Bugbereinigung für cloud Betrieb im viaspeedcam Modus - Bei der Registrierung im Funknetz wurde in 1 von 4 Fällen der Online Messmodus verlassen
+  danach wurde die speedcam nicht mehr mit Messwerten über die serielle Schnittstelle versorgt.
+- Bugbereinigung in atcpin Funktion. Bei SIM-Karten (z. B. von Data Republic CH) die die Reihenfolge der EG91 Einschaltmeldungen ändern (+CPIN: 
+statt +CFUN: zuerst) wird kein Abruch mit GSM/GPRS Fehler mehr erzeugt.
+- Neues cloud debug Kommando 15 - Messdatenspeicher zurücksetzen
+- Bugbereinigung im viaspeedcam Betrieb und LTE Funkmodem war nach 3 Minuten ohne eingesetzte SIM-Karte keine Eingabe mehr möglich, nach Versand der ersten Email
+  wurde die Eingabe-/Ausgabeschnittstelle geändert, so dass keine Messdaten mehr an die speedcam ausgegeben wurden und bei angeschlossenem Terminal auch keine Eingaben
+  mehr möglich waren
+Programmdateien wie unter 5.00
+
+Firmware Version 5.39 vom 20.02.2024
+Änderung:
+- Es wird eine Message-ID in den Email Header beim Versand der Email hinzugefügt.
+  Damit können Kunden mit Gmail Konten auch wieder viasis Emails empfangen.
+Programmdateien wie unter 5.00
+Programmdateien wie unter 5.00
+
+Firmware Version 5.40 vom 19.03.2024
+Änderungen:
+- Das noch fehlende DATE Email Header Feld wird jetzt beim Email Versand eingefügt.
+- Die Firmware unterstützt jetzt sowohl das bisherige Laird 730-SA als auch das RN4678APL BT Funkmodem.
+- Der BT Kopplungs-/Pairing Pin bei SPP ist default nicht mehr '1234', sondern die letzten 4 Ziffern der Seriennummer,
+  bei BLE alle 6 Ziffern der Seriennummer
+Programmdateien wie unter 5.00
+
+Firmware Version 5.40 vom 21.01.2025
+Die Versionsnummer gab es bereits siehe oben, die Firmware kam aber nicht zur Auslieferung an Kunden, sondern diente nur
+als Vorläufer der Version 5.41.
+Diese 5.40 Version basiert auf Version 5.39 ohne RN4678 Unterstützung und verwendet immer noch Pin "1234" für BT Kopplung.
+Bugbereinigung:
+LED Fleckenteppich Anzeigen durch MY9163 LED Treiber Fehlfunktion die durch parasitäre 3V3 Versorgung beim Einschalten des viasis3004 in diesen 
+Fehlerzustand geraten.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.42 vom 29.01.2025
+Firmware Version 5.40 zeigt offline keine gemessene Geschwindigkeit an und wird durch 5.42 ersetzt.
+Programmdateien wie unter 5.00
+
+Firmware Version 5.43 vom 07.02.2025
+Firmware Version 5.43 liefert im viacloud Betrieb beim Empfang eines GET_TIME Kommandos einen Zeitstring
+an den MQTT Server. Der Abruf der Gerätezeit kann ab viacloud Release 19 mit dem Hole Gerätezeit Button erfolgen.
+Nachbesserung 13.02.2025 - Bei Einschalten mit Verbindung (RS232, USB) konnte es zu flashenden LED Anzeigen kommen.
+Programmdateien wie unter 5.00 und sism543_e-es-i.bin/hex englisch-spanisch-italienische Sprachvariante.
+
+Firmware Version 5.44 vom 11.03.2025
+Firmware Version 5.44 sendet im viacloud Betrieb beim Empfang eines GET_TIME Kommandos mit QoS=0 kein PUBACK mit falscher Paketnummer,
+Damit wird am MQTT Server eine Warnungmeldung vermieden.
+Programmdateien wie bei 5.43
+
+*-------------------------------------------------------------------------------*
+Keine Firmware Updates vorgenannter Versionen mit nachfolgenden Versionen!
+Für Hauptplatinen mit Laird Funkmodem oben genannte Versionen verwenden.
+Für Hauptplatinen mit RN4678 dual mode (BLE=low energy und SPP=classic) nachfolgende Firmware verwenden
+
+Firmware Version 5.50 vom 18.07.2025
+- beim Update von Hauptplatinen mit älteren (Laird) Versionen stimmen Parameter(-block) allozierung weder im 
+  Flash noch im SRAM -> kein automatische Reboot, falsche Parameterwerte nach reboot, etc. Wer Probleme vermeiden 
+  will macht einen Firmware Update nur auf die Testsoftware. Sonst manuelle Werkinitialisierung und neu konfigurieren.
+- RN4678 dual mode (BLE=low energy und SPP=classic) sichtbar, verbinden ohne Pairing
+- 6-stellige Pinnabfrage erfolgt durch die Firmware nach dem Connect.
+- Deaktivierung der Bluetooth Schnittstelle nach 6 Minuten ohne Empfangsaktivität (Relevant bei Terminal)
+  Wolfgangs Apps (Android und IoS) machen nach 3 Minuten Dummyabfragen um eine Trennung der Verbindung zu
+  verhindern. Die erste Hauptplatinencharge hat noch keinen MosFET zur Bluetooth-Abschaltung.
+- Update am 22.07.2025 Bluetooth Menü der 2. und 3. Sprache korrigiert
+- Korrektur 25.07.25: Bei Bluetooth Verbindung erfolgt ein Rücksetzen des Menüs
+
+Programmdateien:
+- sism550_d-f-i.BIN und .HEX, deutsch, französisch, italienische Sprachversion
+- Sism550_d-f-pl.BIN und .HEX, deutsch, französisch, polnische Sprachversion
+- Sism550_e-f-nl.BIN und .HEX, englisch, französisch, holländische Sprachversion
+- Sism550_e-f-nl_kry.BIN und .HEX, dto. Sprachversion für Krycer OEM
+- Sism550_e-f-nl_pol.BIN und .HEX, dto. Sprachversion für POL BV OEM
+- Sism550_e-f-slo.BIN und .HEX, englisch, französisch, slowenische Sprachversion
+- Sism550_e-es-pt.BIN und .HEX, englisch, spanisch und portugiesische Sprache
+- Sism550_e-es-i.BIN und .HEX, englisch, spanisch und italienische Sprache
+
+Firmware Version 5.51 vom  24.10.2025
+- Anpassung der Bluetooth Schalt-MOSFET Ansteuerung auf pull-up/down passive Eingangssteuerung.
+Verlangsamt beim IRLML4601 das Durchschalten -> kein Spannungseinbruch auf 3V3, kein CPU Reset
+Programmdateien wie bei Version 5.50
+
+Firmware Version 5.52 vom  25.11.2025
+Bugbereinigung: Nach dem Reboot Neustart um 03:15Uhr antwortet das RN4678 Bluetooth Modem nicht auf die Testabfragen der CPU und wird
+deshalb aus der Liste der Interfaces ausgetragen. Danach ist eine Bluetooth Verbindung ohne Neustart des Geräts nicht mehr möglich. 
+Ursache ist ein sichtbarer Spannungseinbruch während des CPU-Reboot Resets durch die Default CPU Portkonfiguration in der geschalteten RN4678 
+Versorgung zusammen mit den Testabfragen.
+Workaround: Wird keine Testabfrage des Bluetooth Moduls nach dem Reboot durchgeführt, bleibt das RN4678 verbindbar.
+Programmdateien wie bei Version 5.50 
+
+Firmware Version 5.53 vom  16.01.2026
+Bugbereinigung: 
+1. Der in 5.52 wegen dem Bluetooth Modem durchgeführte Reboot führt ohne Interface Initialisierung dazu dass das Default RS232 
+Interface nach dem Reboot scheinbar verbunden ist -> Es wird nach dem ersten Reboot (03:15) keine MQTT Verbindung mehr aufgebaut.
+2. Sind mehr als 5k Messdaten (~100 Fahrzeuge) in die viacloud zu liefern, werden diese eingeliefert danach geht das Gerät aber
+nicht Online in der Cloud da es im Cloud Status DATACK (acknowledge) verbleibt und damit scheinbar bereits eine Verbindung zum
+MQTT Cloud Server besteht. Zu dieser Situation kann es kommen wenn Messdaten gesammelt werden ohne das diese sofort in die viacloud 
+liefern zu können.
+
+Programmdateien wie bei Version 5.50 
+
+Firmware Version 5.54 vom  16.01.2026
+Bugbereinigung: Version 5.53 führt beim Update der Versionen 5.50 bis 5.52 zu einer lauffähigen Elektronik,
+hängt sich aber bei Programmierung mit Flash Magic oder dem Update mit der Prüfsoftware auf. 
+Programmdateien wie bei Version 5.50 
+
+Firmware Version 5.55 vom  30.01.2026
+Änderungen: Die neue GPS Modul LC76G Variante (bisher zuletzt LC76F, GPS Typ 4) wird als GPS Typ 5 unterstützt.
+Die Unterstützung für die alten L70, L76F, ... Module die als GPS Typ 1 und 2 erkannt wurden wird eingestellt.
+Daher kann jetzt auch aus einer Bluetooth Verbindung auf die GPS Menü Datenausgabe (NMEA oder formattiert) 
+zugegriffen werden (da kein GPS Typ den Kanal MUX UART1 mehr nutzt).
+Programmdateien wie bei Version 5.50
+
+

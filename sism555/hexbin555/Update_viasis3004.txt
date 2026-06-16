@@ -1,0 +1,10 @@
+Firmware Update Schema für viasis 3004 Geräte 
+Stand: 04.02.2026
+
+- viasis 3004 Firmware 5.00 bis 5.44 wird mit Firmware Version 5.44 aktualisiert
+Bluetooth support für Laird 730-SA
+Cloud fähige Firmware mit integrierter speedcam Funktionalität.
+
+- viasis 3004 Firmware 5.50 bis 5.55 wird mit Firmware Version 5.55 aktualisiert
+Bluetooth support für Microchip RN4678 und GPS LC76G ab 5.55
+Cloud fähige Firmware mit integrierter speedcam Funktionalität

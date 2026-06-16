@@ -1,0 +1,16 @@
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver\I2C_LPC17xx.c
+.\objects\i2c_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\LPC17xx.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h
+.\objects\i2c_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stdint.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmInstr.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmFunc.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver\I2C_LPC17xx.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver\PIN_LPC17xx.h
+.\objects\i2c_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stdbool.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_I2C.h
+.\objects\i2c_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_Common.h
+.\objects\i2c_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stddef.h
+.\objects\i2c_lpc17xx.o: .\RTE\Device\LPC1768\RTE_Device.h
+.\objects\i2c_lpc17xx.o: .\RTE\_sism\RTE_Components.h

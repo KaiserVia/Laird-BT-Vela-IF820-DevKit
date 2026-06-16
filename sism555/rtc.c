@@ -1,0 +1,442 @@
+//-----------------------------------------------------------------------------
+//  FILE: rtc.c			PROJECT: sis3000M
+//-----------------------------------------------------------------------------
+//  COMMENTS:  Routinen für interne LPC1766 Echtzeituhr
+//-----------------------------------------------------------------------------
+//  HARDWARE:   sis3003-MB, version H2
+//-----------------------------------------------------------------------------
+//  VERSION :  0.01
+//-----------------------------------------------------------------------------
+//  CREATED :   06.11.2014
+//-----------------------------------------------------------------------------              
+//  AUTHOR :	JG
+//-----------------------------------------------------------------------------
+//  MODIFICATIONS:	22.04.2015:	Hardware version H1 -> H2
+//              	
+//-----------------------------------------------------------------------------
+
+#include "rtc.h"
+#include "hard.h"
+#include "i2cm.h"
+#include "sio.h"
+#include "sictst.h"
+#include "sicom.h"
+#include "libtool.h"
+#include "flash.h"
+#include "mqtt.h"
+#include "sictxt.h"
+
+void RTC_IRQHandler (void)						// RTC-Interrupt jede Sekunde oder Minute
+{
+	if (CIIR&IMSEC)	tsec=T1TC;					// Sekundeninterrupt, 1 MHz Timer 2 auslesen
+	else if (CIIR&IMMIN) minute++;	 		// Minutenzähler inkrementieren
+  while (ILR) ILR|=ILR;								// Reset Interrupt Location Register 
+}
+
+void InitRTC (void)				// Initialisierung der Echtzeituhr
+{
+ PCONP|= PCRTC;												// Interne Uhr (nochmal) einschalten
+ if (RTC_INIT_CODE != PARAKENNUNG)		// Uhr bereits initialisiert? 
+ {										
+  RCCR=0;															// Reset and halt clock 1 Hz oscillator
+  SEC=0; MIN=0;	HOUR=0;								// Reset time registers
+  DOM=1; MONTH=1; YEAR=2015;					// Reset date registers
+	DOW=0;															// Sonntag 
+  RCCR|=(CLKEN|CCALEN);								// Clock enable, disable Calibration
+	RTC_INIT_CODE = PARAKENNUNG;				// Parameter Kennung speichern 
+ }  
+ ILR|=ILR;														// Evtl. Anstehende Interrupts löschen
+ CIIR=IMMIN;													// Minuteninterrupt freigeben
+ 
+ NVIC_SetPriority(RTC_IRQn, 8);				// Priorität RTC Interrupt
+ NVIC_EnableIRQ(RTC_IRQn);						// Enable RTC Interrupt	
+}
+
+void read_date_time (uchar typ, char * Pc)// Zeit oder Datum in Übergabe-Puffer schreiben
+{ 												// Übergaben: 	typ - TIME, DATE_SHORT, DATE_LONG
+													// Übergabe 	Pc	- Zeiger auf Puffer
+ uchar i,l;								// Laufvariable	
+ ushort wert;							// Hilfvariable ausmakierter Zeit/Datumswert
+ uint rtcreg;							// Register Echtzeituhr					
+ char del;								// Delimiter
+ uchar digits=2;					// Anzahl Ausgabestellen
+ const char *pmask = &TimeDateMask[0];	// Pointer auf Array mit Maskeninformation 
+ 		
+ if ((typ==TIME)||(typ==TIME_HEX)||(typ==TIME_NODEL)) 		// Zeit lesen
+ { 
+  rtcreg=CTIME0; 	// LPC1766 Zeitregister lesen
+  del=TIME_DEL; 	// Delimiter festlegen
+  i=16;
+ }	  
+ else 		// Datum lesen
+ { 
+  rtcreg=CTIME1;	// LPC1766 Datumsregister lesen 
+  del=DATE_DEL; 	// Delimiter festlegen
+  pmask+=3; 
+  i=0; 
+ }	
+
+ if (Pc==cbuf) cind=0; 		// Zeiger auf cbuf Pufferanfang? Ja, reset Pufferindex
+ 
+ for (l=0;l<3;l++)						// 3 Zeit/Datumselemente senden/in Puffer schreiben 
+ {  	
+  wert=(rtcreg>>i)&mask(*pmask++);					// Registerwert
+  if ((l==2) && ((typ==DATE_HEX)||(typ==DATE_NODEL))) wert%=100;	// Bei Datum HEX oder NODEL kurzer Jahreswert
+  if (typ>=TIME_HEX) *Pc++=wert;						// Hexwerte nach Puffer  
+  else
+  {												// ASCII Ziffern in Puffer
+   if ((l==2) && (typ==DATE_LONG)) digits=4;	// Langes Datum 4 Ziffern Jahreswert
+   putnumber(wert,digits|0xC0);  				// Zeit/Datumselement maskieren und senden/in Puffer schreiben
+   if ((l<2) && (typ!=DATE_NODEL) && (typ!=TIME_NODEL)) putc(del);	// Delimiter senden/in Puffer schreiben 	
+  }
+  if ((typ==TIME)||(typ==TIME_HEX)||(typ==TIME_NODEL)) i-=8; else i+=8;	// Offset für Bitposition Zeit oder Datum
+ }
+}
+
+void send_date_time (uchar mode, uchar menu)	// RTC Datum, Zeit oder beides ausgeben
+{ 										// Übergabe mode 	- 0/1/2 für Datums-/Zeitausgabe oder beides
+											//					menu  - Menüpunktausgabe, 0 - keine
+											// Achtung cind offset auf cbuf Ausgabepuffer wirksam!!!
+ text *tp;												// Zeiger Ausgabetexte
+ int loop=mode;										// Schleifenhilfsvariable
+	
+ do
+ { 	 
+  if (loop&0x01) tp=T_time;				// Zeiger auf Zeittext
+	else tp=T_date;									// Zeiger auf Datumtext
+
+  if (mode<2) newline();					// neue Zeile
+	else if (loop<2) putstr(T_col);	// Komma und Leerzeichen zwischen Datum und Zeit 
+  if (menu) itemno (menu);				// Ausgabe Menüpunkt
+	putstr(tp);											// Datum oder Zeittext mit Doppelpunkt ausgeben
+	putstr(T_dpkt);	
+	if (loop&0x01) read_date_time (TIME, cbuf+cind);	// Zeit ausgeben 
+	else read_date_time (DATE_LONG, cbuf+cind);				// Datum ausgeben
+ }	 
+ while (--loop>0);							
+}
+
+uchar Zeit_falsch (char *line)   // Test der Eingabe von Stunde, Minute und Sekunde  
+{
+   if (atoi(line)>23) return (1);   // Stunde > 23 -> Fehler      
+ 
+   if(atoi(line+3)>59) return (1);  // Minute > 59 -> Fehler      
+
+   if (*(line+5)=='\0') return (0); // verkürzte Zeiteingabe      
+
+   if(atoi(line+6)>59) return (1);  // Sekunde > 59 -> Fehler     
+   
+   return (0);                      // Alles ok 
+}
+
+uchar Datum_falsch (char *line) // Teste Eingabe von Tag, Monat und Jahr
+{
+   uchar Tag,Monat;
+   uint Jahr;
+   
+   Tag = atoi (line);         // Ascii nach Hex Tag   
+   Monat = atoi (line+3);     // Ascii nach Hex Monat 
+   Jahr = atoi (line+6);      // Ascii nach Hex Jahr  
+   
+   if (Jahr<100) Jahr+=2000;	// Kurzes Jahresformat erweitern
+
+   if (Jahr < 2011 || Jahr > 2099) return (1); 	// Jahr von 2011 bis 2099 ok 
+
+   if (Tag < 1 || Tag > 31) return (1);     // Tage von 1 bis 31 gültig       
+
+   if (Monat<1||Monat>12) return (1);       // Monate von 1 bis 12 gültig     
+
+   if((Monat==4 || Monat==6 || Monat==9 || Monat==11) &&
+       Tag > 30) return (1);               // Monate mit nur 30 Tagen 
+
+   if (Monat==2) {                         // Monat Februar                  
+    if (Jahr%4 && Tag > 28) return (1);    // kein Schaltjahr -> 28 Tage     
+    else if (Tag > 29) return (1); }       // im Schaltjahr 29 Tage            
+
+   return (0);
+}
+
+int dayofweek(int dd, int mm, int yyyy)              	// Gibt Wochentag zurück
+																											// Übergaben dd/mm/yyyy	- Tag, Monat, Jahr unbedingt vierstellig
+{ 
+  int s=0, mtag[13]={0,31,28,31,30,31,30,31,31,30,31,30,31};    // Anzahl der Tage pro Monat
+  if ((yyyy % 4==0 && yyyy % 100!=0) || yyyy % 400==0) s=1;     // Schaltjahrescheck
+  if (yyyy<1583 || yyyy>9999) return(-1);                       // Jahr auf sinnvollen Bereich einschränken
+  if (mm<1 || mm>12) return(0);                                 // Monat auf Gültigkeit prüfen
+  if (dd<1 || dd>mtag[mm]+s*(mm==2)) return(0);                 // Tag auf Gültigkeit prüfen
+  if (mm < 3) { mm += 13; yyyy--; } else  mm++;                 // Jahresanfang auf März verschieben
+  s = dd + 26*mm/10 + yyyy + yyyy/4 - yyyy/100 + yyyy/400 + 6;  // eigentliche Berechnung
+		// Rückgabe:
+		// 1  = Sonntag, 2 = Montag, ... , 7 = Samstag
+		// 0  = Datum ungültig z.B. 29.2.2007, 32.12.2007
+		// -1 = Jahr kleiner als 1583 oder größer als 9999
+  return((s % 7) + 1);                                            // Ergebnis anpassen
+}
+
+int get_date_time (text *Pp, text *Pf, uchar len) 	// Datum oder Zeiteingabe vom Terminal prüfen
+{                                           	  
+ uchar ergebnis;		// Hilfsvariable Anzahl gelesener Zeichen
+ uchar delimiter='.';	// Zeit-/Datumstrennzeichen
+ 
+ if (len<10) delimiter=':';	// Zeittrennzeichen
+                     	    
+ do 	// Solange bis gültige Eingabe oder CR
+ {
+  putstr (Pp);
+	putstr (Pf); 
+  putstr(T_ist);
+  ergebnis = getline (cbuf,len,delimiter);	// Zeit-/Datum einlesen
+  newline();
+  if (ergebnis==len)
+  {
+   if (len==10) { if (!Datum_falsch (cbuf)) return (1); }	// Datum
+   else { if (!Zeit_falsch (cbuf)) return (1); }			// Zeit    
+  }       
+  if (!ergebnis) return (0);                // 0 = Eingabe Return           
+ }                                          // 1 = korrekte Zeit/ Datum 
+ while (1);
+}
+
+void set_time (char *tline)			// Setzt Zeit mit Pufferwerten
+{
+ uchar nsec=0;
+
+ if (*(tline+5)!='\0') nsec=atoi(tline+6); 	// Sekundenwert lange Zeiteingabe
+ 
+ RCCR=0;										// Reset and halt clock 
+ HOUR=atoi(tline);					// Stundenregister setzen
+ MIN=atoi(tline+3);					// Minutenregister setzen
+ SEC=nsec;									// Sekundenregister setzen
+ RCCR|=(CLKEN|CCALEN);			// Clock enable, no calibration
+}
+
+void set_date (char *dline)			// Setzt Datum mit Pufferwerten
+{
+ uint year;
+
+ RCCR=0;										// Reset and halt clock 
+ DOM=atoi(dline);						// Tagesregister setzen 
+ MONTH=atoi(dline+3);				// Monatsregister setzen
+ year=atoi(dline+6);				// Jahreswert lesen
+ if (year<100) year+=2000;	// Ggf. kurzes in langes Jahresdatum wandeln
+ YEAR=year;									// Jahresregister setzen
+ DOW=dayofweek(DOM, MONTH, YEAR)-1;  // Berechnet und setzt Wochentag
+ RCCR|=(CLKEN|CCALEN);			// Clock enable, no calibration	
+}
+
+void date_time (void)	// ASCII Zeit und Datumsstring lesen oder ausgeben
+{
+ int c;				// Empfangszeichen
+  
+ c=getc(MODEM_CHAR_TIMEOUT);		// warte auf Antwort
+
+ if (c<0)		// Timeout?
+ {
+	newline(); 
+  read_date_time (TIME, cbuf);				// Zeit in Puffer schreiben   
+  putc(';');													// Trennzeichen
+  read_date_time (DATE_SHORT, cbuf);	// Datum in Puffer schreiben   
+  putc(';');													// Trennzeichen
+  putc(DOW|0x30);				// Wochentag senden
+ }
+ else // Kein Timeout, weitere Zeichen empfangen
+ {
+  cind=0;
+  do								   // Zeit-/Datumsinformation empfangen
+  {
+   cbuf[cind++]=c;						// Empfangszeichen in Puffer 
+   c=getc(MODEM_CHAR_TIMEOUT);			// Zeichen empfangen
+  } while ((cind<=17)&&(c>=0));			// bis Zeit-/Datumsinformation vollständig oder Timeout
+  if (cind==18)							// Zeit-/Datumsinformation vollständig?
+  {
+   if ((c>='0') && (c<='6'))	// Wochentag prüfen 
+   {  
+	  DOW=c&0x07;																// Wochentag in LPC1766 setzen
+	  if (!Zeit_falsch (cbuf))	// Zeit prüfen	 
+	  {
+	   set_time(cbuf);					// Zeit setzen
+     if (!Datum_falsch(cbuf+9)) set_date(cbuf+9);	// Datum prüfen	und setzen     
+    }
+   }
+  } // end Zeit-/Datumsinformation vollständig
+ }	
+ newline();	// Neue Zeile
+}
+
+uchar test_sommerzeit (uchar setzen) // Prüfe auf Sommerzeit oder Winterzeit bei Datums und Zeiteingabe,
+{                              		 // korrigiere Sommer/Winterzeitbit bei automatischer Zeitumstellung
+                               		 // Übergabe setzen=0 nur prüfen, setzen=1 Sommer/Winterzeitflag umstellen 
+ uchar sommerzeit=0;
+ uchar monat=MONTH,	wtag=DOW, tag=DOM, stunde=HOUR; // Zeitwerte
+ 
+ if (fp.s_w_zeit)								// Sommer-/Winterzeitumstellung aktiviert?
+ {	 
+  if ((monat>=4)&&(monat<=9)) sommerzeit=1; 	// Sommerzeitbit Apr bis Sep setzen
+  else if ((monat==3)||(monat==10))					// März und Oktober
+  { if (tag-wtag<25) {        								// letzter Sonntag im Monat nicht erreicht
+     if (monat==10) sommerzeit=1; }					// Oktober Sommerzeit 			
+    else 						// letzter Sonntag im Monat erreicht oder überschritten
+    { if (wtag==0) {													// Heute letzter Sonntag?            
+       if (monat==3)	{												// März
+        if (stunde>=fp.s_w_zeit) sommerzeit=1; } 	// ab 1:00 UTC, letzter So im Mrz Sommerzeit
+       else {																			// Oktober
+        if (stunde<=fp.s_w_zeit) sommerzeit=1; } 	// bis 1:59 UTC, letzter So im Okt Sommerzeit
+      } 
+      else 					// letzter Sonntag überschritten
+      { if (monat==3) sommerzeit=1; }				// März -> Sommerzeit  	 
+    }     
+  } // Ende März und Oktober
+ } // end if Sommer-/Winterzeit aktiv	
+  
+ if (setzen)                  // Setzen und Sommer-/Winterzeitumstellung gesetzt
+ { if (sommerzeit) fp.sz=1;									// Sommerzeit setzen
+   else fp.sz=0; }            							// dto. löschen */
+ return (sommerzeit);  	   							                               
+}
+
+void zeitumstellung (void)		// Prüfe und führe Sommer-Winterzeit Umstellung durch
+{
+ uchar stunde;
+ uchar old_sz=fp.sz;			// Sommerzeitflag sichern
+
+ stunde=HOUR; 						// Stundenwert aus interner LP2132 RTC
+
+ if (fp.s_w_zeit)					// Zeitumstellung eingeschalten?
+ {	 
+  if (test_sommerzeit(0)!=fp.sz) 	// Prüfe ob Zeit umzustellen ist?
+  {
+   if (fp.sz)						// Sommerzeit auf Winterzeit umstellen?
+   {
+    if (stunde!=0) 					// Uhrzeit nicht in der ersten Stunde zurück stellen
+    { stunde--; fp.sz=0; protocol(WINTERZEIT);	// Uhr eine Stunde zurück stellen, Winterzeit eintragen
+			fp.utc--; transferzeit=60; }							// Zeitzonenoffset-1 und setze Prüfsperrzeit 60 Minuten
+   }   
+   else 								// Winterzeit auf Sommerzeit umstellen
+   {
+    if (stunde<23)    					// Zeit vor 23 Uhr, sonst verschieben
+    { stunde++; fp.sz=1; protocol(SOMMERZEIT);  // Uhr eine Stunde vor stellen, Sommerzeit eintragen
+		  fp.utc++; }				// Zeitzonenoffset+1
+   }
+   if (old_sz!=fp.sz) HOUR=stunde;	// Sommerzeitflag geändert
+  }
+ }	else fp.sz=0;					// Umstellung abgeschaltet, reset evtl. gesetztes Sommerzeitflag
+}
+
+uchar Zeitvergleich (uchar fptag, ushort fpein, ushort fpaus, ushort zeitwert, uchar wtag)
+{	   												// Prüft ob Ein-/Ausschaltzeit und Tage aktuelle Zeit ist
+ int result;								// Übergaben	fptag		-	Zeiger auf Einschalttage
+ uchar task=0;							//				fpein/fpaus	-	Zeiger auf Ein-/Ausschaltzeit
+														//				zeitwert		- aktueller Minutenzeitwert
+														//				wtage				-	aktueller Wochentag
+
+ if (fptag&(1<<wtag)) 					// aktueller Tag ist Messtag?
+ {
+  result=fpaus-fpein;					// Differenz Auszeit - Einschaltzeit 
+  if (!result) return(1);				// Einschaltzeit=Ausschaltzeit   
+  if (result>0)							// Ausschaltzeit > Einschaltzeit
+  {
+   if (zeitwert-fpein>=0) task=1;		// Aktuelle Zeit >= Einschaltzeit
+   else task=0;							// Aktuelle Zeit < Einschaltzeit
+   if (zeitwert-fpaus>=0) task=0;		// Aktuelle Zeit >= Ausschaltzeit
+  }
+  else 									// Einschaltzeit > Ausschaltzeit
+  {
+   if (zeitwert-fpaus>=0) task=0; 		// Aktuelle Zeit >= Ausschaltzeit
+   else task=1;							// Aktuelle Zeit < Ausschaltzeit
+   if (zeitwert-fpein>=0) task=1;		// Aktuelle Zeit >= Einschaltzeit
+  }
+ }
+ return (task);	  	// Rückgabe 1 wenn Aufgabe zu erledigen
+}  
+
+uint minutenwert (char *buf)			 // Pufferzeit hh:mm in Minuten umrechnen
+{ return(atoi(cbuf)*60+atoi(cbuf+3)); }	 // Übergabe buf	-	Zeiger auf Puffer
+
+uchar Aufgabenzeit (void)	// Prüfe ob aktuelle Zeit und Tag Zeit für Messung oder GSM aktiv ist
+{																									
+ uchar wtag=DOW, mtag=DOM, stunde=HOUR, lmin=MIN;	// Zeitwerte	aus interner Uhr laden
+ ushort zeitm=stunde*60+lmin;											// Uhrzeit als Minutenwert
+ uchar satz;																			// Laufvariable für Parametersätze	
+ uchar aufgabe=0;																	// Nicht null wenn Messzeit, GSM oder GPS einzuschalten
+	
+ if (fp.turnsw && get_turnswitch())		// Drehschalter aktiviert und Position nicht off
+ {
+  pset=get_turnswitch()-1;				// Parametersatz aus Schalterposition festlegen	
+  aufgabe=0x01;										// und ständige Messung
+ }
+ else															// Sonst alle definierten Parametersätze auf Messzeit prüfen
+ {
+  for (satz=0;satz<fp.psets;satz++)	// Wenn aktuelle Zeit Messzeit eines Parametersatzes, dann Schleifenende	  	
+   if (Zeitvergleich (fp.eintage[satz], fp.tein[satz], fp.taus[satz], zeitm, wtag)) break;						
+  if (satz<fp.psets) { pset=satz; aufgabe=MESSTASK; }	// Aktuelle Zeit war Messzeit eines Parametersatzes
+ }	 
+ 
+ if (test_battery(0)<LOWBATLIMIT) 								// Unterspannung Batterie?
+ {	 
+  if (LastErrorEvent!=BATTERYLOW)									// Noch nicht festgestellt?
+	 protocol (BATTERYLOW);													// Protokollieren und ggf. Mail und SMS-Versand
+ }	
+ else if ((timeupdate==0)&&((stunde==3)&&(lmin==15))) aufgabe|=BOOTTASK;		// Reboot jede Nacht 3:15
+ //else if ((timeupdate==0)&&((lmin==0)|(lmin==15)|(lmin==30)|(lmin==45))) aufgabe|=BOOTTASK;		// Test Reboot jede 15 Minuten
+ 
+ timeupdate=0;																		// reset Flag Zeitaufgabe
+ 
+ if (interfaces&GSM_LINK)										// GSM installiert und erkannt
+ { 
+	if (fp.servertyp==SMTP) 									// viasis mit Email Versand?
+  {
+	 if (LastErrorEvent!=MEMFULL95) 						// Letztes Fehlerereignis nicht Speicher 95% Meldung
+    if (messdaten(1) >= 95)										// Speicher 95% voll?
+    {
+     if (fp.mailmode==1) mailtosend|=DATAMAIL;			// Email Mode Speicher voll Versand?
+     else if (!(mailtosend&MEM95))									// Speicher 95% voll noch nicht vermerkt?
+     {																							// wenn kein automatischer Versand
+      mailtosend|=(ALARMMAIL|MEM95);					// Email Fehlermeldung senden
+		  if (fp.smsalarm) smstosend|=MEM95;			// SMS Speicher 95% voll senden
+		  LastErrorEvent=MEMFULL95;								// Einmalige Nachricht aber kein Protokolleintrag
+     }
+    } 
+   if (fp.mailmode>=2)								// Täglicher, wöchentlich und monatlicher Versand
+   {
+    if (fp.temail==zeitm)													// Sendezeit Daten erreicht?
+    { 
+   	 if (fp.mailmode==2) mailtosend|=DATAMAIL;			// Täglicher Versand?
+		 else if (fp.mailmode==3) 											// Wochenversand?
+		 { if (wtag==fp.ewtag) mailtosend|=DATAMAIL; }	// Wochentag ist Versandtag?
+		 else if (fp.mailmode==4)												// Monatsversand?
+		 { if (mtag==fp.emtag) mailtosend|=DATAMAIL; }	// Monatstag ist Versandtag?
+    } // end Sendezeit erreicht
+   }	// end Tages-, Wochen- und Monatsversand
+	
+   if (!fp.mailalarm) mailtosend&=~(ALARMMAIL|FULMEM|MEM95|LOWBAT);	// Email-Alarm aus? Versand löschen und Fehler löschen
+   if (!fp.smsalarm) smstosend=0;																		// SMS-Alarm aus? Ja, SMS Versand und Fehler löschen
+	 if ((mailtosend&(ALARMMAIL|TESTMAIL|DATAMAIL)) || smstosend)			// Email oder SMS-Versand
+		aufgabe|=GSMTASK; 														// GSM Modem einschalten
+  }	// end if SMTP Mailversand
+	else if (!(connect&MQTT_LINK))		// MQTT Server Betrieb und offline
+	{	
+	 if (!fp.smsalarm) smstosend=0;																		// SMS-Alarm aus? Ja, SMS Versand und Fehler löschen
+	 else if (smstosend) aufgabe|=GSMTASK; 														// GSM Modem ist einzuschalten 		
+	 if ((fp.mqtt_packetsize)&&(mqtt_md_bytes_to_send()>fp.mqtt_packetsize*BLOCKSIZE)) // Messdaten zu senden?
+	 { aufgabe|=GSMTASK; 													  // GSM Modem ist einzuschalten
+		 mqtt_manual=1;																// ohne automatischen mqtt_state inkrement
+   }	 	 
+  } 
+	
+  if (Zeitvergleich (fp.gsmtage,fp.tgsmein,fp.tgsmaus,zeitm, wtag)) 					// GSM-Einschaltzeit?
+	 aufgabe|=GSMTASK; 																													// GSM Modem ist einzuschalten 
+ } // end GSM installiert
+ 
+ if (interfaces&GPS_LINK)													// GPS Modul registriert?
+  if (gpsintv)	 																	// Positionsbestimmung aktiviert?
+ 	 if (gpsfix/60>=gpsintv) aufgabe|=GPSTASK; 			// Zeit für GPS Positionsbestimmung? 
+
+ return (aufgabe);		// Rückgabe Bit0=1 wenn Messzeit, Bit1=1 wenn GSM Einschaltzeit, Bit2=1 wenn GPS Positionsbestimmung	
+}	
+
+
+
+
+
+
+

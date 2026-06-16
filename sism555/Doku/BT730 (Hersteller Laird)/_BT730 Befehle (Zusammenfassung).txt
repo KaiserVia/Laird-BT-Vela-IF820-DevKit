@@ -1,0 +1,357 @@
+
+BT730 Class 1 Bluetooth v2.0 Module, AT command set, Serial Port Profile (SPP)
+Part # BT730-SA, BT730-SC
+www.lairdtech.com/bluetooth
+
+Sniff Mode (S564=1000, S563=500, S562=50, S561=10)
+Current Consumption: 1.8 mA (VCC_IN = 3.8 V, Baudrate = 9600 bps, Separation Distance = 15 meters)
+Idle Mode, S512=1 == 1.25 mA
+Connected Mode (Max Data Transfer) 35 mA
+Connecting Mode (ATDxxx)	66 mA
+
+multi-point connections and numerous Bluetooth profiles including Serial Port Profile (SPP), Dial Up Networking (DUN), FTP Client plus partial support for Headset (HSP) and HandsFree (HFP)
+Hinweis: Standard mäßig ist nur SPP eingeschaltet 
+
+*******************************************************************************
+*** Initialisieren:
+
+
+//default: 9600 Baud !!!
+//Idee: beim Start mit 115200 Baud AT senden und auf OK abfragen
+//keine Antwort == Modul unbenutzt = neu initialisieren !
+
+115200 Baud: 	AT		//ein 'OK' muss zurück kommen!
+9600 Baud:		AT&F3	//Reset = factory default: F3 == Minimum power consumption, UART baud rate set to 115200, Left and Right LED off
+//ATS520=115200 	(ist in AT&F3 enthalten) //default = 9600  (1200..115200) //Change to a standard baud rate. The effect is immediate and the OK is sent at the new baud rate. Only one of the following baud rates are accepted: 1200, 2400, 4800, 9600, 19200, 28800, 38400, 57600, 115200.
+
+jetzt mit 115200 Baud weiter:
+ATE0			//Disable echo  		//ein 'OK' muss zurück kommen!
+//AT+BTF="viasignBT"	-> AT+BTF=<string>{Set Friendly Name}  //Local Friendly Name (max. 8 Zeichen)  //According to the Bluetooth specification a friendly name can be up to 248 bytes long
+AT+BTN="viasignBT"	//Set Friendly Name in Non-volatile Memory  ->  friendly name of this device as seen by other devices. It is stored in non-volatile memory. 
+					//Use AT+BTF to make the name visible to other devices. Use AT+BTN? To read it back. An empty string (“”) deletes the string from non-volatile memory which forces use of the default name.
+AT+BTK=”12345678” // set the pin code (0-8 Zeichen)
+ATS514=60		//Pairing Timeout in seconds (1..60). This includes the time a host takes to supply the PIN number when PIN? messages are indicated
+ATS502=1 		//default = 0  Authentication for incoming connections. Set to 1 to enable authentication
+//ATS503		//default = 0  Encryption for incoming connections. Set to 1 to enable encryption.
+//ATS513=1 		//default = 1 ->  Pairing Authentication, 1 = Enable
+ATS0=-1 		//default = 1  auto answer in x sec -> Number of RING indications before automatically answering an incoming connection. A value of 0 disables autoanswer. 
+				If -1, then autoanswer on one RING and do NOT send RING/CONNECT response to the host. This emulates a serial cable replacement situation:
+				RING 000272BBE808	->	This response is sent to the host every two seconds until the host either accepts the connection using the ATA command or rejects it using the ATH command
+				CONNECT 000272BBE808,1101   //1101 == Profile Name: Serial Port
+				
+ATS536=1 		//der PC kann jetzt das BluetoothModul konfigurieren !!! -> Enter Remote Command Mode
+ATS420=1 		//default = 0  Sekundenzähler (wird bei jeden Reset neu gestartet) Use ATI420 to read the count value. It is basically the time the module has been powered up in seconds.
+//ATS505=3 		//connection attempt timeout 
+//ATS530=5000 	//reconnect delay 
+//AT+BTPU		//Enable page scanning and wait for a connection from any device. Inquiry scanning is also enabled. Authentication is enabled and encryption is disabled.
+
+ATS538=1  	//default =0!  If 1, then when a successful pairing occurs, it is automatically saved in the trusted device database, if the database has room to store it !
+//ATS592=1  	//default = 0  (0,1) Set this to 1 to reduce the trusted device database to one record when autosaving of pairing is enabled via S Reg 538.
+
+
+//ATS535=41 	//default = 20  (0..41) Link Supervision Timeout. If units go out of range, then a NO CARRIER message is sent to the host after the time specified here
+
+//ATS541=20 	//default = 20  (-43...20) This sets the power level in dBm when inquiring or paging. Reading this register returns the value stored in non-volatile memory.
+//ATS542=? 	//-43...20  As per S541, however reading this register returns the current power level as set in the base band. The read can be different from S541because the actual power is set using a lookup table and the base band rounds down to the nearest value in the table
+
+//ATS518=8  	//default =8 (0..255)  Maximum number of responses from an inquiry request. This parameter is reference by the AT+BTI command.
+//ATS560=30 	//default = 20  (15..120) Disconnect timeout in seconds. This timer specifies how long to wait for confirmation (from the peer device and/or the underlying stack) that the connection has been dropped. In some cases a confirmation does not arrive; in this case this timer is used to abort the procedure and put the state machine in a proper mode for new operations.
+//ATS588=0 		//default = 0  (0,1) 	After a disconnection, there is a cold reset.
+ATS593=1 		//default = 0  (0,1) 	Automatically append last six digits of local Bluetooth address to the friendly name which was set via AT+BTN or AT+BTF.
+
+//ATS504=1  	//default = 0  (0,1) 	Setting to 1 forces S0 to -1 and suppresses messages arising from connections or pairing. E.g. CONNECT, NO CARRIER, RING, PAIR etc.
+				Suppressing connection-based messaged allows the Laird device to be configured in cable replacement mode.
+
+//ATS544=1  	//default = 1  (0,1) Configure the UART for either low latency or maximum throughput. A setting of 1 gives maximum throughput.
+//ATS543=1  	//default = 1  (0,1) If this is set to 1, then incoming pairing attempts are accepted (if a pin code has been pre-entered using AT+BTK) while in the wait phase of auto connect cycle initiated by the AT+BTR command. In addition to accepting pairing attempts, if the pairing is successful, then the new device is automatically set as the peer address for automatic connections (as if an explicit AT+BTR command was entered).
+
+//ATS589=F  	//default = 8  (0..F) Codec output gain
+//ATS590=F  	//default = 1  (0..3) Codec input gain
+
+ATS601=1  		//default = 0  (0,1) If this is 1, then on reset S Reg 600 value is incremented. (0..65535 = Number of times this module has gone through a reset cycle)
+
+
+//ATS1001 to ATS1010 	0.. 2^32 == Ten General Purpose 32 b
+
+
+Seite 19			 ...
+
+
+
+
+Sniff Mode einstellen mit S561 - S565 !!!
+Page Scan Interval  mit S508 - S511
+//S531 	Specifies the mode on connection establishment. default: 0 = Normal. Data is exchanged between UART and RF
+//S530	Reconnect delay when configured as master in pure-cable-replacement mode.
+AT+BTD*{Remove All Trusted Devices}
+
+
+ATS512=4 	//default = 1  (0...7) Specify power up state: default: 1=Proceeds to a state as if AT+BTO was entered.  4=Connectable and discoverable (like AT+BTP)
+			AT+BTO<devclass>{Open and make Unit Detectable}  After power up and ATZ, this command is sent to ensure that the RFCOMM is initialised and opened and the service name as specified in AT+BTN is exposed via the SDP registry.
+			AT+BTP<bd_addr>{Enable Cautious Page/Inquiry Scanning}  Enable page scanning and wait for a connection from device with Bluetooth address <bd_addr>.
+
+eventuell:
+//ATS512=1	//== AT+BTO<devclass>{Open and make Unit Detectable} After power up and ATZ, this command is sent to ensure that the RFCOMM is initialised and opened 
+			and the service name as specified in AT+BTN is exposed via the SDP registry.
+			The <devclass> value specifies an optional fixed length hexadecimal device class code. 
+			If it is not specified, then the device class code is taken from S Register 515.
+			For this command to be effective, S Register 512 must be set to zero.
+		
+		
+jetzt speichern und RESET:
+AT&W			//Einstellungen speichern
+ATZ				//Software Reset -> jetzt werden die Einstellungen gültig
+
+-> 	damit ist alles erledigt, nach dem Start kann man sich verbinden mit 115200 Baud
+	PinAbfrage ein
+	die Verbindung wird gespeichert
+
+
+*******************************************************************************
+*** Abfragen:
+AT+BTN?		->	Read Friendly Name from Non-volatile Memory
+AT+BTC?		->	Read Device Class Code ->	This command is used to read the current device class code:  -> da kommt: 001F10
+AT+BTT?		->	list of trusted device issue the command 
+AT+BTW?		->	List Cached Trusted Device. This command is used to list the cached trusted device
+ati420		->	read the count value: time the module has been powered up in seconds
+
+ATSn?	{Read S Register Value}
+ATSn=?	{Read S Register – Valid Range}
+ats541?  	-> 	Power level abfragen
+ATS542=? 	//-43...20  As per S541, however reading this register returns the current power level as set in the base band. The read can be different from S541because the actual power is set using a lookup table and the base band rounds down to the nearest value in the table
+ati4  		-> 	BluetoothAdresse ausgeben (0016A4067613)
+ati3  		-> 	The Laird firmware revision (11.28.0)
+ati / ati0	-> 	(Laird Bluetooth Data Module 730-SA)
+ati1		->	The CSR firmware build number (4294)
+ati5		->	The manufacturer of this device.(Laird Technologies Inc, UK, (c)2009)  == auch ati101
+ati8		->	The chipset format. (BC4-EXT)
+ati9		->	0 if not in a connect state and 1 if in a connect state.
+ati10		->	(Bluecore)
+ati13 		->	The Sniff status returns as follows: Response: <cr,lf>a:b,c,d,e<cr,lf>OK<cr,lf>
+ati14 		->	The current boot mode
+ati101		->	The RSSI value in dBm. If a connection does NOT exist then a value of -32786 returns
+ati333		->	Returns extended firmware version number.
+ati111		->	Returns LinkQual which in the CSR chipset is defined as BER (bit error rate). 
+				This returns a value which is the number of bits in error out of 1 million. 
+				Hence a value of 0 is best, and larger values are worse. 
+				A value approaching 1000 (BER = 0.1%) is an indication that the link is bad and a large number of Bluetooth packets are being lost.
+atS600?  	-> 	0..65535 = Number of times this module has gone through a reset cycle. This feature is enabled by S Reg 601. Writing any value to this register initialises it to a certain value.
+//ATS1001 to ATS1010 	0.. 2^32 == Ten General Purpose 32 b
+
+
+
+*funktioniert nicht im Remote Mode:
+AT+BTF<bd_addr>{Get Remote Friendly Name}
+AT+BTIN 	-> zeigt alle Bluetooth Geräte mit Friendly Name (scan for discoverable Bluetooth devices)
+
+*******************************************************************************
+*** Verbindung umschalten/trennen:
+
+^^^		->	Enter Local Command Mode
++++		->	Enter Local Command Mode
+
+*Wichtig:
+!!!		->	Enter Remote Command Mode (dh. der PC kann jetzt das BluetoothModul konfigurieren !!!
+			For this command to be effective, S Register 536 must be set to 1.
+ATO 	The remote device issues ATO as normal to return to data mode.  (zurück kommt Meldung: CONNECT 000272BBE808,1101)
+
+
+In a conventional telephony modem, a call is normally terminated by first sending a +++ character sequence enveloped by an escape sequence guard time (of the order of 100 to 1000 milliseconds) to enter local command and connected mode and then the ATH command.
+Laird Bluetooth modules provide a variety of ways of dropping a connection. One method is similar to the above, but instead a ^^^ character sequence is used; this eliminates ambiguity when a data call is in progress via a mobile phone which was established using the mobile phone’s Bluetooth AT modem. The second method involves the host dropping the DTR (DSR from the module’s viewpoint) handshaking line.
+Being able to drop a connection using the escape sequence ^^^ has a severe penalty on data throughput. In fact, the data rate is of the order of 85 kbps instead of about 200 kbps.
+
+
+
+
+
+
+*******************************************************************************
+Befehle: 
+^^^{Enter Local Command Mode}
+!!!{Enter Remote Command Mode}  //For this command to be effective, S Register 536 must be set to 1.
+escape sequence is “+++” or “^^^”
+
+In addition, if S Register 538 is set to 1, then on a successful pairing, the link key is automatically saved to the trusted device database. 
+In that case, the asynchronous message PAIR 0 <bd_addr> has an error code appended at the end to convey the result of the save operation.
+
+ATEn{Enable/Disable Echo}	//E0 == Disable echo.
+
+AT+BTO<devclass>{Open and make Unit Detectable}
+After power up and ATZ, this command is sent to ensure that the RFCOMM is initialised and opened and the service name as specified in AT+BTN is exposed via the SDP registry.
+
+AT+BTP<bd_addr>{Enable Cautious Page/Inquiry Scanning}
+Enable page scanning and wait for a connection from device with Bluetooth address <bd_addr>. If the specified address is 000000000000 then incoming connections are accepted from any device, is as per AT+BTP without an address. Inquiry scanning is also enabled.
+
+
+
+
+
+AT+BTO<devclass>{Open and make Unit Detectable}
+After power up and ATZ, this command is sent to ensure that the RFCOMM is initialised and opened and the service name as specified in AT+BTN is exposed via the SDP registry.
+The <devclass> value specifies an optional fixed length hexadecimal device class code. If it is not specified, then the device class code is taken from S Register 515.
+For this command to be effective, S Register 512 must be set to zero.
+
+
+AT+BTPU{Enable Promiscuous Page/Inquiry Scanning}  Enable page scanning and wait for a connection from any device. Inquiry scanning is also enabled. 
+		Authentication is enabled and encryption is disabled.
+
+
+AT+BTQ{Enable Inquiry Scans ONLY}
+When inquiry scan is enabled, it implies that this device responds to inquiries from other devices. Use AT+BTX to disable inquiries.
+
+
+so den service Namen setzen: zB. viasign
+AT+BTS=<string>{Set Service Name}
+This writes the name to non-volatile memory. It is used after ATZ, power cycle, or AT+BTO if it has not yet been issued. 
+Use AT+BTS? to read it back from non-volatile memory. 
+An empty string (“”) deletes the string from non-volatile memory which forces the default service to be used.
+
+12 character Bluetooth address consisting of ASCII characters ‘0’ to ‘9’, ‘A’ to ‘F’ and ‘a’ to ‘f’.
+6 character Bluetooth device class consisting of ASCII characters ‘0’ to ‘9’, ‘A’ to ‘F’ and ‘a’ to ‘f’.
+
+
+AT+BTT?{List Trusted Device}
+This command is used to list the contents of the trusted device database. The link key is not displayed so the response is as shown below. If the list is empty then just the OK response is sent otherwise an OK is used to terminate the list. 
+Use the command ATI6 to read the maximum size of the trusted device database.
+
+
+
+
+BIn a conventional telephony modem, a call is normally terminated by first sending a +++ character sequence enveloped by an escape sequence guard time (of the order of 100 to 1000 milliseconds) to enter local command and connected mode and then the ATH command.
+Laird Bluetooth modules provide a variety of ways of dropping a connection. One method is similar to the above, but instead a ^^^ character sequence is used; this eliminates ambiguity when a data call is in progress via a mobile phone which was established using the mobile phone’s Bluetooth AT modem. 
+The second method involves the host dropping the DTR (DSR from the module’s viewpoint) handshaking line.
+
+
+Wichtig:  Konfiguration von PC Seite !
+1.3.2 !!!{Enter Remote Command Mode}
+When in data and connected mode, the host can force the remote device into a command and connected mode so that AT commands can be issued to the device remotely. The escape sequence guard time is specified by S Register 12 and is the same as per the ^^^ escape sequence. By default the guard time is set to 100 milliseconds. The remote device issues ATO as normal to return to data mode.
+For this command to be effective, S Register 536 must be set to 1.
+Response:<cr,lf>OK<cr,lf>
+
+mit ATO wird dann die Verbindung wieder her gestellt !!!
+
+
+
+S543
+0
+0..1
+If this is set to 1, then incoming pairing attempts are accepted (if a pin code has been pre-entered using AT+BTK) while in the wait phase of auto connect cycle initiated by the AT+BTR command. In addition to accepting pairing attempts, if the pairing is successful, then the new device is automatically set as the peer address for automatic connections (as if an explicit AT+BTR command was entered).
+See S Register 505 and 530.
+
+
+
+AT&Fn{Set S Register Defaults}
+This command only works when the device is in local command and unconnected mode. Depending on the value of ‘n’, it installs S Register values appropriate for various power modes, ranging from minimum power consumption to maximum.
+
+
+
+
+Digital I/O Cable Replacement
+The module has a number of general purpose digital I/O pins. The direction of these is specified via S 610.
+When S Reg 531 is set to four at both ends of the connection, on connection, any changes in the states of the inputs at one end are transmitted to the peer, which then reflects those states on the appropriate I/O pins if they have been configured as outputs.
+It is recommended that the value of S Reg 610 at one end be the complement of the other end. That way, inputs at one end are mirrored at the other end and vice versa.
+In addition S Reg 506 must be set to zero, which disables echoes.
+Note: Due to inherent latency of Bluetooth transmission, expect the change of state to be delayed. This value is typically 100 ms and can be much more if the quality of the link is bad which results in many retries.
+
+
+
+
+All commands are terminated by the carriage return character 0x0D, which is represented by the string <cr> in descriptions below and this cannot be changed.
+Class 1 Bluetooth v2.0 Module
+Firmware User’s Guide
+Americas: +1-800-492-2320 Option 2
+Europe: +44-1628-858-940
+Hong Kong: +852-2923-0610
+www.lairdtech.com/bluetooth
+5 CONN-GUIDE-BT730-FW
+* All responses from the Laird device have carriage return and linefeed characters preceding and appending the response. These dual character sequences have the values 0x0D and 0x0A respectively and shall be represented by the string <cr,lf>.
+* All Bluetooth addresses are represented by a fixed 12 digit hexadecimal string, case insensitive.
+* All Bluetooth Device Class codes are represented by a fixed six digit hexadecimal string, case insensitive.
+* All new Bluetooth specific commands are identified by the string +BTx, where x is generally a mnemonic of the intended functionality
+
+
+*********************************************************************************************
+Error Description
+01
+Register not recognised
+02
+Value for register is out of range
+03
+Incoming call not pending
+04
+No call to connect to. This error code has meaning for ATO only
+05
+Syntax error
+06
+Empty string
+06
+Device class could not be stored
+08
+Invalid Device Class code
+09
+Invalid Bluetooth address
+10
+Could not set Service or Friendly name
+11
+PS Store Write
+12
+PS Store Read
+13
+Not Idle
+14
+Incorrect mode
+15
+Already scanning
+16
+Pairing is already in progress
+17
+Not USED
+18
+Not USED
+19
+Not USED
+20
+Not safe to write to Non-volatile Store - Ongoing Bluetooth Connection
+21
+Link Key Cache is empty
+22
+Link Key Database is full
+23
+Malloc returned NULL - Resource Issue
+24
+Remote Address same as Local Address
+25
+Connection Setup Fail, DSR Not asserted
+26
+Unauthenticated licence
+27
+Max Responses (See S Register 518) too high. Memory allocation error
+28
+The length of Pin in AT+BTK is too long
+29
+Invalid Ring count specified for S Register 0 or 100. If S0<>0 and S100<>0 then S0 must be < S100
+30
+ADC Error
+31
+Analogue Value cannot be read as it is set for output
+32
+Analogue Value cannot be written as it is set for input
+33
+S Register value is invalid
+34
+Both L and R modifier cannot be specified in ATD command
+35
+Invalid Major Device class – valid value in range 0x00 to 0x1F inclusive
+36
+Pairing in progress – Command cannot be actioned – try again later
+37
+Invalid Sniff parameter specified.
+E.g. new Attempt value greater than MinInterval. Solution is to first increase MinInterval and re-enter the Attempt value.
+38
+Get Remote Friendly name Failed
+39
+Failed to change mode to Multipoint
+40
+7 Bit mode requires parity to be even or odd
+41
+Stream error

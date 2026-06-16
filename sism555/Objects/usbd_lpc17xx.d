@@ -1,0 +1,16 @@
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver\USBD_LPC17xx.c
+.\objects\usbd_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stdint.h
+.\objects\usbd_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\LPC17xx.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmInstr.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmFunc.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver\USBD_LPC17xx.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_USBD.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_USB.h
+.\objects\usbd_lpc17xx.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_Common.h
+.\objects\usbd_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stddef.h
+.\objects\usbd_lpc17xx.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stdbool.h
+.\objects\usbd_lpc17xx.o: .\RTE\Device\LPC1768\RTE_Device.h
+.\objects\usbd_lpc17xx.o: .\RTE\_sism\RTE_Components.h

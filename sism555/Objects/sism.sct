@@ -1,0 +1,18 @@
+
+LR_IROM1 0x00000000 0x00040000  {    ; load region size_region
+  ER_IROM1 0x00000000 0x00040000  {  ; load address = execution address
+   *.o (RESET, +First)
+   *(InRoot$$Sections)
+   .ANY (+RO)
+  }
+  
+  non_init 0x2007C000 UNINIT 0x00007FE0 { ; uninitialized data
+   * (non_init)
+   }  
+   
+  RW_IRAM1 0x10000000 0x00008000  {  ; RW, ZI data
+    ramcode.o (+RO)
+   .ANY (+RW +ZI)
+  } 
+}
+

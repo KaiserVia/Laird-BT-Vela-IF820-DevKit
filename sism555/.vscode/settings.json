@@ -1,0 +1,21 @@
+{
+    "files.encoding": "windows1252",
+    "files.autoGuessEncoding": false,
+    "[markdown]": {
+        "files.encoding": "utf8"
+    },
+    "chat.tools.terminal.autoApprove": {
+        "/^cd c:\\\\viaTraffic\\\\GitHub\\\\Projects\\\\sism555; python -c \"\nwith open\\('sicom\\.c','rb'\\) as f:\n    content = f\\.read\\(\\)\n\nold = b'\\\\tMUX_BT_Select;\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t// MUX Bluetooth Leitungsauswahl \\\\r\\\\n  clear_comchange \\(\\)'\nnew = b'\\\\tuart1_release\\(MUX_GSM\\);\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t// Release UART1, restore BT if connected\\\\r\\\\n  clear_comchange \\(\\)'\nassert old in content, 'sicom NOT FOUND'\ncontent = content\\.replace\\(old, new\\)\nwith open\\('sicom\\.c','wb'\\) as f:\n    f\\.write\\(content\\)\nprint\\('sicom\\.c OK'\\)\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd c:\\\\viaTraffic\\\\GitHub\\\\Projects\\\\sism555; python -c \"\nwith open\\('main\\.c','rb'\\) as f:\n    content = f\\.read\\(\\)\nidx = content\\.find\\(b'MUX_BT_Select;\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t// MUX Bluetooth Leitungsauswahl'\\)\nprint\\(repr\\(content\\[idx:idx\\+80\\]\\)\\)\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd c:\\\\viaTraffic\\\\GitHub\\\\Projects\\\\sism555; python -c \"\nwith open\\('libtool\\.c','rb'\\) as f:\n    content = f\\.read\\(\\)\nidx = content\\.find\\(b'Init_GSM_ch \\(baud\\);'\\)\nprint\\(repr\\(content\\[idx:idx\\+100\\]\\)\\)\n\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

@@ -1,0 +1,12 @@
+.\objects\sictxt_e-cz-sl.o: sprachen\sictxt_e-cz-sl.c
+.\objects\sictxt_e-cz-sl.o: sprachen\../sictxt.h
+.\objects\sictxt_e-cz-sl.o: sprachen\../hard.h
+.\objects\sictxt_e-cz-sl.o: sprachen\../alilpc.h
+.\objects\sictxt_e-cz-sl.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h
+.\objects\sictxt_e-cz-sl.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h
+.\objects\sictxt_e-cz-sl.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stdint.h
+.\objects\sictxt_e-cz-sl.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmInstr.h
+.\objects\sictxt_e-cz-sl.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmFunc.h
+.\objects\sictxt_e-cz-sl.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h
+.\objects\sictxt_e-cz-sl.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h
+.\objects\sictxt_e-cz-sl.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\stddef.h
