@@ -9,6 +9,12 @@ werden später Stück für Stück abgearbeitet. Detail-Hintergrund: `Doku/IF820_
 
 ## Phase 0 – Bring-up / Lebenszeichen (JETZT)
 
+**STATUS 2026-06-16: ERREICHT.** `/PING` -> `@R,001D,/PING,0000,R=0000006C,F=A6DC` bei
+115200 empfangen (45 Byte, sauber), IF820 erkannt ("Bluetooth IF820: 115200"). Ursache der
+anfaenglichen RX=0-Fehler war ein Wackelkontakt in der Datenstrecke (Loopback gab erst 1/6
+Byte, nach solider Verbindung 6/6). CTS liegt jetzt auf LOW. TxD/RxD, Pegel, Baudrate und
+Toolchain damit bestaetigt.
+
 Ziel: `/PING` an den IF820 senden und `@R,...,/PING,0000` zurückbekommen. Damit sind
 UART-Verdrahtung, Pegel und Toolchain bewiesen. Bewusst **ohne** Steuerpins, ohne SPP-Verbindung.
 

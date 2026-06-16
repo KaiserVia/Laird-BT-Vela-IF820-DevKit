@@ -90,6 +90,47 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  ResetWDT(); 
  if ((connect&UART1)|(fp.btmodem!=0))	return;	// Zugriffskonflikt - z. B. Konfiguration per GSM oder bereits konfiguriert
  fp.btmodem=0;												// Reset Bluetooth installiert	
+ // === IF820 (EZ-Serial) Erkennung mit Debug -- Testphase 115200 ===
+ {
+  uchar dconn = connect;            // connect sichern
+  char  dbg[96]; uchar dn=0, i;     // RX-Sammelpuffer + Laufvariablen
+  const char *pq;
+  connect = dconn & ~UART1;         // Debug ans Terminal, NICHT ans Modul
+  putstr("\r\n--- BT-DEBUG IF820 (UART1=115200) ---\r\n");
+  putstr(" CTS(P2.2)="); putstr((FIO2PIN&CTS)?"HIGH (FlowCtl aus -> erwartet)":"LOW (bereit)"); newline();
+  putstr(" (CTS/RTS hier NICHT geprueft - Flow Control aus)"); newline();
+  uart1_request(MUX_BT,115200);     // UART1+MUX=BT konfigurieren (CTS-unabhaengig)
+  osDelay(5);
+  bxi = rxi;                        // RX-Puffermarke setzen
+  putstr(" TX  : /PING<CR> (CTS-Poll umgangen)"); newline();
+  for (pq="/PING\r"; *pq; pq++)     // direkt ans U1 senden, ohne CTS-Wait
+  { uint g=0; while(!(U1->LSR & THRE)){ if(++g>300000) break; } U1->THR = *pq; }
+  osDelay(300);                     // auf Antwort warten
+  while (bxi!=rxi && dn<sizeof(dbg)-1) dbg[dn++]=rbuf[++bxi];   // RX einsammeln
+  putstr(" RX  : "); putnumber(dn,0); putstr(" Byte"); newline();
+  putstr(" HEX : ");
+  for (i=0;i<dn;i++){ uchar b=dbg[i]; putc(hexchar(b>>4)); putc(hexchar(b)); putc(' '); }
+  putstr("\r\n TEXT: ");
+  for (i=0;i<dn;i++){ char ch=dbg[i]; putc((ch>=32 && ch<127)?ch:'.'); }
+  newline();
+  fp.btmodem=0;
+  for (i=0;i+1<dn;i++) if (dbg[i]=='@' && dbg[i+1]=='R') fp.btmodem=IF820;   // Antwort @R gefunden?
+  if (fp.btmodem==IF820) putstr(" => OK: TxD+RxD korrekt, Modul auf 115200 (Antwort @R)");
+  else if (dn==0)        putstr(" => RX LEER -> TxD<->RxD pruefen (evtl. vertauscht), Modul versorgt?");
+  else                   putstr(" => Bytes da, kein @R -> Baudrate? oder SPP-Datenmodus (Handy)");
+  newline(); putstr("--- BT-DEBUG Ende ---\r\n");
+  connect = dconn;                  // connect wiederherstellen
+ }
+ if (fp.btmodem==IF820)             // erkannt -> Laird/RN4678-Kaskade ueberspringen
+ {
+  put2str(T_bt,T_if820); putstr(T_dpkt); putnumber(115200,0); newline();
+  uart1_release(MUX_BT);
+  connect=concpy;
+  osDelay(10);
+  clear_comchange();
+  return;
+ }
+ // === Ende IF820-Erkennung; sonst weiter mit Laird/RN4678 ===
  if (!Init_BT_ch(460800)) 							// Konfiguriere uart1 und setze MUX Kanal auf BT modem, Abbruch bei CTS hi
  { newline(); put2str(T_err,E_bt); return; }	 // putnumber(FIO2PIN,0x80);
  pin=atoi(fp.serno+4); 								// letzte 4 Digits der Seriennummer auswerten	

@@ -7,11 +7,13 @@
 
 #define Laird		1			// BT- Modem Laird 730-SA
 #define Roving	46		// Microchip	RN4678APL 
+#define IF820	82		// Ezurio Vela IF820 (EZ-Serial)
 #define T_rn4678	" Micro"
 #define T_laird		" Laird"
+#define T_if820	" IF820"
 
-#define BT_BAUD  (fp.btmodem==Laird ? 460800 : 307200)	// Betriebsbaudrate BT-Modul
-#define GSM_BAUD 460800		// Betriebsbaudrate LTE-Modul (UC15/EG91)
+#define BT_BAUD  (fp.btmodem==IF820 ? 115200 : (fp.btmodem==Laird ? 460800 : 307200))	// Betriebsbaudrate BT-Modul (IF820 Testphase 115200)
+#define GSM_BAUD 115200		// TESTPHASE IF820: war 460800 (UC15/EG91) -- spaeter zurueck
 
 // Laird 730-SA Texte nur für Bluetooth AT Kommando Kommunikation
 #define T_AT		"AT\r"
@@ -70,6 +72,10 @@
 #define T_port	"SS,SerialPort\r"
 #define T_powr	"SY,4\r"
 #define E_errser "Viasis serial number not set"
+
+// Ezurio Vela IF820 (EZ-Serial) Texte
+#define T_ping		"/PING\r"		// system_ping Kommando
+#define T_pingok	"/PING,0000"	// Erfolgsantwort @R,...,/PING,0000
 
 extern bool Init_BT_ch (uint baudrate);	// Konfiguriere uart1 und setze MUX Kanal auf BT modem
 extern bool bt_command (text * command, text * answer, int pause); // Bluetooth Kommando senden, Antwort empfangen

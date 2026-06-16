@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 //  FILE: sictxt.c			PROJECT: sis3000M
 //-----------------------------------------------------------------------------
-//  COMMENTS:  Sprachunabh�ngige Texte 
+//  COMMENTS:  Sprachunabhängige Texte 
 //-----------------------------------------------------------------------------
 //  HARDWARE:   viasis 3003 - MB, revision 1.1
 //-----------------------------------------------------------------------------
@@ -21,10 +21,10 @@
 const ushort Def_sym_font[NOSYM] = {430,450,460,470,480,500,501,503};	// Voreingestellte Symbole
 const char sense_tab[5]={6,4,2,0,1};			// Kanalauswahl MUX IC14 und IC19 Signalverst�rkung
 
-// Nicht zu �bersetzende Textarrays
+// Nicht zu übersetzende Textarrays
 text T_nil[]							=	"";					// not in list Zeiger
 text T_viasis[]						= "VIASIS";		// als const char wg. USB Treiber Verzeichnisname etc.
-text T_version[8]					= "5.78";			// Programmvariante jetzt immer mit viaspeedcam parameter einstellbar, sc Varianten entfallen
+text T_version[8]					= "5.83";			// Programmvariante jetzt immer mit viaspeedcam parameter einstellbar, sc Varianten entfallen
 text T_symgr1[3][SYGLEN] 	= {"30,50,60", "70,80,!", "Smileys"};
 text T_defsym[NOSYM][4]		= {"30","50","60","70","80","!",":-(",":-)"};
 text T_uall[2][5]					= {"km/h","mph"};
@@ -147,9 +147,9 @@ E_mqtt										// 28.
 };
 
 // Zeichenkettenlisten
-text * const L_start[] = {T_2LF,T_name,T_tver,T_version,T_LF,T_coprght,T_nil};				// Einschaltmeldung ohne Hauptmen�
+text * const L_start[] = {T_2LF,T_name,T_tver,T_version,T_LF,T_coprght,T_nil};				// Einschaltmeldung ohne Hauptmenue
 text * const L_winit[] = {T_2LF,T_winit,T_LF,T_nil};								// Werkinitialisierung
-text * const L_conf[]	= {T_conf,T_serial,T_dpkt,T_nil};							// Werksmen� Konfig.
+text * const L_conf[]	= {T_conf,T_serial,T_dpkt,T_nil};							// Werksmenue Konfig.
 text * const L_info[]	= {T_name,T_tver,T_version,T_col,T_nil}; 			// Information
 text * const L_dpp[]	= {T_ende,T_LF,T_plsmin,T_nil};								// DPP einstellen
 text * const L_gsm[]	= {T_tmen,T_gsm,T_nil};												// Zeitplanung GSM/Email
