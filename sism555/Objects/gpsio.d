@@ -17,3 +17,4 @@
 .\objects\gpsio.o: gsmio.h
 .\objects\gpsio.o: mqtt.h
 .\objects\gpsio.o: flash.h
+.\objects\gpsio.o: dtc.h

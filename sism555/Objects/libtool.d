@@ -27,3 +27,4 @@
 .\objects\libtool.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
 .\objects\libtool.o: sictst.h
 .\objects\libtool.o: mqtt.h
+.\objects\libtool.o: dtc.h

@@ -7,13 +7,59 @@ werden später Stück für Stück abgearbeitet. Detail-Hintergrund: `Doku/IF820_
 
 ---
 
+## ⚠ Merker: Spannungsversorgung instabil (2026-06-21)
+
+**Unbedingt merken / noch offen.** Symptom: Der PC findet `VIASIS_12SC3456` nur schlecht und
+**verliert die Verbindung wieder**; zeitweise erscheinen **gleichzeitig** `Fehler Bluetooth`
+*und* `Fehler GSM/GPRS` (Version 5.88 läuft).
+
+Verdacht: **Brownout auf der gemeinsamen 3,3-V-Versorgung.** Das IF820 wird über Fly-Leads
+(J4/J5) aus der Hauptplatine gespeist; Sende-Stromspitzen von BT und/oder LTE lassen die Schiene
+einbrechen → Modul(e) resetten → Gerät „verschwindet" und kommt wieder. Frühere Indizien:
+flackeriger Loopback (erst 1/6 Byte) = marginale Kontakte/Versorgung.
+
+To-Do, wenn wir das angehen:
+- DVK testweise über **eigenes USB** versorgen (nur GND + UART teilen) → bleibt es stabil, ist
+  es die 3,3-V-Speisung/Kontaktierung.
+- **3,3 V unter Last messen** (Oszi/Logikanalysator), Stromreserve prüfen, Stützkondensatoren,
+  solide Kontakte an J4/J5.
+- Wechselwirkung mit **LTE-Modem-TX** prüfen (gemeinsame Schiene? gleichzeitiges Wegbrechen
+  beider Funkmodule deutet darauf hin).
+- Optional Firmware-Diagnose: `@E,…,BOOT,…`-Events mitlesen (= Reset-Nachweis); Sleep testweise
+  aus (`SSLP,L=00`).
+
+---
+
 ## Phase 0 – Bring-up / Lebenszeichen (JETZT)
 
 **STATUS 2026-06-16: ERREICHT.** `/PING` -> `@R,001D,/PING,0000,R=0000006C,F=A6DC` bei
 115200 empfangen (45 Byte, sauber), IF820 erkannt ("Bluetooth IF820: 115200"). Ursache der
-anfaenglichen RX=0-Fehler war ein Wackelkontakt in der Datenstrecke (Loopback gab erst 1/6
-Byte, nach solider Verbindung 6/6). CTS liegt jetzt auf LOW. TxD/RxD, Pegel, Baudrate und
+anfaenglichen RX=0-Fehler: die UART-Kabel waren nicht gekreuzt (RTS<->CTS und TxD<->RxD
+vertauscht). Nach korrekter Kreuzung (MCU-CTS<->BT-RTS, MCU-TxD<->BT-RxD) lief der /PING
+sofort durch. CTS liegt jetzt auf LOW. TxD/RxD, Pegel, Baudrate und
 Toolchain damit bestaetigt.
+
+**Update 5.84:** Flow Control (STU F=1) + CTS/RTS-Leitungen verifiziert: CTS=LOW unter FlowCtl
+(Modul treibt RTS aktiv), `/PING` ueber Normalpfad (CTS respektiert) liefert `@R`. 4-Draht-UART
+komplett ok. CTS-Bypass-Hack damit nicht mehr noetig. Wurzelursache war nicht gekreuzte
+Verkabelung (RTS<->CTS, TxD<->RxD).
+
+**Update 5.85/5.86:** Erkennung auf Normalpfad aufgeraeumt (Debug-Probe + CTS-Bypass entfernt).
+Generische Flow-Control-Verwaltung eingebaut: `bt_get_flowcontrol()` / `bt_set_flowcontrol()` /
+`bt_ensure_flowcontrol()` mit Dispatch je Modultyp + `default`-Fangnetz (neues Modul wird nicht
+still durchgewunken). IF820 voll implementiert: GTU-Abfrage -> bei Bedarf STU F=01 + /SCFG ->
+Verifikation per GTU. Flash-Write nur wenn noetig (schont Flash). RN4678/Laird als TODO-Stubs.
+
+**Update 5.87:** BT-Name generisch (Name = VIASIS_<serno>): `bt_get_name()` / `bt_set_name()` /
+`bt_ensure_name()`, gleiche Dispatch-Logik + `default`-Fangnetz. IF820: GDN-Abfrage -> bei Bedarf
+`SDN$` (schreibt direkt RAM+Flash) -> Verifikation per GDN. Schreibt nur, wenn Name noch nicht
+VIASIS_<serno> ist; ohne gesetzte Seriennummer wird uebersprungen. RN4678/Laird als TODO-Stubs.
+
+**Update 5.88:** Bugfix Name. `SDN`/`GDN` haben einen Typ-Parameter `T` (0=BLE, 1=BT-Classic).
+Bisher nur BLE-Name (T=0 default) gesetzt -> PC sah im SPP-Scan weiter den Werks-Classic-Namen
+"EZ-Serial <MAC>_BT". Jetzt werden BEIDE gesetzt (`SDN$,T=00` und `SDN$,T=01`) und beide
+geprueft. Hinweis: BLE-Name ist sofort aktiv, der BT-Classic-Name wird ggf. erst nach
+Modul-Power-Cycle im Inquiry sichtbar (SDN$ persistiert in Flash).
 
 Ziel: `/PING` an den IF820 senden und `@R,...,/PING,0000` zurückbekommen. Damit sind
 UART-Verdrahtung, Pegel und Toolchain bewiesen. Bewusst **ohne** Steuerpins, ohne SPP-Verbindung.
@@ -104,3 +150,121 @@ Firmware flashen → über RS232-Terminal die BT-Init/Detect anstoßen → `/PIN
 - [ ] Test 10 BLE Discovery + Classic SPP
 - [ ] Test 11 Reichweite / Leistung
 - [ ] Test 12 Timing nach Reboot
+
+
+---
+
+## Fehler-Codes (DTC) — Mechanismus & Registry  (ab Version 5.89)
+
+Ziel: jeder Fehler bekommt einen **eindeutigen** Marker `DTC<nnnnn>`, damit man ihn im Feld/Log
+zweifelsfrei zuordnen kann. **Dubletten sind strukturell unmöglich.**
+
+**Funktionsweise:** `dtc.h` definiert Makros, die `puterror()`, `puterrstr()` und `dtcerr()`
+automatisch auf Varianten mit Code `DTCBASE + __LINE__` umleiten. Jede .c-Datei setzt ihre
+eigene `DTCBASE` (10000er-Schritte) vor `#include "dtc.h"`. Da alle Dateien < 10000 Zeilen
+haben, kann sich kein Code mit einem anderen überschneiden.
+
+**Ausgabe am Terminal:** `Fehler DTC<code> <Kategorie/Text>` (z. B. `Fehler DTC10204 Bluetooth`).
+Bei `puterror` wird der eindeutige Code zusätzlich in den Flash protokolliert (`protocol(dtc)`).
+
+**Datei-Basis → Quelle (so dekodiert man einen DTC):**
+
+| DTCBASE | Datei | Beispiel |
+|---------|-------|----------|
+| 10000 | btio.c | DTC10204 = btio.c, Zeile 204 |
+| 20000 | gsmio.c | |
+| 30000 | sicom.c | |
+| 40000 | mqtt.c | |
+| 50000 | gpsio.c | |
+| 60000 | flash.c | |
+| 70000 | main.c | |
+| 80000 | libtool.c | |
+| 90000 | USB_tools.c | |
+| 100000 | sictst.c | |
+
+Dekodierung: führende Stelle(n) = Datei (1xxxx = btio …), Rest = Quellzeile.
+
+**Neue Funktionen/Dateien:** `dtc.h` (neu); in `sio.c`/`sio.h` ersetzt durch
+`puterror_dtc()`, `puterrstr_dtc()`, `dctext()` (Makro `dtcerr`).
+
+**Neue Fehlerdatei hinzufügen:** nächste freie `DTCBASE` (110000, 120000, …) definieren und
+`#include "dtc.h"` ergänzen — sonst nichts.
+
+**Bekannter Kompromiss:** Da der Code zeilenbasiert ist, ändert sich der DTC einer Fehlerstelle,
+wenn darüber Zeilen eingefügt/entfernt werden. Dafür sind Dubletten ausgeschlossen und der Code
+zeigt direkt Datei + Quellzeile.
+
+
+---
+
+## Update 5.90 — IF820-Zweige + GSM-Baudrate variabel
+
+**Vier BT-Funktionen IF820-fähig gemacht** (`btio.c`): `test_BT`, `send_bt_info`, `set_bt_name`,
+`set_bt_pin`. Ursache der DTC10384 war, dass `fp.btmodem>Laird` für IF820 (=82) wahr ist und in
+den RN4678-Pfad (`$$$`) lief. Jetzt hat jede Funktion einen eigenen `if (fp.btmodem==IF820)`-Zweig:
+- `test_BT`: Lebenstest per `/PING`.
+- `send_bt_info`: `/PING` + Ausgabe „Bluetooth IF820".
+- `set_bt_name`: setzt eingegebenen Namen per `SDN$,T=00` und `SDN$,T=01` (BLE + Classic).
+- `set_bt_pin`: PIN ungenutzt (Just Works) → Hinweis, kein Fehler.
+
+**GSM_BAUD jetzt einstellbar:** war hart auf 115200 (Testphase), ist jetzt die Variable
+`gsmbaud` (in `hard.c`, `extern` in `hard.h`), Default **460800** (= ursprünglicher Wert, passt
+zu `AT+IPR=460800`). Damit könnte auch DTC20311 zusammenhängen, falls es ein Baud-Mismatch war.
+`gsmbaud` ist eine RAM-Variable; für persistente Einstellung müsste sie ins `fp`-Parameterblock
+(Flash-Layout-Änderung – separat zu machen).
+
+
+---
+
+## Update 5.91 — /RBT-Automatik nach Namens-Schreiben
+
+`bt_set_name()` (IF820) sendet nach erfolgreichem `SDN$,T=00`+`T=01` ein `/RBT` und wartet per
+Dot-Schleife auf das Boot-Signal. Damit geht der **BT-Classic-Inquiry-Name sofort live** (er wird
+beim Modul-Boot aus dem Flash gelesen) — kein manuelles Power-Cycle mehr noetig. Reboot nur, wenn
+der Name tatsaechlich (neu) geschrieben wird (einmalig bei Konfiguration).
+
+Offen: **SPP-Datenmodus / "verbinden"** — Geraet wird gefunden/gepairt (Name VIASIS_<serno>), aber
+der transparente SPP-Datenkanal braucht die CYSPP/CONNECTION-Steuerpins (HW-Backlog). Das ist der
+naechste grosse Schritt.
+
+
+---
+
+## ⚠ HW-Check offen: Pull-up auf CYSPP-Leitung (IC54 Bit7)
+
+CYSPP (DVK J1.14) ist auf die bestehende BT-Status-Leitung **IC54 Bit7** (= Software-Bit
+`BT_LINK`, low-aktiv) gelegt, damit die vorhandene Connect-Logik (`communication_change()` in
+libtool.c) die SPP-Verbindung erkennt.
+
+**Zu prüfen / ggf. nachrüsten:** CYSPP **floatet**, wenn keine Verbindung besteht – das Modul
+treibt den Pin **nur bei SPP-Connect auf LOW**. Damit „nicht verbunden" zuverlässig als **HIGH**
+gelesen wird, braucht die Leitung einen **Pull-up (~10 kΩ gegen 3,3 V)**.
+
+Wichtig: Der alte RN4678-Status-Pin trieb HIGH **aktiv** (push-pull) – die Leitung hat daher
+evtl. **keinen** Pull-up. Ohne Pull-up → erratische/falsche Verbindungserkennung (BT_LINK
+flackert). Also: Pegel der CYSPP/IC54-Bit7-Leitung im **unverbundenen** Zustand messen; ist er
+nicht sauber HIGH, **10 kΩ gegen 3,3 V** ergänzen.
+
+(Sauberer waere der dedizierte CONNECTION-Pin des IF820 – der ist aber am DVK nicht als
+Header-Pin herausgefuehrt.)
+
+
+---
+
+## MEILENSTEIN (5.92): SPP-Datenmodus + Menue ueber Bluetooth funktioniert
+
+Mit **CYSPP (DVK J1.14) -> IC54 Bit7** (ohne harten Pull-up) laeuft die volle Menuebedienung
+ueber Bluetooth Classic (SPP):
+- Bei SPP-Connect treibt das **Modul CYSPP selbst auf LOW** -> Datenmodus aktiv (transparenter
+  UART), und IC54 Bit7 liest LOW -> `BT_LINK` aktiv -> `communication_change()` routet das
+  Hauptmenue an UART1. Eingaben funktionieren problemlos.
+- Geraetenamen: BLE = `VIASIS_<serno>`, Classic = `VIASIS_<serno>_BT`.
+
+Wichtig: **Keinen harten Pull-up** auf die CYSPP/IC54-Leitung legen — ein erzwungenes HIGH sagt
+dem Modul "Kommandomodus" und kann den SPP-Connect verhindern. Das Modul treibt die Leitung
+selbst.
+
+**Residual / noch zu beobachten:** Im **unverbundenen** Zustand floatet CYSPP -> IC54 Bit7 kann
+erratisch lesen -> evtl. sporadisch falsches `BT_LINK` / Fremdzeichen / Spontan-DTC (z. B. das
+fruehere DTC31405). Falls das stoert: in SW abfangen (BT_LINK entprellen / nur stabile Flanke
+werten, bzw. EZ-Serial-Events filtern) — NICHT per Pull-up (Konflikt mit SPP-Connect).

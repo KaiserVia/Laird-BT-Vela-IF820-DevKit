@@ -26,3 +26,4 @@
 .\objects\sictst.o: C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\usb_msc.h
 .\objects\sictst.o: sictst.h
 .\objects\sictst.o: sictxt.h
+.\objects\sictst.o: dtc.h

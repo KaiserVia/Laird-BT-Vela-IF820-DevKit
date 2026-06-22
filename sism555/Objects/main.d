@@ -30,3 +30,4 @@
 .\objects\main.o: libtool.h
 .\objects\main.o: measure.h
 .\objects\main.o: mqtt.h
+.\objects\main.o: dtc.h

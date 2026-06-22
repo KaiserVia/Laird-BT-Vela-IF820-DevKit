@@ -23,3 +23,4 @@
 .\objects\mqtt.o: mqtt.h
 .\objects\mqtt.o: sicom.h
 .\objects\mqtt.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
+.\objects\mqtt.o: dtc.h

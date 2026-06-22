@@ -1,7 +1,7 @@
 Dependencies for Project 'sism', Target 'sism': (DO NOT MODIFY !)
-F (.\sprachen\sictxt.c)(0x6A3153E5)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt.o --omf_browse .\objects\sictxt.crf --depend .\objects\sictxt.d)
+F (.\sprachen\sictxt.c)(0x6A38EA27)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt.o --omf_browse .\objects\sictxt.crf --depend .\objects\sictxt.d)
 I (sprachen\../sictxt.h)(0x69EF5696)
-I (sprachen\../hard.h)(0x69F8B586)
+I (sprachen\../hard.h)(0x6A38D5D6)
 I (sprachen\../alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -11,22 +11,22 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
-F (.\main.c)(0x69F9BC09)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
+F (.\main.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdint.h)(0x540EEAF4)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 I (rtc.h)(0x5B90F16A)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmInstr.h)(0x53FF551A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmFunc.h)(0x53FF551A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (gsmio.h)(0x69F9B098)
 I (gpsio.h)(0x697C7B66)
-I (btio.h)(0x6A3148FE)
+I (btio.h)(0x6A38DABF)
 I (sictxt.h)(0x69EF5696)
 I (flash.h)(0x5B87B7A4)
 I (USB_tools.h)(0x551284DE)
@@ -43,8 +43,9 @@ I (ramcode.h)(0x55DED1C2)
 I (libtool.h)(0x687F666C)
 I (measure.h)(0x54EC5E2A)
 I (mqtt.h)(0x6787ACE2)
-F (.\hard.c)(0x69F9B098)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\hard.o --omf_browse .\objects\hard.crf --depend .\objects\hard.d)
-I (hard.h)(0x69F8B586)
+I (dtc.h)(0x6A38D0DD)
+F (.\hard.c)(0x6A38D5D6)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\hard.o --omf_browse .\objects\hard.crf --depend .\objects\hard.d)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -54,12 +55,12 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
-I (btio.h)(0x6A3148FE)
+I (btio.h)(0x6A38DABF)
 I (ramcode.h)(0x55DED1C2)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
 I (sictxt.h)(0x69EF5696)
-F (.\libtool.c)(0x6A01DC29)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\libtool.o --omf_browse .\objects\libtool.crf --depend .\objects\libtool.d)
-I (hard.h)(0x69F8B586)
+F (.\libtool.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\libtool.o --omf_browse .\objects\libtool.crf --depend .\objects\libtool.d)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -69,11 +70,11 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (sicom.h)(0x60AE5A7C)
 I (gsmio.h)(0x69F9B098)
 I (gpsio.h)(0x697C7B66)
-I (btio.h)(0x6A3148FE)
+I (btio.h)(0x6A38DABF)
 I (rtc.h)(0x5B90F16A)
 I (i2cm.h)(0x5C0E3604)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_I2C.h)(0x6985E0C5)
@@ -87,8 +88,9 @@ I (libtool.h)(0x687F666C)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
 I (sictst.h)(0x624C5CB2)
 I (mqtt.h)(0x6787ACE2)
+I (dtc.h)(0x6A38D0DD)
 F (.\i2cm.c)(0x5F84201C)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\i2cm.o --omf_browse .\objects\i2cm.crf --depend .\objects\i2cm.d)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -104,7 +106,7 @@ I (i2cm.h)(0x5C0E3604)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_I2C.h)(0x6985E0C5)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_Common.h)(0x53061E88)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (sictxt.h)(0x69EF5696)
 F (.\fio.c)(0x5731BE38)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\fio.o --omf_browse .\objects\fio.crf --depend .\objects\fio.d)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdio.h)(0x540EEAF4)
@@ -112,7 +114,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdint.h)(0x540EEAF4)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
 I (sictxt.h)(0x69EF5696)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -123,9 +125,9 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_o
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 I (xmodem.h)(0x5C52CDC8)
 I (flash.h)(0x5B87B7A4)
-F (.\flash.c)(0x69C147E6)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\flash.o --omf_browse .\objects\flash.crf --depend .\objects\flash.d)
+F (.\flash.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\flash.o --omf_browse .\objects\flash.crf --depend .\objects\flash.d)
 I (flash.h)(0x5B87B7A4)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -138,7 +140,7 @@ I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 I (ramcode.h)(0x55DED1C2)
 I (libtool.h)(0x687F666C)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (rtc.h)(0x5B90F16A)
 I (i2cm.h)(0x5C0E3604)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_I2C.h)(0x6985E0C5)
@@ -146,9 +148,10 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\
 I (mqtt.h)(0x6787ACE2)
 I (sictxt.h)(0x69EF5696)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
+I (dtc.h)(0x6A38D0DD)
 F (.\ramcode.c)(0x5F620E60)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\ramcode.o --omf_browse .\objects\ramcode.crf --depend .\objects\ramcode.d)
 I (flash.h)(0x5B87B7A4)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -159,8 +162,8 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 I (ramcode.h)(0x55DED1C2)
-F (.\sicom.c)(0x69F9B098)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sicom.o --omf_browse .\objects\sicom.crf --depend .\objects\sicom.d)
-I (hard.h)(0x69F8B586)
+F (.\sicom.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sicom.o --omf_browse .\objects\sicom.crf --depend .\objects\sicom.d)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -175,10 +178,10 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_Common.h)(0x53061E88)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
 I (flash.h)(0x5B87B7A4)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (fio.h)(0x550FCC9A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include\rl_fs.h)(0x5448C3C6)
-I (btio.h)(0x6A3148FE)
+I (btio.h)(0x6A38DABF)
 I (gsmio.h)(0x69F9B098)
 I (gpsio.h)(0x697C7B66)
 I (mqtt.h)(0x6787ACE2)
@@ -189,11 +192,12 @@ I (ramcode.h)(0x55DED1C2)
 I (sictst.h)(0x624C5CB2)
 I (sictxt.h)(0x69EF5696)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
-F (.\sio.c)(0x69F8850A)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sio.o --omf_browse .\objects\sio.crf --depend .\objects\sio.d)
+I (dtc.h)(0x6A38D0DD)
+F (.\sio.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sio.o --omf_browse .\objects\sio.crf --depend .\objects\sio.d)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdint.h)(0x540EEAF4)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -201,7 +205,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmFunc.h)(0x53FF551A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
 I (flash.h)(0x5B87B7A4)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (sictxt.h)(0x69EF5696)
 I (libtool.h)(0x687F666C)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
@@ -211,9 +215,9 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\usb_cdc.h)(0x5448D2F6)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\usb_hid.h)(0x5448D2F6)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\usb_msc.h)(0x5448D2F6)
-F (.\sictst.c)(0x62D92D9C)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictst.o --omf_browse .\objects\sictst.crf --depend .\objects\sictst.d)
+F (.\sictst.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictst.o --omf_browse .\objects\sictst.crf --depend .\objects\sictst.d)
 I (i2cm.h)(0x5C0E3604)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -228,7 +232,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
 I (flash.h)(0x5B87B7A4)
 I (ramcode.h)(0x55DED1C2)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (rtc.h)(0x5B90F16A)
 I (libtool.h)(0x687F666C)
 I (USB_tools.h)(0x551284DE)
@@ -239,7 +243,8 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\usb_msc.h)(0x5448D2F6)
 I (sictst.h)(0x624C5CB2)
 I (sictxt.h)(0x69EF5696)
-F (.\USB_tools.c)(0x5DB03940)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\usb_tools.o --omf_browse .\objects\usb_tools.crf --depend .\objects\usb_tools.d)
+I (dtc.h)(0x6A38D0DD)
+F (.\USB_tools.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\usb_tools.o --omf_browse .\objects\usb_tools.crf --depend .\objects\usb_tools.d)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\rl_usb.h)(0x544A0F7E)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdint.h)(0x540EEAF4)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
@@ -252,14 +257,14 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include\rl_fs.h)(0x5448C3C6)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_USART.h)(0x53859056)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_Common.h)(0x53061E88)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmInstr.h)(0x53FF551A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cmFunc.h)(0x53FF551A)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (rtc.h)(0x5B90F16A)
 I (fio.h)(0x550FCC9A)
 I (flash.h)(0x5B87B7A4)
@@ -267,9 +272,10 @@ I (sicom.h)(0x60AE5A7C)
 I (sictxt.h)(0x69EF5696)
 I (libtool.h)(0x687F666C)
 I (ramcode.h)(0x55DED1C2)
+I (dtc.h)(0x6A38D0DD)
 F (.\rtc.c)(0x696E0084)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\rtc.o --omf_browse .\objects\rtc.crf --depend .\objects\rtc.d)
 I (rtc.h)(0x5B90F16A)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -283,7 +289,7 @@ I (i2cm.h)(0x5C0E3604)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_I2C.h)(0x6985E0C5)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_Common.h)(0x53061E88)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (sictst.h)(0x624C5CB2)
 I (sicom.h)(0x60AE5A7C)
 I (libtool.h)(0x687F666C)
@@ -291,7 +297,7 @@ I (flash.h)(0x5B87B7A4)
 I (mqtt.h)(0x6787ACE2)
 I (sictxt.h)(0x69EF5696)
 F (.\measure.c)(0x69F8A0E9)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\measure.o --omf_browse .\objects\measure.crf --depend .\objects\measure.d)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -302,8 +308,8 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 I (flash.h)(0x5B87B7A4)
-I (sio.h)(0x6924638C)
-I (btio.h)(0x6A3148FE)
+I (sio.h)(0x6A38D0DD)
+I (btio.h)(0x6A38DABF)
 I (gsmio.h)(0x69F9B098)
 I (gpsio.h)(0x697C7B66)
 I (mqtt.h)(0x6787ACE2)
@@ -322,8 +328,8 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\usb_hid.h)(0x5448D2F6)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include\usb_msc.h)(0x5448D2F6)
 F (.\xmodem.c)(0x64D229BE)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\xmodem.o --omf_browse .\objects\xmodem.crf --depend .\objects\xmodem.d)
-I (sio.h)(0x6924638C)
-I (hard.h)(0x69F8B586)
+I (sio.h)(0x6A38D0DD)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -343,9 +349,9 @@ I (libtool.h)(0x687F666C)
 I (xmodem.h)(0x5C52CDC8)
 I (sictxt.h)(0x69EF5696)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
-F (.\btio.c)(0x6A315340)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\btio.o --omf_browse .\objects\btio.crf --depend .\objects\btio.d)
+F (.\btio.c)(0x6A38EA27)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\btio.o --omf_browse .\objects\btio.crf --depend .\objects\btio.d)
 I (libtool.h)(0x687F666C)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -356,14 +362,15 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
-I (btio.h)(0x6A3148FE)
+I (btio.h)(0x6A38DABF)
 I (gsmio.h)(0x69F9B098)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (sictxt.h)(0x69EF5696)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
-F (.\gsmio.c)(0x69F9B098)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\gsmio.o --omf_browse .\objects\gsmio.crf --depend .\objects\gsmio.d)
+I (dtc.h)(0x6A38D0DD)
+F (.\gsmio.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\gsmio.o --omf_browse .\objects\gsmio.crf --depend .\objects\gsmio.d)
 I (gsmio.h)(0x69F9B098)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -373,13 +380,13 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
-I (btio.h)(0x6A3148FE)
+I (btio.h)(0x6A38DABF)
 I (i2cm.h)(0x5C0E3604)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_I2C.h)(0x6985E0C5)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include\Driver_Common.h)(0x53061E88)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
 I (rtc.h)(0x5B90F16A)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (sicom.h)(0x60AE5A7C)
 I (sictxt.h)(0x69EF5696)
 I (libtool.h)(0x687F666C)
@@ -388,9 +395,10 @@ I (flash.h)(0x5B87B7A4)
 I (ramcode.h)(0x55DED1C2)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
 I (mqtt.h)(0x6787ACE2)
-F (.\mqtt.c)(0x69F89EF0)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\mqtt.o --omf_browse .\objects\mqtt.crf --depend .\objects\mqtt.d)
-I (sio.h)(0x6924638C)
-I (hard.h)(0x69F8B586)
+I (dtc.h)(0x6A38D0DD)
+F (.\mqtt.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\mqtt.o --omf_browse .\objects\mqtt.crf --depend .\objects\mqtt.d)
+I (sio.h)(0x6A38D0DD)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -413,9 +421,10 @@ I (sictxt.h)(0x69EF5696)
 I (mqtt.h)(0x6787ACE2)
 I (sicom.h)(0x60AE5A7C)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\string.h)(0x540EEAF4)
-F (.\gpsio.c)(0x697C7B30)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\gpsio.o --omf_browse .\objects\gpsio.crf --depend .\objects\gpsio.d)
+I (dtc.h)(0x6A38D0DD)
+F (.\gpsio.c)(0x6A38D0DD)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\gpsio.o --omf_browse .\objects\gpsio.crf --depend .\objects\gpsio.d)
 I (gpsio.h)(0x697C7B66)
-I (hard.h)(0x69F8B586)
+I (hard.h)(0x6A38D5D6)
 I (alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -425,17 +434,18 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\system_LPC17xx.h)(0x4DA54DDC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_os.h)(0x541FFDA6)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
-I (sio.h)(0x6924638C)
+I (sio.h)(0x6A38D0DD)
 I (sictxt.h)(0x69EF5696)
 I (libtool.h)(0x687F666C)
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stdbool.h)(0x540EEAF4)
 I (gsmio.h)(0x69F9B098)
 I (mqtt.h)(0x6787ACE2)
 I (flash.h)(0x5B87B7A4)
+I (dtc.h)(0x6A38D0DD)
 F (.\sictxt.h)(0x69EF5696)()
 F (.\sprachen\sictxt_d-f-i.c)(0x686F8D96)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt_d-f-i.o --omf_browse .\objects\sictxt_d-f-i.crf --depend .\objects\sictxt_d-f-i.d)
 I (sprachen\../sictxt.h)(0x69EF5696)
-I (sprachen\../hard.h)(0x69F8B586)
+I (sprachen\../hard.h)(0x6A38D5D6)
 I (sprachen\../alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -447,7 +457,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_o
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 F (.\sprachen\sictxt_d-f-pl.c)(0x687F3F7A)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt_d-f-pl.o --omf_browse .\objects\sictxt_d-f-pl.crf --depend .\objects\sictxt_d-f-pl.d)
 I (sprachen\..\sictxt.h)(0x69EF5696)
-I (sprachen\..\hard.h)(0x69F8B586)
+I (sprachen\..\hard.h)(0x6A38D5D6)
 I (sprachen\..\alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -459,7 +469,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_o
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 F (.\sprachen\sictxt_e-cz-sl.c)(0x687F3F7A)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt_e-cz-sl.o --omf_browse .\objects\sictxt_e-cz-sl.crf --depend .\objects\sictxt_e-cz-sl.d)
 I (sprachen\../sictxt.h)(0x69EF5696)
-I (sprachen\../hard.h)(0x69F8B586)
+I (sprachen\../hard.h)(0x6A38D5D6)
 I (sprachen\../alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -471,7 +481,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_o
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 F (.\sprachen\sictxt_e-es-i.c)(0x687F3F7A)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt_e-es-i.o --omf_browse .\objects\sictxt_e-es-i.crf --depend .\objects\sictxt_e-es-i.d)
 I (sprachen\../sictxt.h)(0x69EF5696)
-I (sprachen\../hard.h)(0x69F8B586)
+I (sprachen\../hard.h)(0x6A38D5D6)
 I (sprachen\../alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -483,7 +493,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_o
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 F (.\sprachen\sictxt_e-es-pt.c)(0x687F3F7A)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt_e-es-pt.o --omf_browse .\objects\sictxt_e-es-pt.crf --depend .\objects\sictxt_e-es-pt.d)
 I (sprachen\../sictxt.h)(0x69EF5696)
-I (sprachen\../hard.h)(0x69F8B586)
+I (sprachen\../hard.h)(0x6A38D5D6)
 I (sprachen\../alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)
@@ -495,7 +505,7 @@ I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC\cmsis_o
 I (C:\Keil_v5\ARM\ARMCC_504u2\include\stddef.h)(0x540EEAF4)
 F (.\sprachen\sictxt_e-f-nl.c)(0x687F3E8A)(-c --cpu Cortex-M3 -D__RTX -g -O2 --apcs=interwork -I.\RTE\Device\LPC1768-I.\RTE\_sism-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Driver\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS_RTX\INC-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\RTE_Driver-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\FileSystem\Include-IC:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\MDK-Middleware\6.2.0\USB\Include-D__UVISION_VERSION="528" -D_RTE_ -DLPC175x_6x-o .\objects\sictxt_e-f-nl.o --omf_browse .\objects\sictxt_e-f-nl.crf --depend .\objects\sictxt_e-f-nl.d)
 I (sprachen\../sictxt.h)(0x69EF5696)
-I (sprachen\../hard.h)(0x69F8B586)
+I (sprachen\../hard.h)(0x6A38D5D6)
 I (sprachen\../alilpc.h)(0x62A717EC)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\Keil\LPC1700_DFP\2.0.0\Device\Include\lpc17xx.h)(0x4FF56068)
 I (C:\Users\Kaiser\AppData\Local\Arm\Packs\ARM\CMSIS\4.2.0\CMSIS\Include\core_cm3.h)(0x53FC944A)

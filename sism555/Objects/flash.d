@@ -21,3 +21,4 @@
 .\objects\flash.o: mqtt.h
 .\objects\flash.o: sictxt.h
 .\objects\flash.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
+.\objects\flash.o: dtc.h

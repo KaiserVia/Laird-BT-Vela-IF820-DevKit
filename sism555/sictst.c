@@ -26,6 +26,8 @@
 #include "USB_tools.h"
 #include "sictst.h"
 #include "sictxt.h"
+#define DTCBASE 100000
+#include "dtc.h"
 
 uchar lookup_i2cdevices (uchar dadr)						// Prüft I2C Device List auf Adresseintrag
 {																								// Übergabe Device Adresse: dadr

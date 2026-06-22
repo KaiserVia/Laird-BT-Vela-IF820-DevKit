@@ -28,6 +28,8 @@
 #include "cmsis_os.h"
 #include "sictxt.h"
 #include <string.h>
+#define DTCBASE 60000
+#include "dtc.h"
 
 void EINT0_IRQHandler (void)		// Interruptanforderung Power Down
 {

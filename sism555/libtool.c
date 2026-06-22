@@ -32,6 +32,8 @@
 #include "string.h"
 #include "sictst.h"
 #include "mqtt.h"
+#define DTCBASE 80000
+#include "dtc.h"
 
 const ushort crc_table[PAGE] = {
 0x0000,0x1021,0x2042,0x3063,0x4084,0x50A5,0x60C6,0x70E7,0x8108,0x9129,0xA14A,0xB16B,0xC18C,0xD1AD,0xE1CE,0xF1EF,
@@ -657,7 +659,7 @@ void modem_com (void)						// Direkte Kommunikation mit Modems
 	else 
 	{	
 	 connect=concpy;										
-	 put2str(T_err,E_gsm);						// Fehlermeldung ausgeben
+	 dtcerr(E_gsm);						// Fehlermeldung ausgeben
 	 newline();	
 	 return;	
 	}		 

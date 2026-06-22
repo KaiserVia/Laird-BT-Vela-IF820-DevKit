@@ -537,9 +537,15 @@ int ja (text *s)				// Prüft Eingabe ob Ja oder Nein
  return(result);
 }
 
-void puterrstr (uchar ln) { putc(' '); putstr(T_err); if (ln) newline(); } // Text "Fehler " formatiert ausgeben
+void puterrstr_dtc (uchar ln, uint dtc) { putc(' '); putstr(T_err); putstr("DTC"); putnumber(dtc,0); if (ln) newline(); } // Text "Fehler " formatiert ausgeben
 
-int puterror (int errorno, int errorval)		// Fehlermeldung und Nummer ausgeben
+void dctext (text *msg, uint dtc)   // "Fehler DTCxxx <msg>" + Log, ohne Zeilenumbruch
+{
+ putstr(T_err); putstr("DTC"); putnumber(dtc,0); putc(' '); putstr(msg);
+ if (flashsize) protocol (dtc);
+}
+
+int puterror_dtc (int errorno, int errorval, uint dtc)		// Fehlermeldung und Nummer ausgeben
 {																						// Übergaben 	errorno - Fehlernummer in Fehlerliste
 																						// 						errorval - Rückgabewert -1/0 = kein Ausgabewert/kein Fehler						
  int i;												// Index für Fehlermeldungsliste
@@ -548,10 +554,11 @@ int puterror (int errorno, int errorval)		// Fehlermeldung und Nummer ausgeben
  {
   newline();																			// neue Zeile
   putstr(T_err);																	// Fehlermeldung
+  putstr("DTC"); putnumber(dtc,0);                       /* eindeutiger Marker */
   if (errorno<0) errorno=200-errorno;							// Neg. Fehlermeldungen 
   i=number_exists (errorno, errno, MAXERRORTEXT); // Alle Einträge in Fehlertabelle prüfen
-  if (i>=0) putstr(errtxt[i]);										// Fehlertextausgabe
-  else putnumber(errorno,0x84);										// Sonst Fehlernummer in Hexausgabe	
+  if (i>=0) { putc(' '); putstr(errtxt[i]); }										// Fehlertextausgabe
+  /* kein Hex-Fallback noetig: DTC zeigt den Code */										// Sonst Fehlernummer in Hexausgabe	
 	if (errorval!=-1)
   {		
 	 putc(' ');
@@ -559,7 +566,7 @@ int puterror (int errorno, int errorval)		// Fehlermeldung und Nummer ausgeben
 	}	
   newline();	
  
-  if (flashsize) protocol (errorno);							// Falls Flash vorhanden, Fehler dort protokollieren
+  if (flashsize) protocol (dtc);							// Falls Flash vorhanden, Fehler dort protokollieren
  }	
  
  return (errorval);																// Fehlerwert durchreichen	

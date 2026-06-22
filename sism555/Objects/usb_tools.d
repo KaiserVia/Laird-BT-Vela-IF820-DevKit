@@ -26,3 +26,4 @@
 .\objects\usb_tools.o: sictxt.h
 .\objects\usb_tools.o: libtool.h
 .\objects\usb_tools.o: ramcode.h
+.\objects\usb_tools.o: dtc.h

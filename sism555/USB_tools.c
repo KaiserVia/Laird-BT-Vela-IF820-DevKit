@@ -29,6 +29,8 @@
 #include "sictxt.h"
 #include "libtool.h"
 #include "ramcode.h"
+#define DTCBASE 90000
+#include "dtc.h"
 
 
 CDC_LINE_CODING LineCoding;									// VCP Übertragungsparameter

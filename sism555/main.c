@@ -30,6 +30,8 @@
 #include "libtool.h"
 #include "measure.h"
 #include "mqtt.h"
+#define DTCBASE 70000
+#include "dtc.h"
 
 
  

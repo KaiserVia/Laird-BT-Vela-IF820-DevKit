@@ -16,3 +16,4 @@
 .\objects\btio.o: sio.h
 .\objects\btio.o: sictxt.h
 .\objects\btio.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
+.\objects\btio.o: dtc.h

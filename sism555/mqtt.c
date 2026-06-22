@@ -27,6 +27,8 @@
 #include "mqtt.h"
 #include "sicom.h"
 #include <string.h>
+#define DTCBASE 40000
+#include "dtc.h"
 
 text MQTTCONHEAD[10]	= {0x00,0x04,'M','Q','T','T',0x04,0xCE,0x02,0x58};
 text MQTTDISCON[2]		= {0xE0,0x00};

@@ -34,6 +34,8 @@
 #include "ramcode.h"
 #include "string.h"
 #include "mqtt.h"
+#define DTCBASE 20000
+#include "dtc.h"
 
 const char T_month[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };		// Monate für Email Header Date
 
@@ -267,7 +269,7 @@ void init_gsm (void)	// GSM Modem initialisieren
   
  if (!fp.gsm) 											// Fehler?
  {	 
-	put2str(T_err,E_gsm);							// Fehlermeldung ausgeben
+	dtcerr(E_gsm);							// Fehlermeldung ausgeben
 	newline(); 
   gsm_power(0);											// GSM aus und deselektieren
  }	 
@@ -309,7 +311,7 @@ int test_gsm (uchar poweron)	// Prüfe ob GSM/GPRS Modem antwortet
 	if (poweron) puterror(GSM_ERROR,-1);	// beim Einschalten Fehler melden und protokollieren
 	else  
 	{
-	 put2str(T_err,E_gsm);						// Fehlermeldung ausgeben
+	 dtcerr(E_gsm);						// Fehlermeldung ausgeben
 	 newline();	
   }		
  } // end if result

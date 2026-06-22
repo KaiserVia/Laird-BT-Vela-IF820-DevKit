@@ -25,3 +25,4 @@
 .\objects\gsmio.o: ramcode.h
 .\objects\gsmio.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
 .\objects\gsmio.o: mqtt.h
+.\objects\gsmio.o: dtc.h

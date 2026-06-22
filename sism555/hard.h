@@ -483,6 +483,7 @@ extern volatile uchar rpi;						// Empfangsindex Empfangsringpuffer MQTT und Plu
 extern volatile uchar bpi;						// Bearbeitungsindex Empfangsringpuffer MQTT und Plus Kommunikation
 extern ushort cind;										// Index Char Zeichenpuffer
 /*** GSM/EMAIL/SMS ***/
+extern uint  gsmbaud;                   // einstellbare GSM-Baudrate (Default 460800)
 extern uchar gsmpower;								// 0 wenn GSM 3V5 Spannungsversorgung aus
 extern uchar simpinset;								// 1 wenn GSM SIM Pinnummer gesetzt
 extern uchar gsmcall;									// 1 bei transparenter GSM Einwahlverbindung

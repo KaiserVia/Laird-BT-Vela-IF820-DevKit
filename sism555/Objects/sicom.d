@@ -28,3 +28,4 @@
 .\objects\sicom.o: sictst.h
 .\objects\sicom.o: sictxt.h
 .\objects\sicom.o: C:\Keil_v5\ARM\ARMCC_504u2\Bin\..\include\string.h
+.\objects\sicom.o: dtc.h

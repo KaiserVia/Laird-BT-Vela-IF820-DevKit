@@ -33,6 +33,8 @@
 #include "sictst.h"
 #include "sictxt.h"
 #include "string.h"
+#define DTCBASE 30000
+#include "dtc.h"
 
 
 
@@ -460,7 +462,7 @@ void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
  }	// Modem nicht gestartet	
  else
  {
-	put2str(T_err,E_gsm);								// Fehlermeldung ausgeben
+	dtcerr(E_gsm);								// Fehlermeldung ausgeben
 	newline();	
  }
  clear_comchange ();			// Bereinige scheinbaren Schnittstellenwechsel

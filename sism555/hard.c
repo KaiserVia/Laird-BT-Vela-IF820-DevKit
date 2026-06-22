@@ -56,7 +56,8 @@ uint maxbyte						__noinit;					// Anzahl Byte pro Flash page
 uchar pagepk						__noinit;					// Benötigte Anzahl Flashseiten zur Sicherung eines 1 k-Blocks
 uchar *P_fpar						__noinit;					// Pointer auf Flash/Ymodem Transferdaten
 uchar connect						__noinit;					// Aktive Schnittstellen Uarts, USB etc.
-uchar concpy						__noinit __at(0x2007e1d8);					// Sicherungskopie connect
+uchar concpy						__noinit __at(0x2007e1d8);
+uint gsmbaud=460800;     // einstellbare GSM-Baudrate (Default 460800)					// Sicherungskopie connect
 uchar comstate					__noinit;					// Schnittstellenstatus BT, GSM, Terminal
 uchar interfaces				__noinit;					// Während der Initialisierung aufgefundene Schnittstellen
 uchar pset							__noinit;					// Aktuell ausgeführter Parametersatz
