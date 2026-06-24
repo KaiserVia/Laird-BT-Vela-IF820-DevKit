@@ -156,7 +156,9 @@ int main (void)
 		
     if (fp.btmodem)	{								// BT definiert?
 		 if (test_BT())	interfaces|=BT_LINK;		// Modem antwortet?		 
-		 else syserror++; }	
+		 else {                                     // BT antwortet nicht (z. B. geaenderte Zielbaud)
+		   fp.btmodem=0; init_bluetooth();         // -> neu erkennen (Zwei-Baud) + ggf. auf IF820_BAUD umstellen
+		   if (fp.btmodem) interfaces|=BT_LINK; else syserror++; } }	
 		else if (fp.serno[0]) init_bluetooth();	// BT nicht konfiguriert aber Seriennummer vorhanden? -> automatisch konfigurieren
 		 
 		if (fp.gsm)											// GSM installiert?

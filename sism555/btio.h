@@ -12,7 +12,9 @@
 #define T_laird		" Laird"
 #define T_if820	" IF820"
 
-#define BT_BAUD  (fp.btmodem==IF820 ? 115200 : (fp.btmodem==Laird ? 460800 : 307200))	// Betriebsbaudrate BT-Modul (IF820 Testphase 115200)
+#define IF820_BAUD         460800	// <<< Betriebsbaudrate IF820 - HIER zentral aendern (460800 bewaehrt; hoeher nur mit Oszi-Check!)
+#define IF820_FACTORY_BAUD 115200	// Werks-Baud des IF820 (fix) - nur Erkennung/Erstkonfiguration
+#define BT_BAUD  (fp.btmodem==IF820 ? IF820_BAUD : (fp.btmodem==Laird ? 460800 : 307200))	// Betriebsbaudrate BT-Modul (IF820 = IF820_BAUD)
 #define GSM_BAUD gsmbaud		// einstellbare GSM-Baudrate (Variable gsmbaud, Default 460800)
 
 // Laird 730-SA Texte nur für Bluetooth AT Kommando Kommunikation
@@ -78,7 +80,7 @@
 #define T_pingok	"/PING,0000"	// Erfolgsantwort @R,...,/PING,0000
 #define T_gtu      "GTU\r"        // system_get_uart_parameters
 #define T_gtu_d    ",D="          // Feld direkt nach F= (zum Mitlesen von F)
-#define T_stuf1    "STU,B=0001C200,A=00,C=00,F=01,D=08,P=00,S=01\r"  // Flow Control AN
+#define T_stu_post ",A=00,C=00,F=01,D=08,P=00,S=01\r"  // STU-Suffix: Flow Control AN, 8N1 (Baud aus IF820_BAUD)
 #define T_stuok    "STU,0000"
 #define T_scfg     "/SCFG\r"      // system_store_config (RAM->Flash)
 #define T_scfgok   "SCFG,0000"
@@ -86,6 +88,8 @@
 #define T_sdnok    "SDN$,0000"
 #define T_gdn      "GDN\r"     // gap_get_device_name
 #define T_rbt      "/RBT\r"    // system_reboot
+#define T_dis      "/DIS\r"    // gap_disconnect - offene Verbindung sauber schliessen
+#define T_disok    "/DIS,0000"
 
 extern bool Init_BT_ch (uint baudrate);	// Konfiguriere uart1 und setze MUX Kanal auf BT modem
 extern bool bt_command (text * command, text * answer, int pause); // Bluetooth Kommando senden, Antwort empfangen
@@ -100,6 +104,9 @@ extern bool bt_ensure_flowcontrol (void); // generisch: pruefen, setzen, verifiz
 extern int  bt_get_name (void);           // 1=Name==VIASIS_<serno>, 0=anders, -1=unbek.
 extern bool bt_set_name (void);           // Name=VIASIS_<serno> schreiben (SDN$, Flash)
 extern bool bt_ensure_name (void);        // generisch: pruefen, bei Bedarf schreiben
+extern void bt_show_name (void);          // aktuellen BT-Namen vom Modul lesen + anzeigen
+extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-Mode erzwingen
+extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
 
 #endif // BTIO_H_
 

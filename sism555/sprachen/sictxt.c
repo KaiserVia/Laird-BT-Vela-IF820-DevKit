@@ -24,7 +24,7 @@ const char sense_tab[5]={6,4,2,0,1};			// Kanalauswahl MUX IC14 und IC19 Signalv
 // Nicht zu übersetzende Textarrays
 text T_nil[]							=	"";					// not in list Zeiger
 text T_viasis[]						= "VIASIS";		// als const char wg. USB Treiber Verzeichnisname etc.
-text T_version[8]					= "5.92";			// Programmvariante jetzt immer mit viaspeedcam parameter einstellbar, sc Varianten entfallen
+text T_version[8]					= "5.08";			// Programmvariante jetzt immer mit viaspeedcam parameter einstellbar, sc Varianten entfallen
 text T_symgr1[3][SYGLEN] 	= {"30,50,60", "70,80,!", "Smileys"};
 text T_defsym[NOSYM][4]		= {"30","50","60","70","80","!",":-(",":-)"};
 text T_uall[2][5]					= {"km/h","mph"};

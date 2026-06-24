@@ -1041,7 +1041,7 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, Änder
 		 if (fp.gps<2)gps_pending=0;						// Laufende GPS Positionsbestimmung bei Multiplex unterbrechen
 		 connect|=(UART1|BT_LINK);							// Daten an UART1 senden
      bt_time=BT_TIMEOUT;					  				// Max. Bluetooth Verbindungszeit	ohne Empfang	
-		 if (fp.btmodem==Roving) bt_pininit=1;	// Pinabfrage erforderlich
+		 if (fp.btmodem==Roving || fp.btmodem==IF820) bt_pininit=1;	// Pinabfrage erforderlich (RN4678 + IF820)
 		 
 #if (VSPCAM) 				 
 		 if (fp.vspcam) online=0;				// Online Messmodus reset		

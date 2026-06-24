@@ -21,6 +21,7 @@
 #include "gsmio.h"
 #include "sio.h"
 #include "sictxt.h"
+#include "i2cm.h"		// IC54 (PCA9554) Zugriff fuer CYSPP-Steuerung
 #include "string.h"
 #define DTCBASE 10000
 #include "dtc.h"
@@ -107,9 +108,16 @@ bool bt_set_flowcontrol (void)       // RTS/CTS modulspezifisch aktivieren (+ pe
  switch (fp.btmodem)
  {
   case IF820:
-   if (!bt_command(T_stuf1,T_stuok,300))  return (FALSE);   // STU ...F=01 (ins RAM)
-   if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);   // /SCFG (RAM -> Flash)
+  {
+   char cmd[48]; char *q; int i;
+   strcpy(cmd,"STU,B=");                                       // STU-Kommando aus IF820_BAUD bauen (EINE Quelle)
+   q=cmd+6; for (i=28;i>=0;i-=4) *q++=hexchar(IF820_BAUD>>i);  // Baudrate als 8 Hex-Ziffern anhaengen
+   strcpy(q,T_stu_post);                                       // Suffix ,A=00,...,F=01,...CR
+   if (!bt_command(cmd,T_stuok,300))      return (FALSE);      // STU (RAM) - Antwort kommt @ alter Baud
+   Init_BT_ch(IF820_BAUD);                                     // Host auf Zielbaud (Doku Bsp.1: nach STU-Antwort)
+   if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);      // /SCFG @ neuer Baud -> Flash + verifiziert
    return (TRUE);
+  }
   case Roving:  return (FALSE);   // TODO: RN4678 Flow-Control-Befehl
   case Laird:   return (FALSE);   // TODO: Laird Flow-Control-Register
   default:      dtcerr(E_bt); return (FALSE);   // Fangnetz: neues Modul nicht still durchwinken
@@ -138,13 +146,21 @@ int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, 
   case IF820:
    strcpy(want,"N="); strcat(want,T_viasis); strcat(want,"_"); strcat(want,fp.serno);
    if (!bt_command("GDN,T=00\r",want,300)) return (0);   // BLE-Name == VIASIS_<serno>?
-   strcat(want,"_BT");                                   // Classic-Name = VIASIS_<serno>_BT
-   if (!bt_command("GDN,T=01\r",want,300)) return (0);   // BT-Classic-Name == VIASIS_<serno>_BT?
+   if (!bt_command("GDN,T=01\r",want,300)) return (0);   // BT-Classic-Name == VIASIS_<serno>?
    return (1);
   case Roving:  return (-1);   // TODO: RN4678 GN-Abfrage
   case Laird:   return (-1);   // TODO: Laird AT+BTN? Abfrage
   default:      return (-1);
  }
+}
+
+void bt_reboot (void)   // IF820: /RBT senden + auf Boot warten (Classic-Name wird dann live)
+{
+ uchar cc=connect, w;
+ connect|=UART1; putstr(T_rbt); connect=cc;          // /RBT senden
+ bxi=rxi;
+ for (w=0; w<5; w++) { osDelay(1000); ResetWDT(); putc('.'); if (bxi!=rxi) break; }  // auf Boot-Ausgabe warten
+ newline(); osDelay(300); bxi=rxi;                   // setteln + RX leeren
 }
 
 bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ -> RAM+Flash)
@@ -154,16 +170,11 @@ bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ ->
  {
   case IF820:
    strcpy(cmd,"SDN$,T=00,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"\r");
-   if (!bt_command(cmd,T_sdnok,500)) return (FALSE);   // BLE-Name setzen
-   strcpy(cmd,"SDN$,T=01,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"_BT"); strcat(cmd,"\r");
-   if (!bt_command(cmd,T_sdnok,500)) return (FALSE);   // BT-Classic-Name setzen
-   {                                                   // Modul-Reboot: Classic-Name geht erst nach Boot live
-    uchar cc=connect, w;
-    connect|=UART1; putstr(T_rbt); connect=cc;         // /RBT senden
-    bxi=rxi;
-    for (w=0; w<5; w++) { osDelay(1000); ResetWDT(); putc('.'); if (bxi!=rxi) break; }  // auf Boot warten
-    newline(); osDelay(300); bxi=rxi;                  // setteln + RX leeren
-   }
+   if (!bt_command(cmd,T_sdnok,1500)) return (FALSE);  // BLE-Name setzen (Flash-Write -> grosszuegiger Timeout)
+    osDelay(300);                                       // Flash-Write von T=00 abschliessen lassen, bevor T=01 folgt
+   strcpy(cmd,"SDN$,T=01,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"\r");
+   if (!bt_command(cmd,T_sdnok,1500))                  // BT-Classic-Name setzen (Flash-Write)
+    { osDelay(300); if (!bt_command(cmd,T_sdnok,1500)) return (FALSE); }   // 1 Retry gegen Flash-Write-Timing
    return (TRUE);
   case Roving:  return (FALSE);   // TODO: RN4678 SN,
   case Laird:   return (FALSE);   // TODO: Laird AT+BTN/AT+BTF
@@ -176,39 +187,87 @@ bool bt_ensure_name (void)           // generisch: pruefen, bei Bedarf schreiben
  if (!fp.serno[0]) { dtcerr("BT-Name: keine Seriennummer"); newline(); return (FALSE); }
  if (bt_get_name()==1) { putln(" BT-Name: bereits gesetzt"); return (TRUE); }   // kein Flash-Write
  if (!bt_set_name())   { dtcerr("BT-Name: setzen fehlgeschlagen"); newline(); return (FALSE); }
- if (bt_get_name()==1) { putln(" BT-Name: gesetzt und gesichert"); return (TRUE); }
- dtcerr("BT-Name: Verifikation fehlgeschlagen"); newline(); return (FALSE);
+ if (bt_get_name()!=1) { dtcerr("BT-Name: Verifikation fehlgeschlagen"); newline(); return (FALSE); }  // verify VOR Reboot (Modul stabil)
+ if (fp.btmodem==IF820) bt_reboot();   // Classic-Name live machen - erst NACH erfolgreicher Verifikation
+ putln(" BT-Name: gesetzt und gesichert"); return (TRUE);
+}
+
+void bt_show_name (void)             // aktuellen BT-Namen vom Modul lesen und am Terminal ausgeben
+{
+ char buf[80]; uchar n=0, i; char *p; uchar dconn=connect;
+ if (fp.btmodem!=IF820) return;      // derzeit nur IF820 (RN4678/Laird: GN bzw. AT+BTN? -> TODO)
+ connect=UART1; putstr(T_gdn);       // "GDN\r" an das Modul
+ bxi=rxi;                            // RX-Marke
+ connect=dconn & ~UART1;             // Ausgabe nur ans Terminal, nicht zurueck ans Modul
+ osDelay(200);                       // Antwort abwarten
+ while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+ buf[n]=0;
+ put2str(T_btname,T_ist);            // Label "Device name ..."
+ p=strstr(buf,"N=");                 // Namensfeld der GDN-Antwort
+ if (p) { p+=2; for (i=0; p[i] && p[i]!='\r' && p[i]!='\n'; i++) putc(p[i]); }
+ else putstr("?");
+ newline();
+ connect=dconn;
+}
+
+//-----------------------------------------------------------------------------
+// CYSPP-Steuerung (IC54/PCA9554 Bit 7): Command-Mode erzwingen / SPP trennen
+//-----------------------------------------------------------------------------
+void bt_cmdmode (void)   // CYSPP HIGH treiben -> laufende SPP-Verbindung trennen + Command-Mode
+{
+ write_i2c_dev(IC54, 2, (0x80<<8)|0x01);   // PCA9554 Output-Register (0x01): Bit 7 = HIGH
+ write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);   // PCA9554 Config (0x03): Bit 7 = Ausgang, Bit 0-6 = Eingang
+}
+
+void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesbar, bereit fuer Verbindung)
+{
+ write_i2c_dev(IC54, 2, (0xFF<<8)|0x03);   // PCA9554 Config (0x03): alle Pins Eingang (Werks-/Init-Zustand)
 }
 
 void init_bluetooth (void)		// Bluetooth Modem initialisieren
 { 		
  int32_t result=0;	
- uint32_t pin=0;	
+ uint32_t pin=0; uint32_t detbaud=0;	
  uint8_t retry=4;
 	
  ResetWDT(); 
- if ((connect&UART1)|(fp.btmodem!=0))	return;	// Zugriffskonflikt - z. B. Konfiguration per GSM oder bereits konfiguriert
- fp.btmodem=0;												// Reset Bluetooth installiert	
- // === IF820 (EZ-Serial) Erkennung ueber Normalpfad (115200) ===
- if (Init_BT_ch(115200))                // MUX=BT, UART1=115200, CTS low (Modul bereit)?
+ if (uart1_owner==MUX_GSM) return;      // UART1 gerade von GSM belegt -> nicht stoeren (Konfliktschutz)
+ bt_cmdmode();                          // IMMER: aktive SPP-Verbindung ueber CYSPP (IC54 Bit7) kappen + Command-Mode erzwingen
+ osDelay(600);                          // Modul Zeit geben: SPP abbauen und in Command-Mode wechseln
+ connect&=~(UART1|BT_LINK);             // virtuelle BT-Verbindung loesen (Befehle -> Modul, nicht ueber SPP)
+ fp.btmodem=0;                          // Reset -> Erkennung laeuft (erneut) durch
+ // === IF820-Erkennung: /PING ueber mehrere Baudraten scannen (analog Laird/RN4678) ===
+ // Vor jedem Versuch den Modul-Parser mit CR leeren, sonst verstopft Muell von der falschen Baud
+ // den naechsten /PING. Zielbaud zuerst (schnellster Treffer bei konfiguriertem Modul).
  {
-  if (bt_command(T_ping,T_pingok,300))  // /PING senden, auf "@R,...,/PING,0000" warten
+  static const uint32_t bdscan[] = { IF820_BAUD, IF820_FACTORY_BAUD, 921600, 307200, 230400, 9600 };
+  uchar k;
+  for (k=0; k<sizeof(bdscan)/sizeof(bdscan[0]); k++)
   {
-   fp.btmodem=IF820;                    // IF820 erkannt
-   interfaces|=BT_LINK;                 // BT-Interface aktiv
+   Init_BT_ch(bdscan[k]);                          // UART1 auf Testbaudrate
+   bt_command(T_CR,T_pingok,-60);                  // Modul-Parser mit CR leeren (Antwort egal)
+   if (bt_command(T_ping,T_pingok,300)) { detbaud=bdscan[k]; break; }   // /PING beantwortet?
   }
  }
+ if (detbaud) { fp.btmodem=IF820; interfaces|=BT_LINK; }   // IF820 auf detbaud erkannt
  if (fp.btmodem==IF820)                 // erkannt -> Laird/RN4678-Kaskade ueberspringen
  {
-  put2str(T_bt,T_if820); putstr(T_dpkt); putnumber(115200,0); newline();
+  pin=atoi(fp.serno+4);                 // letzte 4 Digits der Seriennummer
+  if (isdigit(fp.serno[0]) && pin) fp.btpin=atoi(fp.serno)*10000+pin;  // 6-stellige App-Layer-PIN (wie RN4678)
+  put2str(T_bt,T_if820); putstr(T_dpkt); putnumber(IF820_BAUD,0); newline();
+  bt_command(T_dis,T_disok,500); osDelay(300);   // evtl. noch offene SPP-Verbindung sauber schliessen (CYSPP-HIGH beendet sie nicht)
+  if (detbaud!=IF820_BAUD) bt_set_flowcontrol();  // Werks-Baud erkannt -> auf Zielbaud umstellen + sichern
   bt_ensure_flowcontrol();              // generisch: RTS/CTS sicherstellen (Query+Set+Verify)
   bt_ensure_name();                     // generisch: BT-Name VIASIS_<serno> sicherstellen
+  bt_show_name();                       // aktuellen BT-Namen vom Modul auslesen + anzeigen
+  bt_release();                         // CYSPP loslassen (Eingang) -> bereit fuer naechste Verbindung
   uart1_release(MUX_BT);
   connect=concpy;
   osDelay(10);
   clear_comchange();
   return;
  }
+ bt_release();          // CYSPP sicher als Eingang (falls Reconfig Command-Mode erzwang, IF820 aber nicht erkannt)
  // === Ende IF820-Erkennung; sonst weiter mit Laird/RN4678 ===
  if (!Init_BT_ch(460800)) 							// Konfiguriere uart1 und setze MUX Kanal auf BT modem, Abbruch bei CTS hi
  { newline(); dtcerr(E_bt); return; }	 // putnumber(FIO2PIN,0x80);
@@ -487,7 +546,7 @@ void set_bt_name (void)							// Setze Bluetooth device (friendly) name
 	{
 	 char cmd[60];
 	 strcpy(cmd,"SDN$,T=00,N="); strcat(cmd,btnamebuf); strcat(cmd,"\r"); result=bt_command(cmd,T_sdnok,500);
-	 if (result) { strcpy(cmd,"SDN$,T=01,N="); strcat(cmd,btnamebuf); strcat(cmd,"_BT"); strcat(cmd,"\r"); result=bt_command(cmd,T_sdnok,500); }
+	 if (result) { strcpy(cmd,"SDN$,T=01,N="); strcat(cmd,btnamebuf); strcat(cmd,"\r"); result=bt_command(cmd,T_sdnok,500); }
 	}
 	else if (fp.btmodem>Laird)  						
 	{
