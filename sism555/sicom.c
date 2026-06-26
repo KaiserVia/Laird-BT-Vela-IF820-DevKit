@@ -369,7 +369,13 @@ void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
  
  switch (ja(T_bt))			// Bluetooth (J/N)?
  {  
-  case 1: init_bluetooth(); break;											// Bluetooth konfigurieren
+  case 1:
+#if BRINGUP_DEBUG
+   bt_bringup();   /* BRINGUP: Debug-Konsole statt Konfiguration */
+#else
+   init_bluetooth();
+#endif
+   break;											// Bluetooth konfigurieren
   case -1: { if (fp.btmodem==IF820) { bt_cmdmode(); osDelay(300); bt_release(); }  // IF820: aktive SPP-Verbindung trennen
              fp.btmodem=0; interfaces&=~BT_LINK; connect&=~(UART1|BT_LINK); }       // Modem deinstallieren
  }

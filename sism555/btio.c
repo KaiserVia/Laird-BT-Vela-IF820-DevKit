@@ -223,6 +223,94 @@ void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesb
  write_i2c_dev(IC54, 2, (0xFF<<8)|0x03);   // PCA9554 Config (0x03): alle Pins Eingang (Werks-/Init-Zustand)
 }
 
+#if BRINGUP_DEBUG
+/* ===========================================================================
+   bt_bringup - TEMP Bring-up-Debug fuer neues Mainboard (eigener Branch).
+   CTS-UNABHAENGIGE Konsole zum Pruefen von TXD/RXD und Modul-Antwort.
+   Rueckbau: BRINGUP_DEBUG (btio.h) auf 0, diese Funktion + Menue-Hook entfernen.
+   =========================================================================== */
+static const uint32_t bu_bauds[] = {9600,19200,38400,57600,115200,230400,460800,921600};
+#define BU_NB (sizeof(bu_bauds)/sizeof(bu_bauds[0]))
+static uint32_t bu_baud = 115200;
+
+static void bu_txbyte (int ch)            /* ein Byte CTS-unabhaengig an UART1 senden */
+{
+ uint16_t g=0;
+ while (!(U1->LSR & (1<<5))) { if (++g==0) break; }
+ U1->THR = ch;
+}
+static void bu_send (const char *s)       /* String ans Modul (UART1), CTS-unabhaengig */
+{
+ U1->MCR &= ~((1<<7)|(1<<6));             /* Hardware Auto-RTS/CTS AUS */
+ bxi=rxi;
+ while (*s) bu_txbyte(*s++);
+}
+static uchar bu_dump (uint ms)            /* Antwort sammeln + hex/ascii ausgeben */
+{
+ uchar buf[80]; uchar n=0, i;
+ osDelay(ms);
+ while (bxi!=rxi && n<sizeof(buf)) buf[n++]=rbuf[++bxi];
+ putstr(" RX "); putnumber(n,0); putstr(" Byte");
+ if (!n) { putln(": (nichts)"); return (0); }
+ newline(); putstr("  hex:");
+ for (i=0;i<n;i++) { putc(' '); putc(hexchar(buf[i]>>4)); putc(hexchar(buf[i])); }
+ newline(); putstr("  txt: ");
+ for (i=0;i<n;i++) putc((buf[i]>=32 && buf[i]<127) ? buf[i] : '.');
+ newline();
+ return (n);
+}
+
+void bt_bringup (void)
+{
+ int c; uchar i;
+ putln(""); putln(" === BT BRING-UP DEBUG (TEMP) ===");
+ for (;;)
+ {
+  uart1_request(MUX_BT, bu_baud);
+  U1->MCR &= ~((1<<7)|(1<<6));
+  newline(); putstr(" Baud="); putnumber(bu_baud,0); newline();
+  putln(" 1=Loopback  2=/PING  3=Baud-Scan  4=Kommando  5=Baud+  0=Ende");
+  putstr(" Auswahl? ");
+  c=getc(120000); newline();
+  if (c=='0' || c==ESC || c<0) break;
+  else if (c=='1')
+  {
+   putln(" Loopback - TXD<->RXD bruecken...");
+   bu_send("Loopback-123");
+   if (bu_dump(100)) putln(" -> Bytes zurueck: UART1/Leitung bis Stecker ok");
+   else putln(" -> nichts zurueck: Bruecke/MUX/Leitung pruefen");
+  }
+  else if (c=='2') { putln(" /PING ..."); bu_send("/PING\r"); bu_dump(400); }
+  else if (c=='3')
+  {
+   putln(" Baud-Scan /PING:");
+   for (i=0;i<BU_NB;i++)
+   {
+    ResetWDT();
+    uart1_request(MUX_BT, bu_bauds[i]); U1->MCR &= ~((1<<7)|(1<<6));
+    putstr("  "); putnumber(bu_bauds[i],0); putstr(": ");
+    bu_send("/PING\r");
+    if (bu_dump(300)) putln("   ^^ Antwort hier!");
+   }
+  }
+  else if (c=='4')
+  {
+   char cmd[48]; uchar k=0; int x;
+   putstr(" Kommando + Enter: "); bxi=rxi;
+   for (;;) { x=getbyte(30000); if (x<0 || is_CRLF(x)) break; if (x>=32 && k<sizeof(cmd)-1){ putc(x); cmd[k++]=(char)x; } }
+   cmd[k]=0; newline();
+   if (k) { bu_send(cmd); bu_txbyte('\r'); bu_dump(400); }
+  }
+  else if (c=='5')
+  {
+   for (i=0;i<BU_NB;i++) if (bu_bauds[i]==bu_baud) { bu_baud=bu_bauds[(i+1)%BU_NB]; break; }
+  }
+ }
+ uart1_release(MUX_BT);
+ putln(" Bring-up beendet.");
+}
+#endif /* BRINGUP_DEBUG */
+
 void init_bluetooth (void)		// Bluetooth Modem initialisieren
 { 		
  int32_t result=0;	

@@ -13,6 +13,7 @@
 #define T_if820	" IF820"
 
 #define IF820_BAUD         460800	// <<< Betriebsbaudrate IF820 - HIER zentral aendern (460800 bewaehrt; hoeher nur mit Oszi-Check!)
+#define BRINGUP_DEBUG 1   // TEMP Bring-up (neues Mainboard): 1=Debug-Konsole + KEIN Auto-Init, 0=normal
 #define IF820_FACTORY_BAUD 115200	// Werks-Baud des IF820 (fix) - nur Erkennung/Erstkonfiguration
 #define BT_BAUD  (fp.btmodem==IF820 ? IF820_BAUD : (fp.btmodem==Laird ? 460800 : 307200))	// Betriebsbaudrate BT-Modul (IF820 = IF820_BAUD)
 #define GSM_BAUD gsmbaud		// einstellbare GSM-Baudrate (Variable gsmbaud, Default 460800)
@@ -107,6 +108,9 @@ extern bool bt_ensure_name (void);        // generisch: pruefen, bei Bedarf schr
 extern void bt_show_name (void);          // aktuellen BT-Namen vom Modul lesen + anzeigen
 extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-Mode erzwingen
 extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
+#if BRINGUP_DEBUG
+extern void bt_bringup (void);            // TEMP: CTS-unabh. Debug-Konsole (Bring-up)
+#endif
 
 #endif // BTIO_H_
 

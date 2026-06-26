@@ -718,3 +718,29 @@ Sprachdateien zu brechen.
 WICHTIG: Firmware-Aenderungen konnten hier nicht kompiliert werden -> in Keil bauen und testen.
 Neue Diagnose hinzufuegen: Zeile in CSV -> tools/gen_dtc.py laufen lassen -> dtc_text.h aktuell;
 Konstante in dtc_codes.h ergaenzen und an der Fehlerstelle verwenden.
+
+
+---
+
+## Update 5.10 - TEMP Bring-up neues Mainboard (eigener Git-Branch, spaeter zuruecknehmen)
+
+Kontext: neues Mainboard, Verkabelung TXD/RXD/CTS/RTS unklar, Modul-Firmware unklar.
+Alle Aenderungen TEMPORAER, ueber EINEN Schalter rueckbaubar. Plan: Doku/Bringup_Plan.md.
+
+Schalter: #define BRINGUP_DEBUG 1 in btio.h. (0 = normales Verhalten.)
+
+Aenderungen:
+- main.c: Auto-Init (BT-nicht-gefunden -> init_bluetooth + automatische Konfiguration) unter
+  #if BRINGUP_DEBUG DEAKTIVIERT (else syserror++). Bei unklarer Verkabelung nichts auto-konfigurieren.
+- btio.c: neue CTS-UNABHAENGIGE Debug-Konsole bt_bringup() (#if BRINGUP_DEBUG): sendet direkt
+  ueber U1->THR (Auto-RTS/CTS aus, kein CTS-Warten); Antworten roh als hex+ascii. Funktionen:
+  Loopback (TXD<->RXD-Jumper), /PING, Baud-Scan /PING (9600..921600), eigenes Kommando, Baud+.
+- btio.h: BRINGUP_DEBUG-Schalter + Prototyp bt_bringup.
+- sicom.c: Menue-Hook - "Bluetooth (j/n)? j" startet bei BRINGUP_DEBUG bt_bringup() statt init_bluetooth().
+
+Bedienung: RS232/HyperTerminal -> Konfig -> Bluetooth? j -> Debug-Konsole.
+Test-Reihenfolge: Loopback (Jumper) -> /PING 115200 -> Baud-Scan -> eigene Kommandos (AT/$$$/PING).
+
+RUECKBAU vor Merge: BRINGUP_DEBUG auf 0; bt_bringup() (btio.c), Prototyp (btio.h),
+Menue-Hook (sicom.c) und main.c-#if-Guard entfernen. Alle Stellen mit BRINGUP markiert.
+ACHTUNG: Firmware hier nicht kompiliert -> in Keil bauen.
