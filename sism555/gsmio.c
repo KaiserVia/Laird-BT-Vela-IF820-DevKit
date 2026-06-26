@@ -34,8 +34,7 @@
 #include "ramcode.h"
 #include "string.h"
 #include "mqtt.h"
-#define DTCBASE 20000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 const char T_month[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };		// Monate für Email Header Date
 
@@ -269,7 +268,7 @@ void init_gsm (void)	// GSM Modem initialisieren
   
  if (!fp.gsm) 											// Fehler?
  {	 
-	dtcerr(E_gsm);							// Fehlermeldung ausgeben
+	dtcerr(DTC_GSM_NO_RESP);							// Fehlermeldung ausgeben
 	newline(); 
   gsm_power(0);											// GSM aus und deselektieren
  }	 
@@ -308,10 +307,10 @@ int test_gsm (uchar poweron)	// Prüfe ob GSM/GPRS Modem antwortet
  if (result<0)											// Misserfolg?
  {
   gsm_power (0);	 									// Abschalten	
-	if (poweron) puterror(GSM_ERROR,-1);	// beim Einschalten Fehler melden und protokollieren
+	if (poweron) puterror(DTC_GSM_NO_RESP,-1);	// beim Einschalten Fehler melden und protokollieren
 	else  
 	{
-	 dtcerr(E_gsm);						// Fehlermeldung ausgeben
+	 dtcerr(DTC_GSM_NO_RESP);						// Fehlermeldung ausgeben
 	 newline();	
   }		
  } // end if result
@@ -953,7 +952,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
 
  if (failure)
  {
-	if ((mode&0x04)&&(connect&(UART0|USB_LINK))) puterrstr(1);	// Terminalausgabe Text "Fehler"
+	if ((mode&0x04)&&(connect&(UART0|USB_LINK))) { dtcerr(DTC_GSM_CONN_TIMEOUT); newline(); }	// Verbindung Timeout
 	gsm_power(0);																								// Modem bei Fehler aus	 
   if (!testmail)									// Fehlerhafte Test-Emails ignorieren
 	 {
@@ -1071,7 +1070,7 @@ int sendsms (uchar ausgabe)	// SMS Service konfigurieren und SMS versenden
   if (connect&(UART0|USB_LINK))								// RS232 oder USB Terminal 
   {
    put2str(T_LF, &T_service[1][0]);						// Ausgabe Text "SMS
-   if (failure) puterrstr(1);									// Text "Fehler"
+   if (failure) { dtcerr(DTC_GSM_CONN_FAIL); newline(); }									// Verbindungsfehler
    else putln (T_ok);													// Text "Ok"
   }
  } else failure=1; 
@@ -1197,7 +1196,7 @@ void get_apn_config (void)												// APN Konfiguration einlesen
    putln(T_dot3); 
    result=set_gprs_config(3);														// GPRS Verbindung mit Ausgabe aufbauen
    put2str(T_LF,&T_service[0][0]);  										// Text "GPRS
-   if (result<0) puterrstr(1); 													// Text "Fehler"
+   if (result<0) { dtcerr(DTC_GSM_DATA_FAIL); newline(); } 													// Datentransfer Fehler
    else putln (T_ok);
   }
  } // end ändern	  
@@ -1271,7 +1270,7 @@ void get_server_config (void)											// Einlesen der Server Konfiguration
     putln(T_dot3);  
     result=sendmail(3);														// SMTP Konfigurieren
     put2str(T_LF,&T_service[2][0]); 							// Text "Server ..
-    if (result<28) puterrstr(1);									// Text "Fehler"
+    if (result<28) { dtcerr(DTC_GSM_SMS_LEN); newline(); }									// SMS Laenge fehlerhaft
     else putln (T_ok);
 	 } // end if connect	 
   } // end if smtp
@@ -1280,7 +1279,7 @@ void get_server_config (void)											// Einlesen der Server Konfiguration
 	 result=Con_MQTT_server(0);											// MQTT Server verbinden/testen
 	 put2str(T_LF,&T_service[2][0]); 								// Text "Server ..	
 	 if (result>0) putln (T_ok);													
-	 else { puterrstr(0);	putnumber (-result,0); newline(); }	// Text "Fehler" 			 
+	 else { dtcerr(DTC_GSM_SMS_FAIL); putc(' '); putnumber(-result,0); newline(); }	// SMS Senden fehlgeschlagen
   }
  }			
 }
@@ -1825,7 +1824,7 @@ int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den F
  if (flashcrc==filecrc) return (blno);	// Prüfsummen stimmen überein
  
  putln (" Error");
- puterror (CRC_ERROR,-1);							// Fehler protokollieren
+ puterror (DTC_GSM_CRC_ERR,-1);							// Fehler protokollieren
   
  return(-1);											
 }

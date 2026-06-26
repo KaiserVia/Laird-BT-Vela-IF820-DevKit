@@ -29,8 +29,7 @@
 #include "sictxt.h"
 #include "libtool.h"
 #include "ramcode.h"
-#define DTCBASE 90000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 
 CDC_LINE_CODING LineCoding;									// VCP Übertragungsparameter
@@ -43,9 +42,9 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
  {	 
   osSignalWait (1,osWaitForever);							// Warte auf Signalereignis 
 	
-  if (puterror (USB_ERROR, USBD_Initialize (0))==0)     	// USB Device 0 Initialization
+  if (puterror (DTC_USB_DEV_INIT, USBD_Initialize (0))==0)     	// USB Device 0 Initialization
 	 {
-    if (puterror (USB_ERROR, USBD_Connect (0))==0)       	// USB Device 0 Connect
+    if (puterror (DTC_USB_DEV_CONN, USBD_Connect (0))==0)       	// USB Device 0 Connect
     {		
 		 connect|=USB_LINK;												// USB-Verbindung hergestellt, ab hier sendet putb()
 		 concpy=connect;													// Kopie sichern		
@@ -69,12 +68,12 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
 		 } // end while VBUS
 		 connect&=~USB_LINK;		 								// ab hier sendet putb() nicht mehr
 		 concpy=connect;												// Kopie sichern
-		 if (puterror (USB_ERROR, USBD_Disconnect(0))==0) putstr(T_usbdcon);
+		 if (puterror (DTC_USB_DEV_DISC, USBD_Disconnect(0))==0) putstr(T_usbdcon);
 #if (VSPCAM)		 
 		 if (fp.vspcam && (connect&UART0)) online=1; 	// viaspeedcam und RS232 Verbindung -> online Messmodus
 #endif		 
     } // end if USB connect
-		puterror (USB_ERROR, USBD_Uninitialize (0));	// Return Code bei Fehler ausgeben
+		puterror (DTC_USB_DEV_UNINIT, USBD_Uninitialize (0));	// Return Code bei Fehler ausgeben
 		PINMODE3 |= (NOPULL<<28);											// Disable Pullup P1.30
    } 		   	 
 	 FIO1CLR =	USB_PPWR;										// USB Device Versorgung ein
@@ -97,7 +96,7 @@ int init_msd (char *letter) 	// Initialisiere und mounte Laufwerk
    result=fmount(letter);			// Mounte Laufwerk	
    if (result == fsOK) return (TRUE);	// Erfolg
 	 else if (result == fsNoFileSystem) putstr (T_uMsd);
-	 else puterror (USB_ERROR, result);		// Fehler fsStatus numerischen Wert ausgeben	
+	 else puterror (DTC_USB_FS_INIT, result);		// Fehler fsStatus numerischen Wert ausgeben
    funinit (letter);										// Dateisystem Ressourcen wieder freigeben						
   }
 	
@@ -123,7 +122,7 @@ bool flashdiskinfo (void)		// Ausgabe der USB Stick Eigenschaften
 					putstr(cbuf);
 					putstr (T_ser);
 					putnumber (serial,0); */
- if (puterror(USB_ERROR,finfo("U0:",&fsinfo))) return(false);
+ if (puterror(DTC_USB_FS_INFO,finfo("U0:",&fsinfo))) return(false);
 					switch (fsinfo.fs_type)
 					{
 						case fsTypeFAT12:	fattype=12; break;
@@ -138,7 +137,7 @@ bool flashdiskinfo (void)		// Ausgabe der USB Stick Eigenschaften
 					//putnumber (fsinfo.capacity,0);
 					putstr (T_free);
 					dfree=ffree("U0:");										// freien Flash Speicher ermitteln
-					if (dfree<0) { puterror (USB_ERROR, -dfree); return(false); }
+					if (dfree<0) { puterror (DTC_USB_MEM_FULL, -dfree); return(false); }
 					putnumber (dfree/1048576,0);  				// durch Mbyte teilen und ausgeben	
 					putstr (T_MB);
  return (true);		 			
@@ -189,7 +188,7 @@ void confirm_to_infofile (bool erfolg)			// Schreibt Texte "ok" oder "Fehler" in
 {
  redirect_char_Out(putcbuf);								// Zeichenausgabe an Puffer
  if (erfolg==true) putln(T_ok);							// Text "ok" oder
- else puterrstr (true);											// Text " Fehler" nach cbuf
+ else { dtcerr(DTC_USB_FILE_ERR); newline(); }											// USB Datei-Fehler
  cbuf[cind]=0;															// Zeichenkette null terminieren
  write_cbuf_to_finf (); 										// Schreibe Pufferdaten nach usbinfo.txt
  cind=0;																		// Reset Pufferindex	
@@ -213,7 +212,7 @@ void USB_Client_service (void) 								// USB flash disc service
  int result;																	// Hilfsvariable
  uint dblocks=0;															// Hilfsvariable
 	
- if (puterror (USB_ERROR, USBH_Initialize(0))==usbOK)				// Initialize USB Host 0 
+ if (puterror (DTC_USB_HOST_INIT, USBH_Initialize(0))==usbOK)				// Initialize USB Host 0 
  {
 	putstr(T_ucon0); 															// Text "USB flash disc connected"		
 	InitWatchdog(LONG_WD_32);											// Watchdog Interval auf 32 s setzen 
@@ -249,7 +248,7 @@ void USB_Client_service (void) 								// USB flash disc service
 		    delete_data();													// Messdatenzeiger im Parametersatz löschen 
 				i_reset=FIRM_UP_RES;										// Firmware Update Kennung setzen 
 			 }
-			 else puterror (IAP_ERROR_NO_ARM_CODE, -1);		// Keine Firmware Fehler ausgeben	
+			 else puterror (DTC_USB_NO_FW, -1);		// Keine Firmware auf USB-Stick
 			}		
 			close_files (4);													// Schließe ".BIN" Datei  
 			ResetWDT(); 
@@ -265,7 +264,7 @@ void USB_Client_service (void) 								// USB flash disc service
 				putln (T_parainit);											// Meldung "Parameter initialisation"..
 				protocol(PARAMETER_INIT);								// protokollieren	
 			 }
-			 else puterror (PARAMETER_INIT_ERROR, -1); 	// Wenn Kennungen falsch oder Schreibfehler -> Fehler ausgeben	
+			 else puterror (DTC_USB_PARAM_INIT, -1); 	// Parameter-Init fehlgeschlagen
 			} 	
 		  redirect_char_Out(putb);									// Zeichenausgabe wieder an Uarts
 		  close_files (7);													// Schließe alle geöffneten Dateien 	  
@@ -278,7 +277,7 @@ void USB_Client_service (void) 								// USB flash disc service
 	 	  break;  
 		 }	 
 	  }
-	  else puterror(USB_ERROR, -1);
+	  else puterror(DTC_USB_ERROR, -1);
     funmount("U0:");														// Laufwerk freigeben		 
 	 }	// end if init_MSD ok  	
 	 funinit("U0:");															// Dateisystem freigeben	 
@@ -301,7 +300,7 @@ void USB_Client_service (void) 								// USB flash disc service
   if (i_reset==FIRM_UP_RES)						// Firmware Update?
 	{	
    iap_programming (dblocks);					// IAP-Programmierung und Reset
-	 puterror(IAP_PROGRAMM_ERROR, -1);	// Hier sollte der Programmzeiger nie ankommen -> IAP Programmierfehler		
+	 puterror(DTC_USB_IAP_PROG_ERR, -1);	// IAP Programmierfehler USB
 	}	
 	i_reset=SLEEP_RES;									// Setze Resetursache
 	InitWatchdog(0);

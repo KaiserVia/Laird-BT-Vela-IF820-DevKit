@@ -28,8 +28,7 @@
 #include "cmsis_os.h"
 #include "sictxt.h"
 #include <string.h>
-#define DTCBASE 60000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 void EINT0_IRQHandler (void)		// Interruptanforderung Power Down
 {
@@ -438,7 +437,7 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
  } // end if Werkinitialisierung, Parameter reset oder falsche Kennung
  
  if (!parameter_to_progmem())						// Schreibt Sicherungskopie der Parameter in LPC1766 Programmspeicher
-  puterror(PARAMETER_INIT_ERROR, -1);		// wenn es nicht klappt Initialisierungsfehler
+  puterror(DTC_FL_PARAM_INIT, -1);		// Parameter-Initialisierung fehlgeschlagen
 
  if (flashsize!=0)							// Flash vorhanden?
  {
@@ -450,7 +449,7 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
   }
   if (sizeof(fp)>(PARA_LEN)) puterror(PARAMETER_INIT_ERROR, -1); 	// Initialisierungsfehler Parameterarray zu groß 
  } 
- else puterror (FLASH_ERROR, -1);	// Flash Fehler ausgeben und protokollieren
+ else puterror (DTC_FL_WRITE_FAIL, -1);	// Flash Fehler ausgeben und protokollieren
 	
  fp.flash=flashsize;									// Inst. Speichergröße für Parameterblockausgabe bereit stellen  
  

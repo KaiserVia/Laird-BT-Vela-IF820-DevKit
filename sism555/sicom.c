@@ -33,8 +33,7 @@
 #include "sictst.h"
 #include "sictxt.h"
 #include "string.h"
-#define DTCBASE 30000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 
 
@@ -46,14 +45,14 @@ void firmware (void)		// Firmware Empfang, Prüfung und IAP Programmierung
  	
  Ledaus(); 					// Led abschalten
 	
- if ((flashsize==0)||((flashsize>8)&&(flashsize<=128))) puterror (FLASH_ERROR, -1); // Flash fehlt oder zu klein	
+ if ((flashsize==0)||((flashsize>8)&&(flashsize<=128))) puterror (DTC_SI_NO_FLASH, -1); // Flash fehlt oder zu klein
 	
  putln (T_fsend);											// Text "Send file with Xmodem (1k)...
  delete_protocol();										// Protokollzeiger im Parametersatz löschen
  delete_data();												// Messdatenzeiger im Parametersatz löschen	
 	
  if ((blno=xmodem_receive(FIRMWARE_MAX_FILESIZE,0))< 0)		// Empfang 1k Xmodem Daten
-  puterror (blno, -1);								// Wenn negativ -> Xmodem Fehlernummer ausgeben 	 
+  puterror (DTC_SI_XMODEM_ERR, blno);								// Xmodem Fehlernummer als Detail ausgeben
  else  
  {    
   if (file_is_firmware())				// Prüfe ob es sich um Firmware Datei handelt
@@ -75,12 +74,12 @@ void firmware (void)		// Firmware Empfang, Prüfung und IAP Programmierung
     {     
 		 if (connect&USB_LINK) { newline(); putln (T_usbdis);	osDelay (100);	} // Hinweis "Trenne USB				 		
 		 iap_programming (blno);							// Reprogrammierung Erfolg -> System Reset		 	
-     puterror(IAP_PROGRAMM_ERROR, -1); 		// Hier sollte der Programmzeiger nie ankommen -> IAP Programmierfehler		 	
+     puterror(DTC_SI_IAP_PROG_ERR, -1); 		// Hier sollte der Programmzeiger nie ankommen -> IAP Programmierfehler
     }
    } // end if kein CRC Fehler
-   else puterror (CRC_ERROR, -1);							// CRC Fehler ausgeben   		 
+   else puterror (DTC_SI_CRC_ERR, -1);							// CRC Fehler ausgeben
   } // end if Firmware ist ok
-  else  puterror (IAP_ERROR_NO_ARM_CODE, -1);	// Keine Firmware Fehler ausgeben	
+  else  puterror (DTC_SI_NO_FIRMWARE, -1);	// Keine Firmware Fehler ausgeben
  }   
 }
 
@@ -403,7 +402,7 @@ void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
 #endif 
  
  if (!parameter_to_progmem())						// Schreibt Sicherungskopie der Parameter in LPC1766 Programmspeicher
-    puterror(PARAMETER_INIT_ERROR, -1); // wenn es nicht klappt Initialisierungsfehler	
+    puterror(DTC_SI_PARAM_INIT, -1); // Initialisierungsfehler
 }
 
 void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
@@ -425,7 +424,7 @@ void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
   delete_data();													// Messdatenzeiger im Parametersatz löschen
 	 
 	if ((blno=xmodem_receive(FIRMWARE_MAX_FILESIZE,MEASUREPAGE))<0)	// Xmodem Empfang
-	 puterror (blno, -1);																						// Wenn blno negativ -> Xmodem Fehlernummer ausgeben 
+	 puterror (DTC_SI_XMODEM_ERR, blno);																						// Xmodem Fehlernummer als Detail ausgeben
   else		// Empfang ok 
   {
 	 put2str(T_rdat,T_check);			   // Text "File received. Checking checksums ..."
@@ -456,14 +455,14 @@ void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
 		if (fehler > 0)													// Upload result
 		 putln(T_csucc);												// Success message (visible on BT)
 		else
-		 puterror(GSM_ERROR, -1);								// Upload error
+		 puterror(DTC_SI_GSM_UPLOAD_FAIL, -1);								// Upload error
    }
-   else puterror (CRC_ERROR, -1);							// CRC Fehler ausgeben	 
+   else puterror (DTC_SI_CRC_ERR, -1);							// CRC Fehler ausgeben
   }		
  }	// Modem nicht gestartet	
  else
  {
-	dtcerr(E_gsm);								// Fehlermeldung ausgeben
+	dtcerr(DTC_SI_GSM_UPLOAD_FAIL);								// GSM Upload Fehler
 	newline();	
  }
  clear_comchange ();			// Bereinige scheinbaren Schnittstellenwechsel
@@ -588,7 +587,7 @@ void symbol_redefine (void)			// Kundenschnittstelle Symbol Redefinition
  for (i=0;i<symgr;i++) sanz+=fp.nosym[i];				// Index erstes Symbol der Gruppe bestimmen
  result=get_symbols (sanz, sanz+fp.nosym[i]);		// Symbole einlesen	 
  if (result!=sanz+fp.nosym[i]) 	// Symbole unvollständig gelesen
-  puterror (PARAMETER_DEF_ERROR, -1);	 
+  puterror (DTC_SI_PARAM_DEF_ERR, -1);	 
 	
  newline();	
 	
@@ -617,7 +616,7 @@ void symbol_setup (void)				// Symboldefinition
    if (sg!=fp.symgr) 
 	 {	 
 		fp.symbol=0; 	// Fehler beim Einlesen -> Reset Symbole
-		puterror (PARAMETER_DEF_ERROR, -1);
+		puterror (DTC_SI_PARAM_DEF_ERR, -1);
 	 }	 
 }	
 
@@ -701,7 +700,7 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
 			 {		// Prüfe auf Expander oder LED Spot device
 	      if (((fp.swexp[i]==1)&& !(fp.i2cdev&IC58_b)) || ((fp.swexp[i]==2) && ((fp.i2cdev&ICLED_b)==0)))
 				{
-				 puterror(I2C_DEVICE_ERROR, -1);  // IC58 Expander Fehler oder fehlt
+				 puterror(DTC_SI_I2C_EXP_ERR, -1);  // IC58 Expander Fehler oder fehlt
 				 fp.nosw[sg]=0;	// Reset Anzahl Schalter in Gruppe
 				 fp.swexp[i]=0;	// Reset Schalter Expander Eintrag
 				 break;
@@ -1156,7 +1155,7 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
    } // end if result>0
   } // end if result>0
  } // end if result>0
- puterror (result,-1);	  // Fehlermeldung
+ puterror (DTC_SI_COMM_ERR, result);	  // Fehlermeldung
  return (false);		// Ende bei Fehler
 }
 
@@ -1239,16 +1238,11 @@ void put_protocol (uchar ausgabe)	// ASCII Protokoll ausgeben
    {
     byteadress-=PSATZLEN;					// Einen Protokolleintrag zurück
     number=(cbuf[byteadress]<<8)+cbuf[byteadress+1];
-    if((result=number_exists (number, errno, MAXERRORTEXT))>=0) // Alle Einträge in Fehlertabelle prüfen
-    {   
-     putstr(T_err);								// Fehlermeldung
-     putstr(errtxt[result]);			// Fehlertextausgabe   	
+    {                                       // Code -> Typ + Klartext aus Diagnose-Tabelle (alt+neu)
+     char tp; const char *t = dtc_text(number, &tp);
+     if (t) { putc(tp); putnumber(number,0); putc(' '); putstr(t); }
+     else putnumber(number,0);              // unbekannter Code -> nur Nummer
     }
-    else if ((result=number_exists (number, evno, MAXMESSAGES))>=0) // Alle Einträge in Ereignistabelle
-    {
-     putstr(evtxt[result]);	// Ereignistextausgabe
-    }
-    else putnumber (number,0);						// Ereignisnummer ausgeben
     put_date_time (&cbuf[byteadress+2]);	// Datum und Zeit aus Puffereintrag ausgeben
     newline();
 		if (zeile>8) if (!ausgabe) break;
@@ -1272,7 +1266,7 @@ void put_protocol (uchar ausgabe)	// ASCII Protokoll ausgeben
   result=modem_send_pro(1,1);			// 1k (X)modemausgabe Protokoll XXX
   modem_eot (1);									// Xmodem Datentransfer beenden
   if (result<0) 									// 1k (X)modemausgabe Protokoll	ok?
-   puterror (result,-1);					// Nein, Fehler ausgeben  							   
+   puterror (DTC_SI_COMM_ERR, result);					// Fehler ausgeben
  }
  if (ausgabe) 
   if (ja(T_delete)>0) 	// Abfrage Daten löschen?
@@ -1355,20 +1349,20 @@ int Set_parameter (uint blocks)		// Im flash abgelegte Parameterblocks prüfen un
 		{
 		 flash_pcom ((uchar *)cbuf, FREEPAGE+pagepk, FLASH_R_ARRAY, BLOCKSIZE); 	// Zweiten 1k Block nach cbuf
 		 memcpy ((char *)&fp.pKennung, &cbuf[0],(uint)&fp.gp - (uint)&fp.pKennung);	// 1k variable Parameter ohne GPS Datenfeld kopieren
-		} else result=PARAMETER_INIT_ERROR;	// Parameter Initialisierungsfehler
+		} else result=DTC_SI_PARAM_INIT;	// Parameter Initialisierungsfehler
 	 }
 	 if ((result==2)||(result==5)) 					// Gültige Anzahl Blöcke übertragen, bisher kein Fehler
 	 {
     result=parameter_to_progmem();		 		// Schreibt Sicherungskopie der Parameter in LPC1766 Programmspeicher
-	  if (!result) puterror(PARAMETER_INIT_ERROR, -1);	// wenn es nicht klappt Initialisierungsfehler
+	  if (!result) puterror(DTC_SI_PARAM_INIT, -1);	// Initialisierungsfehler
 		else result=blocks; 															// Blockanzahl zurück nach result	
 	 } // end gültige Blockanzahl	
 	 if ((result==5)&&((fp.ex12==2)||(fp.ex12==4)))			// Viasis Plus / Viatext - Datenblock, Textnachrichten und Sonderzeichen	 
-	  if (plus_com(1)<0) result=PARAMETER_INIT_ERROR;		// Upload nicht erfolgreich? 
+	  if (plus_com(1)<0) result=DTC_SI_PARAM_INIT;		// Upload nicht erfolgreich?
   }
-  else result=PARAMETER_INIT_ERROR;								// Parameter Initialisierungsfehler   
+  else result=DTC_SI_PARAM_INIT;								// Parameter Initialisierungsfehler
  }	 // end if 2k oder 5k (Plus, Viatext) empfangen
- else if (result>0) result=PARAMETER_INIT_ERROR;	// sonst allgemeinen Initialisierungsfehler ausgeben 
+ else if (result>0) result=DTC_SI_PARAM_INIT;	// sonst allgemeinen Initialisierungsfehler ausgeben
   //else flash_pcom((uchar *)cbuf,FREEPAGE,FLASH_ERASE_WRITE_1,BLOCKSIZE+2);  
  dset=0;
 

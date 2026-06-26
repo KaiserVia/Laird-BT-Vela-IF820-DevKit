@@ -27,8 +27,7 @@
 #include "mqtt.h"
 #include "sicom.h"
 #include <string.h>
-#define DTCBASE 40000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 text MQTTCONHEAD[10]	= {0x00,0x04,'M','Q','T','T',0x04,0xCE,0x02,0x58};
 text MQTTDISCON[2]		= {0xE0,0x00};
@@ -1031,7 +1030,7 @@ void eval_mqtt_message (void)		// Werte MQTT Server Nachrichten aus
 													 putstr(T_col);														
 													 if (mqbf[0]&(QoS1|QoS2))	putnumber (package,0);	// QoS>0? Ja, Pid ausgeben												
 													 else putstr (T_m_none);													// Text "None"
-													 if (mqtt_fail) puterror(MQTT_ERROR, -1);
+													 if (mqtt_fail) puterror(DTC_MQ_CONN_FAIL, -1);
 													 else putstr(T_col); }														
 													if (compare(T_cmd, (char *)mqbf, mqtt_head+2,mqtt_head+toplen+2)>0)	// Publish to /command?
 													{		
@@ -1067,7 +1066,7 @@ void eval_mqtt_message (void)		// Werte MQTT Server Nachrichten aus
 													   } // end if Wochentag und Datum ok    
 														 if (res<0)												// Nicht Alles ok?
 														 {
-														  protocol (PARAMETER_DEF_ERROR);	// protokollieren
+														  protocol (DTC_SI_PARAM_DEF_ERR);	// protokollieren
 														  mqtt_state=LEAVE;								// Disconnect from Server
 														 }	
 														 break; 																 
@@ -1148,7 +1147,7 @@ void eval_mqtt_message (void)		// Werte MQTT Server Nachrichten aus
 														  } 
 														 }	 
 														}
-														puterror(IAP_PROGRAMM_ERROR, -1);		// Hier sollte der Programmzeiger nicht ankommen -> IAP Programmierfehler
+														puterror(DTC_MQ_IAP_PROG_ERR, -1);		// IAP Programmierfehler MQTT
 														if (mqtt_debug)
 														{
 														 connect=UART0; 	

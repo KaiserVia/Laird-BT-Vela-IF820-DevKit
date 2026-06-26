@@ -1,0 +1,113 @@
+Code;Typ;Subsystem;Kurztext;Ursache;Abhilfe;SeitVersion;Status
+11001;F;Bluetooth;PING keine Antwort;BT-Modul antwortet nicht (Verkabelung, Versorgung oder falsche Baudrate);UART und CTS/RTS pruefen, Power-Cycle des Moduls;5.09;aktiv
+11002;F;Bluetooth;Flow Control setzen fehlgeschlagen;STU/SCFG vom Modul nicht bestaetigt;BT-Verbindung trennen und erneut konfigurieren;5.09;aktiv
+11003;F;Bluetooth;Name setzen fehlgeschlagen;SDN-Kommando ohne Antwort (Flash-Timing oder aktive Verbindung);Aktive BT-Verbindung trennen, Konfiguration wiederholen;5.09;aktiv
+11004;F;Bluetooth;Name-Verifikation fehlgeschlagen;Geraet liest anderen Namen als erwartet zurueck;Seriennummer pruefen, Konfiguration wiederholen;5.09;aktiv
+11005;F;Bluetooth;Kein BT-Modul gefunden;Auf keiner Baudrate eine Antwort (Modul nicht da/defekt);Verkabelung und Modul pruefen, Power-Cycle;5.09;aktiv
+12001;F;GSM/LTE;Modem keine Antwort;Quectel-Modem antwortet nicht auf AT;Versorgung, PWRKEY und SIM pruefen;5.09;aktiv
+12002;F;GSM/LTE;SIM-PIN-Problem;SIM-PIN falsch oder nicht gesetzt;PIN in den Einstellungen pruefen;5.09;aktiv
+13001;F;Menue/Kommunikation;Parametertransfer fehlerhaft;Empfangener Parametersatz ungueltig;Uebertragung wiederholen;5.09;aktiv
+16001;F;Flash/Speicher;Schreiben fehlgeschlagen;Flash-Write nicht bestaetigt;Geraet neu starten, bei Wiederholung Hardware pruefen;5.09;aktiv
+11006;F;Bluetooth;Unbekannter BT-Modultyp;Weder IF820 noch RN4678 noch Laird erkannt;Firmware-Konfiguration und Modultyp pruefen;5.09;aktiv
+11007;F;Bluetooth;Flow Control Verifikation fehlgeschlagen;Flow Control gesetzt aber Rueckmeldung negativ;BT-Verbindung trennen und erneut konfigurieren;5.09;aktiv
+11008;F;Bluetooth;Seriennummer nicht gesetzt;Geraete-Seriennummer leer oder letzte 4 Ziffern null;Seriennummer im Geraet eintragen;5.09;aktiv
+11009;F;Bluetooth;BT UART Init fehlgeschlagen;CTS blieb High oder Kanalwechsel fehlgeschlagen;Verkabelung CTS/RTS pruefen, Power-Cycle des Moduls;5.09;aktiv
+11010;F;Bluetooth;BT Modul nicht konfiguriert;Modultyp 0 nach Initialisierungssequenz;Geraet neu starten, Modul und Verkabelung pruefen;5.09;aktiv
+11011;F;Bluetooth;BT AT-Befehl fehlgeschlagen;AT-Kommando ohne OK-Antwort;BT-Verbindung pruefen, Modul neu starten;5.09;aktiv
+11012;F;Bluetooth;BT Verbindungstest fehlgeschlagen;BTT-Kommando ohne Antwort;Aktive BT-Verbindung und Gegenstelle pruefen;5.09;aktiv
+11013;F;Bluetooth;BT Verbindungsaufbau fehlgeschlagen;CR-Kommando ohne Antwort;BT-Gegenstelle und Verbindungsstatus pruefen;5.09;aktiv
+11014;F;Bluetooth;BT PIN setzen fehlgeschlagen;PIN-Setzbefehl ohne Bestaetigung;Seriennummer und BT-Verbindung pruefen;5.09;aktiv
+12003;F;GSM/LTE;GSM Verbindung Timeout;Verbindungsaufbau abgebrochen nach 5 Versuchen;SIM, Antenne und Netzabdeckung pruefen;5.09;aktiv
+12004;F;GSM/LTE;GSM Verbindungsfehler;Verbindungsversuch fehlgeschlagen;APN-Konfiguration und SIM-Status pruefen;5.09;aktiv
+12005;F;GSM/LTE;GSM Datentransfer fehlgeschlagen;Sendeoperation abgebrochen;Netzverbindung und Zielserver pruefen;5.09;aktiv
+12006;F;GSM/LTE;GSM SMS Laenge fehlerhaft;SMS-Paket kuerzer als erwartet;SMS-Inhalt und Verbindungsqualitaet pruefen;5.09;aktiv
+12007;F;GSM/LTE;GSM SMS Senden fehlgeschlagen;SMS-Sendebefehl mit negativem Rueckgabewert;Netz und SMS-Einstellungen pruefen;5.09;aktiv
+12008;F;GSM/LTE;Firmware CRC-Fehler GSM;CRC-Pruefsumme nach Firmware-Transfer stimmt nicht;Uebertragung wiederholen, Quelldatei pruefen;5.09;aktiv
+13002;F;Menue/Kommunikation;Flash fehlt oder zu klein;Kein Flash oder Groesse ausserhalb Bereich;Flash-Hardware pruefen;5.09;aktiv
+13003;F;Menue/Kommunikation;Firmware-Transfer Xmodem Fehler;Xmodem-Protokoll-Fehler beim Firmware-Upload;Uebertragung wiederholen, Kabel und Terminal pruefen;5.09;aktiv
+13004;F;Menue/Kommunikation;IAP Programmierfehler;Kontrollfluss erreichte IAP-Fehlerposition;Firmware pruefen, Service kontaktieren;5.09;aktiv
+13005;F;Menue/Kommunikation;Firmware CRC-Fehler;CRC-Pruefsumme der hochgeladenen Firmware falsch;Upload wiederholen, Quelldatei pruefen;5.09;aktiv
+13006;F;Menue/Kommunikation;Keine gueltige Firmware;Hochgeladene Datei enthaelt keinen ARM-Code;Korrekte Firmware-Datei verwenden;5.09;aktiv
+13007;F;Menue/Kommunikation;Firmware-Upload GSM Fehler;Firmware-Transfer ueber GSM fehlgeschlagen;Netzverbindung und Datei pruefen;5.09;aktiv
+13008;F;Menue/Kommunikation;Default-Parameter Fehler;Default-Parametersatz konnte nicht geschrieben werden;Flash pruefen, Geraet neu starten;5.09;aktiv
+13009;F;Menue/Kommunikation;I2C Expander Init fehlgeschlagen;I2C-Expander IC58 nicht erreichbar;I2C-Bus und Expander pruefen;5.09;aktiv
+13010;F;Menue/Kommunikation;Kommunikations-Protokollfehler;Protokollkommando ungueltig oder nicht unterstuetzt;Verbindung und Protokollversion pruefen;5.09;aktiv
+14001;F;MQTT;MQTT Verbindung fehlgeschlagen;Broker antwortet nicht oder Verbindungsfehler;Netzverbindung, Broker-URL und Port pruefen;5.09;aktiv
+14002;F;MQTT;IAP Programmierfehler MQTT;Kontrollfluss erreichte IAP-Fehlerposition in MQTT;Firmware pruefen, Service kontaktieren;5.09;aktiv
+15001;F;GPS;GPS Keine Antwort;GPS-Modul antwortet nicht;GPS-Modul, Versorgung und Verkabelung pruefen;5.09;aktiv
+15002;F;GPS;GPS Initialisierung fehlgeschlagen;GPS-Initialisierung meldet Fehler oder kein Fix;GPS-Antenne und Sichtverbindung zum Himmel pruefen;5.09;aktiv
+15003;F;GPS;GPS Kommando fehlgeschlagen;GPS-Befehl ohne Antwort;GPS-Verbindung und Baudrate pruefen;5.09;aktiv
+15004;F;GPS;GPS Fehler;GPS-Fehler waehrend Betrieb;GPS-Modul und Antenne pruefen;5.09;aktiv
+16002;F;Flash/Speicher;Parameter-Initialisierung fehlgeschlagen;Flash-Write fuer Parametersatz nicht bestaetigt;Geraet neu starten, bei Wiederholung Flash pruefen;5.09;aktiv
+17001;F;System;I2C-Bus Fehler beim Start;I2C-Bus-Scan fehlgeschlagen;I2C-Verkabelung und Versorgung pruefen;5.09;aktiv
+17002;F;System;I2C Geraet fehlt;Erwartetes I2C-Geraet nicht erkannt;I2C-Geraete und Adressen pruefen;5.09;aktiv
+17003;F;System;I2C DPP fehlt;DPP-Modul nicht am I2C-Bus erkannt;DPP-Modul und Verbindung pruefen;5.09;aktiv
+17004;F;System;LED-Treiber TCA6507 fehlt;TCA6507 nicht erkannt beim Systemstart;Optionale LED-Spotlampe und Verkabelung pruefen;5.09;aktiv
+18001;F;Hardware;GSM-Fehler in libtool;GSM-Modem meldet Fehler bei TCP/IP-Operation;Netzverbindung und GSM-Modem pruefen;5.09;aktiv
+18002;F;Hardware;LED-Treiber TCA6507 Fehler;TCA6507 nicht erreichbar oder Schreibfehler;TCA6507 und I2C-Bus pruefen;5.09;aktiv
+18003;F;Hardware;Hardware-Fehler;Unerwarteter Hardware-Fehler aufgetreten;Hardware pruefen, Service kontaktieren;5.09;aktiv
+18004;F;Hardware;Kommunikations-Timeout;Timeout bei serieller Kommunikation;Schnittstellenparameter und Kabel pruefen;5.09;aktiv
+19001;F;USB;USB Device Init fehlgeschlagen;USBD_Initialize meldet Fehler;USB-Hardware und Treiber pruefen;5.09;aktiv
+19002;F;USB;USB Device Connect fehlgeschlagen;USBD_Connect meldet Fehler;USB-Kabel und Host pruefen;5.09;aktiv
+19003;F;USB;USB Device Disconnect fehlgeschlagen;USBD_Disconnect meldet Fehler;USB-Verbindung pruefen;5.09;aktiv
+19004;F;USB;USB Device Uninit fehlgeschlagen;USBD_Uninitialize meldet Fehler;USB-Hardware pruefen;5.09;aktiv
+19005;F;USB;USB Dateisystem Init fehlgeschlagen;Dateisystem-Initialisierung meldet Fehler;USB-Stick und Formatierung pruefen;5.09;aktiv
+19006;F;USB;USB Dateisystem Info fehlgeschlagen;finfo() meldet Fehler;USB-Stick und Dateisystem pruefen;5.09;aktiv
+19007;F;USB;USB Speicher voll;Freier Speicher negativ;USB-Stick leeren oder groesseren verwenden;5.09;aktiv
+19008;F;USB;USB Datei-Fehler;Datei-Operation fehlgeschlagen;USB-Stick und Dateirechte pruefen;5.09;aktiv
+19009;F;USB;USB Host Init fehlgeschlagen;USBH_Initialize meldet Fehler;USB-Host-Hardware pruefen;5.09;aktiv
+19010;F;USB;Keine Firmware auf USB-Stick;Kein gueltiger ARM-Code gefunden;Korrekte Firmware-Datei auf USB-Stick kopieren;5.09;aktiv
+19011;F;USB;Parameter-Init fehlgeschlagen USB;Parametersatz-Schreiben nach USB-Update fehlgeschlagen;Update wiederholen, Flash pruefen;5.09;aktiv
+19012;F;USB;USB allgemeiner Fehler;Unspezifischer USB-Fehler aufgetreten;USB-Stick und Verbindung pruefen;5.09;aktiv
+19013;F;USB;IAP Programmierfehler USB;Kontrollfluss erreichte IAP-Fehlerposition in USB-Update;Firmware und USB-Stick pruefen;5.09;aktiv
+20001;F;Systemtest;I2C DPP Test fehlgeschlagen;DPP am I2C-Bus nicht erreichbar;DPP-Modul und I2C-Bus pruefen;5.09;aktiv
+20002;F;Systemtest;I2C Expander Test fehlgeschlagen;I2C-Expander nicht erreichbar;Expander und I2C-Bus pruefen;5.09;aktiv
+20003;F;Systemtest;Kalibrierung Test fehlgeschlagen;Kalibriermessung ausserhalb Toleranz;Sensor und Kalibrierung pruefen;5.09;aktiv
+20004;F;Systemtest;Sensor Test fehlgeschlagen;Sensor-Messwert ausserhalb Bereich;Sensor und Anschluss pruefen;5.09;aktiv
+20005;F;Systemtest;RTC Test fehlgeschlagen;Echtzeituhr meldet Fehler oder Wert unplausibel;RTC und Batterie pruefen;5.09;aktiv
+20006;F;Systemtest;I2C IC34 Expander Fehler;IC34 I2C-Expander nicht erreichbar;IC34 und I2C-Bus pruefen;5.09;aktiv
+20007;F;Systemtest;LED-Treiber Test fehlgeschlagen;TCA6507 bei LED-Test nicht erreichbar;TCA6507 und Verbindung pruefen;5.09;aktiv
+# --- Ereignisse (Typ I, weiterhin aktiv) ---
+1;I;Ereignis;Eingeschaltet;Betriebsereignis;-;alt;aktiv
+3;I;Ereignis;Messbeginn;Betriebsereignis;-;alt;aktiv
+5;I;Ereignis;Sommerzeit;Betriebsereignis;-;alt;aktiv
+6;I;Ereignis;Winterzeit;Betriebsereignis;-;alt;aktiv
+7;I;Ereignis;Reboot;Betriebsereignis;-;alt;aktiv
+11;I;Ereignis;Speicher voll;Betriebsereignis;-;alt;aktiv
+12;I;Ereignis;Batteriespannung < 11,5V;Betriebsereignis;-;alt;aktiv
+30;I;Ereignis;Werkinitialisierung;Betriebsereignis;-;alt;aktiv
+31;I;Ereignis;Watchdog reset;Betriebsereignis;-;alt;aktiv
+32;I;Ereignis;Firmware update;Betriebsereignis;-;alt;aktiv
+33;I;Ereignis;Standardeinstellung;Betriebsereignis;-;alt;aktiv
+34;I;Ereignis;Parameter initialisation;Betriebsereignis;-;alt;aktiv
+35;I;Ereignis;Certificate loaded;Betriebsereignis;-;alt;aktiv
+50;I;Ereignis;MQTT connect;Betriebsereignis;-;alt;aktiv
+# --- Alt-Fehlercodes (Typ F, veraltet - nur fuer Bestands-Logs) ---
+201;F;Legacy;Xmodem remote cancel;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+202;F;Legacy;Xmodem retry exceed;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+203;F;Legacy;Xmodem synchronisation;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+204;F;Legacy;Xmodem file too long;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+205;F;Legacy;Xmodem packet type;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+206;F;Legacy;Xmodem timeout;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+207;F;Legacy;no iap firmware file;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+208;F;Legacy;CRC checksum;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+210;F;Legacy;communication timeout;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+211;F;Legacy;USB media write;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+220;F;Legacy;firmware programming;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+300;F;Legacy;CPU brownout;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+500;F;Legacy;Hardware;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+510;F;Legacy;flash memory;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+520;F;Legacy;I2C bus;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+521;F;Legacy;I2C device;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+522;F;Legacy;I2C DPP;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+524;F;Legacy;TCA6507 LED spot;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+530;F;Legacy;RTC device;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+540;F;Legacy;Bluetooth;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+550;F;Legacy;USB;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+600;F;Legacy;GSM/GPRS;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+650;F;Legacy;SIM PIN;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+700;F;Legacy;GPS;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+701;F;Legacy;GPS position fix time exceeded;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+800;F;Legacy;MQTT communication;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+1000;F;Legacy;Parameter initialisation;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+1001;F;Legacy;illegal parameter definition;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet

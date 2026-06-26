@@ -23,8 +23,7 @@
 #include "sictxt.h"
 #include "i2cm.h"		// IC54 (PCA9554) Zugriff fuer CYSPP-Steuerung
 #include "string.h"
-#define DTCBASE 10000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 bool bt_command (text * command, text * answer, int pause) // Bluetooth Kommando senden, Antwort empfangen
 {																						// Übergaben:	command	-	 Zeiger auf Kommandostring
@@ -120,7 +119,7 @@ bool bt_set_flowcontrol (void)       // RTS/CTS modulspezifisch aktivieren (+ pe
   }
   case Roving:  return (FALSE);   // TODO: RN4678 Flow-Control-Befehl
   case Laird:   return (FALSE);   // TODO: Laird Flow-Control-Register
-  default:      dtcerr(E_bt); return (FALSE);   // Fangnetz: neues Modul nicht still durchwinken
+  default:      dtcerr(DTC_BT_UNKNOWN_TYPE); return (FALSE);   // Fangnetz: neues Modul nicht still durchwinken
  }
 }
 
@@ -129,10 +128,10 @@ bool bt_ensure_flowcontrol (void)    // generisch: pruefen, bei Bedarf setzen, v
  if (bt_get_flowcontrol()==1)                               // schon aktiv?
  { putln(" Flow Control: bereits aktiv"); return (TRUE); } // -> kein Flash-Write noetig
  if (!bt_set_flowcontrol())
- { dtcerr("Flow Control: setzen fehlgeschlagen"); newline(); return (FALSE); }
+ { dtcerr(DTC_BT_FLOWCTL_SET); newline(); return (FALSE); }
  if (bt_get_flowcontrol()==1)
  { putln(" Flow Control: aktiviert und gesichert"); return (TRUE); }
- dtcerr("Flow Control: Verifikation fehlgeschlagen"); newline(); return (FALSE);
+ dtcerr(DTC_BT_FLOWCTL_VERIFY); newline(); return (FALSE);
 }
 
 //-----------------------------------------------------------------------------
@@ -178,16 +177,16 @@ bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ ->
    return (TRUE);
   case Roving:  return (FALSE);   // TODO: RN4678 SN,
   case Laird:   return (FALSE);   // TODO: Laird AT+BTN/AT+BTF
-  default:      dtcerr(E_bt); return (FALSE);
+  default:      dtcerr(DTC_BT_UNKNOWN_TYPE); return (FALSE);
  }
 }
 
 bool bt_ensure_name (void)           // generisch: pruefen, bei Bedarf schreiben, verifizieren
 {
- if (!fp.serno[0]) { dtcerr("BT-Name: keine Seriennummer"); newline(); return (FALSE); }
+ if (!fp.serno[0]) { dtcerr(DTC_BT_NO_SERIAL); newline(); return (FALSE); }
  if (bt_get_name()==1) { putln(" BT-Name: bereits gesetzt"); return (TRUE); }   // kein Flash-Write
- if (!bt_set_name())   { dtcerr("BT-Name: setzen fehlgeschlagen"); newline(); return (FALSE); }
- if (bt_get_name()!=1) { dtcerr("BT-Name: Verifikation fehlgeschlagen"); newline(); return (FALSE); }  // verify VOR Reboot (Modul stabil)
+ if (!bt_set_name())   { dtcerr(DTC_BT_NAME_SET); newline(); return (FALSE); }
+ if (bt_get_name()!=1) { dtcerr(DTC_BT_NAME_VERIFY); newline(); return (FALSE); }  // verify VOR Reboot (Modul stabil)
  if (fp.btmodem==IF820) bt_reboot();   // Classic-Name live machen - erst NACH erfolgreicher Verifikation
  putln(" BT-Name: gesetzt und gesichert"); return (TRUE);
 }
@@ -270,10 +269,10 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  bt_release();          // CYSPP sicher als Eingang (falls Reconfig Command-Mode erzwang, IF820 aber nicht erkannt)
  // === Ende IF820-Erkennung; sonst weiter mit Laird/RN4678 ===
  if (!Init_BT_ch(460800)) 							// Konfiguriere uart1 und setze MUX Kanal auf BT modem, Abbruch bei CTS hi
- { newline(); dtcerr(E_bt); return; }	 // putnumber(FIO2PIN,0x80);
+ { newline(); dtcerr(DTC_BT_UART_INIT); return; }	 // putnumber(FIO2PIN,0x80);
  pin=atoi(fp.serno+4); 								// letzte 4 Digits der Seriennummer auswerten	
  if (!isdigit(fp.serno[0]) | !pin)    // Abbruch wenn Seriennummer nicht gesetzt oder letzte 4 Digits null
- { newline(); dtcerr(E_errser); newline(); return; } 	
+ { newline(); dtcerr(DTC_BT_NO_SERIAL); newline(); return; } 	
  fp.btpin=atoi(fp.serno)*10000+pin;		// 6 stellige Pinnummer setzen
  
  if ((FIO2PIN&CTS)==0)								// CTS Hi Modem empfangsbereit?	
@@ -428,7 +427,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  connect=concpy;												// Verbindungszustand wieder herstellen
  osDelay (10);													// Warte auf Satzsteuerzeichen hinter letztem Ok 		
  clear_comchange ();										// Bereinige Schnittstellenwechsel
- if (fp.btmodem==0) { newline(); dtcerr(E_bt);	// Konfigurationsfehler oder nicht da
+ if (fp.btmodem==0) { newline(); dtcerr(DTC_BT_NOT_CONFIGURED);	// Konfigurationsfehler oder nicht da
 	 newline(); }
 }	
 
@@ -442,7 +441,7 @@ bool test_BT	(void)							// Prüfe ob BT Modul antwortet
  {
   if (Init_BT_ch(baud)) result=bt_command(T_ping,T_pingok,300);
   uart1_release(MUX_BT);
-  if (!result) puterror(BLUETOOTH_ERROR,-1);
+  if (!result) puterror(DTC_BT_PING,-1);
   return(result);
  }
  if (Init_BT_ch (baud))									// Konfiguriere uart1 und setze MUX Kanal auf BT modem
@@ -455,7 +454,7 @@ bool test_BT	(void)							// Prüfe ob BT Modul antwortet
 	else result=bt_command(T_AT,T_OKNZ,0);			// Laird - Sende AT - OK erhalten? -> TRUE Rückgabe
  } // end if Init_BT_ch
  uart1_release(MUX_BT);														// Release UART1
- if (!result) puterror (BLUETOOTH_ERROR,-1);	// Fehlermeldung
+ if (!result) puterror (DTC_BT_AT_FAIL,-1);	// Fehlermeldung
  return(result);
 }	
 
@@ -470,7 +469,7 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
   if (Init_BT_ch(baud)) result=bt_command(T_ping,T_pingok,300);
   if (result) { put2str(T_bt,T_if820); newline(); }
   uart1_release(MUX_BT);
-  if (!result) puterror(BLUETOOTH_ERROR,-1);
+  if (!result) puterror(DTC_BT_PING,-1);
   return;
  }
  if (Init_BT_ch (baud))										// Konfiguriere uart1 und setze MUX Kanal auf BT modem
@@ -522,7 +521,7 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
 	   } } } } }
  newline();	
  uart1_release(MUX_BT);														// Release UART1		
- if (!result) puterror (BLUETOOTH_ERROR,-1);	// Fehlermeldung	 	 
+ if (!result) puterror (DTC_BT_BTT_FAIL,-1);	// Fehlermeldung
 }
 
 void set_bt_name (void)							// Setze Bluetooth device (friendly) name
@@ -587,7 +586,7 @@ void set_bt_name (void)							// Setze Bluetooth device (friendly) name
   }
   connect=concopy;
   uart1_release(MUX_BT);														// Release UART1
-	if (!result) puterror (BLUETOOTH_ERROR,-1);	// Fehlermeldung	
+	if (!result) puterror (DTC_BT_CR_FAIL,-1);	// Fehlermeldung
 	else putln (T_OKNZ);
  } // end Eingabe	
 } 
@@ -650,7 +649,7 @@ void set_bt_pin (void)							// Setze Pinnummer
   }	// end if Init_BT_ch	
 	
 	connect=concopy; 
-	if (!result) puterror (BLUETOOTH_ERROR,-1);	// Fehlermeldung
+	if (!result) puterror (DTC_BT_PIN_FAIL,-1);	// Fehlermeldung
 	else putln (T_OKNZ);	
  }
  uart1_release(MUX_BT);														// Release UART1

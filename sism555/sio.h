@@ -62,9 +62,11 @@ extern int getnumber (text * pk, uint min, uint max); 			// Eingabeaufforderung 
 extern void getsignedchar (text *p1, text *p2, int8_t min, int8_t max, int8_t* par);	// signed int8t einlesen
 extern int getuchar (text *pk, uchar min, uchar max, uchar* parameter);	// Unsigned char Parameter einlesen
 extern int ja (text *s);																		// Prüft Eingabe ob Ja oder Nein
-extern void puterrstr_dtc (uchar ln, uint dtc);														// Text " Fehler" mit/ohne neue Zeile
-extern int  puterror_dtc (int errorno, int errorval, uint dtc);
-extern void dctext (text *msg, uint dtc);						// Fehlermeldung und Nummer ausgeben
+extern void puterrstr_dtc (uchar ln, uint dtc);     /* Fehler <code> <subsystem> + Log */
+extern int  puterror_dtc (uint dtc, int errorval);  /* Fehlermeldung ausgeben, Wert zurueck */
+extern void dctext (uint dtc);                      /* dtcerr(code) - Fehler + Log */
+extern const char *dtc_text (uint code, char *ptyp);/* Kurztext+Typ aus Diagnose-Tabelle, 0=unbekannt */
+extern void put_dtc (uint code);                    /* einheitliche Ausgabe F<code> <Kurztext> */
 extern void putparameter (text *s, uint wert, uint format, text *u);	// Parameterwerte formatiert ausgeben
 extern int list_selection	(text *titel, text *liste, uchar *Parameter, uchar items, uchar size);	// Listenauswahl
 extern void sendbuf(text * buf, ushort lastbyte);						// Puffer im Hexformat ausgeben

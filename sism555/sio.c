@@ -24,6 +24,7 @@
 #include "libtool.h"
 #include "string.h"
 #include "rl_usb.h"
+#include "dtc_text.h"	// generierte Code->Typ/Kurztext-Tabelle (aus Diagnose-Codes.csv)
 
 int redirect_char_Out (int (*pchar_func)(int a)) // Umleitung Standard Ausgabe
 {																									// Must be once called before 
@@ -537,39 +538,66 @@ int ja (text *s)				// Prüft Eingabe ob Ja oder Nein
  return(result);
 }
 
-void puterrstr_dtc (uchar ln, uint dtc) { putc(' '); putstr(T_err); putstr("DTC"); putnumber(dtc,0); if (ln) newline(); } // Text "Fehler " formatiert ausgeben
-
-void dctext (text *msg, uint dtc)   // "Fehler DTCxxx <msg>" + Log, ohne Zeilenumbruch
+/* dtc_subsys: Subsystem-Text aus DTC-Code ableiten (Code / 1000) */
+static const char * dtc_subsys (uint dtc)
 {
- putstr(T_err); putstr("DTC"); putnumber(dtc,0); putc(' '); putstr(msg);
+ switch (dtc / 1000)
+ {
+  case 11: return "Bluetooth";
+  case 12: return "GSM/LTE";
+  case 13: return "Kommunikation";
+  case 14: return "MQTT";
+  case 15: return "GPS";
+  case 16: return "Flash";
+  case 17: return "System";
+  case 18: return "Hardware";
+  case 19: return "USB";
+  case 20: return "Systemtest";
+  default: return "?";
+ }
+}
+
+/* dtc_text: Kurztext + Typ (F/W/I) aus der generierten Tabelle; 0 wenn unbekannt */
+const char * dtc_text (uint code, char *ptyp)
+{
+ uint i;
+ for (i=0; i<DTC_TABLE_LEN; i++)
+  if (dtc_table[i].code==code) { if (ptyp) *ptyp=dtc_table[i].typ; return dtc_table[i].txt; }
+ if (ptyp) *ptyp='F';
+ return 0;
+}
+
+/* put_dtc: einheitliche Ausgabe  F<code> <Kurztext>  (Kurztext aus Tabelle, sonst Subsystem) */
+void put_dtc (uint code)
+{
+ char tp; const char *t = dtc_text(code,&tp);
+ putc('F'); putnumber(code,0); putc(' ');
+ putstr(t ? t : dtc_subsys(code));
+}
+
+void puterrstr_dtc (uchar ln, uint dtc) { put_dtc(dtc); if (ln) newline(); if (flashsize) protocol(dtc); }
+
+void dctext (uint dtc)   /* Fehler <code> <subsystem> + Log */
+{
+ put_dtc(dtc);
  if (flashsize) protocol (dtc);
 }
 
-int puterror_dtc (int errorno, int errorval, uint dtc)		// Fehlermeldung und Nummer ausgeben
-{																						// Übergaben 	errorno - Fehlernummer in Fehlerliste
-																						// 						errorval - Rückgabewert -1/0 = kein Ausgabewert/kein Fehler						
- int i;												// Index für Fehlermeldungsliste
-
- if (errorval!=0)																	// Fehler?
+int puterror_dtc (uint dtc, int errorval)   /* Fehlermeldung und Nummer ausgeben */
+{
+ if (errorval!=0)
  {
-  newline();																			// neue Zeile
-  putstr(T_err);																	// Fehlermeldung
-  putstr("DTC"); putnumber(dtc,0);                       /* eindeutiger Marker */
-  if (errorno<0) errorno=200-errorno;							// Neg. Fehlermeldungen 
-  i=number_exists (errorno, errno, MAXERRORTEXT); // Alle Einträge in Fehlertabelle prüfen
-  if (i>=0) { putc(' '); putstr(errtxt[i]); }										// Fehlertextausgabe
-  /* kein Hex-Fallback noetig: DTC zeigt den Code */										// Sonst Fehlernummer in Hexausgabe	
-	if (errorval!=-1)
-  {		
-	 putc(' ');
-   putnumber (errorval,5);												// Ggf. Fehler Rückgabewert	ausgeben								 
-	}	
-  newline();	
- 
-  if (flashsize) protocol (dtc);							// Falls Flash vorhanden, Fehler dort protokollieren
- }	
- 
- return (errorval);																// Fehlerwert durchreichen	
+  newline();
+  put_dtc(dtc);
+  if (errorval!=-1)
+  {
+   putc(' ');
+   putnumber (errorval,5);
+  }
+  newline();
+  if (flashsize) protocol (dtc);
+ }
+ return (errorval);
 }
 
 void putparameter (text *Ps, uint wert, uint format, text *Pu)	// Parameterwerte formatiert ausgeben

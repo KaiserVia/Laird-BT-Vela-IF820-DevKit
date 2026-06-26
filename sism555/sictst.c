@@ -26,8 +26,7 @@
 #include "USB_tools.h"
 #include "sictst.h"
 #include "sictxt.h"
-#define DTCBASE 100000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 uchar lookup_i2cdevices (uchar dadr)						// Prüft I2C Device List auf Adresseintrag
 {																								// Übergabe Device Adresse: dadr
@@ -204,8 +203,8 @@ void test_i2c_device (void)				// Test I2C Devices
     } // end if (result)
    } // end while  
   } // end Schreiberfolg  
-	if (typ==DPP)	puterror (I2C_DPP_ERROR, -1);			// DPP Fehlermeldung ausgeben
-	else puterror (I2C_DEVICE_ERROR, -1);						// EXPANDER Fehlermeldung ausgeben
+	if (typ==DPP)	puterror (DTC_TST_I2C_DPP, -1);			// DPP Fehlermeldung ausgeben
+	else puterror (DTC_TST_I2C_EXPANDER, -1);						// EXPANDER Fehlermeldung ausgeben
  } // end if adr 
 }
 
@@ -241,7 +240,7 @@ int page_test (uint write)	// Löscht oder beschreibt Flash Seiten und vergleicht
  if (bxi==rxi)																			// Kein Abbruch
  {
   if (pcount==maxpage) putstr(T_ok); 								// Bis zur letzten Seite? -> Text "ok
-  else puterrstr(0); 																// Nein, Text " Fehler
+  else { dtcerr(DTC_TST_CALIB_FAIL); }																// Kalibrierung Test Fehler
 
  }
  else bxi++;																				// Zeichen bearbeitet
@@ -326,7 +325,7 @@ void test_rtc (uchar silent)		// Vergleichstest Echtzeituhr- und Haupt- Oszillat
  {
   if (!silent) 					// keine stille Ausgabe
   {
-   puterrstr(0);				// Text "Fehler"
+   dtcerr(DTC_TST_SENSOR_FAIL);				// Sensor Test Fehler
    if (!fehler)					// wenn Sekundenwechsel aber Abweichung zu groß
    {   
 		if (neg) putc('-');			// Negative Abweichung, RTC langsamer 
@@ -334,7 +333,7 @@ void test_rtc (uchar silent)		// Vergleichstest Echtzeituhr- und Haupt- Oszillat
     putstr (T_ppm);
    }
   }
-  puterror (RTC_ERROR, -1);	// RTC Fehler ausgeben bzw. protokollieren
+  puterror (DTC_TST_RTC_FAIL, -1);	// RTC Fehler ausgeben bzw. protokollieren
  }
  else if (!silent) putln (T_ok); 	// Erfolg 
  
@@ -626,7 +625,7 @@ void amplifier_adjust (void) // Transceiver und Verstärkerabgleich
  fp.txrcon|=sense_tab[4];										// 100% Verstärkung zuweisen
  if (transceiver(ein)>0)										// Transceiver und Verstärker ein
  	set_dpp (IC35,IC35);											// Digitalpoti einstellen
- else puterror (I2C_DEVICE_ERROR, -1);			// IC34 I2C Expander Fehler
+ else puterror (DTC_TST_I2C_IC34, -1);			// IC34 I2C Expander Fehler
  fp.txrcon&=~(GAIN_INH|GAIN_A|GAIN_B);			// Verstärkung löschen
  fp.txrcon|=sense_tab[fp.sense];						// eingestellte Verstärkung zuweisen
  transceiver(aus);													// Transceiver und Verstärker aus
@@ -646,7 +645,7 @@ bool test_ledspot(void)	// Prüfe Steuerchip für externe LED Spotlampe
    return(TRUE);   
   }
  FIO0CLR=EX12_1;							// 12V Lastversorgung 1 aus
- puterror(TCA6507_ERROR, -1);	// Kein Erfolg, Fehler melden
+ puterror(DTC_TST_TCA6507, -1);	// LED-Treiber Test Fehler
  return (FALSE); 							// LED Steuerchip nicht ansprechbar
 }
 

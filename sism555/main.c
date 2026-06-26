@@ -30,8 +30,7 @@
 #include "libtool.h"
 #include "measure.h"
 #include "mqtt.h"
-#define DTCBASE 70000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 
  
@@ -91,7 +90,7 @@ int main (void)
  }	
  
  if (Init_I2C()== ARM_DRIVER_OK) fp.i2cdev|=I2CB0;		// Initialisierung I2C Interface erfolgreich
- else	{ puterror (I2C_BUS_ERROR, -1);	syserror++; }		// oder nicht 
+ else	{ puterror (DTC_MA_I2C_BUS, -1);	syserror++; }		// oder nicht 
  
  	 
  if ((i_reset!=SLEEP_RES)&(i_reset!=FIRM_UP_RES)) 		// Kein Firmware update oder Sleep Power Down Reset? 
@@ -101,9 +100,9 @@ int main (void)
    {
     if (((fp.i2cdev&(IC37_b|IC54_b))!=(IC37_b|IC54_b)) 	// PCA Expander Analogsteuerung oder Schnittstellen-Link fehlt							
 		 || (!(fp.i2cdev&IC58_b&&(fp.ex12>=2))))						// PCA Expander I/O für Plus, FT oder Viatext fehlt
-		 puterror (I2C_DEVICE_ERROR, fp.i2cdev);	   
-    if ((fp.i2cdev&IC35_b)!=IC35_b) puterror (I2C_DPP_ERROR, -1);	 				// DPP fehlt	
-	  if (!(fp.i2cdev&ICLED_b) && fp.ledspot) puterror (TCA6507_ERROR, -1);	// Fehler externe LED Spotlampe
+		 puterror (DTC_MA_I2C_DEVICE, fp.i2cdev);
+    if ((fp.i2cdev&IC35_b)!=IC35_b) puterror (DTC_MA_I2C_DPP, -1);					// DPP fehlt
+	  if (!(fp.i2cdev&ICLED_b) && fp.ledspot) puterror (DTC_MA_TCA6507, -1);	// Fehler externe LED Spotlampe
 		syserror++;	
   } } // end if I2C Bus erfolgreich initialisiert   
 	

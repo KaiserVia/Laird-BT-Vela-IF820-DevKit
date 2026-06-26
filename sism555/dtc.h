@@ -1,18 +1,3 @@
-/* dtc.h - eindeutige Fehler-Marker (DTC) ueber Datei-Basis + Zeilennummer.
-   In jeder .c VOR dem Include DTCBASE definieren, z.B.:
-       #define DTCBASE 10000
-       #include "dtc.h"
-   Dann erzeugt jeder puterror()/puterrstr()/dtcerr() automatisch einen
-   eindeutigen Code DTC<DTCBASE+__LINE__> - keine Dubletten moeglich. */
-#ifndef DTC_H_
-#define DTC_H_
-#ifndef DTCBASE
-#define DTCBASE 0
-#endif
-#undef  puterror
-#undef  puterrstr
-#undef  dtcerr
-#define puterror(e,v)  puterror_dtc((e),(v),(DTCBASE)+__LINE__)
-#define puterrstr(ln)  puterrstr_dtc((ln),(DTCBASE)+__LINE__)
-#define dtcerr(msg)    dctext((msg),(DTCBASE)+__LINE__)
-#endif
+/* dtc.h - ABGELOEST durch dtc_codes.h (ab Version 5.09)
+   Diese Datei ist leer. Alle Fehlerstellen verwenden feste DTC-Konstanten.
+   Siehe: dtc_codes.h, Doku/Diagnose-Codes.csv */

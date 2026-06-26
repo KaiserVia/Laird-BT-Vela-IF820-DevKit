@@ -154,48 +154,40 @@ Firmware flashen → über RS232-Terminal die BT-Init/Detect anstoßen → `/PIN
 
 ---
 
-## Fehler-Codes (DTC) — Mechanismus & Registry  (ab Version 5.89)
+## Fehler-Codes (DTC) — Mechanismus & Registry  (ab Version 5.09)
 
-Ziel: jeder Fehler bekommt einen **eindeutigen** Marker `DTC<nnnnn>`, damit man ihn im Feld/Log
-zweifelsfrei zuordnen kann. **Dubletten sind strukturell unmöglich.**
+> **Altes Schema (DTCBASE + `__LINE__`) abgelöst ab Version 5.09.**
+> Siehe `Doku/Diagnose-Codes_Konzept.md` und den vollständigen Katalog `Doku/Diagnose-Codes.csv`.
 
-**Funktionsweise:** `dtc.h` definiert Makros, die `puterror()`, `puterrstr()` und `dtcerr()`
-automatisch auf Varianten mit Code `DTCBASE + __LINE__` umleiten. Jede .c-Datei setzt ihre
-eigene `DTCBASE` (10000er-Schritte) vor `#include "dtc.h"`. Da alle Dateien < 10000 Zeilen
-haben, kann sich kein Code mit einem anderen überschneiden.
+Jeder Fehler hat einen **festen, lesbaren, stabilen** 5-stelligen Code (11001–99999), der sich
+bei Quellcode-Änderungen nicht verschiebt. Der Code identifiziert Subsystem und Fehlerart.
 
-**Ausgabe am Terminal:** `Fehler DTC<code> <Kategorie/Text>` (z. B. `Fehler DTC10204 Bluetooth`).
-Bei `puterror` wird der eindeutige Code zusätzlich in den Flash protokolliert (`protocol(dtc)`).
+**Ausgabe am Terminal:** `Fehler <Code> <Subsystem>` (z. B. `Fehler 11001 Bluetooth`).
+Der Code wird zusätzlich in den Flash protokolliert (`protocol(code)`).
 
-**Datei-Basis → Quelle (so dekodiert man einen DTC):**
+**Subsystem-Bereiche:**
 
-| DTCBASE | Datei | Beispiel |
-|---------|-------|----------|
-| 10000 | btio.c | DTC10204 = btio.c, Zeile 204 |
-| 20000 | gsmio.c | |
-| 30000 | sicom.c | |
-| 40000 | mqtt.c | |
-| 50000 | gpsio.c | |
-| 60000 | flash.c | |
-| 70000 | main.c | |
-| 80000 | libtool.c | |
-| 90000 | USB_tools.c | |
-| 100000 | sictst.c | |
+| Bereich | Subsystem | Datei |
+|---------|-----------|-------|
+| 11xxx | Bluetooth | btio.c |
+| 12xxx | GSM/LTE | gsmio.c |
+| 13xxx | Menue/Kommunikation | sicom.c |
+| 14xxx | MQTT | mqtt.c |
+| 15xxx | GPS | gpsio.c |
+| 16xxx | Flash/Speicher | flash.c |
+| 17xxx | System | main.c |
+| 18xxx | Hardware/libtool | libtool.c |
+| 19xxx | USB | USB_tools.c |
+| 20xxx | Systemtest | sictst.c |
 
-Dekodierung: führende Stelle(n) = Datei (1xxxx = btio …), Rest = Quellzeile.
+**Neuen Code anlegen:** Nächste freie laufende Nummer im Subsystem-Bereich wählen →
+Zeile in `Doku/Diagnose-Codes.csv` eintragen → `dtc_codes.h` per `tools/gen_dtc.py`
+neu generieren (oder Header manuell ergänzen) → Konstante an der Fehlerstelle verwenden.
 
-**Neue Funktionen/Dateien:** `dtc.h` (neu); in `sio.c`/`sio.h` ersetzt durch
-`puterror_dtc()`, `puterrstr_dtc()`, `dctext()` (Makro `dtcerr`).
+**Technisch:** `dtc_codes.h` definiert die Konstanten (`DTC_BT_PING = 11001` usw.) und
+die Makros `puterror(code,v)` / `dtcerr(code)`. `sio.c` leitet den Subsystem-Text aus
+`code/1000` ab. `dtc.h` ist leer (Tombstone).
 
-**Neue Fehlerdatei hinzufügen:** nächste freie `DTCBASE` (110000, 120000, …) definieren und
-`#include "dtc.h"` ergänzen — sonst nichts.
-
-**Bekannter Kompromiss:** Da der Code zeilenbasiert ist, ändert sich der DTC einer Fehlerstelle,
-wenn darüber Zeilen eingefügt/entfernt werden. Dafür sind Dubletten ausgeschlossen und der Code
-zeigt direkt Datei + Quellzeile.
-
-
----
 
 ## Update 5.90 — IF820-Zweige + GSM-Baudrate variabel
 
@@ -691,3 +683,38 @@ Fixes:
 
 Ablauf bei Config mit aktiver Verbindung jetzt: bt_cmdmode (Command-Mode) -> Scan/Erkennung ->
 /DIS (Verbindung schliessen) -> Flow Control -> Name setzen+verifizieren -> /RBT (Classic live).
+
+
+---
+
+## Update 5.09 - Diagnose-Codes vereinheitlicht (alt+neu) mit Typ-Praefix F/W/I
+
+Umgesetzt (Vorschlag des Anwenders: alte Eintraege in CSV migrieren, alte Tabellen abl: oesen):
+
+Katalog (Doku/Diagnose-Codes.csv) - EINE Quelle fuer alles:
+- Neue Spalte Typ (F=Fault, W=Warning, I=Info/Ereignis, englische Konvention).
+- 68 neue Fehlercodes (11xxx-20xxx) = Typ F.
+- 14 Ereignisse (alte evtxt, Nummern 1-50) = Typ I, Status aktiv (werden weiter geschrieben).
+- 28 Alt-Fehlercodes (alte errtxt, Nummern 201-1001) = Typ F, Status veraltet (nur fuer
+  Bestands-Logs). Alte und neue Nummern ueberschneiden sich nicht (alt <=1001, neu >=11001).
+
+Generator (tools/gen_dtc.py): liest die CSV -> erzeugt dtc_text.h (Code -> Typ + Kurztext,
+110 Eintraege). Einzige Quelle = CSV, kein Drift. dtc_text.h wird NUR in sio.c per #include
+eingebunden (kein Keil-Projekt-Eintrag noetig).
+
+Firmware:
+- sio.c: dtc_text(code,&typ) Lookup ueber die generierte Tabelle; put_dtc(code) gibt einheitlich
+  "F<code> <Kurztext>" aus (Kurztext aus Tabelle, sonst Subsystem). Die drei Fehler-Ausgaben
+  (puterrstr_dtc/dctext/puterror_dtc) nutzen jetzt put_dtc. Ausgabe also z. B. "F11001 PING keine Antwort".
+- sicom.c: Protokoll-Anzeige nutzt dtc_text -> "<Typ><Code> <Kurztext>" (F/W/I) bzw. nur Nummer
+  bei unbekanntem Code. errtxt/evtxt/number_exists werden hier nicht mehr verwendet.
+- sio.h: Prototypen dtc_text/put_dtc.
+
+OFFEN (Cleanup, Build-sicher spaeter): die alten Tabellen errtxt/errno/evtxt/evno (+ ggf.
+number_exists) sind jetzt UNBENUTZT, aber noch definiert (sprachen/*.c, sictxt.h). Koennen
+spaeter entfernt werden - bewusst NICHT jetzt, um den Build nicht blind ueber mehrere
+Sprachdateien zu brechen.
+
+WICHTIG: Firmware-Aenderungen konnten hier nicht kompiliert werden -> in Keil bauen und testen.
+Neue Diagnose hinzufuegen: Zeile in CSV -> tools/gen_dtc.py laufen lassen -> dtc_text.h aktuell;
+Konstante in dtc_codes.h ergaenzen und an der Fehlerstelle verwenden.

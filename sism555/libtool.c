@@ -32,8 +32,7 @@
 #include "string.h"
 #include "sictst.h"
 #include "mqtt.h"
-#define DTCBASE 80000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 const ushort crc_table[PAGE] = {
 0x0000,0x1021,0x2042,0x3063,0x4084,0x50A5,0x60C6,0x70E7,0x8108,0x9129,0xA14A,0xB16B,0xC18C,0xD1AD,0xE1CE,0xF1EF,
@@ -659,7 +658,7 @@ void modem_com (void)						// Direkte Kommunikation mit Modems
 	else 
 	{	
 	 connect=concpy;										
-	 dtcerr(E_gsm);						// Fehlermeldung ausgeben
+	 dtcerr(DTC_LIB_GSM_ERR);						// GSM-Fehler in libtool
 	 newline();	
 	 return;	
 	}		 
@@ -743,7 +742,7 @@ void set_exp_switch (uchar switchno)	// Setzt definierte Schalter über I2C Expan
 	 l=port&0x07;													// Korrespondierende Schalterbits ausmaskieren	
    if (l) write_i2c_dev (ICLED,4,((l<<24)|(l<<16)|(l<<8)|0x10));	// Led ansteuern
   }
-  else puterror(TCA6507_ERROR, -1);			// Led spot Treiber Fehler ausgeben
+  else puterror(DTC_LIB_TCA6507, -1);			// Led spot Treiber Fehler ausgeben
  }
  else put2str (T_err, T_notcon);
  
@@ -924,9 +923,9 @@ int plus_com (uchar mode)		// Kommunikation mit Matrix Controller Platine
  connect=concpy;																			// Schnittstellen wiederherstellen	
  if (result<0)
  {
-  if (result==-1) puterror (HARDWARE_ERROR,-1);			// Hardware Fehler eintragen
+  if (result==-1) puterror (DTC_LIB_HW_ERR,-1);			// Hardware Fehler eintragen
 	else if (result==MATRIX_PARAM_ERROR);							// Nichts machen, neg. Rückgabeergebnis führt zu Parameter Init error  
-	else puterror (COMMUNICATION_TIMEOUT, result);		// Kommunikationsfehler eintragen
+	else puterror (DTC_LIB_COMM_TIMEOUT, result);		// Kommunikationsfehler eintragen
  } 
  return(result);	
 }

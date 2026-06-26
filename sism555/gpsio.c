@@ -29,8 +29,7 @@
 #include "gsmio.h"
 #include "mqtt.h"
 #include "flash.h"
-#define DTCBASE 50000
-#include "dtc.h"
+#include "dtc_codes.h"
 
 int gps_power (uchar mode)			// Schalte GPS L70/LC76F Modem - aus/ein/restart 
 {																// Übergabe: mode - 0/1/2 power off/on/restart
@@ -159,7 +158,7 @@ int test_gps (uchar sendmessages)		// Prüfe ob GPS Modul Einschaltnachrichten se
  if (fp.gps==0)	// Keine Meldung und Modul nicht gefunden
  {
 	 if (!sendmessages)								// Keine Ausgabe im Power On
-	  puterror(GPS_ERROR, -1);				// Kein Erfolg, Fehler im Protokoll melden	 
+	  puterror(DTC_GPS_NO_RESP, -1);				// Kein Erfolg, Fehler im Protokoll melden
  	 gps_power(0);										// Abschalten	
  } 
  return(result);										
@@ -235,7 +234,7 @@ void init_gps (void)							// Initialisiere und teste GPS LC76 Modul
 	Init_UART2(0);
  } //end if result Startnachrichten	
  
- if (result<=0) {fp.gps=0; dtcerr(E_gps);	}// GPS Fehlermeldung ausgeben
+ if (result<=0) {fp.gps=0; dtcerr(DTC_GPS_INIT_FAIL);	}// GPS Fehlermeldung ausgeben
  else		// Erfolg
  {
 	fp.gpsintv=Def_gpsintv;							// Setze default GPS Positionsfix Zeitinterval
@@ -295,7 +294,7 @@ void send_gps_raw (void)						// Ausgabe von GPS Rohdaten GLL, RMC und GGA
 	}
 	Init_UART2 (0);										// bzw. UART2 deinitialisieren
  }	
- else dtcerr(E_gps);			// GPS Fehlermeldung ausgeben 
+ else dtcerr(DTC_GPS_CMD_FAIL);			// GPS Fehlermeldung ausgeben
  gps_power(0);									// L70/LC76F abschalten und deselektieren 
  gps_pending=0;									// GPS Positionsbestimmung unterbrochen
  putln (T_LF);
@@ -366,7 +365,7 @@ void send_gps_GGA	(void)	// Formatierte Ausgabe des GPS NMEA GGA Datensatzes
 	Init_UART2 (0);										// bzw. UART2 deinitialisieren
  }		
 
- if (result<0) dtcerr(E_gps);	// GPS Fehlermeldung ausgeben 
+ if (result<0) dtcerr(DTC_GPS_ERROR);	// GPS Fehlermeldung ausgeben
  gps_power(0);												// LC76 abschalten und deselektieren
  gps_pending=0;												// GPS Positionsbestimmung unterbrochen
  putln (T_LF);
