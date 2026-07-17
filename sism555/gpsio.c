@@ -30,6 +30,7 @@
 #include "mqtt.h"
 #include "flash.h"
 #include "dtc_codes.h"
+#include "rtc.h"							// clock_set() zentrale Zeitsync
 
 int gps_power (uchar mode)			// Schalte GPS L70/LC76F Modem - aus/ein/restart 
 {																// Übergabe: mode - 0/1/2 power off/on/restart
@@ -415,6 +416,15 @@ void get_geopos (void)		// Ermittle GPS position
 			val=cbuf[colonpos(cbuf,2)];					// Werte Feld Zeit/Datum gültig aus
 			if (val=='A')												// Zeit/Datum ist gültig?
 			{		// Statt der Satelliten Zeitdaten werden RTC Zeitdaten verwendet, wg. Match von GPS und Messdaten
+
+			 { // GPS-Zeit (UTC) -> RTC, zentrale Zeitsync (Quelle GPS)
+			  char *gt=cbuf+colonpos(cbuf,1);   // Feld 1: hhmmss
+			  char *gd=cbuf+colonpos(cbuf,9);   // Feld 9: ddmmyy
+			  uchar gh=(gt[0]-'0')*10+(gt[1]-'0'), gm=(gt[2]-'0')*10+(gt[3]-'0'), gs=(gt[4]-'0')*10+(gt[5]-'0');
+			  uchar gD=(gd[0]-'0')*10+(gd[1]-'0'), gM=(gd[2]-'0')*10+(gd[3]-'0');
+			  uint  gY=2000+(gd[4]-'0')*10+(gd[5]-'0');
+			  clock_set(gD,gM,gY, gh,gm,gs, fp.utc, SRC_GPS, CLK_FROM_UTC);
+			 }
 			 val=cbuf[colonpos(cbuf,4)];				// Latitude N/S Feld lesen
 			 if ((val=='N')||(val=='S'))				// Latitude N/S Feld korrekt?
 			 {

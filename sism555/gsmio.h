@@ -113,6 +113,8 @@
 #define T_qseek			"AT+QFSEEK="
 #define T_fread			"AT+QFREAD="
 #define T_qccid			"AT+QCCID"
+#define T_qlts			"AT+QLTS=2"		// Quectel Netzzeit (NITZ) abfragen
+#define T_qltsr			"QLTS"				// Antwort-Token +QLTS:
 
 
 // Routinen extern bereit stellen
@@ -125,6 +127,7 @@ extern void init_gsm (void);						// Initialisierung GSM Modem
 extern int test_gsm (uchar poweron);		// Pr�fe ob GSM/GPRS Modem antwortet
 extern void gsm_com (uchar modemein);		// Direkte Kommunikation mit GSM Modem
 extern void atcpin (ushort set, uchar manual);					// Setze Pinnummer oder pr�fe Status
+extern int gsm_nettime (uchar force);					// Quectel Netzzeit -> Zeitsync
 extern int test_registration (void);										// Pr�fe ob Modem eingebucht ist
 extern int set_gprs_config (uchar ausgabe);							// GPRS Konfiguration setzen und testen
 extern void send_local_ip (void);					// Lokale IP Adresse ausgeben

@@ -402,6 +402,7 @@ void Init_UART0 (void)			// Initialisiert Schnittstelle UART0 (Terminal)
  NVIC_EnableIRQ(UART0_IRQn);	
 }
 
+extern volatile uchar cts_bypass;   // aus sio.c: 1 = Bring-up -> HW-Flusssteuerung (Auto-CTS) aus
 void Init_UART1 (uint baud)					// Initialisiert zweiten UART1 (BT, GSM)
 {																		// Übergaben baud - 9600 oder sonst immer 460800 
  if (!baud)													// Baudrate=0, de-initialisiere UART1
@@ -441,7 +442,9 @@ void Init_UART1 (uint baud)					// Initialisiert zweiten UART1 (BT, GSM)
 	U1->FDR = (8<<4)|0x05;		// 24MHz/(16x3x1,625)	
  }	 
  U1->LCR = 0x00000003;			// Line control 8,N,1, DLAB=0
- U1->MCR|=(1<<7)|(1<<6);		// Enable RTS/CTS flow control
+ U1->MCR |= (1<<6);                            // Auto-RTS IMMER an -> MCU signalisiert empfangsbereit, Modul darf senden (sonst keine Antwort bei F=01!)
+ if (cts_bypass) U1->MCR &= ~(1<<7);          // Bring-up: nur Auto-CTS AUS -> TX nicht durch CTS-HIGH (Werksmodul F=00) blockiert
+ else            U1->MCR |=  (1<<7);          // Normalbetrieb: Auto-CTS an -> volle HW-Flusssteuerung
  U1->IER = 0x01;						// Enable Rx Interrupt 
  
  PINSEL4|=(TXD1|RXD1|CTS1|RTS1);		// Uart1 Pins verbinden

@@ -26,6 +26,22 @@
 #include "mqtt.h"
 #include "sictxt.h"
 
+//-----------------------------------------------------------------------------
+// Zentrale Zeitsynchronisation - alle Quellen (Backend/GPS/NITZ/manuell) hier durch
+//-----------------------------------------------------------------------------
+uchar g_timesrc    = SRC_NONE;   // aktuelle Zeitquelle (Anzeige + Rang)
+uint  g_timesync_h = 0;          // fp.hcount beim letzten erfolgreichen Abgleich
+
+static const uchar src_rank[5] = { 0, 2, 1, 2, 3 };  // NONE,MANUAL,LTE,GPS,MQTT
+
+static int tage_im_monat (int m, int y)   // Tage im Monat inkl. Schaltjahr
+{
+ static const int d[13]={0,31,28,31,30,31,30,31,31,30,31,30,31};
+ if (m==2 && ((y%4==0 && y%100!=0)||y%400==0)) return (29);
+ if (m<1||m>12) return (30);
+ return (d[m]);
+}
+
 void RTC_IRQHandler (void)						// RTC-Interrupt jede Sekunde oder Minute
 {
 	if (CIIR&IMSEC)	tsec=T1TC;					// Sekundeninterrupt, 1 MHz Timer 2 auslesen
@@ -39,9 +55,21 @@ void InitRTC (void)				// Initialisierung der Echtzeituhr
  if (RTC_INIT_CODE != PARAKENNUNG)		// Uhr bereits initialisiert? 
  {										
   RCCR=0;															// Reset and halt clock 1 Hz oscillator
-  SEC=0; MIN=0;	HOUR=0;								// Reset time registers
-  DOM=1; MONTH=1; YEAR=2015;					// Reset date registers
-	DOW=0;															// Sonntag 
+  { /* Default = Build-Datum/-zeit (statt fix 2015): ungestellte Uhr bleibt plausibel */
+   const char *bd=__DATE__;                 /* "Mmm dd yyyy" */
+   const char *bt=__TIME__;                 /* "hh:mm:ss"     */
+   static const char mon[]="JanFebMarAprMayJunJulAugSepOctNovDec";
+   static const int  dowt[12]={0,3,2,5,0,3,5,1,4,6,2,4};   /* Sakamoto */
+   int m,d,y,yy;
+   for (m=0;m<12;m++) if (bd[0]==mon[m*3]&&bd[1]==mon[m*3+1]&&bd[2]==mon[m*3+2]) break;
+   m++;                                      /* 1..12 */
+   d=(bd[4]==' '?0:bd[4]-'0')*10+(bd[5]-'0');
+   y=(bd[7]-'0')*1000+(bd[8]-'0')*100+(bd[9]-'0')*10+(bd[10]-'0');
+   HOUR=(bt[0]-'0')*10+(bt[1]-'0'); MIN=(bt[3]-'0')*10+(bt[4]-'0'); SEC=(bt[6]-'0')*10+(bt[7]-'0');
+   DOM=d; MONTH=m; YEAR=y;
+   yy=y; if (m<3) yy--;
+   DOW=(yy + yy/4 - yy/100 + yy/400 + dowt[m-1] + d) % 7;  /* 0=Sonntag */
+  }
   RCCR|=(CLKEN|CCALEN);								// Clock enable, disable Calibration
 	RTC_INIT_CODE = PARAKENNUNG;				// Parameter Kennung speichern 
  }  
@@ -222,6 +250,92 @@ void set_date (char *dline)			// Setzt Datum mit Pufferwerten
  YEAR=year;									// Jahresregister setzen
  DOW=dayofweek(DOM, MONTH, YEAR)-1;  // Berechnet und setzt Wochentag
  RCCR|=(CLKEN|CCALEN);			// Clock enable, no calibration	
+}
+
+static void clock_logsrc (uchar src)  // Quelle vermerken + Info-Ereignis NUR bei Wechsel
+{
+ if (g_timesrc==src) return;
+ switch (src)
+ {
+  case SRC_MQTT:   protocol(EV_TIME_MQTT);   break;
+  case SRC_GPS:    protocol(EV_TIME_GPS);    break;
+  case SRC_LTE:    protocol(EV_TIME_LTE);    break;
+  case SRC_MANUAL: protocol(EV_TIME_MANUAL); break;
+  default: break;
+ }
+ g_timesrc=src;
+}
+
+uchar clock_set (uchar dd, uchar mm, uint yyyy, uchar hh, uchar mi, uchar ss,
+                 int8_t utc_off, uchar src, uchar flags)  // 1=uebernommen, 0=verworfen
+{
+ int h, wd;
+
+ // 1. Validierung - offensichtlich falsche Zeiten verwerfen
+ if (yyyy<2024 || yyyy>2099) return (0);
+ if (hh>=24 || mi>=60 || ss>=60) return (0);
+ if (dayofweek(dd,mm,yyyy) <= 0) return (0);            // 0/-1 = ungueltiges Datum
+
+ // 2. Auto-Zeit abgeschaltet? Nur Hintergrundquellen blocken (manuell + Force laufen)
+ if (fp.autotime_off==1 && src!=SRC_MANUAL && !(flags&CLK_FORCE)) return (0);
+
+ // 3. Rang-/Drift-Pruefung (ausser bei manuellem Force)
+ if (!(flags&CLK_FORCE) && g_timesrc!=SRC_NONE)
+  if (src_rank[src] < src_rank[g_timesrc])                 // schwaechere Quelle
+   if ((uint)(fp.hcount - g_timesync_h) < RESYNC_STUNDEN)  // letzter Abgleich noch frisch
+    return (0);
+
+ // 4. UTC -> Lokalzeit (fp.utc enthaelt bereits den DST-Versatz)
+ if (flags & CLK_FROM_UTC)
+ {
+  h = (int)hh + fp.utc;
+  while (h<0)   { h+=24; if(--dd<1)  { if(--mm<1){mm=12;yyyy--;} dd=tage_im_monat(mm,yyyy); } }
+  while (h>=24) { h-=24; if(++dd>tage_im_monat(mm,yyyy)){ dd=1; if(++mm>12){mm=1;yyyy++;} } }
+  hh = (uchar)h;
+ }
+
+ // 5. Quelle liefert autoritativen UTC-Offset
+ if (flags & CLK_SET_UTC) fp.utc = utc_off;
+
+ // 6. Schon korrekt (gleiches Datum, <=3 s Abweichung)? -> nur Buchfuehrung
+ {
+  long cur = (long)HOUR*3600 + MIN*60 + SEC;
+  long nw  = (long)hh*3600   + mi*60  + ss;
+  long df  = nw-cur; if (df<0) df=-df;
+  if (YEAR==yyyy && MONTH==mm && DOM==dd && df<=3)
+  { clock_logsrc(src); g_timesync_h=fp.hcount; return (1); }
+ }
+
+ // 7. RTC setzen
+ RCCR=0;
+ SEC=ss; MIN=mi; HOUR=hh;
+ DOM=dd; MONTH=mm; YEAR=yyyy;
+ wd=dayofweek(dd,mm,yyyy); DOW=wd-1;
+ RCCR|=(CLKEN|CCALEN);
+
+ // 8. Buchfuehrung + Info-Ereignis (nur bei Quellenwechsel)
+ clock_logsrc(src);
+ g_timesync_h=fp.hcount;
+ timeupdate=1;        // zeitliche Aufgaben nach Zeitaenderung neu pruefen
+ return (1);
+}
+
+const char * time_source_text (void)   // Klartext der aktuellen Zeitquelle
+{
+ switch (g_timesrc)
+ {
+  case SRC_MQTT:   return ("Backend");
+  case SRC_GPS:    return ("GPS");
+  case SRC_LTE:    return ("Netz");
+  case SRC_MANUAL: return ("manuell");
+  default:         return ("ungestellt");
+ }
+}
+
+void clock_mark_manual (void)   // manuelle Datums-/Zeiteingabe als Quelle vermerken
+{
+ if (g_timesrc!=SRC_MANUAL) { protocol(EV_TIME_MANUAL); g_timesrc=SRC_MANUAL; }
+ g_timesync_h=fp.hcount;
 }
 
 void date_time (void)	// ASCII Zeit und Datumsstring lesen oder ausgeben

@@ -1049,16 +1049,7 @@ void eval_mqtt_message (void)		// Werte MQTT Server Nachrichten aus
 														  {	
 															 if ((mqbf[i+7]>244) || (mqbf[i+7]<15)) // Wert UTC Offset -11 ... +14 korrekt?
 														   {	
-														    RCCR=0;										// Reset and halt clock
-														    DOM=mqbf[i+1];						// DD -> RTC
-														    MONTH=mqbf[i+2];					// MM
-														    YEAR=2000+mqbf[i+3];			// YYYY Langes Jahresformat 
-														    HOUR=mqbf[i+4];						// hh
-														    MIN=mqbf[i+5];						// mm
-														    SEC=mqbf[i+6];						// ss
-														    DOW=theday-1;							// Wochentag setzen, Index anpassen
-														    RCCR|=(CLKEN|CCALEN);			// Clock enable, no calibration		
-														    fp.utc=(int8_t)mqbf[i+7];	// UTC offset übernehmen
+														    clock_set(mqbf[i+1],mqbf[i+2],2000+mqbf[i+3], mqbf[i+4],mqbf[i+5],mqbf[i+6], (int8_t)mqbf[i+7], SRC_MQTT, CLK_SET_UTC);  // zentrale Zeitsync (Backend: Lokalzeit + Offset)
 														    if (mqtt_debug) { newline(); send_date_time (2,0); }	// MQTT Debug Mode? Ja, neue Datum/Uhrzeit ausgeben 													 
 																res=1; 
 														   } // end if Zeitzone korrekt

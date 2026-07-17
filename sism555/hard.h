@@ -395,7 +395,7 @@ typedef struct FlashSavedParameter { 	// Parameter, die dauerhaft im Flash gesic
  uint hcount;										// Betriebsstunden  
  uchar mqtt_packetsize;					// Messdaten Packetgröße
  uchar mqtt_pdbq;								// Erweiterte Debug Protokollfunktion
- uchar fillbytes[2];						// Füllt ersten 1k Block (nicht überschreibbare Parameter)
+ uchar autotime_off;					uchar fuellbyte1;						// Füllt ersten 1k Block (nicht überschreibbare Parameter)
  uint btpin;										// Bluetooth Pin-/Pairing Nummer
 
  uchar pKennung;								// Prüfkennung Parameterblock !!! Ab hier überschreibt der Parameter Upload

@@ -241,6 +241,9 @@ void infomenu (uchar menu)	// Information als Menü oder Email Text ausgeben
   putnumber (val,0);	 							// Zeitzone ausgeben
   	 
   putparameter (T_somwin,0,(3<<16)|('6'<<8),&T_zone[fp.s_w_zeit][0]); // Menütext "5. Sommer-/Winterzeit	
+  newline(); putstr("Zeitquelle: "); putstr(time_source_text());   // Quelle der aktuellen Zeit
+  put_menuitem ("Zeit jetzt synchronisieren", '7');               // erzwungener Abgleich
+  put_menuitem ("Automatische Zeit", '8'); putstr(": "); putstr(fp.autotime_off==1?"aus":"ein");
  }	 
 }	
 
@@ -369,13 +372,7 @@ void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
  
  switch (ja(T_bt))			// Bluetooth (J/N)?
  {  
-  case 1:
-#if BRINGUP_DEBUG
-   bt_bringup();   /* BRINGUP: Debug-Konsole statt Konfiguration */
-#else
-   init_bluetooth();
-#endif
-   break;											// Bluetooth konfigurieren
+  case 1: init_bluetooth(); break;											// Bluetooth konfigurieren
   case -1: { if (fp.btmodem==IF820) { bt_cmdmode(); osDelay(300); bt_release(); }  // IF820: aktive SPP-Verbindung trennen
              fp.btmodem=0; interfaces&=~BT_LINK; connect&=~(UART1|BT_LINK); }       // Modem deinstallieren
  }
@@ -2059,7 +2056,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	case 0x0006:					// Informationsmenü
   {   
    infomenu(1);																// Menüaufruf
-   select('7',1);															// Menüauswahl senden
+   select('9',1);															// Menüauswahl senden
    mensel=0;	
    break;  
   }
@@ -2075,6 +2072,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    if (get_date_time (T_date, T_fdate, 10)) 	// Datum korrekt eingegeben?
    {
     set_date(cbuf);														// wenn Ergebnis korrekt, dann Datum setzen
+    clock_mark_manual();					// manuelle Eingabe als Zeitquelle vermerken
     test_sommerzeit (1);											// Prüfe ob aktuelle Zeit Sommerzeit und setze ggf. Flag		 
    }   	 
    timeupdate=1;															// Zeitänderung, ggf. neue Aufgaben
@@ -2085,6 +2083,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    if (get_date_time (T_time, T_ftime, 8)) 	 // Zeit korrekt eingegeben?
    {
     set_time(cbuf);  			// wenn Ergebnis korrekt, dann Zeit setzen				
+    clock_mark_manual();					// manuelle Eingabe als Zeitquelle vermerken
 	  test_sommerzeit (1);	// Prüfe ob aktuelle Zeit Sommerzeit und setze ggf. Flag
    }
    timeupdate=1;					// Zeitänderung, ggf. neue Aufgaben
@@ -2101,10 +2100,24 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    timeupdate=1;					// Zeitänderung, ggf. neue Aufgaben
    break;
   }		
+	case 0x0067:						// Zeit jetzt synchronisieren (erzwungen)
+	{
+	 putln ("Zeitabgleich...");
+	 if (gsm_nettime(1)) { putstr("Zeit gestellt via "); putln(time_source_text()); }
+	 else putln ("Keine Netzzeit - GPS/Backend stellen die Uhr automatisch");
+	 timeupdate=1;
+	 break;
+	}
+	case 0x0068:						// Automatische Zeit ein/aus
+	{
+	 fp.autotime_off = (fp.autotime_off==1) ? 0 : 1;   // umschalten (0=ein,1=aus)
+	 putstr ("Automatische Zeit: "); putln (fp.autotime_off==1?"aus":"ein");
+	 break;
+	}
 	case 0x0037:						// Testmenü Return 
   case 0x0048:						// Parametermenü Return 
   case 0x0054:						// Modemmenü Return  	   
-  case 0x0067:						// Infomenü Return 
+  case 0x0069:						// Infomenü Return 
   case 0x0425:						// Zeitplan Return
 	case 0x0447:						// Geschindigkeitsanzeigeoptionen Return	
   case 0x0514:						// Bluetooth Menü Return

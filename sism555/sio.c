@@ -26,6 +26,11 @@
 #include "rl_usb.h"
 #include "dtc_text.h"	// generierte Code->Typ/Kurztext-Tabelle (aus Diagnose-Codes.csv)
 
+#define CTS_WAIT_MS 200          // max. Wartezeit auf CTS-LOW je Byte (ms) - bounded, kein Dauerhang
+volatile uchar cts_timeout=0;    // gesetzt in putb(), wenn CTS-Wait ablaeuft (Flow-Control/Verdrahtung)
+volatile uchar cts_bypass=0;     // 1 = CTS-Handshake ueberspringen (Bring-up/Werksmodul F=00; siehe init_bluetooth)
+volatile uchar bt_tx_stuck=0;    // Zaehler: TX-FIFO-Wait (THRE) lief in Timeout -> Sender steckt
+
 int redirect_char_Out (int (*pchar_func)(int a)) // Umleitung Standard Ausgabe
 {																									// Must be once called before 
 																									// use of serial character I/O
@@ -45,22 +50,25 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
  } 
  if (connect&UART1) 						// Schnittstelle UART 1 - Terminal aktiviert  	
  {
-	while (FIO2PIN & CTS)					// Wait for CTS LOW (modem ready to receive)
-  {
-	 if (WDTV<1000)								// Abbruch 1ms vor Watchdog reset
+	if (!cts_bypass)                         // Bring-up/Werksmodul (F=00): CTS-Handshake ueberspringen
+	{ uint _ct0=mstimer;                     // CTS-Wartezeit begrenzen (Flow-Control/Verdrahtung)
+	 while (FIO2PIN & CTS)                    // Wait for CTS LOW (Modem empfangsbereit)
 	 {
-		ResetWDT();								
-		return(-1);								
-	 }		 
-	}	
+	  if ((uint)(mstimer-_ct0) >= CTS_WAIT_MS) { cts_timeout=1; return(-1); } // CTS bleibt High -> Flag + Abbruch
+	  if (WDTV<1000) { ResetWDT(); return(-1); }                             // Sicherheitsnetz Watchdog
+	 }
+	}
+	{ uint _tt=mstimer;                    // TX-FIFO-Wait begrenzen (kein Dauerhang)
 	while (!(U1->LSR & THRE)) 		// Warte UART1 Transmitter FIFO leer?
   {
+	 if ((uint)(mstimer-_tt)>=50) { bt_tx_stuck++; return(-1); }   // THRE haengt >50 ms -> Sender steckt
 	 if (WDTV<1000)								// Abbruch 1ms vor Watchdog reset
 	 {
 		ResetWDT();								
 		return(-1);								
 	 }		 
 	}	
+	}
   U1->THR = ch;									// dann sofort senden 
  }	
  if (connect&UART2)	// Schnittstelle UART 2 - GPS Ausgabe  	
@@ -571,7 +579,7 @@ const char * dtc_text (uint code, char *ptyp)
 void put_dtc (uint code)
 {
  char tp; const char *t = dtc_text(code,&tp);
- putc('F'); putnumber(code,0); putc(' ');
+ putc(t ? tp : 'F'); putnumber(code,0); putc(' ');
  putstr(t ? t : dtc_subsys(code));
 }
 

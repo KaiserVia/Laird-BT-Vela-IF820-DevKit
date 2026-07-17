@@ -66,7 +66,10 @@ extern void puterrstr_dtc (uchar ln, uint dtc);     /* Fehler <code> <subsystem>
 extern int  puterror_dtc (uint dtc, int errorval);  /* Fehlermeldung ausgeben, Wert zurueck */
 extern void dctext (uint dtc);                      /* dtcerr(code) - Fehler + Log */
 extern const char *dtc_text (uint code, char *ptyp);/* Kurztext+Typ aus Diagnose-Tabelle, 0=unbekannt */
-extern void put_dtc (uint code);                    /* einheitliche Ausgabe F<code> <Kurztext> */
+extern void put_dtc (uint code);
+extern volatile uchar cts_bypass;                   /* 1 = CTS-Handshake ueberspringen (Bring-up) */
+extern volatile uchar bt_tx_stuck;                  /* TX-FIFO-Wait Timeout-Zaehler */
+extern volatile uchar cts_timeout;                  /* putb(): CTS-Wait abgelaufen (Flow-Control) */                    /* einheitliche Ausgabe F<code> <Kurztext> */
 extern void putparameter (text *s, uint wert, uint format, text *u);	// Parameterwerte formatiert ausgeben
 extern int list_selection	(text *titel, text *liste, uchar *Parameter, uchar items, uchar size);	// Listenauswahl
 extern void sendbuf(text * buf, ushort lastbyte);						// Puffer im Hexformat ausgeben
