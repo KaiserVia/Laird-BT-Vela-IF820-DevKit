@@ -40,6 +40,7 @@
 #define DTC_GSM_SMS_LEN         12006   /* GSM SMS Laenge fehlerhaft */
 #define DTC_GSM_SMS_FAIL        12007   /* GSM SMS Senden fehlgeschlagen */
 #define DTC_GSM_CRC_ERR         12008   /* Firmware CRC-Fehler GSM */
+#define DTC_GSM_SIM_NF          12009   /* SIM-Karte nicht erkannt / nicht eingelegt */
 
 /* --- Subsystem 13: Menue/Kommunikation (sicom.c) ------------------- */
 #define DTC_SI_PARAM_INIT       13001   /* Parametertransfer fehlerhaft */

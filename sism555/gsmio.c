@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 //  FILE: gsmio.c			PROJECT: sis3000M
 //-----------------------------------------------------------------------------
-//  COMMENTS:  Routinen für Funkmodem und GPS Erweiterung
+//  COMMENTS:  Routinen fï¿½r Funkmodem und GPS Erweiterung
 //-----------------------------------------------------------------------------
 //  HARDWARE:   sis3003-MB, version H6
 //-----------------------------------------------------------------------------
@@ -13,7 +13,7 @@
 //-----------------------------------------------------------------------------
 //  MODIFICATIONS:
 //              	16.08.2012 File creation
-//								08.04.2015 Anpassung für LPC1766
+//								08.04.2015 Anpassung fï¿½r LPC1766
 //								22.04.2015 Hardware version H1 -> H2
 //								06.05.2015 GPS L70 Routinen added
 //								13.07.2015 Hardware version H2 -> H3
@@ -36,10 +36,10 @@
 #include "mqtt.h"
 #include "dtc_codes.h"
 
-const char T_month[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };		// Monate für Email Header Date
+const char T_month[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };		// Monate fï¿½r Email Header Date
 
 void Init_GSM_ch (uint baud)	// Uart1 initialisieren und GSM Kanal an MUX einstellen
-{																// Übergabe baud - baud rate e. g. 115200
+{																// ï¿½bergabe baud - baud rate e. g. 115200
  uart1_request(MUX_GSM, baud);		// State machine: MUX + UART1 + BT suspend
 }	
 
@@ -58,9 +58,9 @@ int wait_ok_time (uint timeout) { return(wait_message(T_OKNZ,timeout)); }	// War
 int wait_ok (void) { return(wait_ok_time(XMODEM_BLOCK_TIMEOUT)); }				// Warte 3 Sekunden auf OK Antwort
 
 int gsm_power (uchar mode)		// GSM Modem ein-/ausschalten
-{																		// Übergabe mode - 	Bit 0 - 0/1 = Funkmodem aus-/ein
+{																		// ï¿½bergabe mode - 	Bit 0 - 0/1 = Funkmodem aus-/ein
 																		//									Bit 1 - 0/1 = MUX GSM Kanal deselect/select
- uchar power_restart=0;			// Flag für Modem Neustart
+ uchar power_restart=0;			// Flag fï¿½r Modem Neustart
  uchar retry=200;						// Wiederholungen	
  
  if (!mode)						// GSM abschalten, mode=0
@@ -68,7 +68,7 @@ int gsm_power (uchar mode)		// GSM Modem ein-/ausschalten
   FIO1CLR = PWRKEY;				// GSM PWRKEY LOW  
   osDelay (25);
 	if (!(FIO0PIN&PWR_GPS)) // Wenn GPS auch aus 
-	 FIO1CLR = GSMPWR;			// Versorgung für GSM und GPS auch aus 
+	 FIO1CLR = GSMPWR;			// Versorgung fï¿½r GSM und GPS auch aus 
 	gsmpower=0;							// GSM Power Status aus 
   gsmcall=0;							// Reset bestehende Dial-in Verbindung
   simpinset=0;						// Pinnummer ist weg	
@@ -101,7 +101,7 @@ int gsm_power (uchar mode)		// GSM Modem ein-/ausschalten
  
  if (mode&0x02)								// Warte bis +CFUN=1 Modem Statusmeldung volle Funktion 
  {		
-  Init_GSM_ch (GSM_BAUD);				// MUX GSM Kanal auswählen und UART1 auf 460800 Baud	 
+  Init_GSM_ch (GSM_BAUD);				// MUX GSM Kanal auswï¿½hlen und UART1 auf 460800 Baud	 
 	 
 	if (FIO0PIN&GSM_DTR)				//  Modem Sleep enabled?
 	 FIO0CLR=GSM_DTR;						// DTR  LO - Disable Modem Sleep	
@@ -119,7 +119,7 @@ int gsm_power (uchar mode)		// GSM Modem ein-/ausschalten
 	 retry=16;											// Anzahl Abfragewiederholungen
    do	
    {	 
-	  connect=UART1;																		// GSM Uart1 auswählen 
+	  connect=UART1;																		// GSM Uart1 auswï¿½hlen 
 	  bxi=rxi;																					// Flush Empfangspuffer
 	  putln(T_atcfun);																	// Abfrage Funktionsstatus
 	  connect=concpy;																		// Uart Status wiederherstellen
@@ -146,12 +146,12 @@ int gsm_power (uchar mode)		// GSM Modem ein-/ausschalten
  return (0);
 }
 
-void set_server_default(uchar servertyp)	// Default Parameter für Server setzen
+void set_server_default(uchar servertyp)	// Default Parameter fï¿½r Server setzen
 {
- char *wp;																// Hilfszeiger zum Löschen der Textfelder
+ char *wp;																// Hilfszeiger zum Lï¿½schen der Textfelder
  wp=&fp.apn[0];														// auf Adresse APN Eintrag setzen
 	
- do *wp++=0;  while (wp < &fp.smsno[0]); 	// Lösche alle fp Textfelder zwischen APN und SMSNO 
+ do *wp++=0;  while (wp < &fp.smsno[0]); 	// Lï¿½sche alle fp Textfelder zwischen APN und SMSNO 
 																					// Eintrag um Artefakte zu vermeiden	
 	
  fp.mailmode=0;														// Kein Email Versand
@@ -170,7 +170,7 @@ void set_server_default(uchar servertyp)	// Default Parameter für Server setzen
 	strcopy (T_deuser, fp.euser);						// Default email user kopieren
 	strcopy (T_dpass, fp.epass);						// Default email Passwort kopieren
 	strcopy (T_dmfrom, fp.emfrom);					// Default email from kopieren	 
-	fp.mqtt_packetsize=0;										// Delete MQTT Packetgröße  
+	fp.mqtt_packetsize=0;										// Delete MQTT Packetgrï¿½ï¿½e  
  }	 
  else if (servertyp==MQTT)
  {
@@ -178,7 +178,7 @@ void set_server_default(uchar servertyp)	// Default Parameter für Server setzen
 	fp.port=Def_mqttport;															// default MQTT Port
   clean_cpy (fp.serno, fp.euser,sizeof(fp.euser));	// Default MQTT user kopieren und Feld bereinigen
   clean_cpy (T_mqpass, fp.epass,sizeof(fp.epass));	// Default MQTT Passwort kopieren
-  fp.mqtt_packetsize=DEF_MQTT_PACKET_SIZE;					// Default MQTT Packetgröße
+  fp.mqtt_packetsize=DEF_MQTT_PACKET_SIZE;					// Default MQTT Packetgrï¿½ï¿½e
   fp.opmode=INTERVAL;																// Default Messdaten Packetversand		 
 	MQTT_index=0;																			// reset MQTT Messdaten Sendeindex
   MQTT_send=(uint)((fp.md_page<<16)+fp.md_adr);			// Sendezeiger auf aktuellen Messdatenzeiger setzen											 
@@ -196,12 +196,12 @@ void init_gsm (void)	// GSM Modem initialisieren
 	
  fp.gsm=0;								// Reset GSM installiert 
  gsm_power (1);						// GSM Modem einschalten
- Init_GSM_ch (115200);		// MUX GSM Kanal auswählen und UART1 konfigurieren
+ Init_GSM_ch (115200);		// MUX GSM Kanal auswï¿½hlen und UART1 konfigurieren
 	
  osDelay(3);							// warte auf Umschaltung		
 	 
  connect|=UART1;					// an Modem senden
- do												// Prüfe 115200, 9600, 307200, 460800
+ do												// Prï¿½fe 115200, 9600, 307200, 460800
  {  
   putln(T_at);															 
   if (wait_ok()>0) break;							// Abbruch wenn Antwort "AT ... OK"    
@@ -228,7 +228,7 @@ void init_gsm (void)	// GSM Modem initialisieren
   if (i)												// "OK" Antworten etc. empfangen 
   {
    putln(cbuf);									// Antwort bis "OK" ausgeben
-	 if (compare(T_uc15,&cbuf[0],0,cind)>0) modem=15;					// Prüfe Puffer auf Produkt ID UC15
+	 if (compare(T_uc15,&cbuf[0],0,cind)>0) modem=15;					// Prï¿½fe Puffer auf Produkt ID UC15
    else if (compare(T_eg91,&cbuf[0],0,cind)>0) modem=91;		// dto. EG91
 	 else modem=1;
    osDelay (2);			
@@ -256,9 +256,9 @@ void init_gsm (void)	// GSM Modem initialisieren
 		  fp.smsno[0]=0;									// reset sms call number
 			fp.radnet=2;										// Funknetz default Automatisch
 		  gsmcall=0;											// reset Einwahlverbindung
-      interfaces|=GSM_LINK;						// zu installierten Interfaces hinzufügen
+      interfaces|=GSM_LINK;						// zu installierten Interfaces hinzufï¿½gen
       fp.gsm=modem; 									// in Parameterblock registrieren
-			set_server_default(SMTP);				// Default Parameter für SMTP Server setzen
+			set_server_default(SMTP);				// Default Parameter fï¿½r SMTP Server setzen
     } // end if ok auf Baudrate und Konfiguration speichern   
    } // end if ok auf modemspezifische Konfiguration
   } // end if ok auf gesendete gemeinsame Konfiguration
@@ -274,13 +274,13 @@ void init_gsm (void)	// GSM Modem initialisieren
  }	 
  else putln(cbuf);									// Letzte Antwort ausgeben
  
- osDelay (10);											// Warte auf geänderten Schnittstellenzustand
+ osDelay (10);											// Warte auf geï¿½nderten Schnittstellenzustand
  clear_comchange ();								// Bereinige Schnittstellenwechsel																					
 }
 
 
-int test_gsm (uchar poweron)	// Prüfe ob GSM/GPRS Modem antwortet
-{															// Übergabe poweron - 1 bei Systemstart
+int test_gsm (uchar poweron)	// Prï¿½fe ob GSM/GPRS Modem antwortet
+{															// ï¿½bergabe poweron - 1 bei Systemstart
  int result;
  uchar uartsave=connect;
  uchar retry=1;	
@@ -327,14 +327,14 @@ int modem_start (void)									// Einschaltsequenz Funkmodem
 	result=gsm_power (3); 											// Einschalten
   if (result>0) 															// Powered und +CFUN Meldung
   {			 	
-	 result=wait_line(3*XMODEM_BLOCK_TIMEOUT);		// Warte auf nächste Modemzeile		 
+	 result=wait_line(3*XMODEM_BLOCK_TIMEOUT);		// Warte auf nï¿½chste Modemzeile		 
 	 if (result>0)			
 	 { 		 
 		result=compare(T_cpin,cbuf,0,cind);				// +CPIN erhalten?
 	  if ((result>0))														// CPIN Startnachricht erhalten?
 	  {					 															
-		 if (compare(T_ready, cbuf, 7,cind) > 0)	result = 2;				// Enhält die Zeile "READY"?	
-		 else if (compare(T_simpin, cbuf,7,cind) > 0) result = 3;		// Enhält die Zeile "SIM PIN"?
+		 if (compare(T_ready, cbuf, 7,cind) > 0)	result = 2;				// Enhï¿½lt die Zeile "READY"?	
+		 else if (compare(T_simpin, cbuf,7,cind) > 0) result = 3;		// Enhï¿½lt die Zeile "SIM PIN"?
 		 else result = 4;																						// Anderes Ergebnis			 	      
 	  }	
    }		
@@ -345,16 +345,41 @@ int modem_start (void)									// Einschaltsequenz Funkmodem
  return (result);
 }	
 
-void atcpin (ushort set, uchar manual)	// Setze Pinnummer oder prüfe Status
-{																				// Übergabe	set			- 0/1 Pinnummer prüfen/setzen
+static int sim_inserted (void)	// AT+QSIMSTAT? -> 1=SIM erkannt, 0=keine SIM erkannt, -1=unbekannt
+{																// Erkennt fehlende/defekte SIM zuverlaessig, unabhaengig von PIN-Status
+ int p, r=-1; uchar cc=connect;
+ connect=UART1; bxi=rxi;										// an Modem senden, Empfangspuffer flush
+ putln(T_qsimstat);												// "AT+QSIMSTAT?"
+ connect=cc;																// Ausgabezustand wiederherstellen
+ if (wait_message(T_qsimresp,XMODEM_BLOCK_TIMEOUT)>0)	// "+QSIMSTAT:" empfangen?
+  if (wait_ok()>0)													// Zeile mit OK abgeschlossen?
+  {
+   p=compare(",",cbuf,0,cind);							// Komma vor <insert_status> suchen
+   if (p>0) r=(cbuf[p]=='0')?0:1;						// nur '0' = keine SIM; '1'/'2'(erkennend) = vorhanden
+  }
+ return (r);															// unbekannt (-1) -> kein Fehlalarm (z. B. alte Firmware)
+}
+
+void atcpin (ushort set, uchar manual)	// Setze Pinnummer oder prï¿½fe Status
+{																				// ï¿½bergabe	set			- 0/1 Pinnummer prï¿½fen/setzen
 																				//			 		manual 	- 0/1 nach Zeitplan automatisch/manuell setzen	 
  int result;														// Ergebnis Abfrage
 	
  concpy=connect;
 	
- result=modem_start ();									// Einschaltsequenz Funkmodem	
+ result=modem_start ();
+	/* --- BT 5.50: SIM physisch erkannt? Sonst Fehlercode F12009 (SIM nicht eingelegt) --- */
+	if (result>0 && sim_inserted()==0)	/* Modem antwortet, aber QSIMSTAT meldet keine SIM */
+	{
+	 connect=concpy;
+	 dtcerr(DTC_GSM_SIM_NF); newline();	/* "F12009 SIM-Karte nicht erkannt" ausgeben + protokollieren */
+	 mqtt_con_err=45; simpinset=0; fp.pinerr=0;
+	 gsm_power(0);						/* Modem abschalten */
+	 return;
+	}									// (SIM-Pruefung F12009 vor Auswertung der Einschaltsequenz)
+
 	
- if (result > 1) {																		// Rückmeldung von Modem?							
+ if (result > 1) {																		// Rï¿½ckmeldung von Modem?							
 	connect=concpy;				
 	if (!set) 																					// PIN nicht setzen?
 	{	
@@ -368,9 +393,9 @@ void atcpin (ushort set, uchar manual)	// Setze Pinnummer oder prüfe Status
 	 wait_message (T_pbdone,5*XMODEM_BLOCK_TIMEOUT); 		// Warte Ende Einschalt URCs
 	 return;																						// und Ende
   } // end if PIN nicht setzen
- } // end if Rückmeldung von Modem? 
+ } // end if Rï¿½ckmeldung von Modem? 
  
- /* else if (result<0)																		// keine Rückmeldung GSM/UMTS/LTE Modem Fehler
+ /* else if (result<0)																		// keine Rï¿½ckmeldung GSM/UMTS/LTE Modem Fehler
  {  
 	connect=concpy; 
   puterror (GSM_ERROR,-1); 
@@ -380,7 +405,7 @@ void atcpin (ushort set, uchar manual)	// Setze Pinnummer oder prüfe Status
   putnumber (result,0); newline();
   osDelay (200); */
 																						// Modem war bereits an (result=1) oder PIN muss gesetzt werden				
- connect=UART1;															// GSM Uart1 auswählen  
+ connect=UART1;															// GSM Uart1 auswï¿½hlen  
  putln(T_cmee);															// sende +CMEE=2
  rxi=bxi;
  result=wait_ok_time(XMODEM_BLOCK_TIMEOUT);	// warte auf OK Antwort
@@ -405,7 +430,7 @@ void atcpin (ushort set, uchar manual)	// Setze Pinnummer oder prüfe Status
  }																								   
  else putc('?');									// Pinnummer abfragen
  
- bxi=rxi;													// bisherige Meldungen löschen
+ bxi=rxi;													// bisherige Meldungen lï¿½schen
  simpinset=0;											// Status Pinnummer nicht gesetzt
  newline();
  connect=concpy;									// Uart Status wiederherstellen
@@ -429,7 +454,7 @@ void atcpin (ushort set, uchar manual)	// Setze Pinnummer oder prüfe Status
  {	 
 	 gsm_power(0);		// Schalte Modem ab, wenn Pinnummer nicht gesetzt 
 	 mqtt_con_err=41;
-	 bxi=rxi;					// Modem Ausschaltmeldungen löschen
+	 bxi=rxi;					// Modem Ausschaltmeldungen lï¿½schen
  } 
  else 							// Pinnummer gesetzt nach Einschaltung?
  {
@@ -477,10 +502,10 @@ int gsm_nettime (uchar force)   // Quectel Netzzeit (AT+QLTS=2) -> zentrale Zeit
  return (r);
 }
 
-int test_registration (void)	// Prüfe ob Modem eingebucht ist
+int test_registration (void)	// Prï¿½fe ob Modem eingebucht ist
 {
  uchar retry=16;						// Anzahl Abfragewiederholungen
- uchar i;										// Laufvariable für iccid Kopie	
+ uchar i;										// Laufvariable fï¿½r iccid Kopie	
  uchar status=0;
  int pos;	
 
@@ -496,7 +521,7 @@ int test_registration (void)	// Prüfe ob Modem eingebucht ist
   {		
    do
    {
-    connect=UART1;						// GSM Uart1 auswählen
+    connect=UART1;						// GSM Uart1 auswï¿½hlen
     bxi=rxi;									// Flush Empfangspuffer
 		if (fp.gsm==EG91) putln (T_cregeg91);		// EG91 Netzwerk Registrierungsstatus abfragen
 		else putln (T_creguc15);
@@ -524,13 +549,13 @@ int test_registration (void)	// Prüfe ob Modem eingebucht ist
 	 
 	 if ((status =='1')||((status=='5')&&fp.roaming)) // Status eingebucht oder "roaming"? 
 	 {	
-		connect=UART1;						// GSM Uart1 auswählen	
-		putln(T_csq);							// Signalstärke abfragen	
+		connect=UART1;						// GSM Uart1 auswï¿½hlen	
+		putln(T_csq);							// Signalstï¿½rke abfragen	
 		bxi=rxi;									// Puffer leeren		
 		if (wait_message(T_csq+3,XMODEM_CHAR_TIMEOUT)>0)	
 		{								 
 		 if (wait_ok()>0) 
-		 fp.csq=atoi(&cbuf[2]); 	// Signalstärke sichern
+		 fp.csq=atoi(&cbuf[2]); 	// Signalstï¿½rke sichern
     } 	
 		putln(T_qccid);						// SIM ICCID mit "AT+QCCID"	Kommando abfragen
 		bxi=rxi;									// Flush Empfangspuffer
@@ -538,7 +563,7 @@ int test_registration (void)	// Prüfe ob Modem eingebucht ist
 		{
 		 if (wait_ok()>0)										// Warte auf Ok
 		 {	
-			i=2;												// Führendes CRLF überspringen
+			i=2;												// Fï¿½hrendes CRLF ï¿½berspringen
       while (cbuf[i]!='\r') i++;	// Stringabschluss suchen
 			cbuf[i]='\0';								// String terminieren
 			clean_cpy(&cbuf[2],iccid,sizeof(iccid));	// String kopieren
@@ -548,7 +573,7 @@ int test_registration (void)	// Prüfe ob Modem eingebucht ist
 		gsm_nettime(0);						// LTE-Netzzeit (NITZ) best-effort -> Zeitsync
 		connect=concpy;						// Uart Status wiederherstellen
  		mqtt_con_err=0;						// reset Verbindungsfehler	
-		return (status);					// Ja, Status zurück 				   	  	
+		return (status);					// Ja, Status zurï¿½ck 				   	  	
 	 }
 	 else mqtt_con_err=42;			// Keine Registrierung	
 	} // end if gsm_power > 0
@@ -572,10 +597,10 @@ void send_local_ip (void)			// Lokale IP Adresse ausgeben
  {
 	putstr(T_ip);														// Text "+IP: senden	
 	for (i=0;i<cind;i++) {									// Puffer durchsuchen
-	 if (cbuf[i]=='\"') {										// bis Anführungsstriche
+	 if (cbuf[i]=='\"') {										// bis Anfï¿½hrungsstriche
 		if (send) break; 
 		 else {send=1;	i++; } }	 
-	 if (send) putc(cbuf[i]);								// Zeichen zwischen Anführungsstrichen senden 
+	 if (send) putc(cbuf[i]);								// Zeichen zwischen Anfï¿½hrungsstrichen senden 
   } // end for
 	 newline();
 	} 			 
@@ -583,13 +608,13 @@ void send_local_ip (void)			// Lokale IP Adresse ausgeben
 }
 
 int set_gprs_config (uchar mode)	// GPRS Konfiguration senden und testen
-{																	// Übergabe mode	-	Bit0 - 0/1 für ohne/mit Terminalausgabe
+{																	// ï¿½bergabe mode	-	Bit0 - 0/1 fï¿½r ohne/mit Terminalausgabe
 																	//									Bit1 - 0/1 Deaktiviere GPRS beim Beenden		
  uchar state=1;									// Laufvariable
  uint timeout;									// Zeitabbruch
  uchar uartsave=connect; 				// Schnittstellenstatus sichern										
  
- if (test_registration ()>0)				// Prüfe ob Modem eingebucht ist
+ if (test_registration ()>0)				// Prï¿½fe ob Modem eingebucht ist
  {
   if (mode&0x01) connect|=UART1;	// Ausgabe der Kommandos an Terminal
   else connect=UART1; 
@@ -607,7 +632,7 @@ int set_gprs_config (uchar mode)	// GPRS Konfiguration senden und testen
 						putc(',');
 						putqstr(fp.pass);
 						newline();						
-						timeout=3*XMODEM_BLOCK_TIMEOUT;		// Aktivierung dauert länger	
+						timeout=3*XMODEM_BLOCK_TIMEOUT;		// Aktivierung dauert lï¿½nger	
 						break;						
 		case 3:	osDelay (50);											// Warte 50 ms
 						bxi=rxi;													// Empfangspuffer flush 
@@ -623,7 +648,7 @@ int set_gprs_config (uchar mode)	// GPRS Konfiguration senden und testen
 						}
 		        else putstr(T_at);									// Dummy AT senden				
 						newline();	
-						break;															// AT Kommando abschließen   						
+						break;															// AT Kommando abschlieï¿½en   						
    } // end switch state
    if (wait_ok_time(timeout)<0) break;	// kein Ok -> Abbruch	
   } // end for 
@@ -640,7 +665,7 @@ int set_gprs_config (uchar mode)	// GPRS Konfiguration senden und testen
 }
 
 void putcbuf_line (uchar offset)	// Puffer terminieren und eine Zeile an Schnittstelle senden
-{																	// Übergabe offset - Zeichenoffset in cbuf 
+{																	// ï¿½bergabe offset - Zeichenoffset in cbuf 
  uchar uartsave=connect;		// Schnittstellen sichern
 	
  connect&=~UART1;						// Nicht an Modem senden
@@ -677,8 +702,8 @@ bool email_messdaten (void)			// Erweiterten Email Header ausgeben
 } 
 
 uchar sendmail (uchar mode)			// Email versenden und konfigurieren
-{										// Übergabe mode 	Bit 0	-	0/1 ohne/mit Terminalausgabe
-										//								Bit 1	-	0/1 Verbindung halten/schließen
+{										// ï¿½bergabe mode 	Bit 0	-	0/1 ohne/mit Terminalausgabe
+										//								Bit 1	-	0/1 Verbindung halten/schlieï¿½en
 										//								Bit 2	-	0/1 keine/eine Email senden																			
 										
 
@@ -689,7 +714,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
  uchar testmail=0;										// Hilfsvariable 1 wenn Testmail		
  text *P_resp;												// Zeiger auf Modem - Antwortstring
  uchar uartsave=connect;							// Schnittstellenstatus sichern		
- uchar utc;														// Hilfsvariable für Zeitzone		
+ uchar utc;														// Hilfsvariable fï¿½r Zeitzone		
 	
  InitWatchdog(LONG_WD_32);							// langes Watchdog Interval auf 32 Sekunden setzen
  
@@ -719,7 +744,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   { if (mode&0x01) send_local_ip (); 			// nur bei Terminalausgabe
 		state++;															// weiter mit state 13
   }
-  else if (state==13)											// TCP Verbindung zum Mailserver öffnen
+  else if (state==13)											// TCP Verbindung zum Mailserver ï¿½ffnen
   {   
    putstr(T_qiopen);											// Kommando AT+QIOPEN= senden
 	 putstr(T_tcp);													// Kontext "TCP" senden
@@ -727,11 +752,11 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
    putc(',');
    putnumber(fp.port,0);									// Portnummer angeben 
 	 putln(",0,2");													// Local Port automatic, transparent access mode	
-   timeout=3*XMODEM_BLOCK_TIMEOUT;	    	// 9 Sekunden Timeout für TCP Verbindungsaufbau
+   timeout=3*XMODEM_BLOCK_TIMEOUT;	    	// 9 Sekunden Timeout fï¿½r TCP Verbindungsaufbau
    P_resp=T_connect;											// Antwortet mit CONNECT 
 	 state++; 															// weiter mit state	15 
   } 					
-  else if (state==15)	  									// Prüfe Restmeldung Mailserver nach Connect
+  else if (state==15)	  									// Prï¿½fe Restmeldung Mailserver nach Connect
   {	  	
    if (mode&0x01) 												// Bei Terminalausgabe
    { connect=uartsave&~UART1; 						// nicht an GSM modem
@@ -745,7 +770,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
    if (fp.euser[0]==0) 										// Kein Euser?
    {
     putstr(T_Helo); 											// Sende "HELO ", nur SMTP
-		state+=3;															// ubergehe 3 Folgezustände (AUTH LOGIN)
+		state+=3;															// ubergehe 3 Folgezustï¿½nde (AUTH LOGIN)
    }
    else putstr(T_Ehlo);										// sonst sende "EHLO ", ESMTP
 	 putln(fp.ehost);												// Sende "hostdomain.de"	  
@@ -784,11 +809,11 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
    put2str(T_mailf, fp.emfrom); 					// Text und MAIL FROM Einstellung senden
    putln(T_cb);							 
    response=250;													// Serverantwortcode 250
-   if (mode<4)	state=33;		 							// Keine Mail zu senden -> QUIT Serververbindung schließen
+   if (mode<4)	state=33;		 							// Keine Mail zu senden -> QUIT Serververbindung schlieï¿½en
   }
   else if (state==21)											// Sende RCPT - Mail to
   {
-   put2str(T_mrcp,fp.emto);								// Empfängeradresse senden
+   put2str(T_mrcp,fp.emto);								// Empfï¿½ngeradresse senden
    putln(T_cb);
    response=250;													// Serverantwortcode 
   }
@@ -796,12 +821,12 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   {
    if (isalpha(fp.emcopy[0]))							// Mail copy to gesetzt?
    {
-    put2str(T_mrcp,fp.emcopy);						// Empfängeradresse senden
+    put2str(T_mrcp,fp.emcopy);						// Empfï¿½ngeradresse senden
     putln(T_cb);
     response=250;													// Serverantwortcode 
    }
   }
-  else if (state==23)											// Mailserver Daten ankündigen
+  else if (state==23)											// Mailserver Daten ankï¿½ndigen
   {
    putln(T_mdata);												// SMTP DATA senden
    response=354;													// Serverantwortcode 
@@ -810,16 +835,16 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   else if (state==24)											// --- Mailheader aufbauen
   {	
    connect=UART1;													// Nicht an Terminal senden
-   if (isalpha(fp.emto[0]))		   					// Empfängeradresse gesetzt?
+   if (isalpha(fp.emto[0]))		   					// Empfï¿½ngeradresse gesetzt?
    {							
     putstr(T_hfrom);											// Headertext "From: "
     putln(fp.emfrom);											// Senderadresse
     putstr(T_hto);												// Headertext "To: "
-    putln(fp.emto);												// Empfängeradresse
+    putln(fp.emto);												// Empfï¿½ngeradresse
     if (isalpha(fp.emcopy[0]))						// Mail copy to gesetzt?
     {
      putstr(T_hcc);												// Headertext "Cc: "
-		 putln(fp.emcopy);										// Mail copy to Empfängeradresse senden
+		 putln(fp.emcopy);										// Mail copy to Empfï¿½ngeradresse senden
     }		
     		
 		putstr(T_edate);											// Text "Date: "
@@ -852,7 +877,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
    }
    else state=33;				    							// Weiter mit QUIT Serververbindung
   }
-  else if (state==25)											// Headertext "Subject: " je nach Emailtyp vervollständigen 
+  else if (state==25)											// Headertext "Subject: " je nach Emailtyp vervollstï¿½ndigen 
   {
    if (mailtosend&TESTMAIL) putln(T_status);  	// Testemail Headertext "Subject: " + Text "Status"  				  
    else if (mailtosend&DATAMAIL) 
@@ -880,7 +905,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   else if (state==26)														// --- Mailbody
   {   
    newline();																		// Leerzeile Header zum Mailbody
-	 state=32; 																		// Weiter mit Email abschließen	
+	 state=32; 																		// Weiter mit Email abschlieï¿½en	
    if (mailtosend&TESTMAIL) putln(T_mailset);		// Testemail Text "Email Versand eingerichtet
    else 
    {
@@ -898,14 +923,14 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
     }   
    } // end else Testmail
   }
-  else if (state==33)											// Email abschließen
+  else if (state==33)											// Email abschlieï¿½en
   {
    putln(T_mend);													// CRLF "." CRLF
    if (mode&0x01) connect=uartsave|UART1;		// Ausgabe auch an angeschlossenes Terminal?
    timeout=10*XMODEM_BLOCK_TIMEOUT;
    response=250;			    								// Serverantwortcode   
   }
-  else if (state==34)											// QUIT Serververbindung schließen
+  else if (state==34)											// QUIT Serververbindung schlieï¿½en
   {  
 	 connect=UART1;													// keine Terminalausgabe mehr	
 	 if (fp.gsm==EG91) send3plus	();				// Umschaltung Modem vom data in den command mode		 
@@ -914,9 +939,9 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
    P_resp=T_OKNZ;													// Erwarte OK Antwort 		 	 
 	 state=36;															// Weiter mit state 37
   }
-  else if (state==37)											// Modemverbindung zum SMTP-Server schließen
+  else if (state==37)											// Modemverbindung zum SMTP-Server schlieï¿½en
   {
-	 FIO0CLR=GSM_DTR;												// DTR sofort rücksetzen, sonst UC15 -> Sleep	
+	 FIO0CLR=GSM_DTR;												// DTR sofort rï¿½cksetzen, sonst UC15 -> Sleep	
 	 timeout=5*XMODEM_BLOCK_TIMEOUT;	
 	 connect=UART1;													// keine Terminalausgabe mehr			
  	 putstr (T_qiclose); 										// AT+QICLOSE senden
@@ -926,7 +951,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   else if (state==38)											// GPRS Verbindung deaktivieren
   {   
    putstr(T_qideact);											// Deaktiviere IP Kontext
-	 putln("=1");														// Ergänze Kontext ID	
+	 putln("=1");														// Ergï¿½nze Kontext ID	
 	 timeout=5*XMODEM_BLOCK_TIMEOUT;	
    P_resp=T_OKNZ;	   											// Erwarte OK Antwort
   }
@@ -958,23 +983,23 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   {
    if (mailtosend&TESTMAIL) 							// Testnachricht?
 	 {	 
-		mailtosend&=~TESTMAIL;								// Testnachricht Versandaufgabe löschen
+		mailtosend&=~TESTMAIL;								// Testnachricht Versandaufgabe lï¿½schen
 		testmail=1;														// Testmail Flag setzen
 	 }	 
    else if (mailtosend&DATAMAIL)					// Messdaten Email 
    {
-    delete_data();												// Messdaten im Speicher löschen
-		mailtosend&=~DATAMAIL;								// Messdaten Versandaufgabe löschen
+    delete_data();												// Messdaten im Speicher lï¿½schen
+		mailtosend&=~DATAMAIL;								// Messdaten Versandaufgabe lï¿½schen
    }
-   else if (mailtosend&ALARMMAIL)					// Status/Fehler Email Versandaufgabe löschen
+   else if (mailtosend&ALARMMAIL)					// Status/Fehler Email Versandaufgabe lï¿½schen
    {
-    mailtosend&=~(ALARMMAIL|SYSERROR|FULMEM|MEM95|LOWBAT);	// Fehler Versandaufgabe löschen
+    mailtosend&=~(ALARMMAIL|SYSERROR|FULMEM|MEM95|LOWBAT);	// Fehler Versandaufgabe lï¿½schen
    }
   } // end else if state=33 Nachricht vom Server quittiert
  } while (state++<38);	// end do Zustandsfolgeschleife	
  
  connect=uartsave;									// Verbindungszustand wieder herstellen
- wait_mail=3;											// zuerst immer 3 Minuten mit nächster Email warten
+ wait_mail=3;											// zuerst immer 3 Minuten mit nï¿½chster Email warten
  
  if ((mode&0x04)&&(connect&(UART0|USB_LINK)))		// Mail senden und Terminal verbunden
   put2str(T_LF,&T_service[3][0]); 							// Text "Email ..
@@ -985,23 +1010,23 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
 	gsm_power(0);																								// Modem bei Fehler aus	 
   if (!testmail)									// Fehlerhafte Test-Emails ignorieren
 	 {
-	  if (mailfail<20) mailfail++; 	// Fehlerzähler erhöhen, bis 20 Fehler 3 Minuten Wiederholverzögerung
-    else wait_mail=60;						// nach 20 Sendeversuchen, 60 Minuten Wiederholverzögerung
+	  if (mailfail<20) mailfail++; 	// Fehlerzï¿½hler erhï¿½hen, bis 20 Fehler 3 Minuten Wiederholverzï¿½gerung
+    else wait_mail=60;						// nach 20 Sendeversuchen, 60 Minuten Wiederholverzï¿½gerung
 	 } 
 	return(0);
  }	 
  else if ((mode&0x04)&&(connect&(UART0|USB_LINK))) putln (T_ok); // Terminalausgabe Text "ok"	
  
  FIO0SET=GSM_DTR;									// DTR HI -> enable Sleep 
- mailfail=0;											// erfolgreicher Versand, reset Fehlerzähler
+ mailfail=0;											// erfolgreicher Versand, reset Fehlerzï¿½hler
   
  clear_comchange ();							// Bereinige scheinbaren Schnittstellenwechsel
  
- return(state);										// Letzten gültigen Betriebsstatus zurück
+ return(state);										// Letzten gï¿½ltigen Betriebsstatus zurï¿½ck
 }
 
 int sendsms (uchar ausgabe)	// SMS Service konfigurieren und SMS versenden
-{																			// Übergabe ausgabe 0/1 - Terminalausgabe
+{																			// ï¿½bergabe ausgabe 0/1 - Terminalausgabe
  uchar state=0;												// Laufvariable
  uchar failure=0;											// Fehler aufgetreten
  uint timeout=XMODEM_BLOCK_TIMEOUT/2;	// Zeitabbruch
@@ -1074,7 +1099,7 @@ int sendsms (uchar ausgabe)	// SMS Service konfigurieren und SMS versenden
     if (smstosend&TESTSMS) putln(T_smsset);			// SMS Versand ist eingerichtet		
     if (smstosend&LOWBAT) putln(T_batlow);			// Batteriespannung niedrig
     if (smstosend&(MEM95|FULMEM)) putln(T_memfull);	// Speicher voll
-    if (smstosend&SYSERROR) putln(T_syserr);		// Gerätefehler
+    if (smstosend&SYSERROR) putln(T_syserr);		// Gerï¿½tefehler
     osDelay(10);
     putb(STRZ);																	// Nachrichtenabschluss  
     connect=uartsave;															// Ausgabeschnittstellen wieder herstellen 
@@ -1104,23 +1129,23 @@ int sendsms (uchar ausgabe)	// SMS Service konfigurieren und SMS versenden
   }
  } else failure=1; 
  
- wait_sms=3;											// immer 3 Minuten mit nächster SMS warten
+ wait_sms=3;											// immer 3 Minuten mit nï¿½chster SMS warten
 
  if (failure) 
  { 
 	gsm_power(0);										// Modem bei Fehler aus	  
 	if (!(smstosend&TESTSMS))				// Fehlerhafte Test-SMS ignorieren
 	{
-	  if (smsfail<20) smsfail++; 		// Fehlerzähler erhöhen, 3 Minuten Wiederholverzögerung
-    else wait_sms=60;							// nach 20 Sendeversuchen, 60 Minuten Wiederholverzögerung
+	  if (smsfail<20) smsfail++; 		// Fehlerzï¿½hler erhï¿½hen, 3 Minuten Wiederholverzï¿½gerung
+    else wait_sms=60;							// nach 20 Sendeversuchen, 60 Minuten Wiederholverzï¿½gerung
 	} 	 
 	return(-1);
  } // end failure
  else FIO0SET=GSM_DTR;					// DTR HI enable Sleep
  
- smstosend=0;				// Nachricht(en) wurden versandt -> löschen
- smsfail=0;					// reset SMS Versandfehler Zähler
- return(state);  		// Rückgabe letzter Zustand
+ smstosend=0;				// Nachricht(en) wurden versandt -> lï¿½schen
+ smsfail=0;					// reset SMS Versandfehler Zï¿½hler
+ return(state);  		// Rï¿½ckgabe letzter Zustand
 }
 
 void get_email_config (void)		// Email Konfiguration einlesen
@@ -1133,7 +1158,7 @@ void get_email_config (void)		// Email Konfiguration einlesen
  putln_ifexist (fp.emcopy);												// Mail copy ausgeben
  putparameter (T_emalarm,0,3<<16,&T_offon[fp.mailalarm][0]); // Ausgabe SMS Alarm: ein/aus
 
- result=ja(T_change);															// Abfrage "Ändern ...?" 
+ result=ja(T_change);															// Abfrage "ï¿½ndern ...?" 
  
  if (result>0)																		// Ergebnis ja
  { 
@@ -1175,7 +1200,7 @@ void get_sms_config (void)	// SMS Konfiguration einlesen
  putln_ifexist (fp.smsno);												// SMS Rufnummer
  putparameter (T_smsalarm,0,3<<16,&T_offon[fp.smsalarm][0]); // Ausgabe SMS Alarm: ein/aus
 
- result=ja(T_change);															// Abfrage "Ändern ...?"
+ result=ja(T_change);															// Abfrage "ï¿½ndern ...?"
 
  if (result>0)																		// wenn Ergebnis "Ja"
  {
@@ -1193,7 +1218,7 @@ void get_sms_config (void)	// SMS Konfiguration einlesen
    if (!(connect&(UART1|MQTT_LINK)))							// keine bestehende BT, MQTT oder GSM Verbindung auf UART1
    {
     sendsms(1);																		// Sofortversand
-    smstosend&=~TESTSMS;													// Test SMS versenden wieder löschen
+    smstosend&=~TESTSMS;													// Test SMS versenden wieder lï¿½schen
    }
   }
 }
@@ -1210,7 +1235,7 @@ void get_apn_config (void)												// APN Konfiguration einlesen
  putln_ifexist (fp.pass);
  putparameter (T_roam,0,3<<16,&T_offon[fp.roaming][0]); // Ausgabe ROAMING: ein/aus
 
- if (ja(T_change)>0)																		// Abfrage "Ändern ...?"
+ if (ja(T_change)>0)																		// Abfrage "ï¿½ndern ...?"
  {     
   put2str(T_LF,T_apn); 
   readline(fp.apn,sizeof(fp.apn),'a');	 								// APN einlesen 
@@ -1228,7 +1253,7 @@ void get_apn_config (void)												// APN Konfiguration einlesen
    if (result<0) { dtcerr(DTC_GSM_DATA_FAIL); newline(); } 													// Datentransfer Fehler
    else putln (T_ok);
   }
- } // end ändern	  
+ } // end ï¿½ndern	  
 }
 
 void get_server_config (void)											// Einlesen der Server Konfiguration
@@ -1265,16 +1290,16 @@ void get_server_config (void)											// Einlesen der Server Konfiguration
 	putln (T_cmqtt); 																// Verbindungsmeldung	  
 	if (ja(T_discon)>0) 
 	{	
-	 Con_MQTT_server(18);														// MQTT Serververbindung schließen   
+	 Con_MQTT_server(18);														// MQTT Serververbindung schlieï¿½en   
 	 wait_min=Def_wait;															// Warte 3 Minuten mit reconnect
 	}	
  }	 
- else if (ja(T_change)>0)															// Abfrage "Ändern ...?"
+ else if (ja(T_change)>0)															// Abfrage "ï¿½ndern ...?"
  { 
   put2str (T_LF,Server);
   readline(fp.server,sizeof(fp.server),'a');	 		// Server einlesen
   result=getnumber (Port,1,0xFFFF);								// Port einlesen
-  if (result>=0) fp.port=result;									// Übernehmen wenn > Null
+  if (result>=0) fp.port=result;									// ï¿½bernehmen wenn > Null
 	else putparameter (Port,fp.port,5<<16,T_nil);
 	if (fp.servertyp==SMTP)
   {  
@@ -1313,8 +1338,8 @@ void get_server_config (void)											// Einlesen der Server Konfiguration
  }			
 }
 
-void change_radionet (uchar net)		// Funknetzeinstellung GSM / UMTS / LTE ändern
-{																		// Übergabe gewünschtes Netzwerk 1/2/3 für GSM/UMTS(LTE)/Automatisch
+void change_radionet (uchar net)		// Funknetzeinstellung GSM / UMTS / LTE ï¿½ndern
+{																		// ï¿½bergabe gewï¿½nschtes Netzwerk 1/2/3 fï¿½r GSM/UMTS(LTE)/Automatisch
 
  int result=-1;	
  uchar uartsave=connect;
@@ -1338,12 +1363,12 @@ void change_radionet (uchar net)		// Funknetzeinstellung GSM / UMTS / LTE ändern
    MUX_BT_Select;										// MUX Bluetooth Leitungsauswahl	
 	}	
  }
- else put2str(T_LF,T_noacc);				// kein Zugriff über GSM oder BT 
+ else put2str(T_LF,T_noacc);				// kein Zugriff ï¿½ber GSM oder BT 
 }		
 	
 
 int file_to_uc15(uint filesize, char *Pfname)				// File upload UC15 Funkmodem
-{																										// Übergabe filesize - Länge Datei in Bytes
+{																										// ï¿½bergabe filesize - Lï¿½nge Datei in Bytes
 																										// 					Pfname - Zeiger auf Dateinamen		
  int result=-1;	
  uint filehandle;
@@ -1365,7 +1390,7 @@ int file_to_uc15(uint filesize, char *Pfname)				// File upload UC15 Funkmodem
 	putstr(T_fwrite);								// AT+QFWRITE senden
   putnumber (filehandle,0);				// file handle senden
   putc(',');
-  putnumber (filesize,0);					// Dateigrösse senden
+  putnumber (filesize,0);					// Dateigrï¿½sse senden
   newline();
   result=wait_message(T_connect,XMODEM_CHAR_TIMEOUT);						// Warte auf "CONNECT" Antwort	 
 	if (result>0) 
@@ -1378,12 +1403,12 @@ int file_to_uc15(uint filesize, char *Pfname)				// File upload UC15 Funkmodem
 		flash_pcom((uchar *)&cbuf,page,FLASH_R_ARRAY,blockbytes);		// Anzahl blockbytes nach cbuf lesen
 		filesize-=blockbytes;																				
     i=0; while (blockbytes--) putb(cbuf[i++]);									// Blockbytes an Modem senden
-		page+=pagepk; 																							// Flash Seiten hochzählen		 																			
+		page+=pagepk; 																							// Flash Seiten hochzï¿½hlen		 																			
 	 }		 		
 	 wait_ok_time(XMODEM_CHAR_TIMEOUT);					// Warte auf ok
-	 putstr(T_fclose);													// AT+QFCLOSE, Datei schließen
+	 putstr(T_fclose);													// AT+QFCLOSE, Datei schlieï¿½en
    putnumber (filehandle,0);									// Handle senden
-	 newline();																	// Kommando abschließen
+	 newline();																	// Kommando abschlieï¿½en
 	 result=wait_ok_time(XMODEM_CHAR_TIMEOUT);	// Warte auf ok
 	}	
  }	
@@ -1393,23 +1418,23 @@ int file_to_uc15(uint filesize, char *Pfname)				// File upload UC15 Funkmodem
 }
 
 int cert_to_uc15 (uchar offset)							// MQTT Zertikats-File upload ins UC15 Funkmodem
-{																						// Übergabe: offset - Offset im MQTT Empfangspuffer zum 1. Zertifikatsbyte
+{																						// ï¿½bergabe: offset - Offset im MQTT Empfangspuffer zum 1. Zertifikatsbyte
  int result=-1;	
  uint filehandle;
  uchar constate=connect;										// Ausgabe-Schnittstallen Status sichern	
  ushort i=offset; 	
 	
  connect=(connect&~MQTT_LINK)|UART1;				// Empfang auf von mqbf auf rbuf umschalten  
-  if (fp.gsm==EG91) send3plus();							// EG91 vorläufig "+++" senden 	
+  if (fp.gsm==EG91) send3plus();							// EG91 vorlï¿½ufig "+++" senden 	
  FIO0SET=GSM_DTR;														// DTR HI -> Modem switch DATA to COMMAND Mode	
  result=wait_ok_time(XMODEM_CHAR_TIMEOUT); 
- FIO0CLR=GSM_DTR;														// DTR sofort rücksetzen, sonst UC -> Sleep
+ FIO0CLR=GSM_DTR;														// DTR sofort rï¿½cksetzen, sonst UC -> Sleep
  if (result>0) 															// UC15 Data->Command Mode, OK auf Umschaltung?
  {																					 
 	connect=UART1;														// Nur Modemausgabe
 	putstr (T_fopen1);												// Command open ufs file for writing part 1
  	putb ('"'); 	 
-  putb ('_');	 															// Underline vor Dateinamen einfügen	
+  putb ('_');	 															// Underline vor Dateinamen einfï¿½gen	
   putstr (certname);												// Zertikats-Filename
 	putb ('"');  
   putln(T_fopen2);													// Command part2
@@ -1422,7 +1447,7 @@ int cert_to_uc15 (uchar offset)							// MQTT Zertikats-File upload ins UC15 Fun
 	 putstr(T_fwrite);								// AT+QFWRITE senden
    putnumber (filehandle,0);				// file handle senden
    putc(',');
-   putnumber (certsize,0);					// Dateigrösse senden
+   putnumber (certsize,0);					// Dateigrï¿½sse senden
    newline();
    result=wait_message(T_connect,XMODEM_CHAR_TIMEOUT);				// Warte auf "CONNECT" Antwort	 
 	 if (result>0) 
@@ -1430,16 +1455,16 @@ int cert_to_uc15 (uchar offset)							// MQTT Zertikats-File upload ins UC15 Fun
 	  while (certsize-->0)	putb (mqbf[i++]);	// Zertifikat an UC15 senden
 	  wait_ok_time(XMODEM_CHAR_TIMEOUT);			// Warte auf ok - Zertifikat vom UC15 eingelesen 
 	 }	
-	 putstr(T_fclose);												// AT+QFCLOSE, Datei schließen
+	 putstr(T_fclose);												// AT+QFCLOSE, Datei schlieï¿½en
    putnumber (filehandle,0);								// Handle senden
-	 newline();																// Kommando abschließen
+	 newline();																// Kommando abschlieï¿½en
 	 if (wait_ok_time(XMODEM_BLOCK_TIMEOUT)>0)	// Warte auf ok - Datei ist zu 	
    {		 
 	  putln (T_ctsw);													// Kontextumschaltung Command -> Data Mode
     if (wait_message(T_connect,6*XMODEM_BLOCK_TIMEOUT)>0)	// Erfolg, CONNECT ?
 		{
 		 for (i=0;i<3;i++) if (certs[i][0]==0) { memcpy(&certs[i][0], &certname[0], sizeof(certname)); break; }	// Zertifikat in Liste eintragen	
-		 if (i==3) while (i) certs[--i][0]=0;	 						// Kein freier Namensplatz - alle Löschen
+		 if (i==3) while (i) certs[--i][0]=0;	 						// Kein freier Namensplatz - alle Lï¿½schen
 		 else if (mqtt_debug)
 		 {			
 			connect=constate&~(UART1|MQTT_LINK);						// Nur an RS232/USB Terminal
@@ -1465,15 +1490,15 @@ int activate_cert (void)										// Aktiviert im Funkmodem vorhandene neue TLS 
  uchar constate=connect;										// Ausgabe-Schnittstallen Status sichern	
  uchar i;
 	
- for (i=0;i<3;i++) if (certs[i][0]) break;	// Prüfe ob Zertifikatsnamen gespeichert	
+ for (i=0;i<3;i++) if (certs[i][0]) break;	// Prï¿½fe ob Zertifikatsnamen gespeichert	
 
  if (i<3)																		// Wenigstens 1 Zertifikatsnamen gefunden?
  {	 
   connect=UART1;														// Empfang auf von mqbf auf rbuf umschalten  
-  if (fp.gsm==EG91) send3plus();						// Vorläufig mit defektem DTR Prototyp 	 
+  if (fp.gsm==EG91) send3plus();						// Vorlï¿½ufig mit defektem DTR Prototyp 	 
   FIO0SET=GSM_DTR;													// DTR HI -> UC15 switch DATA to COMMAND Mode 	
   result=wait_ok_time(XMODEM_CHAR_TIMEOUT); // Warte auf Umschalt-OK des Command mode
-  FIO0CLR=GSM_DTR;													// DTR sofort rücksetzen, sonst Modem -> Sleep
+  FIO0CLR=GSM_DTR;													// DTR sofort rï¿½cksetzen, sonst Modem -> Sleep
   if (result>0) 														// UC15 Data->Command Mode, OK auf Umschaltung?	
   {
 	 for (i=0;i<3;i++)				// Bis zu 3 Zertifikatsdateien aktivieren
@@ -1500,9 +1525,9 @@ int activate_cert (void)										// Aktiviert im Funkmodem vorhandene neue TLS 
 			putstr (&certs[i][0]);											// Zertname
       putstr (T_m_activ);									 				// Text " active..."
 			while (!(U0->LSR&THRE));										// Daten an Terminal gesendet 
-			connect=UART1;	 														// Zurück auf Modemverbindung
+			connect=UART1;	 														// Zurï¿½ck auf Modemverbindung
 		 }	 
-		 certs[i][0]=0;					// Zertifikatsnamen löschen, da bearbeitet 	 
+		 certs[i][0]=0;					// Zertifikatsnamen lï¿½schen, da bearbeitet 	 
 		}	// end if Zert existiert		
    } // end for jedes Zert
 	 
@@ -1524,15 +1549,15 @@ int activate_cert (void)										// Aktiviert im Funkmodem vorhandene neue TLS 
 }
 
 int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTTP Server vt.gonicus.de  und lade Firmware herunter
-{																					// Übergabe mqtt_connect 0/1, 1=wenn noch MQTT Server-Verbindung besteht
-																					// Übergabe s - Zeiger auf URL String
-																					// Rückgabe Erfolg/Misserfolg 1/-1 
+{																					// ï¿½bergabe mqtt_connect 0/1, 1=wenn noch MQTT Server-Verbindung besteht
+																					// ï¿½bergabe s - Zeiger auf URL String
+																					// Rï¿½ckgabe Erfolg/Misserfolg 1/-1 
  uint timeout=XMODEM_BLOCK_TIMEOUT;				// Antworttimeout
  uchar state=9;														// Zustandsvariable, beginne erst bei 9 wg. GPRS states
  uchar failure=0;													// Fehler aufgetreten
  text *P_resp;														// Zeiger auf Modem - Antwortstring	
  int pos;																	// Position im Puffer und Ergebnis Hilfsvariable
- int filesize;														// Dateilänge
+ int filesize;														// Dateilï¿½nge
  char *s;																	// Hilfszeiger	 
 
  s=(char *)url;														// Zeiger auf URL String
@@ -1553,7 +1578,7 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
 	 connect=concpy|UART1;										
 	 if (set_gprs_config(0)< 0) failure=1;	// APN GPRS Verbindung nicht erfolgreich? -> Fehlerabbruch
 	 else send_local_ip (); 								// sende IP an Terminal 	
-	 state+=2;															// Trennen der MQTT Serververbindung überspringen	
+	 state+=2;															// Trennen der MQTT Serververbindung ï¿½berspringen	
   }
 	else if (state==10)											// Modem Data in Command Mode umschalten  
   {
@@ -1580,17 +1605,17 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
 		}		
   }
 
-  else if (state==11)											// TCP/IP Verbindung zum MQTT-Server schließen
+  else if (state==11)											// TCP/IP Verbindung zum MQTT-Server schlieï¿½en
   {
-	 FIO0CLR=GSM_DTR;												// DTR sofort rücksetzen, sonst UC15 -> Sleep	
+	 FIO0CLR=GSM_DTR;												// DTR sofort rï¿½cksetzen, sonst UC15 -> Sleep	
 	 timeout=5*XMODEM_BLOCK_TIMEOUT;	
 	 connect=UART1;													// keine Terminalausgabe mehr			
- 	 putstr (T_sslclose);										// verschlüsselte Verbindung AT+QSSLCLOSE 
+ 	 putstr (T_sslclose);										// verschlï¿½sselte Verbindung AT+QSSLCLOSE 
 	 putstr("=1,2"); 												// UC15, connectID und socket timeout 2s senden
 	 newline();															// Kommandozeilenabschluss senden	
    P_resp=T_OKNZ;	   											// Erwarte OK Antwort		   	
   }
-	else if (state==12) {										// Kontext für https Firmware Download Server erstellen
+	else if (state==12) {										// Kontext fï¿½r https Firmware Download Server erstellen
 	 if (mqtt_debug) 
 	 {
 		connect=concpy;  
@@ -1610,12 +1635,12 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
 	 P_resp=T_OKNZ;		 											// Erwarte "OK" Antwort		
   }
 	
-  else if (state==13)	{										// Konfiguriere Verschlüsselung und Server Zertifikat am UC15
+  else if (state==13)	{										// Konfiguriere Verschlï¿½sselung und Server Zertifikat am UC15
 	 putln(T_sslcfg0);		
    state++;																// Ohne Zertifikate weiter mit 15			
 	 P_resp=T_OKNZ;	}	 											// Erwarte "OK" Antwort	
 	
-	else if (state==14)	{										// Konfiguriere Client Zertifikat und Schlüssel
+	else if (state==14)	{										// Konfiguriere Client Zertifikat und Schlï¿½ssel
 		putstr(T_sslcfg2);										// Konfiguriere Client Zertifikat
 		putstr(fp.serno);					
 		putstr(T_sslcfg3);										// Konfiguriere Client private key
@@ -1626,8 +1651,8 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
 	else if (state==15)	  {									//    
 	 putstr(T_htcfg2); 											// Kommando	"AT+QHTTPURL=" senden	
 	 pos=0;	
-   while (*s++) pos++;										// URL Stringlänge ermitteln							
-	 putnumber (pos,0);											// URL Stringlänge senden
+   while (*s++) pos++;										// URL Stringlï¿½nge ermitteln							
+	 putnumber (pos,0);											// URL Stringlï¿½nge senden
    putc(',');		
    putln("80");														// 80 Sekunden	 	
 	 P_resp=T_connect;											// UC15 antwortet sofort mit CONNECT  
@@ -1648,7 +1673,7 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
    {
 		putcbuf_line (0); 
 		newline(); 
-		 pos=compare ("GET: ",cbuf,0,cind); 				// prüfe ob "+QHTTPGET: " Teilstring Antwort?
+		 pos=compare ("GET: ",cbuf,0,cind); 				// prï¿½fe ob "+QHTTPGET: " Teilstring Antwort?
 		if (pos<0) failure=1;
 		else
 		{
@@ -1656,7 +1681,7 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
 		 else
      {
 			if (atoi (cbuf+pos+2)!=200)	failure=3;		// Serverantwort nicht 200 = ok? 
-			else filesize = atoi (cbuf+pos+6);				// Content length = Dateilänge lesen
+			else filesize = atoi (cbuf+pos+6);				// Content length = Dateilï¿½nge lesen
       if (filesize>FIRMWARE_MAX_FILESIZE) 			// Firmware Datei zu lang
 			{
 			 protocol(XMODEM_FILE_TOO_LONG);					// Fehler protokollieren
@@ -1675,12 +1700,12 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
 		P_resp=T_OKNZ;												// Erwarte "OK" Antwort
   }
 	
-	else if (state==20)	{												// Prüfe AT+QHTTPREADFILE Ergebnis
+	else if (state==20)	{												// Prï¿½fe AT+QHTTPREADFILE Ergebnis
 	 if (wait_line (20*XMODEM_BLOCK_TIMEOUT)>0)
 	 {	 
 		putcbuf_line (0);
     newline();	 
-	  pos=compare ("FILE: ",cbuf,0,cind);			// Antwort enthält +QHTTPREADFILE: Teilstring?
+	  pos=compare ("FILE: ",cbuf,0,cind);			// Antwort enthï¿½lt +QHTTPREADFILE: Teilstring?
 	  if (pos<0) failure=5;
 	  else if (cbuf[pos]!='0') failure=6;			// Nicht Null Fehlerabbruch
 	 }	 
@@ -1690,7 +1715,7 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
   else if (state==21)												// Deaktiviere PDP Kontext						
   {	 
    putstr(T_qideact);												// "AT+QIDEACT"
-   putstr("=1");														// Ergänze Kontext ID	
+   putstr("=1");														// Ergï¿½nze Kontext ID	
    newline();
 	 P_resp=T_OKNZ;
    timeout=5*XMODEM_BLOCK_TIMEOUT;					// Warte bis zu 15 s	
@@ -1727,14 +1752,14 @@ int Download_firmware	(const char *url, uchar mqtt_connect)		// Verbinde mit HTT
 }
 
 int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den Flash
-{																			// Prüfe Datei CRC auf Übereinstimmung					
+{																			// Prï¿½fe Datei CRC auf ï¿½bereinstimmung					
  int pos;															// Hilfsvariable Zeichenposition im String
- int filehandle=-1;										// Handle für geöffnete Firmware Datei	
- uint filesize=0,fbytetoread=0;				// Größe der Firmware Datei / Anzahl Dateidaten zu lesen
+ int filehandle=-1;										// Handle fï¿½r geï¿½ffnete Firmware Datei	
+ uint filesize=0,fbytetoread=0;				// Grï¿½ï¿½e der Firmware Datei / Anzahl Dateidaten zu lesen
  int bytes_to_read=0;									// Anzahl Bytes zu lesen
  int bytes_read=0;										// Anzahl Bytes gelesen
- int flashcrc=0;											// CRC Prüfsumme der gespeicherten Datei im Flash
- uint blno=0;													// Anzahl gelesene 1k Blöcke
+ int flashcrc=0;											// CRC Prï¿½fsumme der gespeicherten Datei im Flash
+ uint blno=0;													// Anzahl gelesene 1k Blï¿½cke
  uchar retry=3;												// Anzahl Block Lese-Wiederholversuche			
  uchar concpy=connect;	
 	
@@ -1747,9 +1772,9 @@ int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den F
 
  connect|=UART1;												// Command Ausgabe an Modem		
 	
- putstr (T_fopen1);											// AT command Datei öffnen	AT+QFOPEN=
+ putstr (T_fopen1);											// AT command Datei ï¿½ffnen	AT+QFOPEN=
  putqstr(T_fwfile);											// Firmware Dateiname, z. B. firmware.bin
- putln (",2");													// Zum Lesen öffnen
+ putln (",2");													// Zum Lesen ï¿½ffnen
  if (wait_ok_time (XMODEM_BLOCK_TIMEOUT)>0)			// Warte auf OK Abschluss
  {
   pos=compare(T_fresp,cbuf,0,cind);			// Suche +QFOPEN Antwort	
@@ -1766,14 +1791,14 @@ int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den F
    putcbuf_line (2);											
    if (pos>0) 													// Komma gefunden			
 	 {	
-	  filesize=atoi(cbuf+pos);						// Dateilänge lesen		
+	  filesize=atoi(cbuf+pos);						// Dateilï¿½nge lesen		
 		if (filesize)												// Keine Null Byte lange Datei
 		{		
 		 fbytetoread=filesize;							// kopieren 	
 		 putstr (T_qseek);									// Kommando Dateizeiger "AT+QFSEEK=
 		 putnumber(filehandle,0); 					
 		 putln (",0,0"); 										// auf Dateianfang	
-		 if (wait_ok_time (XMODEM_BLOCK_TIMEOUT)>=0) do		// Datei Zeiger positioniert, dann Daten Blöcke lesen
+		 if (wait_ok_time (XMODEM_BLOCK_TIMEOUT)>=0) do		// Datei Zeiger positioniert, dann Daten Blï¿½cke lesen
 		 {		
 			if (fbytetoread<BLOCKSIZE) bytes_to_read=fbytetoread;	// Dateirest < 1k zu lesen?
 			else bytes_to_read=BLOCKSIZE;			// 1024 Bytes zu lesen		  
@@ -1798,7 +1823,7 @@ int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den F
 			 continue;												// Selben Block nochmal lesen	
 			}		
 			else break;
-			retry=3;													// Block mit Erfolg gelesen Wiederholzähler reinit		
+			retry=3;													// Block mit Erfolg gelesen Wiederholzï¿½hler reinit		
 			wait_line (5);										// Warte auf OK	Abschluss des Leseblocks	
 			connect&=~UART1;
 			if (!blno++) { putstr ("Write"); putstr (T_block); } 
@@ -1819,7 +1844,7 @@ int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den F
  connect=concpy;
  newline ();													// Neue Zeile
  connect|=UART1;
- putstr (T_fclose);										// Datei schließen
+ putstr (T_fclose);										// Datei schlieï¿½en
  putnumber(filehandle,0);						  // Dateihandle als ASCII senden 
  newline ();													// Kommandoabschluss
  if (wait_ok_time(XMODEM_BLOCK_TIMEOUT) > 0)	// OK, Datei zu?
@@ -1831,9 +1856,9 @@ int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den F
 	 flash_pcom((uchar *)cbuf,pagepk*blno,FLASH_R_ARRAY,BLOCKSIZE);			// Atmel Flash Seite(n) mit CRC lesen
 	 if (fbytetoread>BLOCKSIZE) bytes_to_read=BLOCKSIZE;								// Anzahl Flash Daten zu lesen > 1k
    else bytes_to_read=fbytetoread; 																				
-	 flashcrc=crcgen((uchar *)cbuf,bytes_to_read,flashcrc);							// CRC über gelesene Flash Daten bilden
+	 flashcrc=crcgen((uchar *)cbuf,bytes_to_read,flashcrc);							// CRC ï¿½ber gelesene Flash Daten bilden
 	 fbytetoread-=bytes_to_read;																				// Anzahl restlicher Lesedaten berechnen
-	 if (!blno++) { putstr ("Read"); putstr (T_block); }								// Meldung gelesener Datenblöcke
+	 if (!blno++) { putstr ("Read"); putstr (T_block); }								// Meldung gelesener Datenblï¿½cke
 	 else
 	 {	
 		connect=concpy;
@@ -1849,8 +1874,8 @@ int firmware_to_flash (int filecrc)		// Transfer Firmware vom Funkmodem in den F
  putstr (T_crc);
  putnumber (flashcrc,0x80);
  
- if(!filecrc) return (blno);						// CRC=0 übergeben - Testfunktion
- if (flashcrc==filecrc) return (blno);	// Prüfsummen stimmen überein
+ if(!filecrc) return (blno);						// CRC=0 ï¿½bergeben - Testfunktion
+ if (flashcrc==filecrc) return (blno);	// Prï¿½fsummen stimmen ï¿½berein
  
  putln (" Error");
  puterror (DTC_GSM_CRC_ERR,-1);							// Fehler protokollieren

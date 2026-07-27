@@ -73,6 +73,7 @@ static const dtc_entry_t dtc_table[] = {
   {12006,'F',"GSM SMS Laenge fehlerhaft"},
   {12007,'F',"GSM SMS Senden fehlgeschlagen"},
   {12008,'F',"Firmware CRC-Fehler GSM"},
+  {12009,'F',"SIM-Karte nicht erkannt"},
   {13001,'F',"Parametertransfer fehlerhaft"},
   {13002,'F',"Flash fehlt oder zu klein"},
   {13003,'F',"Firmware-Transfer Xmodem Fehler"},

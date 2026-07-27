@@ -23,6 +23,7 @@ Code;Typ;Subsystem;Kurztext;Ursache;Abhilfe;SeitVersion;Status
 12006;F;GSM/LTE;GSM SMS Laenge fehlerhaft;SMS-Paket kuerzer als erwartet;SMS-Inhalt und Verbindungsqualitaet pruefen;5.09;aktiv
 12007;F;GSM/LTE;GSM SMS Senden fehlgeschlagen;SMS-Sendebefehl mit negativem Rueckgabewert;Netz und SMS-Einstellungen pruefen;5.09;aktiv
 12008;F;GSM/LTE;Firmware CRC-Fehler GSM;CRC-Pruefsumme nach Firmware-Transfer stimmt nicht;Uebertragung wiederholen, Quelldatei pruefen;5.09;aktiv
+12009;F;GSM/LTE;SIM-Karte nicht erkannt;SIM nicht eingelegt oder Kartenfehler (AT+QSIMSTAT insert=0);SIM-Karte und Kartenhalter/Kontakte pruefen;5.50;aktiv
 13002;F;Menue/Kommunikation;Flash fehlt oder zu klein;Kein Flash oder Groesse ausserhalb Bereich;Flash-Hardware pruefen;5.09;aktiv
 13003;F;Menue/Kommunikation;Firmware-Transfer Xmodem Fehler;Xmodem-Protokoll-Fehler beim Firmware-Upload;Uebertragung wiederholen, Kabel und Terminal pruefen;5.09;aktiv
 13004;F;Menue/Kommunikation;IAP Programmierfehler;Kontrollfluss erreichte IAP-Fehlerposition;Firmware pruefen, Service kontaktieren;5.09;aktiv

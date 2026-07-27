@@ -1517,3 +1517,35 @@ kaputt bis Reboot.
 **Fix:** bt_disconnect() setzt jetzt `concpy=connect` vor bt_command() und `connect=concpy` danach
 -> connect bleibt definiert/unveraendert; measure.c maskiert anschliessend nur die BT-Bits.
 Version -> 5.49. Geaenderte Datei: btio.c, sictxt.c.
+
+**Nachtrag 5.49 - Modul-Defekt, SW entlastet:** Nach Power-Cycle antwortete ein IF820 auf KEINER
+Baud (rx:(none), TXstuck=0 -> LPC-TX ok, Modul stumm) -> F11009. Mit einem ANDEREN Modul und
+derselben Firmware 5.49 laeuft es. => defektes Modul bzw. dessen Verdrahtung/Versorgung, NICHT die
+Software. Vermutliche Ursache wie beim DVK: externe Einspeisung/Brownout. Merker: nur EINE
+Versorgungsquelle (DVK-USB ODER Board), VBAT/VDDIO nicht gegeneinander speisen, Modul beim Umstecken
+stromlos machen.
+
+## Update 5.50 - SIM-Karte nicht erkannt -> eigener Fehlercode F12009
+
+**Anforderung:** Fehlende/nicht erkannte SIM soll einen eigenen Fehlercode bekommen und
+in der Kommunikation angezeigt werden.
+
+**Ursache/Luecke:** atcpin() unterschied bisher nur "READY" (PIN ok) und "incorrect"
+(falsche PIN). Der Fall "keine SIM" fiel still durch (nur interne Marke mqtt_con_err=41),
+ohne Diagnose-Code und ohne gezielte Meldung.
+
+**Fix:** Neuer Code DTC_GSM_SIM_NF=12009 "SIM-Karte nicht erkannt" (Typ F, Subsystem 12).
+Erkennung ueber AT+QSIMSTAT? (physischer Steckstatus, unabhaengig von PIN) via neue
+statische Hilfsfunktion sim_inserted() in gsmio.c, aufgerufen in atcpin() direkt nach
+modem_start() (deckt PIN- und Kein-PIN-Pfad ab). Bei insert=0 -> dtcerr(DTC_GSM_SIM_NF)
+(gibt "F12009 SIM-Karte nicht erkannt" aus + protokolliert), Modem aus. QSIMSTAT ohne
+eindeutige Antwort (-1, z. B. altes Modem) loest bewusst KEINEN Fehler aus (kein Fehlalarm);
+insert=2 ("wird erkannt") gilt als vorhanden.
+
+**Geaenderte Dateien:** dtc_codes.h, dtc_text.h, Doku/Diagnose-Codes.csv, gsmio.h, gsmio.c,
+sprachen/sictxt.c (Version -> 5.50). Details in Doku/LTE_Fix.md.
+
+**Hinweis:** dtc_text.h ist generiert (tools/gen_dtc.py aus der CSV); Generator liegt nicht
+im Repo -> CSV und Header parallel von Hand gepflegt. Firmware hier nicht kompiliert -> in
+Keil bauen; QSIMSTAT-Antwortformat und Verhalten mit/ohne SIM am Geraet verifizieren
+(Checkliste in LTE_Fix.md).

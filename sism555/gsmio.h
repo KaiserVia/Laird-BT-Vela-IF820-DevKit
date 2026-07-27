@@ -113,6 +113,8 @@
 #define T_qseek			"AT+QFSEEK="
 #define T_fread			"AT+QFREAD="
 #define T_qccid			"AT+QCCID"
+#define T_qsimstat	"AT+QSIMSTAT?"	// SIM-Steckstatus abfragen (EG91)
+#define T_qsimresp	"+QSIMSTAT:"		// Antwort-Token: +QSIMSTAT: <enable>,<insert> (insert 0=keine SIM)
 #define T_qlts			"AT+QLTS=2"		// Quectel Netzzeit (NITZ) abfragen
 #define T_qltsr			"QLTS"				// Antwort-Token +QLTS:
 
