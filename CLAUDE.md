@@ -53,6 +53,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 2. **project-status.md fortschreiben** — jede substanzielle Änderung als neues
    `## Update <Version>`-Kapitel mit Symptom / Ursache / Fix.
 3. **Git committen** — sicherste dauerhafte Sicherung, unabhängig von Cowork.
+   **Konvention: JEDE Erhöhung von `T_version` wird automatisch als eigener Commit
+   gesichert** (nur die geänderten Quell-/Doku-Dateien unter `sism555/`, KEINE Binär-/
+   Firmware-Dateien), mit sinnvoller Log-Nachricht `BT <version>: <Kurzbeschreibung>`.
 4. Diese `CLAUDE.md` aktuell halten (Branch, aktuelle Version, große offene Punkte).
 
 ---

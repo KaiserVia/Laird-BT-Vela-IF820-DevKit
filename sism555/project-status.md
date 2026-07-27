@@ -1504,3 +1504,16 @@ fp.btmodem==IF820 nur. I2C-Aufrufe ausserhalb der Critical Section.
 **Versionssicher:** CYSPP-HIGH-zum-SPP-Verlassen wirkt erst ab Modul-FW 1.4.18.18. Auf 1.4.12.12
 bleibt der Junk (Feature fehlt), aber der Code macht nichts kaputt. Firmware-unabhaengige Alternative
 bleibt ein HW-Pull-up auf der IF820-RXD. Version -> 5.48. Geaenderte Datei: hard.c, sictxt.c.
+
+---
+
+## Update 5.49 - FIX: bt_disconnect() korrumpierte connect (concpy nicht gesetzt)
+
+**Symptom:** Nach einer BT-Verbindung + Inaktivitaets-Timeout „ging das Modul/Terminal nicht mehr".
+**Ursache:** bt_disconnect() (5.47) ruft bt_command() auf; bt_command() stellt am Ende
+`connect=concpy` her. bt_disconnect setzte `concpy` aber NICHT -> im Timeout-Kontext war concpy
+veraltet -> `connect` wurde nach dem Timeout auf einen falschen Wert gesetzt -> Terminal/BT-Routing
+kaputt bis Reboot.
+**Fix:** bt_disconnect() setzt jetzt `concpy=connect` vor bt_command() und `connect=concpy` danach
+-> connect bleibt definiert/unveraendert; measure.c maskiert anschliessend nur die BT-Bits.
+Version -> 5.49. Geaenderte Datei: btio.c, sictxt.c.

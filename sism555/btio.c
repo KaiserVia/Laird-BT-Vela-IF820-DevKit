@@ -246,12 +246,16 @@ void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesb
 void bt_disconnect (void)
 {
  if (fp.btmodem!=IF820) return;
+ concpy = connect;                          // WICHTIG: bt_command() stellt am Ende connect=concpy her
+                                            // -> ohne dies wuerde connect auf einen veralteten Wert gesetzt
+                                            //    (Timeout-Kontext) und Terminal/BT-Routing kaputtgehen.
  bt_cmdmode();                              // CYSPP HIGH -> Command-Mode
  osDelay(150);                              // Modul Zeit geben: SPP-Datenmodus -> Command-Mode
  bt_command(T_dis, T_disok, -300);          // /DIS still senden (kein Terminal-Spam), Antwort abwarten
  osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
  bt_release();                              // CYSPP wieder als Eingang
  bxi=rxi;                                   // RX-Reste (/DIS-Antwort) verwerfen -> nichts ins Terminal/Menue
+ connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
 
 void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW-Diagnose (Testmenue)
