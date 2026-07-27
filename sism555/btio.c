@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 //  FILE: btio.c			PROJECT: sis3000M
 //-----------------------------------------------------------------------------
-//  COMMENTS:  Routinen für Bluetooth Modem Erweiterung
+//  COMMENTS:  Routinen fï¿½r Bluetooth Modem Erweiterung
 //-----------------------------------------------------------------------------
 //  HARDWARE:   sis3003-MB, version H2
 //-----------------------------------------------------------------------------
@@ -26,58 +26,54 @@
 #include "dtc_codes.h"
 
 bool bt_command (text * command, text * answer, int pause) // Bluetooth Kommando senden, Antwort empfangen
-{																						// Übergaben:	command	-	 Zeiger auf Kommandostring
-																						//						answer	- Zeiger auf erforderliche Antwortsequenz
-																						//						|pause|	- Wartezeit auf und nach Antort
-																						//						pause > 0 Kommandosequenz samt Antwort ausgeben
-																						//						pause < 0 Nur Antwort ausgeben
-																						//						pause = 0 keine Wartezeit nach Antwort, keine Ausgabe
-																						//						Wenn |pause| > 10000 dann CRLF bei Ausgabe und |pause|=|pause|-10000
-																						
- int result;															// Hilfsvariable Ergebnis Antwortsequenz	
- uchar clen=0;														// Zähl- und Laufvariable
- uint timeout=BT_CHAR_TIMEOUT;						// Minimalwartezeit
- uchar addcrlf=0;	
-	 	 
- osDelay (2);															// Warten
- MUX_BT_Select;														// MUX Bluetooth Leitungsauswahl	
- osDelay (2);															// Warten	
-	
- while (*(command+clen)!=0) clen++;				// Ermittle Kommandolänge
-	
+{                                          // pause>0: Kommando+Antwort formatiert ans Terminal spiegeln
+                                           // pause<0: still senden (nur intern); |pause|>10000: CRLF-Flag (RN4678)
+ int result;
+ uchar clen=0;
+ uint timeout=BT_CHAR_TIMEOUT;
+ uchar addcrlf=0;
+
+ osDelay (2);
+ MUX_BT_Select;                            // MUX Bluetooth Leitungsauswahl
+ osDelay (2);
+
+ while (*(command+clen)!=0) clen++;        // Kommandolaenge
+
  result = pause;
- if (result <0) result=-result;						
+ if (result <0) result=-result;
  if (result > 10000) { addcrlf=1; result-=10000; }
  if (pause) timeout=result;
-	 
- if (pause>0) connect|=UART1;							// Ausgabe an bisherige Verbindungen und an UART1	
- else connect=UART1;											// Ausgabe nur an UART1
- putstr (command);												// Kommando senden			
- 
- bxi=rxi;																	// Indizes Empfangspuffer gleichsetzen 
- result =	wait_message (answer,timeout);	// Warte auf Antwort	
 
- osDelay (2);															// Warten	
- connect=concpy;	 												// ursprüngliche Verbindung wiederherstellen
- 
- if (result>=0)				// Antwort erhalten	
- {	
-  if (pause>0) 
-	{	
-	 osDelay (timeout/5);								// Wartezeit nächster Befehl
-	 putstr (cbuf);											// Sende- und Antwortsequenz an Terminal senden     
-	 if (addcrlf) newline();						// RN4678 neue Zeile anfügen	
-	 connect|=UART1;										// Ausgabe wieder an BT Modem umleiten
-	}	
-  else if (pause<0) putxchr (cbuf+2, cind-6);		// Antwortsequenz senden ohne OK		 									 
- }	 
+ if (pause>0)                              // gesendetes Kommando -> Terminal, eigene Zeile "  > <cmd>"
+ { uchar cc=connect; connect=concpy&~UART1; newline(); putstr("  > "); putstrCR(command); connect=cc; }
+ connect=UART1;                            // Kommando NUR ans Modul senden (kein roher Mix am Terminal)
+ putstr (command);
 
- if (result<0) return (FALSE); 
- return (TRUE); 						
+ bxi=rxi;                                  // Empfangspuffer-Indizes gleichsetzen
+ result = wait_message (answer,timeout);   // auf Antwort warten
+
+ osDelay (2);
+ connect=concpy;                           // urspruengliche Verbindung wiederherstellen
+
+ if (pause>0 && result>=0)                 // empfangene Antwort -> Terminal, eigene Zeile "  < <resp>"
+ {
+  osDelay (timeout/5);                      // Wartezeit naechster Befehl
+  { uchar cc=connect; connect=concpy&~UART1; newline(); putstr("  < "); putstr(cbuf); if (addcrlf) newline(); connect=cc; }
+ }
+
+ if (cts_timeout)                          // CTS-Wait in putb() abgelaufen -> Warnung (throttled)
+ { static uint last_cts_warn=0;
+   cts_timeout=0;
+   if ((uint)(mstimer-last_cts_warn) > 2000)
+   { uchar cc=connect; connect&=~UART1;
+     dtcerr(DTC_BT_CTS_TIMEOUT); newline(); connect=cc; last_cts_warn=mstimer; }
+ }
+ if (result<0) return (FALSE);
+ return (TRUE);
 }	
 
 bool Init_BT_ch (uint baudrate)			// Konfiguriere uart1 und setze MUX Kanal auf BT modem 
-{																// Übergabe Baudrate - Baudrate nur 9600 oder 115200
+{																// ï¿½bergabe Baudrate - Baudrate nur 9600 oder 115200
  uart1_request(MUX_BT, baudrate);		// State machine: MUX switch + UART1 config
  if ((FIO2PIN&CTS)==0) return (TRUE);		// CTS Low BT Modem empfangsbereit?	
  return(FALSE);	// nicht bereit
@@ -92,10 +88,20 @@ int bt_get_flowcontrol (void)        // Abfrage: -1=unbekannt, 0=aus, 1=an
  switch (fp.btmodem)
  {
   case IF820:
-   if (!bt_command(T_gtu,T_gtu_d,300)) return (-1);   // GTU senden, Antwort bis ",D=" in cbuf
-   p = strstr(cbuf,",F=");                            // Flow-Control-Feld suchen
-   if (!p) return (-1);
-   return ((p[3]=='0' && p[4]=='1') ? 1 : 0);         // "F=01" -> an
+  {
+   uchar tries;
+   for (tries=0; tries<3; tries++)                    // GTU direkt nach /PING liefert manchmal keine Antwort -> Retry
+   {
+    bxi=rxi;                                           // RX-Reste (z. B. /PING-Nachlauf) verwerfen
+    if (bt_command(T_gtu,T_gtu_d,400))                 // GTU senden, Antwort bis ",D=" in cbuf
+    {
+     p = strstr(cbuf,",F=");                           // Flow-Control-Feld suchen
+     if (p) return ((p[3]=='0' && p[4]=='1') ? 1 : 0); // "F=01" -> an, sonst aus
+    }
+    osDelay(60);                                       // kurz setteln, dann erneut versuchen
+   }
+   return (-1);                                        // 3x keine verwertbare GTU-Antwort
+  }
   case Roving:  return (-1);   // TODO: RN4678 Flow-Control-Abfrage
   case Laird:   return (-1);   // TODO: Laird ATS-Register-Abfrage
   default:      return (-1);   // unbekanntes/neues Modul
@@ -113,7 +119,9 @@ bool bt_set_flowcontrol (void)       // RTS/CTS modulspezifisch aktivieren (+ pe
    q=cmd+6; for (i=28;i>=0;i-=4) *q++=hexchar(IF820_BAUD>>i);  // Baudrate als 8 Hex-Ziffern anhaengen
    strcpy(q,T_stu_post);                                       // Suffix ,A=00,...,F=01,...CR
    if (!bt_command(cmd,T_stuok,300))      return (FALSE);      // STU (RAM) - Antwort kommt @ alter Baud
+   osDelay(80);                                                // Modul seine UART auf Zielbaud umstellen lassen
    Init_BT_ch(IF820_BAUD);                                     // Host auf Zielbaud (Doku Bsp.1: nach STU-Antwort)
+   osDelay(20); bt_command(T_CR,T_scfgok,-60);                 // setteln + Parser/Puffer leeren vor /SCFG
    if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);      // /SCFG @ neuer Baud -> Flash + verifiziert
    return (TRUE);
   }
@@ -143,9 +151,10 @@ int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, 
  switch (fp.btmodem)
  {
   case IF820:
-   strcpy(want,"N="); strcat(want,T_viasis); strcat(want,"_"); strcat(want,fp.serno);
-   if (!bt_command("GDN,T=00\r",want,300)) return (0);   // BLE-Name == VIASIS_<serno>?
+   strcpy(want,"N="); strcat(want,T_viasis); strcat(want,"_"); strcat(want,fp.serno);  // N=VIASIS_<serno>
    if (!bt_command("GDN,T=01\r",want,300)) return (0);   // BT-Classic-Name == VIASIS_<serno>?
+   strcat(want,"_BLE");                                  // -> N=VIASIS_<serno>_BLE
+   if (!bt_command("GDN,T=00\r",want,300)) return (0);   // BLE-Name == VIASIS_<serno>_BLE?
    return (1);
   case Roving:  return (-1);   // TODO: RN4678 GN-Abfrage
   case Laird:   return (-1);   // TODO: Laird AT+BTN? Abfrage
@@ -158,8 +167,9 @@ void bt_reboot (void)   // IF820: /RBT senden + auf Boot warten (Classic-Name wi
  uchar cc=connect, w;
  connect|=UART1; putstr(T_rbt); connect=cc;          // /RBT senden
  bxi=rxi;
- for (w=0; w<5; w++) { osDelay(1000); ResetWDT(); putc('.'); if (bxi!=rxi) break; }  // auf Boot-Ausgabe warten
- newline(); osDelay(300); bxi=rxi;                   // setteln + RX leeren
+ for (w=0; w<6; w++) { osDelay(1000); ResetWDT(); putc('.'); if (bxi!=rxi) break; }  // auf Boot-Ausgabe warten
+ osDelay(1500); ResetWDT();                          // Modul fertig booten lassen (UART/RTS erst dann bereit)
+ newline(); bxi=rxi;                                 // RX leeren
 }
 
 bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ -> RAM+Flash)
@@ -168,7 +178,7 @@ bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ ->
  switch (fp.btmodem)
  {
   case IF820:
-   strcpy(cmd,"SDN$,T=00,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"\r");
+   strcpy(cmd,"SDN$,T=00,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"_BLE"); strcat(cmd,"\r");  // BLE-Name: VIASIS_<serno>_BLE
    if (!bt_command(cmd,T_sdnok,1500)) return (FALSE);  // BLE-Name setzen (Flash-Write -> grosszuegiger Timeout)
     osDelay(300);                                       // Flash-Write von T=00 abschliessen lassen, bevor T=01 folgt
    strcpy(cmd,"SDN$,T=01,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"\r");
@@ -201,6 +211,7 @@ void bt_show_name (void)             // aktuellen BT-Namen vom Modul lesen und a
  osDelay(200);                       // Antwort abwarten
  while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
  buf[n]=0;
+ newline();                          // eigene Zeile (nicht an vorherige Meldung kleben)
  put2str(T_btname,T_ist);            // Label "Device name ..."
  p=strstr(buf,"N=");                 // Namensfeld der GDN-Antwort
  if (p) { p+=2; for (i=0; p[i] && p[i]!='\r' && p[i]!='\n'; i++) putc(p[i]); }
@@ -214,13 +225,101 @@ void bt_show_name (void)             // aktuellen BT-Namen vom Modul lesen und a
 //-----------------------------------------------------------------------------
 void bt_cmdmode (void)   // CYSPP HIGH treiben -> laufende SPP-Verbindung trennen + Command-Mode
 {
+#if BT_CYSPP
  write_i2c_dev(IC54, 2, (0x80<<8)|0x01);   // PCA9554 Output-Register (0x01): Bit 7 = HIGH
  write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);   // PCA9554 Config (0x03): Bit 7 = Ausgang, Bit 0-6 = Eingang
+#endif
 }
 
 void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesbar, bereit fuer Verbindung)
 {
+#if BT_CYSPP
  write_i2c_dev(IC54, 2, (0xFF<<8)|0x03);   // PCA9554 Config (0x03): alle Pins Eingang (Werks-/Init-Zustand)
+#endif
+}
+
+// IF820: offene BT/SPP-Verbindung SAUBER trennen.
+// Ablauf: CYSPP HIGH -> PUART in Command-Mode (ab FW 1.4.18.18 zuverlaessig), dann /DIS
+// (gap_disconnect) -> das Modul baut die Verbindung aktiv ab (Peer wird informiert, SPP-Slot frei).
+// Defensiv: quittiert das Modul /DIS nicht (z. B. alte FW 1.4.12.12), wird trotzdem freigegeben -
+// also nie schlechter als der bisherige reine CYSPP-Puls.
+void bt_disconnect (void)
+{
+ if (fp.btmodem!=IF820) return;
+ bt_cmdmode();                              // CYSPP HIGH -> Command-Mode
+ osDelay(150);                              // Modul Zeit geben: SPP-Datenmodus -> Command-Mode
+ bt_command(T_dis, T_disok, -300);          // /DIS still senden (kein Terminal-Spam), Antwort abwarten
+ osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
+ bt_release();                              // CYSPP wieder als Eingang
+ bxi=rxi;                                   // RX-Reste (/DIS-Antwort) verwerfen -> nichts ins Terminal/Menue
+}
+
+void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW-Diagnose (Testmenue)
+{
+ int st; uchar now, last=0xFF, sec=0;
+ bt_release();                              // sicherstellen: CYSPP als Eingang -> Modul kann treiben
+ putln("CYSPP/BT_LINK monitor (IC54 bit7). Now try to connect via BT. Key = exit (max 30s).");
+ for (sec=0; sec<255; sec++)                // laeuft bis Taste/comchange, aber begrenzt
+ {
+  st = read_i2cdev(IC54, 0, 1);             // IC54 Eingangsregister lesen
+  if (st < 0) putln(" I2C read error (IC54)");
+  else
+  {
+   now = (uchar)((st>>7)&1);                 // Bit7 = CYSPP-Leitung
+   if (now != last)                          // nur bei Aenderung ausgeben
+   {
+    putstr(" CYSPP bit7 = ");
+    putstr(now ? "HIGH (idle / not connected)" : "LOW  (connected / data mode)");
+    newline();
+    last = now;
+   }
+  }
+  ResetWDT();
+  if (getkey(120) >= 0) break;               // ~120 ms warten; Taste (1) oder comchange (0) -> Ende
+ }
+ newline(); putln(" CYSPP monitor ended");
+}
+
+//-----------------------------------------------------------------------------
+// Gebremste IF820-Erkennung: /PING auf EINER Baud mit HARTER Zeitgrenze +
+// Roh-RX-Dump am Terminal. Kein Haenger mehr, wenn bei falscher Baud Muell
+// hereinkommt (wait_message wuerde sonst pro Byte den Timeout verlaengern).
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Diagnose-Ausgaben nur ans Terminal (nicht ins BT-Modul) - Ablaufverfolgung
+//-----------------------------------------------------------------------------
+static void bt_msg (char *m)              // Klartext-Zeile ans Terminal
+{ uchar cc=connect; connect=concpy & ~UART1; newline(); putstr(m); connect=cc; }
+static void bt_msgnum (char *m, uint32_t v)  // Klartext + Zahl ans Terminal
+{ uchar cc=connect; connect=concpy & ~UART1; newline(); putstr(m); putnumber(v,0); connect=cc; }
+
+static int bt_scan_ping (uint32_t baud)   // 1 = "/PING,0000" gesehen, sonst 0
+{
+ char buf[96]; int n=0, i; uchar cc; uint deadline;
+ bt_tx_stuck=0;                                         // TX-Steckt-Zaehler fuer diese Baud nullen
+ bt_msgnum(" scan @", baud);                            // welche Baud - VOR jeder Aktion
+ Init_BT_ch(baud);
+ bt_msg("  [ch] send CR");
+ cc=connect; connect=UART1; putstr(T_CR); connect=cc;   // Modul-Parser: (Muell-)Zeile abschliessen (5.98)
+ osDelay(20); bxi=rxi;                                  // kurz setteln, dann RX-Puffer leeren
+ bt_msg("  [CR] send /PING");
+ cc=connect; connect=UART1; putstr(T_ping); connect=cc; // /PING senden (cts_bypass aktiv -> ohne CTS-Gate)
+ bt_msg("  [PING] wait 250ms for reply");
+ deadline=mstimer+250;                                  // HARTE Grenze 250 ms, unabhaengig von RX-Aktivitaet
+ while ((int)(deadline-mstimer)>0)
+ {
+  ResetWDT();
+  while (bxi!=rxi && n<(int)sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+  osThreadYield();
+ }
+ buf[n]=0;
+ cc=connect; connect=concpy & ~UART1;                   // Diagnose nur ans Terminal, nicht zurueck ans Modul
+ putstr("  rx: ");
+ if (!n) putstr("(none)");
+ else for (i=0;i<n;i++) putc((buf[i]>=32 && buf[i]<127)?buf[i]:'.');
+ putstr("  [TXstuck="); putnumber(bt_tx_stuck,0); putstr("]");
+ newline(); connect=cc;
+ return (strstr(buf,"/PING,0000")!=0) ? 1 : 0;
 }
 
 void init_bluetooth (void)		// Bluetooth Modem initialisieren
@@ -231,42 +330,106 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 	
  ResetWDT(); 
  if (uart1_owner==MUX_GSM) return;      // UART1 gerade von GSM belegt -> nicht stoeren (Konfliktschutz)
+ { uint sp=atoi(fp.serno+4);                // keine gueltige Seriennummer? -> BT-Name/PIN unmoeglich
+   if (!isdigit((int)fp.serno[0]) || !sp)   // FRUEH erkennen, bevor das Modul angefasst wird
+   { newline(); dtcerr(DTC_BT_NO_SERIAL); newline(); return; } }
  bt_cmdmode();                          // IMMER: aktive SPP-Verbindung ueber CYSPP (IC54 Bit7) kappen + Command-Mode erzwingen
  osDelay(600);                          // Modul Zeit geben: SPP abbauen und in Command-Mode wechseln
  connect&=~(UART1|BT_LINK);             // virtuelle BT-Verbindung loesen (Befehle -> Modul, nicht ueber SPP)
  fp.btmodem=0;                          // Reset -> Erkennung laeuft (erneut) durch
- // === IF820-Erkennung: /PING ueber mehrere Baudraten scannen (analog Laird/RN4678) ===
- // Vor jedem Versuch den Modul-Parser mit CR leeren, sonst verstopft Muell von der falschen Baud
- // den naechsten /PING. Zielbaud zuerst (schnellster Treffer bei konfiguriertem Modul).
+ // ===========================================================================
+ // IF820-Erkennung + Konfiguration (5.27) - klarer, idempotenter Ablauf:
+ //  Erkennung : Modul + Baud finden (konfiguriert -> /PING@460800 mit Handshake;
+ //              sonst Baud-Scan OHNE CTS, weil Werksmodul F=00 sein CTS HIGH haelt)
+ //  Schritt 1/2: Baud 460800 + Flow Control F=01 (STU setzt beides) - nur wenn noetig
+ //  Schritt 3 : Geraetename VIASIS_<serno> - nur schreiben wenn abweichend
+ //  Schritt 4 : nur wenn etwas geaendert -> /RBT + Verifikation; sonst sofort fertig
+ // ===========================================================================
  {
-  static const uint32_t bdscan[] = { IF820_BAUD, IF820_FACTORY_BAUD, 921600, 307200, 230400, 9600 };
-  uchar k;
-  for (k=0; k<sizeof(bdscan)/sizeof(bdscan[0]); k++)
+  uchar changed=0;
+
+  { uchar cc=connect; connect=concpy&~UART1; newline(); putstr(" BT init (fw "); putstr(T_version); putstr("): command mode ok"); connect=cc; }  // Version dynamisch aus T_version -> kein Auseinanderlaufen
+
+  // --- Erkennung A: konfiguriertes Modul? /PING @460800 MIT Handshake ---
+  cts_bypass=0;
+  if ((FIO2PIN&CTS)==0)                 // CTS schon LOW -> Modul meldet sich bereit
   {
-   Init_BT_ch(bdscan[k]);                          // UART1 auf Testbaudrate
-   bt_command(T_CR,T_pingok,-60);                  // Modul-Parser mit CR leeren (Antwort egal)
-   if (bt_command(T_ping,T_pingok,300)) { detbaud=bdscan[k]; break; }   // /PING beantwortet?
+   bt_msg(" Detection: probe 460800 with handshake");
+   Init_BT_ch(IF820_BAUD); bt_command(T_CR,T_pingok,-60);
+   if (bt_command(T_ping,T_pingok,300)) detbaud=IF820_BAUD;
   }
- }
- if (detbaud) { fp.btmodem=IF820; interfaces|=BT_LINK; }   // IF820 auf detbaud erkannt
- if (fp.btmodem==IF820)                 // erkannt -> Laird/RN4678-Kaskade ueberspringen
- {
-  pin=atoi(fp.serno+4);                 // letzte 4 Digits der Seriennummer
-  if (isdigit(fp.serno[0]) && pin) fp.btpin=atoi(fp.serno)*10000+pin;  // 6-stellige App-Layer-PIN (wie RN4678)
-  put2str(T_bt,T_if820); putstr(T_dpkt); putnumber(IF820_BAUD,0); newline();
-  bt_command(T_dis,T_disok,500); osDelay(300);   // evtl. noch offene SPP-Verbindung sauber schliessen (CYSPP-HIGH beendet sie nicht)
-  if (detbaud!=IF820_BAUD) bt_set_flowcontrol();  // Werks-Baud erkannt -> auf Zielbaud umstellen + sichern
-  bt_ensure_flowcontrol();              // generisch: RTS/CTS sicherstellen (Query+Set+Verify)
-  bt_ensure_name();                     // generisch: BT-Name VIASIS_<serno> sicherstellen
-  bt_show_name();                       // aktuellen BT-Namen vom Modul auslesen + anzeigen
-  bt_release();                         // CYSPP loslassen (Eingang) -> bereit fuer naechste Verbindung
-  uart1_release(MUX_BT);
-  connect=concpy;
-  osDelay(10);
-  clear_comchange();
-  return;
+  // --- Erkennung B: sonst Werks-/Fehlzustand -> Baud-Scan OHNE CTS ---
+  if (!detbaud)
+  {
+   static const uint32_t bdscan[] = { IF820_FACTORY_BAUD, IF820_BAUD, 921600, 307200, 230400, 9600 };
+   uchar k;
+   cts_bypass=1;                        // Werksmodul (F=00) -> ohne CTS-Handshake senden
+   bt_msg(" Detection: baud scan without CTS (factory module)");
+   for (k=0; k<sizeof(bdscan)/sizeof(bdscan[0]); k++)
+    if (bt_scan_ping(bdscan[k])) { detbaud=bdscan[k]; break; }
+  }
+
+  if (detbaud)                          // === IF820 gefunden ===
+  {
+   fp.btmodem=IF820; interfaces|=BT_LINK;
+   pin=atoi(fp.serno+4);
+   if (isdigit(fp.serno[0]) && pin) fp.btpin=atoi(fp.serno)*10000+pin;  // 6-stellige App-Layer-PIN
+   bt_msgnum(" -> IF820 found at baud ",detbaud);
+   put2str(T_bt,T_if820); putstr(T_dpkt); putnumber(IF820_BAUD,0); newline();
+   bt_command(T_dis,T_disok,500); osDelay(300);          // evtl. offene SPP-Verbindung schliessen
+
+   // --- Schritt 1/2: Baud 460800 + Flow Control F=01 (STU setzt beides gemeinsam) ---
+   if (detbaud!=IF820_BAUD || bt_get_flowcontrol()!=1)
+   {
+    bt_msg(" Step 1/2: set baud 460800 + flow control F=01");
+    if (bt_set_flowcontrol()) bt_msg("   set and saved to flash (/SCFG)");
+    else                      bt_msg("   ERROR while setting/saving");
+    changed=1;
+    cts_bypass=0;                       // Modul ist jetzt F=01 -> ab hier Handshake
+   }
+   else bt_msg(" Step 1/2: baud 460800 + F=01 already ok");
+   cts_bypass=0;                        // Name/Verifikation immer mit Handshake
+
+   // --- Schritt 3: Geraetename VIASIS_<serno> ---
+   if (bt_get_name()==1) bt_msg(" Step 3: name already correct");
+   else
+   {
+    bt_msg(" Step 3: write name VIASIS_<serno>");
+    if (bt_set_name()) { changed=1; bt_msg("   name set"); }
+    else               { dtcerr(DTC_BT_NAME_SET); newline(); }
+   }
+
+   // --- Schritt 4: nur bei Aenderung speichern/rebooten + verifizieren ---
+   if (changed)
+   {
+    bt_msg(" Step 4: change -> reboot (/RBT) + verify");
+    bt_reboot();                        // Reboot: F=01 aus Flash, Classic-Name live (wartet auf Boot)
+    cts_bypass=0;
+    { uchar v; result=0;               // Modul braucht nach Reboot Anlaufzeit -> mehrere Versuche
+      for (v=0; v<4 && !result; v++)
+      { Init_BT_ch(IF820_BAUD); bt_command(T_CR,T_pingok,-60);
+        result=bt_command(T_ping,T_pingok,300);
+        if (!result) { bt_msg("   waiting for module after reboot..."); osDelay(400); } } }
+    if (!result)                        // nach mehreren Versuchen keine Antwort -> echter Fehler
+    {
+     newline(); dtcerr(DTC_BT_UART_INIT); newline();   // F11009 CTS/RTS pruefen
+     fp.btmodem=0; connect&=~(UART1|BT_LINK);
+     bt_release(); uart1_release(MUX_BT); connect=concpy; clear_comchange(); return;
+    }
+    bt_msg("   verify after reboot OK");
+   }
+   else bt_msg(" Step 4: nothing changed -> done (no save/reboot)");
+
+   bt_show_name();
+   bt_release(); uart1_release(MUX_BT); connect=concpy; osDelay(10); clear_comchange();
+   bt_msg("BT init done: IF820, 460800, F=01");
+   return;
+  }
+  bt_msg(" -> no IF820 found");
+  cts_bypass=0;                         // kein IF820 -> Legacy-Fallback (Laird/RN4678)
  }
  bt_release();          // CYSPP sicher als Eingang (falls Reconfig Command-Mode erzwang, IF820 aber nicht erkannt)
+ bt_msg(" Fallback: no IF820 -> quick Laird/RN4678 detection");
  // === Ende IF820-Erkennung; sonst weiter mit Laird/RN4678 ===
  if (!Init_BT_ch(460800)) 							// Konfiguriere uart1 und setze MUX Kanal auf BT modem, Abbruch bei CTS hi
  { newline(); dtcerr(DTC_BT_UART_INIT); return; }	 // putnumber(FIO2PIN,0x80);
@@ -284,14 +447,14 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 	 result=bt_command(T_F1,T_OKNZ,300);	// Sende AT&F1 - Reset auf Werkseinstellung, 
    if (result)	break;									// OK erhalten?
    connect=UART0;
-   newline();														// Neue Zeile für nächstes Kommandos		
+   newline();														// Neue Zeile fï¿½r nï¿½chstes Kommandos		
 	 if      (retry==3) { Init_UART1 (115200); putnumber(115200,0); newline(); }	// teste 115200 Baud
 	 else if (retry==2) { Init_UART1 (9600);   putnumber(9600,0);   newline(); }	// teste 9600 Baud
 	 else if (retry==1) { Init_UART1 (307200); putnumber(307200,0); newline(); }	// teste 307200 Baud
 	 connect=UART1;															// Nur an UART1 senden
 	 putstr(T_AT);															// Sende AT\r um Modul AT Parser zurueckzusetzen
 	 connect=concpy;														// Verbindung wiederherstellen
-	 osDelay(300);															// Warte auf Modul-Antwort (OK oder ERROR)
+	 osDelay(150);															// Warte kurz auf Modul-Antwort (OK oder ERROR)
 	 bxi=rxi;																		// Empfangspuffer leeren
   }	
 	
@@ -311,7 +474,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
   } // end if Antwort erhalten 
  
   if (result>0) {  													// Laird, weiter mit hoher Baudrate	
-   if (bt_command(T_S502,T_OKNZ,100)) {			// Sende ATS502=1, Authentifizierung für eingehende Verbindungen
+   if (bt_command(T_S502,T_OKNZ,100)) {			// Sende ATS502=1, Authentifizierung fï¿½r eingehende Verbindungen
     if (bt_command(T_S504,T_OKNZ,100)) { 		// Sende ATS504=1, Autoresponse, suppress messages
 		 if (bt_command(T_S507,T_OKNZ,100)) { 	// Sende ATS507=2, do not scan for ^^^ local mode ESC sequence
 		  if (bt_command(T_S508,T_OKNZ,100)) {	// Sende ATS508=1000,	page scan interval 1 sec.
@@ -340,7 +503,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
        } } } } } } // end if result>0 			 
 			 
   if (result>0) {	
-	 if (bt_command(T_S514,T_OKNZ,100)) {			// Setze Timeout Verbindungsschlüssel auf 60s, OK erhalten?	
+	 if (bt_command(T_S514,T_OKNZ,100)) {			// Setze Timeout Verbindungsschlï¿½ssel auf 60s, OK erhalten?	
 	  if (bt_command(T_S512,T_OKNZ,100)) {		// Sende ATS512=4 Modem sicht- und verbindbar, OK erhalten?
      if (bt_command(T_S538,T_OKNZ,100)) {		// Sende ATS538=1 Sichere last pairing in data base, OK erhalten?		 
 		  if (bt_command(T_ATW,T_OKNZ,1000)) { 	// Sende AT&W - sichere Parameter, OK erhalten?
@@ -351,8 +514,9 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 				interfaces|=BT_LINK;								// BT interface ist aktiv	
 				} } } } } } // end if result>0
  
-  if (fp.btmodem==0)												// Kein Laird erkannt -> prüfen ob RN4678 vorhanden
+  if (fp.btmodem==0)												// Kein Laird erkannt -> prï¿½fen ob RN4678 vorhanden
 	{
+	 dtcerr(DTC_BT_LAIRD_NF); newline();   // I11016 (Info: kein Laird gefunden)
 	 if (Init_BT_ch(115200)) 									// CTS noch low?
    {
 		put2str(T_bt,T_rn4678);														// "Bluetooth Micro" Modultyp ausgeben
@@ -363,11 +527,11 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 		 result=bt_command(T_$,T_cmdp,10300);	// Sende $$$, warte 300ms auf CMD> prompt 
      if (result)	break;																							// CMD> erhalten? 
 		 connect=UART0;
-		 newline();																																// Neue Zeile für nächstes Kommandos	
+		 newline();																																// Neue Zeile fï¿½r nï¿½chstes Kommandos	
 		 if      (retry==3) { Init_UART1 (9600);   putnumber(9600,0);   newline(); }	// teste 9600 Baud
 		 else if (retry==2) { Init_UART1 (307200); putnumber(307200,0); newline(); }	// teste 307200 Baud
 		 else if (retry==1) { Init_UART1 (460800); putnumber(460800,0); newline(); }	// teste 460800 Baud
-		 osDelay(500);															// Silence gap fuer $$$ Kommandomodus Erkennung
+		 osDelay(250);															// Silence gap fuer $$$ Kommandomodus Erkennung
 		 bxi=rxi;																		// Empfangspuffer leeren
 		}
 		
@@ -427,11 +591,11 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  connect=concpy;												// Verbindungszustand wieder herstellen
  osDelay (10);													// Warte auf Satzsteuerzeichen hinter letztem Ok 		
  clear_comchange ();										// Bereinige Schnittstellenwechsel
- if (fp.btmodem==0) { newline(); dtcerr(DTC_BT_NOT_CONFIGURED);	// Konfigurationsfehler oder nicht da
+ if (fp.btmodem==0) { newline(); dtcerr(DTC_BT_RN_NF); newline(); dtcerr(DTC_BT_NOT_CONFIGURED);	// I11017 + F11010
 	 newline(); }
 }	
 
-bool test_BT	(void)							// Prüfe ob BT Modul antwortet
+bool test_BT	(void)							// Prï¿½fe ob BT Modul antwortet
 {
  bool result=FALSE;
  uint32_t baud=BT_BAUD;																// Baudrate BT
@@ -439,10 +603,12 @@ bool test_BT	(void)							// Prüfe ob BT Modul antwortet
 
  if (fp.btmodem==IF820)                       // IF820: Lebenstest per /PING
  {
-  if (Init_BT_ch(baud)) result=bt_command(T_ping,T_pingok,300);
+  if (Init_BT_ch(baud))                       // Parser leeren (kalter Erst-Ping) + ein Retry
+  { bt_command(T_CR,T_pingok,-60);
+    result=bt_command(T_ping,T_pingok,300);
+    if (!result) result=bt_command(T_ping,T_pingok,300); }
   uart1_release(MUX_BT);
-  if (!result) puterror(DTC_BT_PING,-1);
-  return(result);
+  return(result);                             // KEIN puterror: Boot-Lebenstest; echten Fehler meldet init_bluetooth (F11005)
  }
  if (Init_BT_ch (baud))									// Konfiguriere uart1 und setze MUX Kanal auf BT modem
  {
@@ -451,23 +617,60 @@ bool test_BT	(void)							// Prüfe ob BT Modul antwortet
 	 result=bt_command(T_$,T_cmdp,0);									// Sende $$$, warte auf CMD> prompt		
 	 if (result) result = bt_command(T_min,T_end,0);	// Return to data mode	
 	}
-	else result=bt_command(T_AT,T_OKNZ,0);			// Laird - Sende AT - OK erhalten? -> TRUE Rückgabe
+	else result=bt_command(T_AT,T_OKNZ,0);			// Laird - Sende AT - OK erhalten? -> TRUE Rï¿½ckgabe
  } // end if Init_BT_ch
  uart1_release(MUX_BT);														// Release UART1
  if (!result) puterror (DTC_BT_AT_FAIL,-1);	// Fehlermeldung
  return(result);
 }	
 
+// IF820-Abfrage: Kommando senden, KOMPLETTE Roh-Antwort ans Terminal, RX-Puffer danach leeren.
+// Wichtig: feste Wartezeit statt Echo-Match (bt_command matcht sonst das Echo und laesst die
+// eigentliche @R-Antwort im Puffer -> Bytes landen als Tastendruck im Menue -> Menue rast durch).
+static void bt_query_show (char *cmd)
+{
+ char buf[128]; int n=0, i; uchar cc; uint deadline;
+ cc=connect; connect=concpy & ~UART1;                     // "> gesendet" nur ans Terminal (ohne CR)
+ newline(); putstr("  > ");
+ for (i=0; cmd[i] && cmd[i]!='\r' && cmd[i]!='\n'; i++) putc(cmd[i]);
+ connect=cc;
+ osDelay(2); bxi=rxi;                                     // alten Pufferinhalt verwerfen
+ cc=connect; connect=UART1; putstr(cmd); connect=cc;      // Kommando NUR ans Modul
+ deadline=mstimer+400;                                    // feste Antwortzeit (keine Echo-Abhaengigkeit)
+ while ((int)(deadline-mstimer)>0)
+ { ResetWDT();
+   while (bxi!=rxi && n<(int)sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+   osThreadYield();
+ }
+ buf[n]=0;
+ cc=connect; connect=concpy & ~UART1;                     // "< empfangen" nur ans Terminal
+ putstr("  < ");
+ if (!n) putstr("(no response)");
+ else for (i=0; i<n; i++) if (buf[i]>=32 && buf[i]<127) putc(buf[i]);
+ newline(); connect=cc;
+ bxi=rxi;                                                 // Rest sicher verwerfen -> keine Bytes ins Menue
+}
+
 void send_bt_info (void)							// Bluetooth Informationen ausgeben
-{	
+{
  bool result=FALSE;
  uint32_t baud=BT_BAUD;
- 
 
- if (fp.btmodem==IF820)                       // IF820: Basis-Info ausgeben
+
+ if (fp.btmodem==IF820)                       // IF820: Firmware-Version + Einstellungen abfragen
  {
-  if (Init_BT_ch(baud)) result=bt_command(T_ping,T_pingok,300);
-  if (result) { put2str(T_bt,T_if820); newline(); }
+  if (Init_BT_ch(baud)) result=bt_command(T_ping,T_pingok,300);   // Lebenszeichen (Command-Mode noetig)
+  if (result)
+  {
+   newline(); put2str(T_bt,T_if820); newline();                   // "BT: IF820"
+   bt_query_show(T_qfv);                                          // Firmware/Stack/Protokoll/HW (E=/S=/P=/H=)
+   bt_query_show(T_gtu);                                          // UART: Baud (B=), Flow Control (F=01/00), 8N1
+   bt_query_show("GDN,T=00\r");                                   // BLE-Name  (N=VIASIS_<serno>_BLE)
+   bt_query_show("GDN,T=01\r");                                   // Classic-Name (N=VIASIS_<serno>)
+   bt_query_show(T_gba);                                          // Bluetooth MAC-Adresse (A=)
+   bt_query_show(T_cypget);                                       // CYSPP-Parameter (E=enable,G=role,C=,L=,R=,M=)
+  }
+  osDelay(50); bxi=rxi;                                           // finaler Flush: keine Modulbytes ins Menue
   uart1_release(MUX_BT);
   if (!result) puterror(DTC_BT_PING,-1);
   return;
@@ -516,7 +719,7 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
 			putln(T_btlst);											// Text "Trusted device list... 
 			result=bt_command(T_BTT, T_OKNZ, -500);	
 			if (result) 
-				if (ja(T_dellst)>0)											// Abfrage "Liste löschen?"
+				if (ja(T_dellst)>0)											// Abfrage "Liste lï¿½schen?"
 					result=bt_command(T_BTDM, T_OKNZ, 0);	// Clear trusted device list
 	   } } } } }
  newline();	
@@ -537,7 +740,7 @@ void set_bt_name (void)							// Setze Bluetooth device (friendly) name
  else { maxlen=40; baud=BT_BAUD; }																// Laird 40 characters
 	
  put2str(T_btname,T_ist);
- result=getline(btnamebuf,maxlen,'a');			// Abfrage Bluetooth Gerätename
+ result=getline(btnamebuf,maxlen,'a');			// Abfrage Bluetooth Gerï¿½tename
  if (result>0) 															// Eingabe erfolgt?				
  {
 	Init_BT_ch (baud);												// Konfiguriere uart1 und setze MUX Kanal auf BT modem 				
@@ -631,7 +834,7 @@ void set_bt_pin (void)							// Setze Pinnummer
 			connect=UART1; 
 			putstr (T_sr1);											// Reboot Command
 		  osDelay(1000);											// Warte 1s	
-		  fp.btpin=pin;												// PIN übernehmen		
+		  fp.btpin=pin;												// PIN ï¿½bernehmen		
 		  result=bt_command(T_$,T_cmdp,0);		// Sende $$$, warte auf CMD> prompt	
 			if (result) result = bt_command(T_min,T_end,0);	// Gehe in Datenmodus, END Nachricht erhalten? 			
 		 }	// end if Reboot 	
@@ -644,7 +847,7 @@ void set_bt_pin (void)							// Setze Pinnummer
 		putnumber(pin,0xC4);										// Pinnummer 4 digits senden 		
 	 	putc('"');															// Abschluss Pinnummer
 		result=bt_command (T_CR, T_OKNZ, 0); 		// Kommandoabschluss, warte auf OK Antwort
-    if (result) fp.btpin=pin;								// PIN übernehmen		 
+    if (result) fp.btpin=pin;								// PIN ï¿½bernehmen		 
    }		 
   }	// end if Init_BT_ch	
 	

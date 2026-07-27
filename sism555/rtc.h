@@ -21,6 +21,23 @@
 
 static const char TimeDateMask[] =  {5,6,6,5,4,12};
 
+
+// Zeitsynchronisation - Quellen-IDs (Identitaet + Anzeige)
+#define SRC_NONE    0
+#define SRC_MANUAL  1
+#define SRC_LTE     2
+#define SRC_GPS     3
+#define SRC_MQTT    4
+// clock_set() Flags
+#define CLK_FROM_UTC   0x01   // Eingabe ist UTC -> +fp.utc auf Lokalzeit
+#define CLK_SET_UTC    0x02   // Quelle liefert UTC-Offset -> fp.utc setzen
+#define CLK_FORCE      0x04   // manuell ausgeloest: Rang/Drift/Auto-Aus ignorieren
+#define RESYNC_STUNDEN 12     // schwaechere Quelle darf erst nach 12 h nachziehen
+// Info-Ereigniscodes Zeitsync (System 17, Typ I)
+#define EV_TIME_MQTT   17050
+#define EV_TIME_GPS    17051
+#define EV_TIME_LTE    17052
+#define EV_TIME_MANUAL 17053
 /* Funktionen extern bereit stellen */
 extern void RTC_IRQHandler (void);													// RTC-Interrupt jede Sekunde
 extern void InitRTC (void);																	// Initialisierung der Echtzeituhrvoid 
@@ -36,4 +53,10 @@ extern void zeitumstellung (void);													// Prüfe und führe Sommer-Winterz
 extern uint minutenwert (char *buf);												// Pufferzeit hh:mm in Minuten umrechnen
 extern uchar Aufgabenzeit (void);							// Prüfe ob aktuelle Zeit und Tag Mess- oder GSM Einschaltzeit ist
 
+extern uchar clock_set (uchar dd, uchar mm, uint yyyy, uchar hh, uchar mi, uchar ss,
+                        int8_t utc_off, uchar src, uchar flags); // zentrale Zeitsync
+extern uchar g_timesrc;                                     // aktuelle Zeitquelle
+extern uint  g_timesync_h;                                  // fp.hcount letzter Abgleich
+extern const char *time_source_text (void);                // Klartext Zeitquelle
+extern void clock_mark_manual (void);                       // manuelle Eingabe vermerken
 #endif /*RTC_H_*/

@@ -111,3 +111,10 @@ Code;Typ;Subsystem;Kurztext;Ursache;Abhilfe;SeitVersion;Status
 800;F;Legacy;MQTT communication;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
 1000;F;Legacy;Parameter initialisation;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
 1001;F;Legacy;illegal parameter definition;Alt-Code aus Bestands-Firmware;siehe neuen Code im Subsystem;alt;veraltet
+17050;I;System;Zeit via Backend;RTC vom Backend/MQTT gestellt;-;5.13;aktiv
+17051;I;System;Zeit via GPS;RTC aus GPS-Zeit (RMC) gestellt;-;5.13;aktiv
+17052;I;System;Zeit via Netz;RTC aus LTE-Netzzeit (NITZ) gestellt;-;5.13;aktiv
+17053;I;System;Zeit manuell;RTC manuell im Menue gestellt;-;5.13;aktiv
+11015;W;Bluetooth;CTS Timeout;CTS blieb High beim Senden (Flow-Control-Verdrahtung falsch/vertauscht oder Modul aus);RTS/CTS gekreuzt verdrahten, Modul-Versorgung pruefen;5.14;aktiv
+11016;I;Bluetooth;Laird-Modul nicht erkannt;Fallback-Erkennung: kein Laird BT730 auf den Testbaudraten;Normal auf IF820-Geraet; nur relevant bei Laird-Hardware;5.25;aktiv
+11017;I;Bluetooth;RN4678-Modul nicht erkannt;Fallback-Erkennung: kein RN4678 gefunden;Normal auf IF820-Geraet; nur relevant bei RN4678-Hardware;5.25;aktiv

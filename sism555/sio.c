@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 //  FILE: sio.c			PROJECT: sis3000M
 //-----------------------------------------------------------------------------
-//  COMMENTS:  Serielle Ein-/Ausgabe Routinen für LPC1766
+//  COMMENTS:  Serielle Ein-/Ausgabe Routinen fï¿½r LPC1766
 //-----------------------------------------------------------------------------
 //  HARDWARE:   sis3003-MB, version H2
 //-----------------------------------------------------------------------------
@@ -26,6 +26,11 @@
 #include "rl_usb.h"
 #include "dtc_text.h"	// generierte Code->Typ/Kurztext-Tabelle (aus Diagnose-Codes.csv)
 
+#define CTS_WAIT_MS 50           // max. Wartezeit auf CTS-LOW je Byte (ms) - bounded, kein Dauerhang
+volatile uchar cts_timeout=0;    // gesetzt in putb(), wenn CTS-Wait ablaeuft (Flow-Control/Verdrahtung)
+volatile uchar cts_bypass=0;     // 1 = CTS-Handshake ueberspringen (Bring-up/Werksmodul F=00; siehe init_bluetooth)
+volatile uchar bt_tx_stuck=0;    // Zaehler: TX-FIFO-Wait (THRE) lief in Timeout -> Sender steckt
+
 int redirect_char_Out (int (*pchar_func)(int a)) // Umleitung Standard Ausgabe
 {																									// Must be once called before 
 																									// use of serial character I/O
@@ -45,22 +50,26 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
  } 
  if (connect&UART1) 						// Schnittstelle UART 1 - Terminal aktiviert  	
  {
-	while (FIO2PIN & CTS)					// Wait for CTS LOW (modem ready to receive)
-  {
-	 if (WDTV<1000)								// Abbruch 1ms vor Watchdog reset
+	if (!cts_bypass)                         // Bring-up/Werksmodul (F=00): CTS-Handshake ueberspringen
+	{ uint _ct0=mstimer;                     // CTS-Wartezeit begrenzen (Flow-Control/Verdrahtung)
+	 while (FIO2PIN & CTS)                    // Wait for CTS LOW (Modem empfangsbereit)
 	 {
-		ResetWDT();								
-		return(-1);								
-	 }		 
-	}	
+	  if ((uint)(mstimer-_ct0) >= CTS_WAIT_MS) { cts_timeout=1; return(-1); } // CTS bleibt High -> Flag + Abbruch
+	  if (WDTV<1000) { ResetWDT(); return(-1); }                             // Sicherheitsnetz Watchdog
+	  osDelay(1);                            // WICHTIG: Taskwechsel zulassen -> kein System-Freeze bei BT-Backpressure (kein Busy-Spin)
+	 }
+	}
+	{ uint _tt=mstimer;                    // TX-FIFO-Wait begrenzen (kein Dauerhang)
 	while (!(U1->LSR & THRE)) 		// Warte UART1 Transmitter FIFO leer?
   {
+	 if ((uint)(mstimer-_tt)>=50) { bt_tx_stuck++; return(-1); }   // THRE haengt >50 ms -> Sender steckt
 	 if (WDTV<1000)								// Abbruch 1ms vor Watchdog reset
 	 {
 		ResetWDT();								
 		return(-1);								
 	 }		 
 	}	
+	}
   U1->THR = ch;									// dann sofort senden 
  }	
  if (connect&UART2)	// Schnittstelle UART 2 - GPS Ausgabe  	
@@ -86,10 +95,10 @@ void putc(int c)			// send a character/byte to the current output device
 
 int putcbuf (int ch) { cbuf[cind++]=ch; return(1); }	// Zahl in Zeichenpuffer kopieren
 
-/* int putbm10 (int ch)	// Byte an M10 Quecktel mit Zeitüberwachung senden
+/* int putbm10 (int ch)	// Byte an M10 Quecktel mit Zeitï¿½berwachung senden
 {	
  uchar retry=5;									// Gesamttimeout 5 * XMODEM_BLOCK_TIMEOUT	
- msdelay=XMODEM_BLOCK_TIMEOUT;	// Langer Timeout wg. GPRS Übertragungspausen	
+ msdelay=XMODEM_BLOCK_TIMEOUT;	// Langer Timeout wg. GPRS ï¿½bertragungspausen	
 	
  while (!(U1->LSR & THRE)) {		// Warte UART1 Transmitter FIFO leer? 
 	if (!msdelay) 								// nach XMODEM_BLOCK_TIMEOUT
@@ -105,43 +114,43 @@ int putcbuf (int ch) { cbuf[cind++]=ch; return(1); }	// Zahl in Zeichenpuffer ko
 
 int getkey (uint wartezeit) 		// Warteschleife, Abbruch bei Zeichenempfang
 {
- msdelay = wartezeit;						// Abwärtszähler laden
+ msdelay = wartezeit;						// Abwï¿½rtszï¿½hler laden
  
  while (bxi==rxi)	// Solange kein Zeichenempfang
  {	 
   if (wartezeit)
   {
    if  (!msdelay) return (-1); 			// Kein Zeichen in Wartezeit empfangen
-   if (comchange) return (0);				// Abbruch Änderung Kommunikationsstatus
+   if (comchange) return (0);				// Abbruch ï¿½nderung Kommunikationsstatus
   }
   if ((connect&MQTT_LINK)&&(mqtt_com>1)) break;	
 	osDelay(1);
  }
- return (1);		// Rückgabe Zeichen empfangen  
+ return (1);		// Rï¿½ckgabe Zeichen empfangen  
 } 
 
-uchar getkey1 (void)						// Rückgabe Vergleich Empfangspuffer Indizes UART1
+uchar getkey1 (void)						// Rï¿½ckgabe Vergleich Empfangspuffer Indizes UART1
 {
- if (rxi==bxi) return(0);				// Kein Zeichenempfang, Rückgabe falsch
- else return (1);								// Zeichenempfang, Rückgabe wahr
+ if (rxi==bxi) return(0);				// Kein Zeichenempfang, Rï¿½ckgabe falsch
+ else return (1);								// Zeichenempfang, Rï¿½ckgabe wahr
 }	
 
-uchar getkey2 (void)						// Rückgabe Vergleich Empfangspuffer Indizes UART2
+uchar getkey2 (void)						// Rï¿½ckgabe Vergleich Empfangspuffer Indizes UART2
 {
- if (rx2==bx2) return(0);				// Kein Zeichenempfang, Rückgabe falsch
- else return (1);								// Zeichenempfang, Rückgabe wahr
+ if (rx2==bx2) return(0);				// Kein Zeichenempfang, Rï¿½ckgabe falsch
+ else return (1);								// Zeichenempfang, Rï¿½ckgabe wahr
 }
 
 int getbyte (uint wartezeit)		// Warte auf Zeichen von UART(s)
 {
- msdelay = wartezeit;						// Abwärtszähler laden
+ msdelay = wartezeit;						// Abwï¿½rtszï¿½hler laden
 		 
 	while (bxi==rxi)								// Warte auf Zeichen
 	{
 	 if (wartezeit) 						    // Wartezeit definiert?
 	 {	 
 	  if  (!msdelay) return (-1); 			// Abbruch nach Wartezeit
-		else if (comchange) return (-1);	// Abbruch Änderung Kommunikationsstatus 
+		else if (comchange) return (-1);	// Abbruch ï¿½nderung Kommunikationsstatus 
 	 }	 
 	 else if (!msdelay)							// ohne Wartezeit
 	 {
@@ -151,11 +160,11 @@ int getbyte (uint wartezeit)		// Warte auf Zeichen von UART(s)
 	 osThreadYield(); 
   }
 	
- return (rbuf[++bxi]);				// Bearbeitungsindex erhöhen und Rückgabe
+ return (rbuf[++bxi]);				// Bearbeitungsindex erhï¿½hen und Rï¿½ckgabe
 }
 
 int waitcms (uint wartezeit, char c)	// Warte ms lang auf Zeichen
-{																			// Übergaben: wartezeit - in ms	
+{																			// ï¿½bergaben: wartezeit - in ms	
 																			//				c	-	Zeichen, 0 alle Zeichen
  msdelay=wartezeit;				
  while (msdelay)
@@ -177,45 +186,45 @@ int getc (uint timeout)				// Warte auf Eingaben von UART(s)
  ResetWDT();									// Watchdog reset	
  //comchange=0;								// ignoriere vorhergehenden Schnittstellenwechsel
  bxi=rxi;											// reset evtl. vorhandene Pufferzeichen
- return (getbyte(timeout));		// Rückgabe Zeichen oder Fehler (<=0)				
+ return (getbyte(timeout));		// Rï¿½ckgabe Zeichen oder Fehler (<=0)				
 }
 
 
 void newline (void) { putc('\n'); }													// neue Zeile 
 void space (int anz) { while (anz--) putc(' '); } 					// Anzahl Leerzeichen ausgeben
 void delchar (uchar anzahl) { while(anzahl--) putc(BS); } 	// Ausgabe Anzahl Delete Character
-void itemno (uchar i) { putc(i); putc ('.'); putc (' '); }	// Menünummer ausgeben
+void itemno (uchar i) { putc(i); putc ('.'); putc (' '); }	// Menï¿½nummer ausgeben
 
-int is_CRLF (int c) // Prüft ob Zeichen Carriage return oder Line Feed
-{					   				// Übergabe: c - Zeichen
+int is_CRLF (int c) // Prï¿½ft ob Zeichen Carriage return oder Line Feed
+{					   				// ï¿½bergabe: c - Zeichen
  if (c==CR) return (1);
  if (c==LF) return (1);
  return (0);	// weder noch
 }
 
-text * sprachauswahl (text *s)	// Setzt Zeiger auf gewählte Ausgabesprache
-{																// Durchsuche String bis '\f' der gewählten Sprachnummer
+text * sprachauswahl (text *s)	// Setzt Zeiger auf gewï¿½hlte Ausgabesprache
+{																// Durchsuche String bis '\f' der gewï¿½hlten Sprachnummer
  uchar i = fp.sprache;			// Laufvariable Sprachnummer
 
- if (i>ANZSPRACHEN-1) i=0;	// Ungültiger Zeiger
+ if (i>ANZSPRACHEN-1) i=0;	// Ungï¿½ltiger Zeiger
 
  if (*s=='\0') return(s);		// Leere Zeichenkette -> Abbruch
  else if (*s=='\f')					// Mehrsprachiger Text?
  {
-  while (i) { do s++; while (*s!='\f'); i--; }	// Durchsuche String bis '\f' der gewählten Sprachnummer
-  s++; 											// Zeiger auf Anfang Teilzeichenkette der gewählten Sprache
+  while (i) { do s++; while (*s!='\f'); i--; }	// Durchsuche String bis '\f' der gewï¿½hlten Sprachnummer
+  s++; 											// Zeiger auf Anfang Teilzeichenkette der gewï¿½hlten Sprache
  }	 	
- return (s);								// Rückgabe Zeiger auf gewählte Sprache
+ return (s);								// Rï¿½ckgabe Zeiger auf gewï¿½hlte Sprache
 }
 
-void putstr(text * s)			// Stringausgabe für null terminierte Strings
-{													// Übergabe Zeiger auf String, Rückgabe Anzahl Ausgabezeichen
+void putstr(text * s)			// Stringausgabe fï¿½r null terminierte Strings
+{													// ï¿½bergabe Zeiger auf String, Rï¿½ckgabe Anzahl Ausgabezeichen
 	
  s=sprachauswahl(s);			// Setzt Zeiger auf Ausgabesprache	
 	
  while (*s)								// Ausgabe bis Nullterminierung
  {
-  if (*s=='\f') break;		// nächste Teilzeichenkette (=Sprache) erreicht
+  if (*s=='\f') break;		// nï¿½chste Teilzeichenkette (=Sprache) erreicht
   putc(*s++);							// Zeichen- oder Teilzeichenkette ausgeben
  }
 }
@@ -230,7 +239,7 @@ void putstrCR(text * s)		// Gibt String bis CR oder Terminierung aus
 }
 
 uchar putxchr (text *s, uchar anz)		// Stringausgabe - Anzahl Zeichen
-{																			// Übergaben: 	*s - Zeiger auf String
+{																			// ï¿½bergaben: 	*s - Zeiger auf String
 																			// 							anz - Anzahl Ausgabezeichen
  uchar send=0;												// Anzahl Ausgabezeichen
 
@@ -238,12 +247,12 @@ uchar putxchr (text *s, uchar anz)		// Stringausgabe - Anzahl Zeichen
 
  while (send<anz)											// Anzahl Zeichen ausgeben
  {
-  if ((*s=='\f')|(*s=='\0')) break;		// nächste Teilzeichenkette (=Sprache) erreicht
+  if ((*s=='\f')|(*s=='\0')) break;		// nï¿½chste Teilzeichenkette (=Sprache) erreicht
   putc(*s++);													// Zeichen- oder Teilzeichenkette ausgeben 
 	send++; 
  }
  
- return (send);					 	// Rückgabe Anzahl ausgegebender Zeichen
+ return (send);					 	// Rï¿½ckgabe Anzahl ausgegebender Zeichen
 }
 
 
@@ -251,11 +260,11 @@ void put2str(text * s1, text *s2) 	// Zwei Textstrings ausgeben
 { putstr (s1); putstr (s2);	}
 
 void putmstr (text * const strings[]) // Ausgabe Textstringfolge
-{								// Übergabe strings - Zeigerarray auf Strings
+{								// ï¿½bergabe strings - Zeigerarray auf Strings
  uchar ind=0;
  text *s;
  while (1) 
- { s=strings[ind++];		// Zeichenkette zuweisen, Arrayindex erhöhen 
+ { s=strings[ind++];		// Zeichenkette zuweisen, Arrayindex erhï¿½hen 
    if (*s=='\0') break;		// Abbruch bei Leerzeichenkette
    putstr (s++); 			// Ausgabe Zeichenkette
  }
@@ -277,14 +286,14 @@ void putln_ifexist (text * s) // Stringausgabe - wenn Null Text "nicht gesetzt"
 void putqstr (text *qs)	{ putc('"');	putstr(qs); putc('"');	} // Sende Zeichenfolge in Hochkommas
 
 void putnumber(uint n, uchar format) 	// Formatierte Ganzzahlausgabe
-{										// Übergabe:	n		- Ausgabewert
+{										// ï¿½bergabe:	n		- Ausgabewert
 										// 				format 	- Bits D0..D5 Anzahl digits 0..32
-										//						  		D0..D5 = 0 -> variable Länge			
+										//						  		D0..D5 = 0 -> variable Lï¿½nge			
 			 							//	D7	D6		Ausgabe
-										//	0	0		dezimal führende Leerzeichen
-										//	1	1		dezimal führende Nullen
-										//	1	0		hexadezimal führende Nullen
-										//	0	1		binär führende Nullen	
+										//	0	0		dezimal fï¿½hrende Leerzeichen
+										//	1	1		dezimal fï¿½hrende Nullen
+										//	1	0		hexadezimal fï¿½hrende Nullen
+										//	0	1		binï¿½r fï¿½hrende Nullen	
 																					
  char *p, buf[33];						// Pointer auf und Ausgabepuffer max. 32 digits
  uint x=n;	
@@ -295,7 +304,7 @@ void putnumber(uint n, uchar format) 	// Formatierte Ganzzahlausgabe
 
  switch (format&0xC0)
  {
-  case 0x00:	padchar=' '; 			// führende Leerzeichen
+  case 0x00:	padchar=' '; 			// fï¿½hrende Leerzeichen
   case 0xC0:	break;						// dezimal
   case 0x80:	base=16;	break;	// hexadezimal
   case 0x40:	base=2;		
@@ -323,7 +332,7 @@ void putnumber(uint n, uchar format) 	// Formatierte Ganzzahlausgabe
  //if (base==16) {putb ('0'); putb('x');}
  while(*p) putc(*p++); 						// print the string right-justified
 
- if (base==2) putc('b');	 				// indiziere Binärzahl
+ if (base==2) putc('b');	 				// indiziere Binï¿½rzahl
  else if (base==16) putc('h');		// indiziere Hexadezimalzahl
 }
 
@@ -359,7 +368,7 @@ uchar getstr (char *buf, uchar n, uchar typ) // Zeichenkette einlesen
 			case 'a':
               if (isalpha(c))       	// ignore all except alphanumeric characters  
 							{      
-							 if ((c!='?')&&(c!=':'))  // ? und : wg. Menüsteuerung ausschließen
+							 if ((c!='?')&&(c!=':'))  // ? und : wg. Menï¿½steuerung ausschlieï¿½en
 								{
 								 putc (*Pb++ = c);       		// echo and store character       
 								 if (c=='\\') *(Pb-1)='\f';	// Erweiterung mehrsprachiger Text
@@ -389,18 +398,18 @@ uchar getstr (char *buf, uchar n, uchar typ) // Zeichenkette einlesen
  while (i < n);      					// check limit and line feed
  l=i;
  do *Pb++ = 0; while (l++ < n);  	// String termination and clear buffer
- return (i);											// Rückgabe Anzahl gelesener Zeichen
+ return (i);											// Rï¿½ckgabe Anzahl gelesener Zeichen
 }
 
 uchar getline (char *buf, uchar n, uchar typ) 	// Zeile einlesen
-{																// Übergaben: siehe getstr()
+{																// ï¿½bergaben: siehe getstr()
  uchar i=getstr (buf, n, typ); 	// Zeichenkette einlesen
  newline();											// neue Zeile
- return (i);										// Rückgabe Anzahl gelesener Zeichen
+ return (i);										// Rï¿½ckgabe Anzahl gelesener Zeichen
 }
 
-void readline(char *Ppar, uchar length, char type) 	// Lies Zeile, übernehme bei Eingabe
-{												 														// Übergaben: 	length - Pufferlänge 
+void readline(char *Ppar, uchar length, char type) 	// Lies Zeile, ï¿½bernehme bei Eingabe
+{												 														// ï¿½bergaben: 	length - Pufferlï¿½nge 
 																										//							type siehe getstr()
  int dummy;																// Hilfsvariable
  uchar pass=0;
@@ -411,14 +420,14 @@ void readline(char *Ppar, uchar length, char type) 	// Lies Zeile, übernehme bei
   if (!pass) putstr (Ppar);								// Bisherigen String ausgeben
   else putstr(T_stars);										// Passwortdummy senden
  }
- else if ((dummy==1)&&(cbuf[0]==' ')) *Ppar=0;			// String löschen
- else if (dummy>0) memcpy(Ppar,cbuf,length);			// Eingabe? Ja, mit Terminierung übernehmen
+ else if ((dummy==1)&&(cbuf[0]==' ')) *Ppar=0;			// String lï¿½schen
+ else if (dummy>0) memcpy(Ppar,cbuf,length);			// Eingabe? Ja, mit Terminierung ï¿½bernehmen
  newline();
 }
 
 int getmnumber (text * pk, uint min, uint max, uint multiple)	// Eingabeaufforderung und Variable einlesen
-{												// Übergabe min - kleinster zulässiger Wert
-												//			max - größter zulässiger Wert											
+{												// ï¿½bergabe min - kleinster zulï¿½ssiger Wert
+												//			max - grï¿½ï¿½ter zulï¿½ssiger Wert											
 												//			pk - Pointer auf nullterm. Zeichenkette
 												//			multiple - Eingabe muss Vielfaches von multiple sein
  uint anz=0;		// max. Anzahl digits einzulesen
@@ -434,26 +443,26 @@ int getmnumber (text * pk, uint min, uint max, uint multiple)	// Eingabeaufforde
   ziffern=getline(cbuf,anz,'d');		// Wert einlesen, Ergebnis 0 bei Keine Eingabe, Timeout
   if (ziffern) dummy=atoi(cbuf);		// ASCII in Puffer in HEX Wert wandeln
   else return(-1);									// Abbruch
- } while (dummy<min || dummy>max || (multiple && (dummy%multiple)));	// Bis zulässiger Wert eingegeben
- return (dummy);						// Rückgabe Eingabe
+ } while (dummy<min || dummy>max || (multiple && (dummy%multiple)));	// Bis zulï¿½ssiger Wert eingegeben
+ return (dummy);						// Rï¿½ckgabe Eingabe
 }
 
 int getnumber (text * pk, uint min, uint max) 	// Eingabeaufforderung und Variable einlesen
-{ return(getmnumber (pk, min, max, 0)); }		// Reduziert Übergabeaufwand, da KGV meist unbenutzt
+{ return(getmnumber (pk, min, max, 0)); }		// Reduziert ï¿½bergabeaufwand, da KGV meist unbenutzt
 
 int getuchar (text *pk, uchar min, uchar max, uchar* parameter)	// Unsigned char Parameter einlesen
-{																								// Übergaben * parameter - Zeiger auf Parameterwert
+{																								// ï¿½bergaben * parameter - Zeiger auf Parameterwert
  int wert;																			//			 andere siehe getnumber	()
  wert=getnumber (pk, min, max);									// Wert einlesen
  if (wert<0) return (-1);												// Kein Erfolg -> Abbruch
  *parameter=wert;																// Variablen zuweisen
- return (1); // Rückgabe Erfolg
+ return (1); // Rï¿½ckgabe Erfolg
 }
 
 void getsignedchar (text *p1, text *p2, int8_t min, int8_t max, int8_t* par)	// int8t einlesen
-{																								// Übergaben *p1	- Erster Textteil Parameter
+{																								// ï¿½bergaben *p1	- Erster Textteil Parameter
  uchar anz=0;																		//					 *p2	- Zweiter Textteil Parameter
- uchar wert;																		//				min,max - Zulässige kleinste/größte Eingabe
+ uchar wert;																		//				min,max - Zulï¿½ssige kleinste/grï¿½ï¿½te Eingabe
  int8_t sval;																		//						par - Zeiger auf zu lesenden Parameter
  uchar sign;	
  char *Ptr;	
@@ -464,7 +473,7 @@ void getsignedchar (text *p1, text *p2, int8_t min, int8_t max, int8_t* par)	// 
 	put2str (p1,p2);															// Parametertext ausgeben
 	putstr (T_ist);
   anz=getstr(cbuf,3,'-');												// 3 Zeichen - Ziffern und '-' lesen					 
-  if (anz)																			// Gültige Eingabe?
+  if (anz)																			// Gï¿½ltige Eingabe?
   {
 	 Ptr=cbuf;
    if (*Ptr=='-')	{ Ptr++; sign=1; }						// Negatives Vorzeichen
@@ -478,29 +487,29 @@ void getsignedchar (text *p1, text *p2, int8_t min, int8_t max, int8_t* par)	// 
      if ((sval>=min)&&(sval<=max)) { *par=sval;  break;}			 // Wert zuweisen und Ende
 	 }		 
   }						
- } while(anz);	// Solange (gültige) Eingabe	
+ } while(anz);	// Solange (gï¿½ltige) Eingabe	
 }	
 
-void put_menuitem (text *s, char item)	// Menüpunkt ausgeben
-{																				// Übergaben	s	-	Zeiger auf Menüpunkttext
-																				//				item - 	Menüpunktnummer
+void put_menuitem (text *s, char item)	// Menï¿½punkt ausgeben
+{																				// ï¿½bergaben	s	-	Zeiger auf Menï¿½punkttext
+																				//				item - 	Menï¿½punktnummer
  newline();									// Neue Zeile
- itemno(item);							// Menüpunktnummer
- putstr(s);									// Menüpunkttext
+ itemno(item);							// Menï¿½punktnummer
+ putstr(s);									// Menï¿½punkttext
 }
 
 void select (char bis, uchar zuruck)  	// Sendet "Ihre Auswahl .." an Terminal 
-{                          							// Übergabeparameter:	bis - ergänzt "Ihre Ausw..." 
-																				//						zuruck = 1 ergänzt MP zurueck  
+{                          							// ï¿½bergabeparameter:	bis - ergï¿½nzt "Ihre Ausw..." 
+																				//						zuruck = 1 ergï¿½nzt MP zurueck  
  
- if (zuruck) put_menuitem (T_zuruck,bis); // Menüpunkt ". zurück" senden
+ if (zuruck) put_menuitem (T_zuruck,bis); // Menï¿½punkt ". zurï¿½ck" senden
  newline();																// Leerzeile 
  putstr(T_ausw);													// "Ihre Auswahl 1 bis" senden
  putc(bis);        												// letzte Auswahlnummer
  putc('?');   														// Abschluss
 }
 
-int putmenu (text *s, char bis)	// Menüabfrage
+int putmenu (text *s, char bis)	// Menï¿½abfrage
 {
  int c;
 
@@ -509,16 +518,16 @@ int putmenu (text *s, char bis)	// Menüabfrage
  c=getc(TERMINAL_CHAR_TIMEOUT);		// Warte auf Zeichen max. 30 Sekunden
  if (isdigit(c)) putc(c);	  			// Zeichenecho
  else if (c=='R') { c=-1; }				// return
- else if (c=='H') { menu=0; c=-1; }	// Hauptmenüaufruf
+ else if (c=='H') { menu=0; c=-1; }	// Hauptmenï¿½aufruf
   
  newline();	newline();					// Neue Zeilen
 
- return(c);			// Eingabe zurück geben
+ return(c);			// Eingabe zurï¿½ck geben
 }
 
-int ja (text *s)				// Prüft Eingabe ob Ja oder Nein
-{ 	                    // da JA, NEIN länderspezifisch siehe Definition
-												// Übergaben: *s -Fragetext
+int ja (text *s)				// Prï¿½ft Eingabe ob Ja oder Nein
+{ 	                    // da JA, NEIN lï¿½nderspezifisch siehe Definition
+												// ï¿½bergaben: *s -Fragetext
  char c;	  						// Eingabe
  int result; 
  
@@ -571,7 +580,7 @@ const char * dtc_text (uint code, char *ptyp)
 void put_dtc (uint code)
 {
  char tp; const char *t = dtc_text(code,&tp);
- putc('F'); putnumber(code,0); putc(' ');
+ putc(t ? tp : 'F'); putnumber(code,0); putc(' ');
  putstr(t ? t : dtc_subsys(code));
 }
 
@@ -601,18 +610,18 @@ int puterror_dtc (uint dtc, int errorval)   /* Fehlermeldung und Nummer ausgeben
 }
 
 void putparameter (text *Ps, uint wert, uint format, text *Pu)	// Parameterwerte formatiert ausgeben
-{												// Übergaben	*Ps	-	Zeiger auf Parameterlabel 
+{												// ï¿½bergaben	*Ps	-	Zeiger auf Parameterlabel 
 												//				wert - Numerischer Ausgabewert
 												//				*Pu	-	Zeiger auf nachgestellten Textstring		
 												//				format 	- 1. Byte (LSB) Zahlenformat wert
-												//					   		- 2. Byte vorangestellte Menüpunktnummer
+												//					   		- 2. Byte vorangestellte Menï¿½punktnummer
 												//					   		- 3. Byte Bit 0	- ": "
 												//								 Bit 1  - keinen Wert ausgeben											
 												//								 Bit 2  - Zeilenabschluss senden
 												
- uchar smenu=(uchar)(format>>8);					// Menüpunkt maskieren
+ uchar smenu=(uchar)(format>>8);					// Menï¿½punkt maskieren
  							
- if (smenu) put_menuitem (Ps, smenu);				// Ggf. Menüpunkt ausgeben
+ if (smenu) put_menuitem (Ps, smenu);				// Ggf. Menï¿½punkt ausgeben
  else putstr (Ps);													// vorangestellten Textstring ausgeben
  if ((format>>16)&0x01) putstr (T_dpkt);		// Doppelpunkt
  if (!((format>>17)&0x01))									// Wert ausgeben?
@@ -622,31 +631,31 @@ void putparameter (text *Ps, uint wert, uint format, text *Pu)	// Parameterwerte
 }
 
 int list_selection	(text *titel, text *liste, uchar *Parameter, uchar items, uchar size)	// Listenauswahl
-{								// Übergaben:	*titel	-		Zeiger auf Listenüberschrift
+{								// ï¿½bergaben:	*titel	-		Zeiger auf Listenï¿½berschrift
 								//						*liste	- 	Zeiger auf Listenanfang
-								//						items	-			Anzahl Listeneinträge 1..9, bit7=1 langer Abfragetext "Inre Auswahl etc."
-								//						Parameter - für Ergebniseintrag
-								//						size	-			Arrayelementgröße
+								//						items	-			Anzahl Listeneintrï¿½ge 1..9, bit7=1 langer Abfragetext "Inre Auswahl etc."
+								//						Parameter - fï¿½r Ergebniseintrag
+								//						size	-			Arrayelementgrï¿½ï¿½e
  uchar i;																// Laufvariable
- uchar offset=0;			   								// Offset auf Listentexteinträge
+ uchar offset=0;			   								// Offset auf Listentexteintrï¿½ge
  uint timeout=TERMINAL_CHAR_TIMEOUT;
- int dummy=0;														// Hilfsvariable für Eingabe
+ int dummy=0;														// Hilfsvariable fï¿½r Eingabe
  int result=-1;													// Abfrageergebnis
- uchar lprompt=items&0xC0;							// Hilfsvariable für Abfragewiederholung
+ uchar lprompt=items&0xC0;							// Hilfsvariable fï¿½r Abfragewiederholung
 
- items&=0x0F;								// Anzahl Listeneinträge ausmaskieren
+ items&=0x0F;								// Anzahl Listeneintrï¿½ge ausmaskieren
 
  putstr(titel);							// "Titeltext
- for (i=0;i<items;i++)			// für alle Listenpunkte 
+ for (i=0;i<items;i++)			// fï¿½r alle Listenpunkte 
  {
-  put_menuitem(liste+offset,(i+1)|0x30);	// Menüpunkt als Listeneintrag ausgeben
+  put_menuitem(liste+offset,(i+1)|0x30);	// Menï¿½punkt als Listeneintrag ausgeben
   offset+=size;
  }
 
  do
  {	
-	if (lprompt==0xC0) select((items+1)|0x30,1);  				// Menüauswahltext	  
-  else if (lprompt==0x80) select(items|0x30,0);  		// Menüauswahltext
+	if (lprompt==0xC0) select((items+1)|0x30,1);  				// Menï¿½auswahltext	  
+  else if (lprompt==0x80) select(items|0x30,0);  		// Menï¿½auswahltext
   else { newline(); putc('?'); }					// Neue Zeile und Ausgabe '?'
   
   dummy=getc(timeout);	// Zeichen einlesen 
@@ -662,7 +671,7 @@ int list_selection	(text *titel, text *liste, uchar *Parameter, uchar items, uch
 		 result=1;	 
 		 break; 
     } 
-		else if ((lprompt==0xC0)&(dummy==items+1)) break;		// Auswahl zurück 
+		else if ((lprompt==0xC0)&(dummy==items+1)) break;		// Auswahl zurï¿½ck 
    } // end ziffer
   }
   if (dummy=='H') { menu=0; break; } 	// Abbruch ins Hauptmenu
@@ -673,7 +682,7 @@ int list_selection	(text *titel, text *liste, uchar *Parameter, uchar items, uch
 }
 
 void sendbuf(text * buf, ushort lastbyte)	// Puffer im Hexformat ausgeben
-{											// Übergaben 	*buf 		- Zeiger auf Puffer
+{											// ï¿½bergaben 	*buf 		- Zeiger auf Puffer
  											//				lastbyte 	- Anzahl Bytes zu senden
  ushort i;
   
@@ -692,7 +701,7 @@ void sendbuf(text * buf, ushort lastbyte)	// Puffer im Hexformat ausgeben
 }
 
 void put_signed_float (int zahl, ushort teiler, uchar vor, uchar nach) // Zahl mit Vorzeichen und Nachkommastelle ausgeben
-{										// Übergabe zahl - auszugebende Zahl	
+{										// ï¿½bergabe zahl - auszugebende Zahl	
  										//					Teiler - Teilerfaktor
  										// 					vor - Vorkommastellen
 										//					nach - Nachkommastelle
@@ -719,7 +728,7 @@ void put_signed_float (int zahl, ushort teiler, uchar vor, uchar nach) // Zahl m
 }
 
 void putbat (uint wert)				// Batteriespannung formatiert ausgeben
-{															// Übergabe wert - Batteriespannung in 10 mV Einheiten
+{															// ï¿½bergabe wert - Batteriespannung in 10 mV Einheiten
  put2str(T_batt,T_dpkt);							// Text "Batteriespannung...
  put_signed_float (wert, 100, 2, 2);	// Spannungsausgabe mit 2 Vor- und 2 Nachkommastelle
  putln(T_Volt);	 											// Volt Einheit
@@ -732,9 +741,9 @@ void wait_return (void)				// Warte auf Return Eingabe
  putln(T_ende);								// Ausgabe Ende mit Return
  while (1)
  {
-  if (bxi!=rxi)  							// Indizeänderung, Zeichen in Puffer?
+  if (bxi!=rxi)  							// Indizeï¿½nderung, Zeichen in Puffer?
   {
-   bxi++; 										// Bearbeitungsindex erhöhen
+   bxi++; 										// Bearbeitungsindex erhï¿½hen
    c=rbuf[rxi];
    if (is_CRLF (c)) break; 			// Zeichen ist Return Eingabe -> Ende
   }
@@ -748,13 +757,13 @@ void wait_return (void)				// Warte auf Return Eingabe
 }
 
 void put_schwellwert (text *Ps, text *Parr, uchar *Pw, uchar ind)	// Ein-/Aus-Schwellwerte ausgeben
-{														// Übergaben	*Ps	-	Zeiger auf Bezeichner, z. B. Zeichen
+{														// ï¿½bergaben	*Ps	-	Zeiger auf Bezeichner, z. B. Zeichen
 														//				*Pb	-	Zeiger in Elementarray, z. B. <30>, <50> ...  
 														//				*Pw - Zeiger auf numerischen Ausgabewert										
- uchar i;				// Laufvariable					//				ind - Menüindex
+ uchar i;				// Laufvariable					//				ind - Menï¿½index
  for (i=0;i<=1;i++)
  {
-  put_menuitem (Ps, (2*ind+1+i)|0x30);	// Menüpunkt ausgeben
+  put_menuitem (Ps, (2*ind+1+i)|0x30);	// Menï¿½punkt ausgeben
   putc(' ');
   putstr (Parr);												// Symbol- / Zeichenbezeichner ausgeben
   putc(' ');
@@ -768,7 +777,7 @@ void put_schwellwert (text *Ps, text *Parr, uchar *Pw, uchar ind)	// Ein-/Aus-Sc
 }
 
 void put_date_time (char *Pbuf)		// Datum und Zeit aus Puffereintrag ausgeben
-{																	// Übergabe *Pbuf - Zeiger auf Datum/Zeit Werte
+{																	// ï¿½bergabe *Pbuf - Zeiger auf Datum/Zeit Werte
  uchar i;
  char delim='.';			// Datums-Trennzeichen
 
@@ -782,10 +791,10 @@ void put_date_time (char *Pbuf)		// Datum und Zeit aus Puffereintrag ausgeben
 }
 
 int uart_read (uint anz, uint st_out, ushort ind)	// Anzahl Bytes von UART nach Arbeitspuffer cbuf lesen
-{																									// Übergabe anz 	- Anzahl Bytes zu lesen
+{																									// ï¿½bergabe anz 	- Anzahl Bytes zu lesen
 																									// 					st_out	- Wartezeit bis erstes Zeichen
 																									// 					ind 	- Pufferstartindex
- uint stoptime=mstimer+st_out;		// Lange Wartezeit bis Übertragungsbeginn
+ uint stoptime=mstimer+st_out;		// Lange Wartezeit bis ï¿½bertragungsbeginn
  uint chartimeout=st_out/6;
 	
  cind=ind;	
@@ -804,13 +813,13 @@ int uart_read (uint anz, uint st_out, ushort ind)	// Anzahl Bytes von UART nach 
  return (cind);
 }
 
-void puttage(uchar eintag)	// Ausgabe der Wochentagskürzel 
-{														// Übergabe eintag - aufzulistende Einschalttage
+void puttage(uchar eintag)	// Ausgabe der Wochentagskï¿½rzel 
+{														// ï¿½bergabe eintag - aufzulistende Einschalttage
  text *s ;									// Textzeiger
- uchar i,l,k;								// Laufvariable Sprachnummer, Wochentag, Zeichenkürzel
- uchar wkaus=0;							// Flag für bereits Kürzel ausgegeben
+ uchar i,l,k;								// Laufvariable Sprachnummer, Wochentag, Zeichenkï¿½rzel
+ uchar wkaus=0;							// Flag fï¿½r bereits Kï¿½rzel ausgegeben
 
- for (l=0;l<=6;l++)					// Jeden Einschalttag prüfen und ggf. ausgeben
+ for (l=0;l<=6;l++)					// Jeden Einschalttag prï¿½fen und ggf. ausgeben
  {  
   if (eintag&(1<<l))				// Tagesflag gesetzt
   {
@@ -819,46 +828,46 @@ void puttage(uchar eintag)	// Ausgabe der Wochentagskürzel
    if (*s=='\f')						// Mehrsprachiger Text?
    {
     i= fp.sprache;
-    while (i) { do s++; while (*s!='\f'); i--; }	// Durchsuche String bis '\f' der gewählten Sprachnummer
-    s++; 										// Zeiger auf Anfang Teilzeichenkette der gewählten Sprache
+    while (i) { do s++; while (*s!='\f'); i--; }	// Durchsuche String bis '\f' der gewï¿½hlten Sprachnummer
+    s++; 										// Zeiger auf Anfang Teilzeichenkette der gewï¿½hlten Sprache
    }
-   for (k=0;k<WTAG_KURZ;k++) putc(*s++);	// Wochentagskürzel ausgeben
+   for (k=0;k<WTAG_KURZ;k++) putc(*s++);	// Wochentagskï¿½rzel ausgeben
    wkaus++;	
   }	 // end Tagesflag gesetzt
- }	// end für jeden Einschalttag
+ }	// end fï¿½r jeden Einschalttag
 }
 
 void get_weekday (uchar *wparam)		// Wochentage einlesen
-{										// Übergabe	wparam - Zeiger auf Wochentags-Parameter
- uchar cres;							// Hilfsvariable für Eingabe
+{										// ï¿½bergabe	wparam - Zeiger auf Wochentags-Parameter
+ uchar cres;							// Hilfsvariable fï¿½r Eingabe
 
  if(list_selection(T_wtag, &T_tag[0][0], &cres, 0x87, sizeof(T_tag[0]))>0)	// Listenauswahl Wochentag
  {
   cres=(1<<cres);							// Tagesflag bilden	    
-  if (*wparam&cres) *wparam&=~cres;			// Tagesflag gesetzt -> löschen
+  if (*wparam&cres) *wparam&=~cres;			// Tagesflag gesetzt -> lï¿½schen
     else *wparam|=cres;						// wenn nicht dann setzen
  }
 }
 
 int wait_message (text *Pt, uint timeout)		// Warte auf Nachricht
-{																						// Übergaben 	*Pt 	- Zeiger auf erwarteten Text
+{																						// ï¿½bergaben 	*Pt 	- Zeiger auf erwarteten Text
 																						// 				timeout	- Timeout bis erstes Zeichen empfangen								
- ushort anzahl=0, start=0;					// Hilfsvariable Länge Zeichenkette und Suchoffset in cbuf
+ ushort anzahl=0, start=0;					// Hilfsvariable Lï¿½nge Zeichenkette und Suchoffset in cbuf
  uint ltime=mstimer+timeout;				// Wartezeitmarke 
 	
- if (ltime<mstimer) { mstimer=0; ltime=timeout; }	// mstimer Überlaufkorrektur
+ if (ltime<mstimer) { mstimer=0; ltime=timeout; }	// mstimer ï¿½berlaufkorrektur
 
  cind=0;														// reset cbuf Index
  //bxi=rxi;													// Indizes Empfangspuffer gleichsetzen	
- while (*(Pt+anzahl)!=0) anzahl++;	// Ermittle Textlänge
+ while (*(Pt+anzahl)!=0) anzahl++;	// Ermittle Textlï¿½nge
  
  do
  {
   if (bxi!=rxi)										// Zeichenempfang?
   { 
-   ltime=mstimer+timeout/2;				// Wartezeit zwischen Zeichen verkürzen
+   ltime=mstimer+timeout/2;				// Wartezeit zwischen Zeichen verkï¿½rzen
    cbuf[cind++]=rbuf[++bxi];			// Empfangs- in Arbeitspuffer kopieren
-   if (cind>=start+anzahl) 				// Anzahl neue Zeichen > Länge Zeichenkette
+   if (cind>=start+anzahl) 				// Anzahl neue Zeichen > Lï¿½nge Zeichenkette
    {
     cbuf[cind]=0;									// Zeichenkettenabschluss
     if (compare((char *)Pt,cbuf,start, start+anzahl)>0) // Zeichenkettenvergleich positiv
@@ -868,7 +877,7 @@ int wait_message (text *Pt, uint timeout)		// Warte auf Nachricht
   }	 // Ende neues Zeichen
 	else 
 	{ 
-	 ResetWDT();															// Setze Watchdog zurück
+	 ResetWDT();															// Setze Watchdog zurï¿½ck
    //if (osActiveThread) clear_comchange();		// Thread aktiv - Ignoriere Schnittstellenwechsel 
 	 osThreadYield(); 												// gib Taskwechsel frei
 	}	 
@@ -877,16 +886,16 @@ int wait_message (text *Pt, uint timeout)		// Warte auf Nachricht
 }
 
 int wait_message_2 (text *Pt, uint timeout, uchar uart)		// Warte auf Nachricht in UART Puffern
-{																													// Übergaben 	*Pt 	- Zeiger auf erwarteten Text
+{																													// ï¿½bergaben 	*Pt 	- Zeiger auf erwarteten Text
 																													// 				timeout	- Timeout bis erstes Zeichen empfangen
 																													//				uart		- Empfangsschnittstelle
- ushort anzahl=0, start=0;							// Hilfsvariable Länge Zeichenkette und Suchoffset in cbuf
+ ushort anzahl=0, start=0;							// Hilfsvariable Lï¿½nge Zeichenkette und Suchoffset in cbuf
  uchar (*f_ptr) (void) = getkey1;				// Zeiger auf UART1 Funktion
  if (uart==UART2) f_ptr = getkey2;			// Zeiger auf UART2 Funktion
 	
  cind=0;														// reset cbuf Index
- while (*(Pt+anzahl)!=0) anzahl++;	// Ermittle Textlänge
- msdelay=timeout;										// Lange Wartezeit bis Übertragungsbeginn
+ while (*(Pt+anzahl)!=0) anzahl++;	// Ermittle Textlï¿½nge
+ msdelay=timeout;										// Lange Wartezeit bis ï¿½bertragungsbeginn
  do
  {
   if (f_ptr())										// Zeichenempfang?
@@ -894,7 +903,7 @@ int wait_message_2 (text *Pt, uint timeout, uchar uart)		// Warte auf Nachricht 
    msdelay=timeout/2;							// Kurze Wartezeit zwischen Zeichen
    if (uart==UART2) cbuf[cind++]=gbuf[++bx2];	// Empfangs- in Arbeitspuffer kopieren
    else cbuf[cind++]=rbuf[++bxi];							
-   if (cind>=start+anzahl) 				// Anzahl neue Zeichen > Länge Zeichenkette
+   if (cind>=start+anzahl) 				// Anzahl neue Zeichen > Lï¿½nge Zeichenkette
    {
     cbuf[cind]=0;									// Zeichenkettenabschluss
     if (compare((char *)Pt,cbuf,start, start+anzahl)>0) // Zeichenkettenvergleich positiv
@@ -902,7 +911,7 @@ int wait_message_2 (text *Pt, uint timeout, uchar uart)		// Warte auf Nachricht 
 	  else start++;	   							// Suchoffset inkrementieren
    }   
   }	 // Ende neues Zeichen
-	else ResetWDT();							// Setze Watchdog zurück 
+	else ResetWDT();							// Setze Watchdog zurï¿½ck 
  } while (msdelay>0);	 					// Abbruch bei Timeout
  return (-1);										// kein Erfolg
 }
@@ -913,7 +922,7 @@ int wait_line (uint timeout)		// Warte auf Zeile von Uart
  uchar CRLF_header=1;	
  uint ltime=mstimer+timeout;			// Wartezeitmarke 
 	
- if (ltime<mstimer) { mstimer=0; ltime=timeout; }	// mstimer Überlaufkorrektur
+ if (ltime<mstimer) { mstimer=0; ltime=timeout; }	// mstimer ï¿½berlaufkorrektur
 	
  cind=0;														// reset cbuf Index
 	
@@ -931,12 +940,12 @@ int wait_line (uint timeout)		// Warte auf Zeile von Uart
    {		 
 		 if (c==LF) 
 			 { cbuf[cind++]=0 ;					// Zeichenkettenabschluss
-				 return (cind);	}					// Rückgabe Zeichenanzahl
+				 return (cind);	}					// Rï¿½ckgabe Zeichenanzahl
 	 }	 
   }
   else 
-  { ResetWDT();	osThreadYield(); }	// Setze Watchdog zurück und gib Taskwechsel frei	
- } while (ltime>mstimer);	 		// bis Wartezeitmarke Timer überläuft	
+  { ResetWDT();	osThreadYield(); }	// Setze Watchdog zurï¿½ck und gib Taskwechsel frei	
+ } while (ltime>mstimer);	 		// bis Wartezeitmarke Timer ï¿½berlï¿½uft	
  
  return(-1);
 }

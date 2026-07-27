@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 //  FILE: Hard.c			PROJECT: sis3000M
 //-----------------------------------------------------------------------------
-//  COMMENTS:  Hardwarenahe Routinen für LPC1766
+//  COMMENTS:  Hardwarenahe Routinen fï¿½r LPC1766
 //-----------------------------------------------------------------------------
 //  HARDWARE:   sis3003-MB, version H2
 //-----------------------------------------------------------------------------
@@ -29,7 +29,7 @@ uint const CRP __at (0x2FC)	=	CRPNONE;	 	// Code read protection undefined im Pr
 uint const CRP __at (0x2FC)	=	CRP2;				// Code read protection level 2 im Programmspeicher 
 #endif
 
-char const fp_cp_area[4096] __at (0x7000);	// Programmspeicher Sektor 7 für Kopie Parameterblock
+char const fp_cp_area[4096] __at (0x7000);	// Programmspeicher Sektor 7 fï¿½r Kopie Parameterblock
 
 #pragma arm section zidata = "non_init"		/* nicht Null initialisierte globale Variable */
 // Funktionszeiger
@@ -37,83 +37,83 @@ int (*pchar) (int c)		__noinit;					// Funktionszeiger Zeichenausgabe
 
 // Globale Variable
 __align(4) flashparameter fp 	__noinit;		// Parameter, die im Flash gesichert werden
-tcap tm									__noinit;					// Messpuffer mit Capture Zählerständen
+tcap tm									__noinit;					// Messpuffer mit Capture Zï¿½hlerstï¿½nden
 char rbuf[PAGE]					__noinit;					// Allgemeiner Empfangsringpuffer eine Seite
-char pbuf[PAGE]					__noinit;					// Empfangsringpuffer für Plus Matrix eine Seite
+char pbuf[PAGE]					__noinit;					// Empfangsringpuffer fï¿½r Plus Matrix eine Seite
 __align(4) char cbuf[CBUFSIZE] __noinit;	// char Arbeitspuffer (1056+256=1312 Byte)
 uchar probuf[FLASHKGV]	__noinit;					// Puffer Protokolldaten
 uchar vbuf[FLASHKGV]		__noinit;					// Puffer Geschwindigkeitsdaten
-uchar flbuf[FBUFSIZE]		__noinit;					// uchar Arbeitspuffer u. a. für flash commands
-uint iap_data[5]				__noinit;					// Globales Array für IAP Kommando/Ergebnis Übergabe
+uchar flbuf[FBUFSIZE]		__noinit;					// uchar Arbeitspuffer u. a. fï¿½r flash commands
+uint iap_data[5]				__noinit;					// Globales Array fï¿½r IAP Kommando/Ergebnis ï¿½bergabe
 volatile uchar rpi 			__noinit;					// Empfangsindex Empfangsringpuffer MQTT und Plus Kommunikation
 volatile uchar bpi 			__noinit;					// Bearbeitungsindex Empfangsringpuffer MQTT und Plus Kommunikation
-volatile uchar comchange __noinit;				// > 0 bei Änderung Status Datenschnittstellen
+volatile uchar comchange __noinit;				// > 0 bei ï¿½nderung Status Datenschnittstellen
 ushort cind							__noinit;					// Index Char Zeichenpuffer
-uint ledton, ledtoff		__noinit;					// Ein-/Ausschaltwerte für LED
-uint flashsize					__noinit;					// Flash Speichergröße KB/MB				
+uint ledton, ledtoff		__noinit;					// Ein-/Ausschaltwerte fï¿½r LED
+uint flashsize					__noinit;					// Flash Speichergrï¿½ï¿½e KB/MB				
 uint maxpage						__noinit;					// letzter Flash Seitenindex
 uint maxbyte						__noinit;					// Anzahl Byte pro Flash page
-uchar pagepk						__noinit;					// Benötigte Anzahl Flashseiten zur Sicherung eines 1 k-Blocks
+uchar pagepk						__noinit;					// Benï¿½tigte Anzahl Flashseiten zur Sicherung eines 1 k-Blocks
 uchar *P_fpar						__noinit;					// Pointer auf Flash/Ymodem Transferdaten
 uchar connect						__noinit;					// Aktive Schnittstellen Uarts, USB etc.
 uchar concpy						__noinit __at(0x2007e1d8);
 uint gsmbaud=460800;     // einstellbare GSM-Baudrate (Default 460800)					// Sicherungskopie connect
 uchar comstate					__noinit;					// Schnittstellenstatus BT, GSM, Terminal
-uchar interfaces				__noinit;					// Während der Initialisierung aufgefundene Schnittstellen
-uchar pset							__noinit;					// Aktuell ausgeführter Parametersatz
-uchar timeupdate				__noinit;					// 1 wenn zeitliche Aufgaben z. B. nach Änderung der Zeit
+uchar interfaces				__noinit;					// Wï¿½hrend der Initialisierung aufgefundene Schnittstellen
+uchar pset							__noinit;					// Aktuell ausgefï¿½hrter Parametersatz
+uchar timeupdate				__noinit;					// 1 wenn zeitliche Aufgaben z. B. nach ï¿½nderung der Zeit
 uchar tasks							__noinit;					// Aufgaben Bit1 - Messzeit, Bit2 -GSM Datenversand
 volatile uint tsec 			__noinit;					// Test Echtzeituhr Sekundenzeitstempel
-uchar ledbuf[6]					__noinit;					// Puffer für LED Anzeigeinformation
-uchar tast[MAXTAST]			__noinit;					// Liste LED Tastverhältnisse für LED Farbanzeigen 
+uchar ledbuf[6]					__noinit;					// Puffer fï¿½r LED Anzeigeinformation
+uchar tast[MAXTAST]			__noinit;					// Liste LED Tastverhï¿½ltnisse fï¿½r LED Farbanzeigen 
 uint cycletime					__noinit;					// Dauer Grundzykluszeit
 uint speed10						__noinit;					// 10 fache Geschwindigkeit
 uint IFConst						__noinit;					// Doppler-Konstante ~44,7 Hz pro km/h
 uint v_const						__noinit;					// Konstante zur Geschwindigkeitsberechnung
-uint volatile t_mess		__noinit;					// Messzeitzähler
+uint volatile t_mess		__noinit;					// Messzeitzï¿½hler
 uint t_mess_max					__noinit;					// Maximale Messdauer
-ushort i_reset					__noinit;					// Zusätzliche Reset Information
+ushort i_reset					__noinit;					// Zusï¿½tzliche Reset Information
 uint dimm								__noinit;					// LED Dimmfaktor 1 ... 200
 uint cap20,cap30,cap31	__noinit;					// Capture Count Werte Timer 2 und 3
 uchar gsmcall						__noinit;					// 1 wenn GSM Datenverbindung besteht
 uchar gsmpower					__noinit;					// 0 wenn GSM 3V5 Spannungsversorgung aus
 uchar mailtosend				__noinit;					// > 0 wenn Email zu versenden, Bit1/2/3 = 1 - Testmail/Datenmail/Fehlermail
 uchar smstosend					__noinit;					// > 0 wenn SMS zu versenden, Bit1/2/3 = 1 - Test/Batteriespg niedrig/Speicher voll - SMS
-uchar wait_min					__noinit;					// Minuten Wartezeit für GPS, EMAIL und SMS nach dem Einschalten oder Terminalverbindung 
+uchar wait_min					__noinit;					// Minuten Wartezeit fï¿½r GPS, EMAIL und SMS nach dem Einschalten oder Terminalverbindung 
 //uint minuten						__noinit;					// Minutenlaufzeit seit dem Einschalten oder Terminalverbindung
 uchar simpinset					__noinit;					// 1 wenn GSM SIM Pinnummer gesetzt
-int vtst								__noinit;					// Testgeschwindigkeit für Anzeige- und Schaltersimulation
+int vtst								__noinit;					// Testgeschwindigkeit fï¿½r Anzeige- und Schaltersimulation
 uchar gps_pending				__noinit;					// > 0 wenn GPS Positionsbestimmung gestartet
-ushort gpsfix						__noinit;					// Minutenzähler für GPS Positionsbestimmung
+ushort gpsfix						__noinit;					// Minutenzï¿½hler fï¿½r GPS Positionsbestimmung
 uchar gpsintv						__noinit;					// Kopie fp.gpsintv Zeitintervall GPS Positionsbestimmung
-uchar transferzeit			__noinit;					// Sperrzeit nach Winter auf Sommerzeit Rückstellung 3 -> 2 Uhr
+uchar transferzeit			__noinit;					// Sperrzeit nach Winter auf Sommerzeit Rï¿½ckstellung 3 -> 2 Uhr
 uchar gbuf[PAGE]				__noinit;					// GPS Empfangsringpuffer 256 Byte
 uchar mqbf[MQBFSIZE]		__noinit;					// MQTT Empfangs-Puffer 3072+256 Byte
-volatile ushort mqtt_len	__noinit;				// MQTT Nachichtenlänge
+volatile ushort mqtt_len	__noinit;				// MQTT Nachichtenlï¿½nge
 volatile uchar mqtt_head 	__noinit;				// MQTT fixed header length + length remaining length bytes
-mqttpacks mqttp[8]				__noinit;				// Structure für MQTT Packetverwaltung
+mqttpacks mqttp[8]				__noinit;				// Structure fï¿½r MQTT Packetverwaltung
 uchar mqtt_mess_pend 		__noinit;					// > 0 wenn vom MQTTS unquittierte Nachricht(en)
-mqtt_crc mcrc						__noinit;					// CRC Prüfsummen für Geräteparameter in MQTT Kommunikation
+mqtt_crc mcrc						__noinit;					// CRC Prï¿½fsummen fï¿½r Gerï¿½teparameter in MQTT Kommunikation
 mqttd_pub mqtt_pbd			__noinit;					// Informationen DataMessage bei pending Messdatenversand
-uchar poweron_min				__noinit;					// Einschaltminute wird zum stündlichen MQTT Datenversand benutzt
-uchar mqtt_set					__noinit;					// MQTT Parameter/Bitmaps/Plus oder Certs abzuholen, Bit 7 Abholung läuft 
-uchar mqtt_param_get		__noinit;					// MQTT Parameter/Bitmaps/Plus zu senden, Bit 7 Versand läuft
+uchar poweron_min				__noinit;					// Einschaltminute wird zum stï¿½ndlichen MQTT Datenversand benutzt
+uchar mqtt_set					__noinit;					// MQTT Parameter/Bitmaps/Plus oder Certs abzuholen, Bit 7 Abholung lï¿½uft 
+uchar mqtt_param_get		__noinit;					// MQTT Parameter/Bitmaps/Plus zu senden, Bit 7 Versand lï¿½uft
 uchar mqtt_md_simu			__noinit;					// MQTT Messdatensimulation 0/1 - ein/aus
-uchar mailfail					__noinit;					// Aufwärtszähler gescheiterte Mail Versandversuche
-uchar smsfail						__noinit;					// Aufwärtszähler gescheiterte SMS Versandversuche
+uchar mailfail					__noinit;					// Aufwï¿½rtszï¿½hler gescheiterte Mail Versandversuche
+uchar smsfail						__noinit;					// Aufwï¿½rtszï¿½hler gescheiterte SMS Versandversuche
 uchar wait_sms					__noinit;					// Warteminuten SMS Wiederholzeit
 uchar wait_mail					__noinit;					// Warteminuten Email Wiederholzeit
 short LastErrorEvent		__noinit;					// Letzter protokolliertes Fehlereignis
 uchar mqtt_con_err			__noinit;					// MQTT Verbindungsfehler
-uchar thread_comchange	__noinit;					// Schnittstellenwechsel während GSM/MQTT Verbindungsthread
+uchar thread_comchange	__noinit;					// Schnittstellenwechsel wï¿½hrend GSM/MQTT Verbindungsthread
 uchar online						__noinit;					// 1 wenn Online Datenausgabe
-char certname[16]				__noinit;					// Zertifikatsname für MQTT command CertSave
-ushort certcrc					__noinit;					// Zertifikat CRC Prüfsumme
-ushort certsize					__noinit;					// Zertifikat Dateigröße
+char certname[16]				__noinit;					// Zertifikatsname fï¿½r MQTT command CertSave
+ushort certcrc					__noinit;					// Zertifikat CRC Prï¿½fsumme
+ushort certsize					__noinit;					// Zertifikat Dateigrï¿½ï¿½e
 char certs[3][16]				__noinit;					// Zertifikatsliste	
 char iccid[23]					__noinit;					// SIM Karte ICCID Nummer
-uchar t_amp_en					__noinit;					// Verstärker Übersteuerungszeit ersetzt Dampen
-uchar bt_time						__noinit;					// Bluetooth Verbindungszeitüberwachung
+uchar t_amp_en					__noinit;					// Verstï¿½rker ï¿½bersteuerungszeit ersetzt Dampen
+uchar bt_time						__noinit;					// Bluetooth Verbindungszeitï¿½berwachung
 uchar btmode						__noinit;					// BLE=48 oder SPP=47 Profil aktiv?
 	
 #pragma arm section zidata			/* Globale Variable initialisiert */
@@ -122,28 +122,28 @@ volatile uchar bxi=0;						// Bearbeitungsindex UART Empfangspuffer
 volatile uchar rbuf_full=0;			// 0 wenn UART Empfangspuffer leer
 volatile uchar tmi=0;						// Messindex Messpuffer IF und Phase
 volatile uchar minute=0;				// Minutenwechsel der Echtzeituhr (RTC Interrupt)
-volatile uint msdelay=0;				// Millisekunden Abwärtszähler feeded by Timer 0
-volatile uint mstimer=0;				// Millisekunden Aufwärtszähler feeded by Timer 0	
+volatile uint msdelay=0;				// Millisekunden Abwï¿½rtszï¿½hler feeded by Timer 0
+volatile uint mstimer=0;				// Millisekunden Aufwï¿½rtszï¿½hler feeded by Timer 0	
 osThreadId usbh_thread_id=0;		// USB Host Thread ID	
 uchar simulation=0;							// 1 wenn Anzeige- und Schaltersimulation
-uchar menrep=0;									// Flag Menüwiederholung
-uint menu=0;										// Variable für Steuerung der Menüebene
-uchar dset=0;										// Im Menü angezeigter Parametersatz
+uchar menrep=0;									// Flag Menï¿½wiederholung
+uint menu=0;										// Variable fï¿½r Steuerung der Menï¿½ebene
+uchar dset=0;										// Im Menï¿½ angezeigter Parametersatz
 uchar startmessage=0;						// Startmeldung bei Verbindungsaufbau
 uchar farbcode=0;								// Farbversorgungen COL1-5 - EN-POWER 1-5 Treiber
 uchar shiftcnt=0;								// Base64 Schiebefortschritt letzter Puffer
 uint shiftb64=0;								// Base64 Codierung 3 Byte bzw. 4 x 6 Bit Schieberegister
-uchar b64crlf=0;								// CRLF Zähler, Base64 nach 57 Bytes
+uchar b64crlf=0;								// CRLF Zï¿½hler, Base64 nach 57 Bytes
 bool plustrans=0;								// transparenter Datentransfer Plus Matrix controller
 uchar alcol=0;									// Farbwechsel Zyklus
 uchar discharge=0;							// Entladung Clusterspannungs-Kondensatoren
-uchar Dampen=10;								// Verstärker Übersteuerungszeit
+uchar Dampen=10;								// Verstï¿½rker ï¿½bersteuerungszeit
 volatile ushort rmi=0;					// Empfangsindex MQTT Empfangspuffer
 volatile uchar rx2=0;						// Empfangsindex GPS Empfangspuffer
 volatile uchar bx2=0;						// Empfangsindex GPS Empfangspuffer
 uint mqtttime=0;								// Zeitmarke MQTT Anforderung
-ushort PacketId=1000;						// PackageId zählt aufwärts
-volatile uchar mqtt_com=0;			// MQTT Nachrichtstatus 0/1/2 - nichts empfangen/laufend/vollständig
+ushort PacketId=1000;						// PackageId zï¿½hlt aufwï¿½rts
+volatile uchar mqtt_com=0;			// MQTT Nachrichtstatus 0/1/2 - nichts empfangen/laufend/vollstï¿½ndig
 volatile uchar mqtt_fail=0;			// MQTT Kommunikationsfehler
 osThreadId gsmp_thread_id=0;		// GSM power and registration thread ID	
 uchar osActiveThread=0;					// Gestartete Threads 
@@ -156,14 +156,14 @@ uchar mqtt_state=0;							// Kommunikationsstatus mit MQTTS, 0/1/2/3/4/... = dis
 uchar bt_pininit=0;							// Wenn 1 Pinabfrage erforderlich
 
 /**** Interrupt Priority Tabelle (statisch)
-EINT0_IRQn		6							- Power down 12V Über/-Unterspannungsüberwachung IC4, LTC4365
+EINT0_IRQn		6							- Power down 12V ï¿½ber/-Unterspannungsï¿½berwachung IC4, LTC4365
 RTC_IRQn 			8							
 EINT2_IRQn	 	12						-	Detektionsfehler IF/IQ
 TIMER1_IRQn 	13
 TIMER2_IRQn	 	14
 EINT1_IRQn 		15						- Interruptanforderung I2C Expander IC54, PCA9554
 TIMER3_IRQn	 	16
-PWM1_IRQn			28						-	LED Auffrisch/Farbwechsel Interrupt, Priorität siehe Init_Timer
+PWM1_IRQn			28						-	LED Auffrisch/Farbwechsel Interrupt, Prioritï¿½t siehe Init_Timer
 UART1_IRQn 		29
 UART0_IRQn 		30
 UART2_IRQn 		31
@@ -177,8 +177,8 @@ void UART0_IRQHandler(void) 						// UART0 Sende- und Empfangsinterrupt
  switch (U0->IIR&0x000E)								// Verteile je nach Interruptquelle
  {	
   case 0x0002:	break;																	// Kein Puffer leer Sendeinterrupt
-  case 0x0004: 	if (!plustrans)	rbuf[++rxi]=U0->RBR; 		// Zeichen in allgemeinen Empfangspuffer, präinkrement									
-								else pbuf[++rpi]=U0->RBR;								// Zeichen in Plus Empfangspuffer, präinkrement
+  case 0x0004: 	if (!plustrans)	rbuf[++rxi]=U0->RBR; 		// Zeichen in allgemeinen Empfangspuffer, prï¿½inkrement									
+								else pbuf[++rpi]=U0->RBR;								// Zeichen in Plus Empfangspuffer, prï¿½inkrement
 								break;		
   default: 		c=U0->LSR;	 							// Dummy read Rx Fehlerstatus  
  }
@@ -192,13 +192,13 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
  {	
   case 0x0002:	break;												// Kein Puffer leer Sendeinterrupt
   case 0x0004: 	if ((connect&MQTT_LINK)&&(bpi!=(rpi+1))) 	// MQTTS Verbindung besteht und Platz in Puffer? 								
-								 pbuf[++rpi]=U1->RBR; 										// Zeichen in Empfangspuffer, präinkrement	
+								 pbuf[++rpi]=U1->RBR; 										// Zeichen in Empfangspuffer, prï¿½inkrement	
 								else if (!(connect&MQTT_LINK) && (bxi!=(rxi+1))) // Keine MQTTS Verbindung und Platz in Puffer?
 								{	
-								 rbuf[++rxi]=U1->RBR; 		// Sonst Zeichen in Empfangspuffer, präinkrement
+								 rbuf[++rxi]=U1->RBR; 		// Sonst Zeichen in Empfangspuffer, prï¿½inkrement
 								 bt_time=BT_TIMEOUT;			// Reset Bluetooth Verbindungstimeout	
 								}	
-								else											// Ringpufferindizes vor Überlauf? 
+								else											// Ringpufferindizes vor ï¿½berlauf? 
 								{													// I. d. F. solange U1->RBR ungelesen RTS=High -> Empfangsstop
 								 rbuf_full=1;										// Puffer voll Flag setzen
 								 NVIC_DisableIRQ(UART1_IRQn);		// Disable UART1 Interrupt
@@ -215,7 +215,7 @@ void UART2_IRQHandler(void) 						// UART2 Sende- und Empfangsinterrupt
  switch (U2->IIR&0x000E)								// Verteile je nach Interruptquelle
  {	
   case 0x0002:	break;																		// Sendeinterrupt
-  case 0x0004: 	if (bx2!=(rx2+1)) gbuf[++rx2]=U2->RBR; 		// Platz in Puffer? Ja, Zeichen in Empfangspuffer, präinkrement															   
+  case 0x0004: 	if (bx2!=(rx2+1)) gbuf[++rx2]=U2->RBR; 		// Platz in Puffer? Ja, Zeichen in Empfangspuffer, prï¿½inkrement															   
 								else c=U2->RBR;														// Dummy read und wegwerfen
 								break;		
   default: 		c=U2->LSR;	 							// Dummy read Rx Fehlerstatus  
@@ -224,41 +224,41 @@ void UART2_IRQHandler(void) 						// UART2 Sende- und Empfangsinterrupt
 
 void EINT1_IRQHandler (void)				// Interruptanforderung I2C Expander
 {
- comchange=1;				// Schnittstellenstatus geändert
- EXTINT|=(1<<1);		// Anforderung löschen								 	
+ comchange=1;				// Schnittstellenstatus geï¿½ndert
+ EXTINT|=(1<<1);		// Anforderung lï¿½schen								 	
 }	
 
 void EINT2_IRQHandler (void)				// Interruptanforderung Detektionsfehler
 {
  tmi=0;							// reset Messpufferindizes
- EXTINT|=(1<<2);		// Anforderung löschen								 	
+ EXTINT|=(1<<2);		// Anforderung lï¿½schen								 	
 }
 
 void TIMER1_IRQHandler (void)					// Timer 1 1ms Match Interrupt
 {
-  T1MR0=T1TC+1000;										// nächstes 1 ms Match setzen
-	if (t_mess) t_mess--;								// Messzeitzähler - 1 
-  if (msdelay!=0) msdelay--;					// Dekrementiere 1 ms Abwärtszähler	
-  mstimer++;													// Inkrementiere 1 ms Aufwärtszähler	
-  cycletime++;												// Inkrementiere 1 ms Aufwärtszähler, Mess- und Anzeigesteuerung
-	while (T1IR) T1IR|=T1IR;						// Anstehenden Match Interrupt löschen 	 
+  T1MR0=T1TC+1000;										// nï¿½chstes 1 ms Match setzen
+	if (t_mess) t_mess--;								// Messzeitzï¿½hler - 1 
+  if (msdelay!=0) msdelay--;					// Dekrementiere 1 ms Abwï¿½rtszï¿½hler	
+  mstimer++;													// Inkrementiere 1 ms Aufwï¿½rtszï¿½hler	
+  cycletime++;												// Inkrementiere 1 ms Aufwï¿½rtszï¿½hler, Mess- und Anzeigesteuerung
+	while (T1IR) T1IR|=T1IR;						// Anstehenden Match Interrupt lï¿½schen 	 
 }
 
 void TIMER3_IRQHandler (void)				// Timer 3 Count Interrupts
 {
- if ((T2CCR&CAP1FE)==0)							// Transceiver-/Verstärkerabgleich
+ if ((T2CCR&CAP1FE)==0)							// Transceiver-/Verstï¿½rkerabgleich
  {
 	if (T3IR&(1<<4))									// CR0 Interrupt, D-IQA oder D-IQB
 	{
-	 cap30++;													// Inkrementiere Impulszähler D-IQA / D-IQB		
-	 while (T3IR&(1<<4)) T3IR|=(1<<4);	// Lösche CR0 Interrupt Flag 	
+	 cap30++;													// Inkrementiere Impulszï¿½hler D-IQA / D-IQB		
+	 while (T3IR&(1<<4)) T3IR|=(1<<4);	// Lï¿½sche CR0 Interrupt Flag 	
 	}
 	else if (T3IR&(1<<5))							// CR1 Interrupt, D-IFB
 	{
-	 cap31++;													// Inkrementiere Impulszähler D-IFB
-	 while (T3IR&(1<<5)) T3IR|=(1<<5);	// Lösche CR1 Interrupt Flag	
+	 cap31++;													// Inkrementiere Impulszï¿½hler D-IFB
+	 while (T3IR&(1<<5)) T3IR|=(1<<5);	// Lï¿½sche CR1 Interrupt Flag	
   }		
-	else while (T3IR) T3IR|=T3IR;			// Lösche alle Interruptanforderungen
+	else while (T3IR) T3IR|=T3IR;			// Lï¿½sche alle Interruptanforderungen
  }	 
 }
 
@@ -269,19 +269,19 @@ void TIMER2_IRQHandler (void)				// Timer 2 Capture Interrupt
 	if (tmi>=LenTm) tmi=0;						// reset Messpufferindex am Pufferende  
   if (FIO2PIN&DETEKT) 							// Detektionssignal ok?
   {
-   tm.cIF[tmi]=T2CR0;								// D-IFA, IF1 Zählerstand auslesen
-   tm.cIP[tmi++]=T2CR1;							// Phase A, IP1 Zählerstand lesen
+   tm.cIF[tmi]=T2CR0;								// D-IFA, IF1 Zï¿½hlerstand auslesen
+   tm.cIP[tmi++]=T2CR1;							// Phase A, IP1 Zï¿½hlerstand lesen
   }
   else tmi=0;												// Pufferindex reset 
  }
- else 															// Transceiver-/Verstärkerabgleich
+ else 															// Transceiver-/Verstï¿½rkerabgleich
  {	 
-	cap20++;													// Inkrementiere Impulszähler D-IF-A	
+	cap20++;													// Inkrementiere Impulszï¿½hler D-IF-A	
  }	
- while (T2IR) T2IR|=T2IR;						// Anstehenden Capture Interrupt löschen	
+ while (T2IR) T2IR|=T2IR;						// Anstehenden Capture Interrupt lï¿½schen	
 }	
 
-void sendspi	(uchar data)			// Daten über SPI versenden
+void sendspi	(uchar data)			// Daten ï¿½ber SPI versenden
 {
  uint rdelay;												// Antwortzeit in us
  rdelay=T1TC;												// Timer 1 Stand laden	
@@ -299,17 +299,17 @@ void PWM1_IRQHandler (void )			// PWM Interrupt, aktiv bei mehrfarbiger Anzeige
  if (!(PINSEL0&(MOSI|SCK|MISO)))	// SPI nicht aktiv?
  {	 
   Init_SPI();														// SPI initialisieren	
-	for (i=4;i;i--)	sendspi	(ledbuf[i]);	// Daten über SPI versenden  
+	for (i=4;i;i--)	sendspi	(ledbuf[i]);	// Daten ï¿½ber SPI versenden  
   if (alcol==COL1) alcol=COL2; 			// Toggle Farbe
   else alcol=COL1; 
-	sendspi	(alcol|discharge); 				// Farbinformation über SPI versenden
+	sendspi	(alcol|discharge); 				// Farbinformation ï¿½ber SPI versenden
 	FIO2SET = LE_TRB;									// Latch Schiebedaten 74HC595 
   while ((FIO2PIN & LE_TRB) == 0);	// Warte bis gesetzt 
-  FIO2CLR = LE_TRB;									// Latch reset -> LED Treiber MBI5039 Datenübernahme   
+  FIO2CLR = LE_TRB;									// Latch reset -> LED Treiber MBI5039 Datenï¿½bernahme   
 	PCONP&=~PCSSP1;	 									// SSP1 power disable
   PINSEL0&=~(MOSI|SCK|MISO);				// Deselect SSP1 Pinfunktionen
  }	
- PWMIR|=PWMIR;	 										// Interrupt wieder löschen
+ PWMIR|=PWMIR;	 										// Interrupt wieder lï¿½schen
 }
 
 void ResetWDT (void)								// Watchdog reset and feed
@@ -351,7 +351,7 @@ void Init_Ext_Intr (void)						// Initialisiere externe Interrupts
  NVIC_ClearPendingIRQ(EINT2_IRQn);	
 }	
 
-void InitTimer (void)				// Initialisiere Timer für Millisekunden Zähler
+void InitTimer (void)				// Initialisiere Timer fï¿½r Millisekunden Zï¿½hler
 {
  PCONP|=(PCTIM1|PCTIM2|PCTIM3|PCPWM1);		// Power Timer 1, 2 und 3	und PWM1
 
@@ -394,7 +394,7 @@ void Init_UART0 (void)			// Initialisiert Schnittstelle UART0 (Terminal)
  U0->IER = 0x00;						// Disable Interrupts 
  U0->FCR = 0x07; 						// FIFO control enable and reset buffers	
  U0->LCR = 0x00000083;			// Line control 8,N,1, DLAB=1
- U0->DLL = 0x04;						// Baudrate Ganzzahlteiler für 115200 Baud
+ U0->DLL = 0x04;						// Baudrate Ganzzahlteiler fï¿½r 115200 Baud
  U0->LCR = 0x00000003;			// Line control 8,N,1, DLAB=0 	
  U0->FDR = (8<<4)|0x05;			// Fractional divider	5/8 			 
  U0->IER = 0x01;						// Enable Rx Interrupt
@@ -402,12 +402,13 @@ void Init_UART0 (void)			// Initialisiert Schnittstelle UART0 (Terminal)
  NVIC_EnableIRQ(UART0_IRQn);	
 }
 
+extern volatile uchar cts_bypass;   // aus sio.c: 1 = Bring-up -> HW-Flusssteuerung (Auto-CTS) aus
 void Init_UART1 (uint baud)					// Initialisiert zweiten UART1 (BT, GSM)
-{																		// Übergaben baud - 9600 oder sonst immer 460800 
+{																		// ï¿½bergaben baud - 9600 oder sonst immer 460800 
  if (!baud)													// Baudrate=0, de-initialisiere UART1
  {
 	NVIC_DisableIRQ(UART1_IRQn); 			// Sperre Uart Interrupts wieder
-	PINSEL4&=~(TXD1|RXD1|CTS1|RTS1);	// Uart1 Pins trennen -> wieder Eingänge mit Pull-up 
+	PINSEL4&=~(TXD1|RXD1|CTS1|RTS1);	// Uart1 Pins trennen -> wieder Eingï¿½nge mit Pull-up 
 	PCONP&=~PCUART1;									// Power Uart 1 wegnehmen
   connect&=~UART1;									// Uart 1 deaktiviert	
   MUX_NO_Select;										// MUX auf unbenutzten Kanal	 
@@ -441,7 +442,9 @@ void Init_UART1 (uint baud)					// Initialisiert zweiten UART1 (BT, GSM)
 	U1->FDR = (8<<4)|0x05;		// 24MHz/(16x3x1,625)	
  }	 
  U1->LCR = 0x00000003;			// Line control 8,N,1, DLAB=0
- U1->MCR|=(1<<7)|(1<<6);		// Enable RTS/CTS flow control
+ U1->MCR |= (1<<6);                            // Auto-RTS IMMER an -> MCU signalisiert empfangsbereit, Modul darf senden (sonst keine Antwort bei F=01!)
+ if (cts_bypass) U1->MCR &= ~(1<<7);          // Bring-up: nur Auto-CTS AUS -> TX nicht durch CTS-HIGH (Werksmodul F=00) blockiert
+ else            U1->MCR |=  (1<<7);          // Normalbetrieb: Auto-CTS an -> volle HW-Flusssteuerung
  U1->IER = 0x01;						// Enable Rx Interrupt 
  
  PINSEL4|=(TXD1|RXD1|CTS1|RTS1);		// Uart1 Pins verbinden
@@ -455,7 +458,10 @@ uchar uart1_owner = MUX_NONE;				// Current UART1 owner, default: no owner
 
 uchar uart1_request (uchar requester, uint baud)	// Request UART1 resource
 {																											// Returns TRUE if granted
+ uchar prev_owner;											// bisheriger Owner (fuer IF820 Command-Mode-Handling)
+ uchar bt_displaced = 0;								// IF820 wird von UART1 verdraengt?
  __disable_irq();												// Critical section: protect owner + connect
+ prev_owner = uart1_owner;								// merken, woher wir kommen
  if (uart1_owner == requester)						// Already owns UART1?
  {
 	__enable_irq();
@@ -463,10 +469,19 @@ uchar uart1_request (uchar requester, uint baud)	// Request UART1 resource
 	return(TRUE);
  }
  if (uart1_owner == MUX_BT)							// BT currently owns UART1?
+ {
 	connect &= ~UART1;										// Suspend BT terminal output
+	if ((requester != MUX_BT) && (connect & BT_LINK) && (fp.btmodem==IF820))
+	 bt_displaced = 1;										// IF820 verliert UART1 an GSM/GPS
+ }
  uart1_owner = requester;								// Claim ownership atomically
  __enable_irq();												// End critical section
- 
+
+ // IF820 in Command-Mode nehmen, BEVOR der MUX wegschaltet: sonst floatet die IF820-RX ueber
+ // den MUX und das Modul leitet Leitungsrauschen als Junk ueber SPP weiter. Wirkt ab Modul-FW
+ // 1.4.18.18; auf 1.4.12.12 wirkungslos, aber harmlos. I2C -> ausserhalb der Critical Section.
+ if (bt_displaced) bt_cmdmode();
+
  osDelay(3);														// Wait for last byte to finish
  switch (requester)											// Switch MUX to requested channel
  {
@@ -477,11 +492,16 @@ uchar uart1_request (uchar requester, uint baud)	// Request UART1 resource
  }
  Init_UART1(baud);											// Configure UART1 baud rate
  osDelay(3);														// Wait for MUX settling
- 
+
  __disable_irq();												// Critical section: restore connect
  if ((requester == MUX_BT) && (connect & BT_LINK))	// BT requested and BT connected?
 	connect |= UART1;										// Restore BT terminal output
  __enable_irq();
+
+ // Rueckkehr GSM/GPS -> BT: IF820 wieder freigeben (SPP-Weiterleitung/Status aktiv). Nur bei
+ // echter Rueckkehr (prev_owner GSM/GPS) - stoert so NICHT die init_bluetooth-Sequenz.
+ if ((requester == MUX_BT) && (fp.btmodem==IF820) &&
+	 (prev_owner == MUX_GSM || prev_owner == MUX_GPS)) bt_release();
 
  return(TRUE);
 }
@@ -505,15 +525,15 @@ void uart1_release (uchar requester)		// Release UART1 resource
  }
 }
 
-void Init_UART2 (uint baud)			// Initialisiert Schnittstelle UART2 für GPS Direktverbindung
-{																// Übergabe baud rate 0=off, 9600 und 115200 benötigt 
+void Init_UART2 (uint baud)			// Initialisiert Schnittstelle UART2 fï¿½r GPS Direktverbindung
+{																// ï¿½bergabe baud rate 0=off, 9600 und 115200 benï¿½tigt 
 
  if (!baud)													// Baudrate=0, de-initialisiere UART2
  {
 	connect&=~UART2;									// Sperre UART2 Ausgabe
   concpy=connect;										// Sperre UART2 Ausgabe	 
 	NVIC_DisableIRQ(UART2_IRQn); 			// Sperre Uart 2 Interrupts wieder
-	PINSEL0&=~(TXD2|RXD2);						// Uart2 Pins trennen -> wieder Eingänge mit Pull-up
+	PINSEL0&=~(TXD2|RXD2);						// Uart2 Pins trennen -> wieder Eingï¿½nge mit Pull-up
   	 
 	PCONP&=~PCUART2;									// Power Uart 2 wegnehmen  	 
 	return; 
@@ -529,9 +549,9 @@ void Init_UART2 (uint baud)			// Initialisiert Schnittstelle UART2 für GPS Direk
 	U2->IER = 0x00;										// Disable Interrupts 
   U2->FCR = 0x07; 									// FIFO control enable and reset buffers	
   U2->LCR = 0x00000083;							// Line control 8,N,1, DLAB=1
-	if (baud==9600) U2->DLL = 0x030;				// Baudrate Ganzzahlteiler für 9600 Baud
-	else if (baud==115200) U2->DLL = 0x04;	// Baudrate Ganzzahlteiler für 115200 Baud
-	else U2->DLL = 0x001;										// Baudrate Ganzzahlteiler für 460800 Baud 
+	if (baud==9600) U2->DLL = 0x030;				// Baudrate Ganzzahlteiler fï¿½r 9600 Baud
+	else if (baud==115200) U2->DLL = 0x04;	// Baudrate Ganzzahlteiler fï¿½r 115200 Baud
+	else U2->DLL = 0x001;										// Baudrate Ganzzahlteiler fï¿½r 460800 Baud 
   U2->LCR = 0x00000003;							// Line control 8,N,1, DLAB=0 	
   U2->FDR = (8<<4)|0x05;						// Fractional divider	5/8 			 
   U2->IER = 0x01;										// Enable Rx Interrupt
@@ -543,7 +563,7 @@ void Init_UART2 (uint baud)			// Initialisiert Schnittstelle UART2 für GPS Direk
 void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
 {
 	PINSEL0 = TXD0|RXD0|CAP20|CAP21;	// Uart0 - RXD0,TXD0 und Capture 2(0) und 2(1)
-	PINSEL1 = AD02|AD03|CAP30|CAP31;	// AD Eingänge AD02 und 03 und Capture 3(0) und 3(1)
+	PINSEL1 = AD02|AD03|CAP30|CAP31;	// AD Eingï¿½nge AD02 und 03 und Capture 3(0) und 3(1)
 	PINSEL4 = EINT0|EINT1|EINT2;			// Externe Interrupts EINT0,1 und 2
 	//PINSEL7 = PWM3;									// Externe PWM
 
@@ -554,11 +574,11 @@ void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
 	if (RSID&POR)																// Power On Reset
 	{	
 	 FIO2CLR = PWM_TRB|LE_TRB;									// Latch Enable LED Treiber
-	 FIO2SET = G_SHIFT|DIS_TRB;									// PWM Pin Treiber HI, 74HC595 Ausgänge Tristate, 3V3 Treiber aus
+	 FIO2SET = G_SHIFT|DIS_TRB;									// PWM Pin Treiber HI, 74HC595 Ausgï¿½nge Tristate, 3V3 Treiber aus
 	}	
 	else																				// Im getakteten Messbetrieb 
 	{
-	 FIO2CLR = LE_TRB|DIS_TRB|G_SHIFT;					// Latch Enable LED Treiber, 3V3 Treiber aus, 74HC595 Ausgänge aktiv
+	 FIO2CLR = LE_TRB|DIS_TRB|G_SHIFT;					// Latch Enable LED Treiber, 3V3 Treiber aus, 74HC595 Ausgï¿½nge aktiv
    FIO2SET = PWM_TRB;													// PWM Pin Treiber HI 	 		
   }		
 	FIO4SET	= CSFLASH1;													// FLASH 1 deselect
@@ -571,10 +591,10 @@ void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
   }	
   else gps_pending=0;																	// kein Update, kein Sleep ->reset gps_pending
 
- 	FIO0DIR = PWR_GPS|EX12_1|EX12_2|CSFLASH2|CSAF|CSBF|GSM_DTR|TXD_2;					// Port 0 Ausgänge		
-	FIO1DIR = USB_PPWR|USB_RPWR|LED1|MUX_A|MUX_B|GSMPWR|PWRKEY|EN_ANA;								// Port 1 Ausgänge		
-	FIO2DIR = DIS_TRB|LE_TRB|G_SHIFT|PWM_TRB;																					// Port 2 Ausgänge		
-	FIO4DIR	= CSFLASH1;						 																										// Port 4 Ausgänge
+ 	FIO0DIR = PWR_GPS|EX12_1|EX12_2|CSFLASH2|CSAF|CSBF|GSM_DTR|TXD_2;					// Port 0 Ausgï¿½nge		
+	FIO1DIR = USB_PPWR|USB_RPWR|LED1|MUX_A|MUX_B|GSMPWR|PWRKEY|EN_ANA;								// Port 1 Ausgï¿½nge		
+	FIO2DIR = DIS_TRB|LE_TRB|G_SHIFT|PWM_TRB;																					// Port 2 Ausgï¿½nge		
+	FIO4DIR	= CSFLASH1;						 																										// Port 4 Ausgï¿½nge
 	
 	PINMODE0 = (PULLDOWN<<14)|(PULLDOWN<<18);						// Pulldown P0.7/9 SPI1 SCK und MOSI
 	PINMODE1 = (NOPULL<<18)|(NOPULL<<20);								// No pull resistor P0.25/P0.26 - AD02/AD03	
@@ -590,22 +610,22 @@ void Init_Peripheral (void)		// Initialisiert Ports fuer Peripherie
  if ((fp.ex12==1) || (fp.ex12==2) || (fp.ex12==4)) FIO0SET = EX12_2;	// 12V extern=ein,Viasis Plus oder Viatext
  else FIO0CLR = EX12_2;																								// 12V extern=aus oder =Viasis Plus FT		
 	
- if (fp.ex12==3) PINMODE7 = (PULLDOWN<<20);														// Pulldown PWM extern Ausgang für Plus FT	
+ if (fp.ex12==3) PINMODE7 = (PULLDOWN<<20);														// Pulldown PWM extern Ausgang fï¿½r Plus FT	
 }
 
-void uswait (uint delay)			// µs Warten
+void uswait (uint delay)			// ï¿½s Warten
 {
- uint t1time=T1TC;						// Timer 1 Zählerstand
+ uint t1time=T1TC;						// Timer 1 Zï¿½hlerstand
  while (T1TC-t1time<delay);	 	// Differenz bilden
 }	
 
 uint get_ad (uchar chanel)		// A/D Wert ermitteln
-{															// Übergabe chanel - A/D Kanal
+{															// ï¿½bergabe chanel - A/D Kanal
  uint wert;										// Hilfsvariable A/D Wert
 
  PCONP|=PCADC;								// A/D Wandler Versorgung einschalten
 
- ADCR=PDN|(2<<8)|(1<<chanel);	// Kanal auswählen, enable A/D Wandler, ADCLK = 24MHz/8/3 = 1 MHz
+ ADCR=PDN|(2<<8)|(1<<chanel);	// Kanal auswï¿½hlen, enable A/D Wandler, ADCLK = 24MHz/8/3 = 1 MHz
 
  ADCR|=(STRTNOW);							// Wandlung starten
  while (!(ADSTAT&(1<<chanel)));	// warte bis DONE des indiv. Kanals gesetzt
@@ -623,24 +643,24 @@ uint get_brightness (void)		// Umgebungshelligkeit messen, A/D-Wert SFH213 Fotod
  if (PINSEL4&PWM6)				// Sind LED aktiv? 
 	PINSEL4 &= ~(PWM6);			// Disable Versorgungsregler und MBI5039 outputs, trenne PWM -> OE\ hi durch pull-up	  
  
- FIO1CLR = MUX_A|MUX_B;		// Helligkeit über MUX IC39 an CPU A/D Eingang 
+ FIO1CLR = MUX_A|MUX_B;		// Helligkeit ï¿½ber MUX IC39 an CPU A/D Eingang 
  	
  wert=get_ad(3);					// A/D Kanal 3 (AD0.3) auslesen 
  
  PINSEL4=pindef;					// Portdefinition wiederherstellen
  
- return (wert>>2);				// SFH213 A/D-Wert auf 1024 Byte normiert zurück 
+ return (wert>>2);				// SFH213 A/D-Wert auf 1024 Byte normiert zurï¿½ck 
 }
 
 void shift_to_LED (text * const sequence)	// LED Anzeigedaten an Treiberplatine senden
-{															// Übergabe sequence - Zeiger auf Sendesequenz oder T_nil
+{															// ï¿½bergabe sequence - Zeiger auf Sendesequenz oder T_nil
 															// Wenn sequence = T_nil Ausgabe Anzeigepuffer ledbuf 
 								
  uchar i=5;										// Laufvariable
  bool bicolor=FALSE;
 	
  if ((ledbuf[0]&(COL1|COL2))==(COL1|COL2)) bicolor=TRUE; // zweifarbige numerische Anzeige
- PWMMCR&=~PWMMR0I;									// Lösche Interrupt vorausgehende Zweifarbdarstellung	
+ PWMMCR&=~PWMMR0I;									// Lï¿½sche Interrupt vorausgehende Zweifarbdarstellung	
  Init_SPI ();												// SPI initialisieren 		
  FIO2CLR = LE_TRB;									// LE low
 	
@@ -661,11 +681,11 @@ void shift_to_LED (text * const sequence)	// LED Anzeigedaten an Treiberplatine 
  if (bicolor) PWMMCR|=PWMMR0I;				// zweifarbige num. Anzeige -Interrupt aktivieren	 
  else																	// einfarbige Anzeige
  {
-	while (i--) sendspi	(ledbuf[i]);		// Daten/Anzeigepuffer über SPI versenden	
+	while (i--) sendspi	(ledbuf[i]);		// Daten/Anzeigepuffer ï¿½ber SPI versenden	
 
   FIO2SET = LE_TRB;										// Latch Schiebedaten 74HC595 
   while ((FIO2PIN & LE_TRB) == 0);		// Warte bis gesetzt 
-  FIO2CLR = LE_TRB;										// Latch reset -> LED Treiber MBI5039 Datenübernahme    
+  FIO2CLR = LE_TRB;										// Latch reset -> LED Treiber MBI5039 Datenï¿½bernahme    
  }	
  PINSEL4 |= PWM6; 										// Enable Taktung Versorgungsspannungsregler
  Clear_SPI ();												// Disable SPI
@@ -681,42 +701,42 @@ void Ledaus (void)
  sendspi(AUSVCL);										// 3V3 auf Treiber aus, Clusterspannungsregler aus	
  FIO2SET = LE_TRB;									// Latch Schiebedaten 74HC595 
  while ((FIO2PIN & LE_TRB) == 0);		// Warte bis gesetzt 
- FIO2CLR = LE_TRB;									// Latch reset -> LED Treiber MBI5039 Datenübernahme	
+ FIO2CLR = LE_TRB;									// Latch reset -> LED Treiber MBI5039 Datenï¿½bernahme	
  Clear_SPI ();											// Disable SPI	   
 }	
 
-uint adj_hell (void)		// Kundenfaktor (0,1 und 2) und Abgleichwert in Helligkeit berücksichtigen 
+uint adj_hell (void)		// Kundenfaktor (0,1 und 2) und Abgleichwert in Helligkeit berï¿½cksichtigen 
 {																
  uint hellwert;									
  uchar tastind=0;											// Index Helligkeits-Abgleichwerte
  
- if (farbcode&COL1) tastind=0; 				// Berechnet wird der Helligkeitswert für die
- else if (farbcode&COL2) tastind=1; 	// aktuell gültige farbcode Variable
+ if (farbcode&COL1) tastind=0; 				// Berechnet wird der Helligkeitswert fï¿½r die
+ else if (farbcode&COL2) tastind=1; 	// aktuell gï¿½ltige farbcode Variable
  else if (farbcode&COL3) tastind=2;	
  else if (farbcode&COL5) tastind=3;	
 	
  hellwert=fp.hell[tastind]; 						// Abgleichwert und 
- return ((hellwert*(5+fp.hoff*5))/10);	// Kundenfaktor (0,1 und 2) berücksichtigen
+ return ((hellwert*(5+fp.hoff*5))/10);	// Kundenfaktor (0,1 und 2) berï¿½cksichtigen
 }
 
 void set_pwm (uchar hell, uchar hellx)		// Setze externe und LED PWM 
-{																					// Übergabe hell	-	Helligkeit LED 0 = variabel oder 1...200 * 1/2% 
+{																					// ï¿½bergabe hell	-	Helligkeit LED 0 = variabel oder 1...200 * 1/2% 
 																					// 					hellx - dto. externe PWM		
- uint pwm3,pwm6;													// Hilfsvariable Tastverhältnisberechnung	LED PWM Tastverhältnis in %
+ uint pwm3,pwm6;													// Hilfsvariable Tastverhï¿½ltnisberechnung	LED PWM Tastverhï¿½ltnis in %
 	
- if (!hell) pwm6=(adj_hell()*dimm)/100;		// Variable Helligkeit - Lichtsensor, Kundenfaktor und LED Farbe bestimmen Tastverhältnis
- else pwm6=hell;  												// sonst Vorgabe übernehmen	
+ if (!hell) pwm6=(adj_hell()*dimm)/100;		// Variable Helligkeit - Lichtsensor, Kundenfaktor und LED Farbe bestimmen Tastverhï¿½ltnis
+ else pwm6=hell;  												// sonst Vorgabe ï¿½bernehmen	
  if (!hellx) 															// Externe PWM variable Helligkeit
-	pwm3=fp.pwmex*dimm*(1+fp.hoff)/200;			// Lichtsensor und Kundenfaktor bestimmen Tastverhältnis
- else pwm3=hellx;   											// sonst Vorgabe übernehmen
+	pwm3=fp.pwmex*dimm*(1+fp.hoff)/200;			// Lichtsensor und Kundenfaktor bestimmen Tastverhï¿½ltnis
+ else pwm3=hellx;   											// sonst Vorgabe ï¿½bernehmen
  
  if (pwm6==0) pwm6=1;
- else if (pwm6>=RES_PWM) pwm6=RES_PWM-1;	// 1 bis 200 Tastverhältnis 0,5% bis 100%
+ else if (pwm6>=RES_PWM) pwm6=RES_PWM-1;	// 1 bis 200 Tastverhï¿½ltnis 0,5% bis 100%
  if (pwm3==0) pwm3=1;
  else if (pwm3>=RES_PWM) pwm3=RES_PWM-1;	// Korrektur wg. Kundenfaktor bis 150%	
 										
- PWMMR6=RES_PWM-1-pwm6;											// LED Tastverhältnis/Helligkeit einstellen
- PWMMR3=pwm3;																// Externe PWM Tastverhältnis/Helligkeit einstellen
+ PWMMR6=RES_PWM-1-pwm6;											// LED Tastverhï¿½ltnis/Helligkeit einstellen
+ PWMMR3=pwm3;																// Externe PWM Tastverhï¿½ltnis/Helligkeit einstellen
  PWMMR4=RES_PWM-1-pwm6;											// Versorgungregler Gegentaktsignal PWM-2 setzen
  if (pwm6>=(RES_PWM-1)) PWMMR5=RES_PWM;			// PWM Dauer Hi	= Versorgungregler permanent ein
  else PWMMR5=RES_PWM-1;											// Versorgungregler Gegentaktsignal reset	
@@ -724,7 +744,7 @@ void set_pwm (uchar hell, uchar hellx)		// Setze externe und LED PWM
  PWMLER=(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<0);		// Enable PWM 0, 3, 4, 5 und 6 Latch
  if (!((PINSEL4&PWM6)||(PINSEL7&PWM3)))		// Kein aktives PWM-Signal								
  {	 
-  PWMTC=PWMMR0-1;													// nächster count -> match	
+  PWMTC=PWMMR0-1;													// nï¿½chster count -> match	
   PWMTCR=(1<<3)|(1<<0);										// Enable Counter und PWM 
  }	 
  

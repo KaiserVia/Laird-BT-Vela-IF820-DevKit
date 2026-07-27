@@ -718,3 +718,789 @@ Sprachdateien zu brechen.
 WICHTIG: Firmware-Aenderungen konnten hier nicht kompiliert werden -> in Keil bauen und testen.
 Neue Diagnose hinzufuegen: Zeile in CSV -> tools/gen_dtc.py laufen lassen -> dtc_text.h aktuell;
 Konstante in dtc_codes.h ergaenzen und an der Fehlerstelle verwenden.
+
+
+---
+
+## Update 5.10 - TEMP Bring-up neues Mainboard (eigener Git-Branch, spaeter zuruecknehmen)
+
+Kontext: neues Mainboard, Verkabelung TXD/RXD/CTS/RTS unklar, Modul-Firmware unklar.
+Alle Aenderungen TEMPORAER, ueber EINEN Schalter rueckbaubar. Plan: Doku/Bringup_Plan.md.
+
+Schalter: #define BRINGUP_DEBUG 1 in btio.h. (0 = normales Verhalten.)
+
+Aenderungen:
+- main.c: Auto-Init (BT-nicht-gefunden -> init_bluetooth + automatische Konfiguration) unter
+  #if BRINGUP_DEBUG DEAKTIVIERT (else syserror++). Bei unklarer Verkabelung nichts auto-konfigurieren.
+- btio.c: neue CTS-UNABHAENGIGE Debug-Konsole bt_bringup() (#if BRINGUP_DEBUG): sendet direkt
+  ueber U1->THR (Auto-RTS/CTS aus, kein CTS-Warten); Antworten roh als hex+ascii. Funktionen:
+  Loopback (TXD<->RXD-Jumper), /PING, Baud-Scan /PING (9600..921600), eigenes Kommando, Baud+.
+- btio.h: BRINGUP_DEBUG-Schalter + Prototyp bt_bringup.
+- sicom.c: Menue-Hook - "Bluetooth (j/n)? j" startet bei BRINGUP_DEBUG bt_bringup() statt init_bluetooth().
+
+Bedienung: RS232/HyperTerminal -> Konfig -> Bluetooth? j -> Debug-Konsole.
+Test-Reihenfolge: Loopback (Jumper) -> /PING 115200 -> Baud-Scan -> eigene Kommandos (AT/$$$/PING).
+
+RUECKBAU vor Merge: BRINGUP_DEBUG auf 0; bt_bringup() (btio.c), Prototyp (btio.h),
+Menue-Hook (sicom.c) und main.c-#if-Guard entfernen. Alle Stellen mit BRINGUP markiert.
+ACHTUNG: Firmware hier nicht kompiliert -> in Keil bauen.
+
+
+---
+
+## Update 5.11 - Bring-up zurueckgebaut -> normale Software
+
+Neues Mainboard verkabelt + Bluetooth bestaetigt (/PING ok). Die temporaeren Bring-up-Aenderungen
+(5.10) sind vollstaendig entfernt - zurueck auf normalen Stand:
+- main.c: Auto-Init wieder aktiv (Self-Heal + automatische Konfiguration; #if-Guard entfernt).
+- sicom.c: "Bluetooth (j/n)? j" ruft wieder direkt init_bluetooth() (Menue-Hook entfernt).
+- btio.c: Debug-Konsole bt_bringup() entfernt.
+- btio.h: Schalter BRINGUP_DEBUG + Prototyp entfernt.
+Verifiziert: keine BRINGUP-Reste mehr (grep leer), Encoding ISO-8859/CRLF, kein \r\r\n.
+
+Doku/Bringup_Plan.md bleibt als Vorlage erhalten - falls ein weiteres Board in Betrieb genommen
+werden muss, einfach wieder anwenden (BRINGUP_DEBUG-Schalter + bt_bringup-Konsole).
+
+## Update 5.12 - F11001-Rauschen im Fehlerspeicher unterdrueckt
+
+**Beobachtung:** Im Protokoll stand `F11001 PING keine Antwort` zeitgleich mit `I1 Eingeschaltet`,
+obwohl BT danach laeuft. Ursache: `test_BT()` (btio.c) macht beim Boot **einen** /PING auf 460800
+und loggte bei Fehlschlag sofort `F11001` - erst danach heilt `main.c` per `init_bluetooth()`.
+Der Fehler ist also ein **selbstheilender Transient** (frisches Modul noch auf Werksbaud, oder
+kalter Erst-Ping).
+
+**Aenderung (btio.c, test_BT, IF820-Zweig):**
+- CR-Flush + **ein Retry** vor dem Urteil (killt den kalten Erst-Ping).
+- `puterror(DTC_BT_PING)` **entfernt** - die Boot-Probe loggt nichts mehr. Echte Defekte meldet
+  weiterhin `init_bluetooth` als `F11005 Kein BT-Modul gefunden` (-> `syserror++`).
+- `send_bt_info()` (benutzerinitiierte Info-Ausgabe) bleibt unveraendert - dort ist ein
+  Ping-Fehler ein echter, zu meldender Fehler.
+
+Hinweis: btio.c ist ISO-8859/CRLF -> **nur byte-sicher per Skript editieren** (das Edit-Tool
+interpretiert die Datei als UTF-8 und zerstoert Umlaute). Nach versehentlicher Korruption alle
+20 Umlaut-Bytes aus dem Kontext wiederhergestellt; Encoding verifiziert (ISO-8859, kein \r\r\n).
+
+## Update 5.13 - Mehrstufige automatische Zeitsynchronisation
+
+Umgesetzt nach Doku/Zeitsync_Plan.md. Eine zentrale Funktion, vier Quellen mit Rang/Drift,
+Nutzer-Steuerung. Uhr stellt sich selbst (kein "2015"/Build-Datum mehr noetig sobald eine
+Quelle da ist).
+
+**Zentrale Funktion (rtc.c):** `clock_set(dd,mm,yyyy,hh,mi,ss, utc_off, src, flags)` -
+validiert (dayofweek + Bereiche), Rang-/Drift-Pruefung (RESYNC_STUNDEN=12), UTC->Lokal
+(CLK_FROM_UTC via fp.utc), Offset-Update (CLK_SET_UTC), schreibt RTC nur bei >3 s Abweichung,
+Info-Ereignis nur bei Quellenwechsel (clock_logsrc). CLK_FORCE umgeht Rang/Drift/Auto-Aus.
+Globals g_timesrc/g_timesync_h (RAM, kein fp-Eingriff). Raenge: NONE0 / LTE1 / GPS2=MANUAL2 / MQTT3.
+
+**Quellen:**
+- Backend/MQTT (mqtt.c): Inline-RTC-Block -> clock_set(...,SRC_MQTT,CLK_SET_UTC).
+- GPS-RMC (gpsio.c): bei gueltigem Fix Feld1=hhmmss, Feld9=ddmmyy -> clock_set(...,SRC_GPS,CLK_FROM_UTC).
+- LTE-NITZ (gsmio.c): neue Funktion gsm_nettime(force) - AT+QLTS=2 parsen (Lokalzeit+Zeitzone in
+  Viertelstunden) -> clock_set(...,SRC_LTE,CLK_SET_UTC). best-effort, in test_registration mit 0 gerufen.
+- Build-Datum (rtc.c InitRTC): Fallback bei ungestellter Uhr (5.12).
+- Manuell (sicom.c Datum/Zeit-Menue): nach set_date/set_time -> clock_mark_manual() (SRC_MANUAL).
+
+**Nutzer (sicom.c Information und Zeit):**
+- Anzeige "Zeitquelle: Backend/GPS/Netz/manuell/ungestellt" (time_source_text()).
+- Menuepunkt 7 "Zeit jetzt synchronisieren": gsm_nettime(1) erzwungen (Code 0x0067).
+- Menuepunkt 8 "Automatische Zeit ein/aus": fp.autotime_off umschalten (Code 0x0068).
+- "zurueck" jetzt Item 9 (Return 0x0069); select('9',1).
+
+**Persistenz:** fp-Reserve 'fillbytes[2]' -> 'autotime_off' (==1 = aus, sonst ein; Default ein,
+robust gegen 0x00 und 0xFF). Layout unveraendert (keine gespeicherten Parameter gebrochen).
+
+**Codes:** 4 Info-Ereignisse 17050-17053 (Typ I) in Diagnose-Codes.csv; dtc_text.h neu generiert
+(114 Eintraege). EV_TIME_* in rtc.h.
+
+Encoding aller geaenderten ISO-8859-Dateien verifiziert (kein \r\r\n, keine neuen Replacement-
+Zeichen; gsmio.h/sictxt.c hatten je vorbestehende). Version -> 5.13. In Keil bauen und testen.
+
+HINWEIS: AT+QLTS wirkt nur, wenn das Modem gerade auf dem GSM-MUX-Kanal eingebucht ist (sonst
+liefert "Zeit jetzt synchronisieren" "Keine Netzzeit"); der automatische Pfad laeuft nach der
+Registrierung in test_registration.
+
+## Update 5.14/5.15 - CTS-Timeout begrenzt + Warning-Log, fruehe Seriennummer-Pruefung
+
+**Problem 1:** Ohne/falsch verdrahtetes CTS (RTS/CTS vertauscht) blockierte putb() pro Byte fast
+eine ganze Watchdog-Periode -> MCU "haengt brutal", danach F11009. Ursache: CTS geht nie LOW.
+
+Fix (sio.c putb): CTS-Warteschleife auf `CTS_WAIT_MS` (200 ms, an EINER Stelle einstellbar)
+begrenzt statt ~WDT-Periode. Bei Ablauf wird Byte verworfen, globales Flag `cts_timeout` gesetzt
+(KEIN Logging in putb -> keine Rekursion/Flut). In bt_command() wird daraus EINMAL (throttled 2 s,
+nicht ueber die BT-UART) eine Warnung + Protokolleintrag: neuer Code **W11015 "CTS Timeout"** (Typ W).
+Zusatz: `put_dtc()` gibt jetzt den echten Typ-Praefix (F/W/I) aus statt hart 'F'.
+
+**Problem 2:** Wenn das Geraet noch keine gueltige Seriennummer hat, kann BT-Name/PIN nicht gesetzt
+werden -> Init lief bisher erst halb durch und scheiterte spaet.
+
+Fix (btio.c init_bluetooth): FRUEHE Pruefung ganz am Anfang (vor jeder Modul-Interaktion) -
+`!isdigit(serno[0]) || last4==0` -> `F11008 "Seriennummer nicht gesetzt"` (Code existierte bereits)
+auf Konsole + ins Protokoll, dann sauberer Abbruch. Kein sinnloses Scannen/Umkonfigurieren mehr.
+
+Codes: W11015 in Diagnose-Codes.csv (Typ W) + dtc_text.h neu generiert (115 Eintraege) +
+DTC_BT_CTS_TIMEOUT in dtc_codes.h. F11008 unveraendert (nur frueher ausgeloest). Version -> 5.15.
+Hinweis: CTS_WAIT_MS ggf. erhoehen, falls bei sehr langsamer BT-Gegenstelle im Normalbetrieb
+W11015 faelschlich kommt.
+
+
+---
+
+## Update 5.16 - Selbstheilende BT-Init mit CTS-Bootstrap (Werksmodul/Modultausch)
+
+**Problem:** Ab 5.14/5.15 wartet `putb()` vor JEDEM Byte an UART1 auf CTS-LOW. Ein Modul im
+**Werkszustand** (Flow Control AUS, `F=00`) treibt seine RTS-Leitung aber nicht als "ready" ->
+die MCU-CTS (P2.2) bleibt HIGH. Folge: die Firmware kann nicht einmal das `/PING` zur Erkennung
+senden, geschweige denn das `STU,...,F=01`, das Flow Control ueberhaupt erst einschaltet ->
+`W11015 CTS Timeout` auf allen Baudraten -> `F11009 BT UART Init fehlgeschlagen`. **Deadlock:**
+Zum Einschalten von Flow Control muesste gesendet werden, aber Senden ist bis zum Einschalten
+blockiert. (Das Debug-Tool 5.10 lief nur, weil dessen `putb()` die CTS-Pruefung noch nicht hatte.)
+
+**Fix:** Neues globales Flag `cts_bypass` (sio.c/sio.h). In `putb()` ist die CTS-Warteschleife
+jetzt mit `if (!cts_bypass)` geklammert -> waehrend Bring-up/Erst-Konfiguration kann ohne
+CTS-Handshake gesendet werden (gefahrlos, da das Modul bei `F=00` seinerseits keine Flow Control
+macht).
+
+`init_bluetooth()` (btio.c) neu dreistufig & selbstheilend - erkennt auch **Werksreset oder
+Modultausch**, weil es sich nie auf gespeicherte Werte verlaesst:
+- **Phase 0 (Schnellpfad, CTS scharf):** Nur wenn CTS bereits LOW -> `/PING @ IF820_BAUD` +
+  `GTU`-Pruefung `F=01`. Erfolg -> `fastpath`, Phase A/B/C entfallen (schnellster Fall, kein
+  unnoetiges W11015 auf Werksmodulen, da nur bei CTS-LOW versucht).
+- **Phase A (Baud-Scan, CTS AUS):** `cts_bypass=1`, `/PING` ueber
+  `{460800,115200,921600,307200,230400,9600}`. Findet auch das Werks-/getauschte Modul (115200/F=00).
+- **Phase B (Konfig, CTS AUS):** Wenn nicht auf Zielbaud ODER `F!=01`: `bt_set_flowcontrol()`
+  (`STU B=460800,F=01` -> Host 460800 -> `/SCFG`) + `bt_reboot()` (`/RBT`, Modul kommt sauber mit
+  `F=01` aus dem Flash hoch).
+- **Phase C (Verifikation, CTS scharf):** `cts_bypass=0`, `/PING` mit echtem CTS-Handshake.
+  Antwort -> Handshake elektrisch bewiesen -> weiter mit Name/PIN. **Kein** `/PING` trotz
+  `F=01`+Reboot -> `F11009` "CTS/RTS pruefen" + sauberer Abbruch = **echter Verdrahtungsfehler**
+  (unterscheidet heilbaren Werkszustand von HW-Defekt).
+
+`cts_bypass` wird auf ALLEN Austrittspfaden wieder auf 0 gesetzt (kein Haengenbleiben). Die alte
+`bt_ensure_flowcontrol()` bleibt definiert, wird hier aber nicht mehr aufgerufen (durch Phase B/C
+ersetzt). Version -> 5.16 (`sprachen/sictxt.c` `T_version`).
+
+**Noch zu tun:** In Keil kompilieren + auf Hardware verifizieren (Werksmodul-Fall: erst Scan,
+dann automatische Umkonfiguration auf 460800/F=01 + Reboot, danach Menue ueber BT).
+
+
+---
+
+## Update 5.17 - Gebremste + diagnosefaehige IF820-Erkennung (Scan haengt nicht mehr)
+
+**Symptom (5.16 auf HW):** Kein W11015 mehr (cts_bypass greift, Senden frei), aber der Baud-Scan
+lieferte 6x `/PING` ohne Antwort und brauchte **~10 min**, dann `F11009`. Modul lebt (GTU im
+5.10-Debugtool antwortet).
+
+**Ursache:** `wait_message()` verlaengert bei JEDEM empfangenen Byte den Timeout
+(`ltime=mstimer+timeout/2`). Bei falscher Baud kommt Muell herein -> die Warteschleife lief pro
+Baud sehr lange, statt sauber abzubrechen. Ausserdem sendete der Scan die Zielbaud (460800)
+zuerst -> Werksmodul (115200) bekam erst Muell, was den Modul-Parser verstopfte.
+
+**Fix (btio.c):** Neuer Helfer `bt_scan_ping(baud)` fuer die Erkennung (Phase A):
+- **Harte Zeitgrenze** 250 ms pro Baud ueber eigenen `mstimer`-Deadline-Loop - unabhaengig von
+  RX-Aktivitaet (kein Verlaengern durch Muell mehr) -> Gesamt-Scan ~1,5 s statt Minuten.
+- **CR-Flush + RX-Puffer leeren** vor jedem `/PING` (gegen Parser-Verstopfung, 5.98).
+- **Roh-RX-Dump** am Terminal: ` scan <baud>: <empfangene Zeichen>` (nicht darstellbare Bytes als
+  '.') bzw. `(keine Antwort)`. Damit sieht man pro Baud, WAS das Modul liefert - Kern der
+  Ferndiagnose.
+- Scan-Reihenfolge: **115200 (Werksbaud) zuerst**, dann 460800, dann die uebrigen -> ein frisch
+  zurueckgesetztes/getauschtes Modul wird ohne Muell-Vorlauf sauber getroffen.
+
+Phasen 0/B/C unveraendert (5.16). Version -> 5.17.
+
+**Test:** Ueber RS232 `Bluetooth? j` -> die ` scan <baud>: ...`-Zeilen mitlesen. Antwortet das
+Modul bei 115200 mit `@R,...,/PING,0000` -> Erkennung greift, dann Phase B (STU F=01+/SCFG+/RBT)
+und Phase C (Verifikation mit CTS). Was pro Baud zurueckkommt, sagt uns, falls es noch klemmt,
+genau wo.
+
+
+---
+
+## Update 5.18 - Ablaufmeldungen fuer die BT-Init (sichtbar, wo es haengt)
+
+Diagnose-Helfer `bt_msg()` / `bt_msgnum()` (btio.c): Klartext-Zeilen NUR ans Terminal
+(`connect=concpy & ~UART1`, nicht ins Modul). `init_bluetooth()` gibt jetzt jeden Schritt aus,
+sodass die LETZTE Zeile im Terminal immer zeigt, wo der Ablauf steht:
+
+```
+BT 5.18 init: Command-Mode ok, Erkennung startet
+ Phase 0: Schnellpfad-Ping (CTS ist LOW)          (nur falls CTS schon LOW)
+ Phase A: Baud-Scan (ohne CTS-Handshake):
+ scan 115200: @R,...,/PING,0000,...               (Roh-RX-Dump je Baud, aus 5.17)
+ scan 460800: (keine Antwort)
+ -> IF820 erkannt bei Baud 115200
+ Phase B: Flow Control setzen (STU F=01 + /SCFG)...
+ Phase B: Modul-Reboot (/RBT), warte auf Boot...
+ Phase C: Verifikation /PING mit CTS-Handshake...
+ Phase C: OK - CTS-Handshake funktioniert
+ Name setzen/pruefen (VIASIS_<serno>)...
+BT-Init fertig: IF820, 460800, F=01
+```
+
+Fehlerfaelle bleiben wie gehabt (`F11009` bei CTS-Fehler in Phase C, `-> kein IF820 gefunden`
+wenn keine Baud antwortet). Version -> 5.18.
+
+Damit ist bei der Ferndiagnose sofort erkennbar, welcher Schritt haengt bzw. was das Modul pro
+Baud liefert.
+
+
+---
+
+## Update 5.19 - Schritt-Marker im Scan + TX-Wait begrenzt (Haenger lokalisieren)
+
+**Symptom (5.18):** Ausgabe blieb bei ` Phase A: Baud-Scan` stehen - der Ablauf haengt INNERHALB
+`bt_scan_ping`, noch vor der ersten ` scan`-Zeile. Also entweder in `Init_BT_ch` oder beim Senden
+auf UART1.
+
+**Zwei Massnahmen:**
+1. `bt_scan_ping` gibt jetzt VOR jeder Aktion Marker aus: ` scan @<baud>` -> `  [ch] sende CR`
+   -> `  [CR] sende /PING` -> `  [PING] warte 250ms` -> `  rx: <daten>`. Die letzte sichtbare
+   Zeile lokalisiert den Haenger exakt.
+2. `putb()` (sio.c): die TX-FIFO-Warteschleife (`while(!(U1->LSR&THRE))`) hat jetzt eine harte
+   50-ms-Grenze (`mstimer`). Bislang konnte sie ewig haengen, wenn der Watchdog von einem anderen
+   Thread gefuettert wird und THRE nie gesetzt wird (z. B. UART1-TX nicht bereit). Kein Dauerhang
+   mehr beim Senden.
+
+Version -> 5.19. Naechster Lauf zeigt an den Markern, ob es beim Kanalwechsel (`Init_BT_ch`) oder
+beim Senden klemmt.
+
+
+---
+
+## Update 5.20 - TX-Steckt-Zaehler (TX-Sendeproblem vs. stummes Modul trennen)
+
+**Erkenntnis (5.19):** Haenger weg (TX-Wait auf 50 ms begrenzt), aber `rx: (nichts)` auf ALLEN
+Baudraten. Marker `sende CR/PING` beweisen NICHT, dass Bytes rausgingen - `putstr` kehrt jetzt auch
+nach TX-Timeout zurueck. Verdacht: UART1-TX zum Modul geht nicht raus (der alte 10-min-Haenger war
+`putb()` an der THRE-Warteschleife). Das "/PING" in alten Logs war nur das Terminal-Echo von
+`bt_command`.
+
+**Diagnose-Erweiterung:** globaler Zaehler `bt_tx_stuck` (sio.c) - wird erhoeht, wenn die
+TX-FIFO-Warteschleife (`THRE`) in den 50-ms-Timeout laeuft. `bt_scan_ping` nullt ihn pro Baud und
+haengt an die Ausgabe `[TXsteckt=<n>]`.
+
+Auswertung beim naechsten Lauf:
+- `[TXsteckt>0]` -> Sender kommt nicht raus (UART1-TX/MUX/PCONP/Baud-Divisor oder HW). Modul
+  bekommt gar kein /PING.
+- `[TXsteckt=0]` + `rx:(nichts)` -> TX ok, Modul antwortet nicht (Command-Mode? RX-Verdrahtung?
+  Modul stumm?).
+
+Version -> 5.20. Damit ist die naechste Weiche eindeutig.
+
+
+---
+
+## Update 5.21 - WURZELURSACHE: Hardware-Auto-CTS blockierte TX (Werksmodul)
+
+**Beweis (5.10-Debugtool vs. 5.20 auf gleicher HW):** Debugtool: Loopback ok, `/PING` -> Modul
+antwortet (`@E,...,ERR,E=0203`), `GTU` -> `@R,...,B=0001C200,...,F=00,...` = Modul lebt, 115200,
+**F=00**. Produktiv 5.20: `[TXsteckt=6]` auf jeder Baud - der Sender kam gar nicht raus.
+
+**Ursache:** `Init_UART1()` (hard.c) schaltete IMMER `U1->MCR |= (1<<7)|(1<<6)` = **Hardware
+Auto-RTS/Auto-CTS** der LPC1766-UART1 ein. Auto-CTS haelt den Sender HARDWARESEITIG an, solange
+CTS HIGH ist. Werksmodul F=00 -> RTS wird nicht als "ready" getrieben -> CTS HIGH -> TX komplett
+blockiert, `THRE` nie gesetzt -> `[TXsteckt]`. Der `cts_bypass` (5.16) umging nur die SOFTWARE-
+CTS-Schleife in `putb()`; die HARDWARE-Auto-CTS im MCR blieb aktiv und blockierte weiter. Deshalb
+half der Bypass nicht. (Das 5.10-Debugtool aktiviert Auto-CTS nicht -> sendet immer.)
+
+**Fix (hard.c Init_UART1):** MCR-Flusssteuerung an `cts_bypass` gekoppelt:
+- `cts_bypass=1` (Bring-up/Scan): `U1->MCR &= ~((1<<7)|(1<<6))` -> Auto-CTS AUS -> TX sendet auch
+  bei CTS HIGH (Werksmodul erreichbar).
+- `cts_bypass=0` (Normalbetrieb/Phase C): `U1->MCR |= (1<<7)|(1<<6)` -> HW RTS/CTS an.
+
+Damit schaltet `cts_bypass` jetzt BEIDE CTS-Ebenen (Software-Warteschleife in putb + Hardware
+Auto-CTS im MCR). `extern volatile uchar cts_bypass;` in hard.c ergaenzt (sio.h ist dort
+auskommentiert). Version -> 5.21.
+
+**Erwartung:** Phase A findet das Modul jetzt bei 115200 (`rx: @R,...,/PING,0000`, TXsteckt=0) ->
+Phase B stellt auf 460800/F=01 + /RBT -> Phase C verifiziert mit echtem CTS-Handshake.
+
+**BESTAETIGT auf Hardware (5.21):** Werksmodul (115200/F=00) laeuft vollstaendig selbstheilend
+durch: `scan @115200 -> @R,/PING,0000 [TXsteckt=0]` -> erkannt -> Phase B `STU F=01`+`/SCFG`+`/RBT`
+-> Phase C `/PING` mit CTS-Handshake OK -> Name `VIASIS_<serno>` gesetzt+verifiziert ->
+"BT-Init fertig: IF820, 460800, F=01". Der komplette Bring-up-Deadlock (5.15-5.20) ist geloest;
+Wurzelursache war die HW-Auto-CTS im MCR.
+
+Kleiner Restpunkt (kosmetisch): `bt_show_name()` gab "Geraetename = ?" aus, obwohl GDN
+`N=VIASIS_26SC9993...` lieferte - vermutlich Parse-/Puffer-Timing beim Auslesen direkt nach dem
+Setzen. Nicht funktional (Name ist gesetzt+gesichert). Bei Gelegenheit die Anzeige nachziehen.
+
+
+---
+
+## Update 5.22 - /SCFG-Persistenz haerten + Idempotenz sichtbar machen
+
+**Beobachtung (2. Lauf):** Init lief beim WIEDERHOLEN erneut komplett durch (STU/SCFG/RBT),
+obwohl scheinbar schon konfiguriert. Ursache: Der Scan fand das Modul beim 2. Lauf wieder bei
+**115200/F=00** - es war also erneut im Werkszustand. Im Log fehlt nach `/SCFG` das
+`@R,...,SCFG,0000`. Verdacht: **/SCFG persistiert nicht**, weil es DIREKT nach dem Baud-Wechsel
+gesendet wird, bevor das Modul seine UART auf 460800 umgestellt hat -> /SCFG verpufft, Flash
+behaelt 115200/F=00; `/RBT` behaelt nur die RAM-Werte (deshalb war Phase C ok), aber der naechste
+Kaltstart ist wieder Werkszustand.
+
+**Wichtig:** Die gewuenschte Idempotenz ("wenn alles passt, nichts tun") ist bereits vorhanden -
+Phase B schreibt nur bei `Baud!=460800 || F!=01`, Name nur bei Abweichung, Phase 0 (Schnellpfad)
+beendet sofort. Sie greift nur nicht, solange das Modul nach jedem Kaltstart wieder auf 115200
+faellt.
+
+**Fix (btio.c bt_set_flowcontrol):**
+- nach dem STU (Antwort @ alter Baud) `osDelay(80)` -> Modul stellt eigene UART auf Zielbaud um,
+- dann `Init_BT_ch(IF820_BAUD)` (Host), `osDelay(20)` + CR-Flush,
+- dann erst `/SCFG` (Antwort `SCFG,0000` wird geprueft).
+- Rueckgabewert wird in Phase B jetzt gemeldet: " STU + /SCFG OK -> in Flash gesichert" bzw.
+  " /SCFG FEHLGESCHLAGEN -> NICHT persistiert!". Skip-Fall meldet
+  " bereits 460800/F=01 -> nichts schreiben/rebooten".
+
+Version -> 5.22. Naechster Test zeigt, ob /SCFG jetzt bestaetigt (SCFG OK) und - nach echtem
+Power-Cycle - ob das Modul auf 460800/F=01 bleibt (dann greift der Schnellpfad und Init endet sofort).
+
+
+---
+
+## Update 5.23 - Auto-RTS bleibt immer an (Modul kann bei F=01 antworten) + MUX-Verdacht
+
+**Beobachtung:** `/SCFG FEHLGESCHLAGEN`, Phase C `W11015`/`F11009`. Bei F=00 laeuft alles (Debug-
+Tool, Phase A) - sobald F=01 aktiv ist, wird das Modul STUMM.
+
+**Zwei zusammenwirkende Ursachen:**
+1. **Eigener Fehler (5.21):** Beim `cts_bypass` hatte ich BEIDE MCR-Bits geloescht - Auto-CTS (7)
+   UND Auto-RTS (6). Auto-RTS ist aber das Signal, mit dem die MCU dem Modul "empfangsbereit"
+   meldet. Ohne assertiertes RTS sendet ein F=01-Modul seine Antwort (z. B. `/SCFG`-Ack) NICHT ->
+   `/SCFG` scheitert. Fix (hard.c): **Auto-RTS immer an**, nur Auto-CTS per `cts_bypass` schalten.
+2. **Hardware/MUX (Anwender-Hinweis):** CTS/RTS laufen auf dem Mainboard ueber einen MUX
+   (IC36/IC39, CSAF/CSBF) - anders als auf dem DVK (direkte 4-Draht, wo Flow Control lief, s.
+   Update 5.84). Ob der LPC-RTS1-Pin (P2.7) das Modul-CTS ueber den MUX wirklich erreicht, ist
+   offen. Fehlerbild (Modul stumm sobald F=01) passt zu "RTS-Handshake kommt nicht durch".
+
+**Test 5.23:** Wenn Fix 1 reicht (RTS1 erreicht Modul via MUX) -> `/SCFG` meldet OK, Modul
+antwortet bei F=01, Persistenz haelt. Wenn NICHT -> MUX gibt den RTS-Handshake nicht durch ->
+Entscheidung noetig: HW-seitig RTS-Routing klaeren ODER Modul auf **F=00** betreiben (im Debug-
+Tool voll funktionsfaehig, bidirektional). Version -> 5.23.
+
+
+---
+
+## Update 5.24 - Ueberfluessigen /RBT aus Phase B entfernt (Phase C pingte zu frueh)
+
+**Beobachtung (5.23):** `/SCFG` OK (persistiert!), aber Phase C danach `W11015`/`F11009`.
+`/RBT.` (nur 1 Punkt = Boot-Byte kam schnell) -> Phase C pingte 300 ms spaeter, da war das Modul
+noch am Booten -> RTS/CTS noch HIGH -> W11015.
+
+**Ursache:** Der `/RBT` in Phase B war UEBERFLUESSIG. `STU` aktiviert 460800/F=01 sofort im RAM;
+`/SCFG` sichert es in Flash. Das Modul LAEUFT danach bereits auf 460800/F=01 (es hat ja gerade
+`@R,/SCFG,0000` geantwortet). Der Reboot nahm es nur kurz offline, und Phase C traf das noch
+bootende Modul.
+
+**Fix:** `bt_reboot()` aus Phase B entfernt. Phase C verifiziert direkt am laufenden Modul ->
+CTS ist LOW (Modul empfangsbereit) -> `/PING` -> `@R` -> OK. Version -> 5.24.
+
+Stand: Erkennung + Persistenz + Verifikation sollten jetzt ohne Reboot-Timingluecke durchlaufen.
+
+
+---
+
+## Update 5.25 - Konfiguriertes Modul wird in Phase 0 erkannt (kein Fehl-Fallback) + Legacy gekuerzt
+
+**Symptom (5.24-Log):** Phase 0 pingte das Modul erfolgreich bei 460800 (`@R,/PING,0000`,
+Persistenz greift also!), fiel aber trotzdem in Phase A -> dort `rx:(nichts)` -> "kein IF820" ->
+**Laird/RN4678-Fallback** -> `F11010`. Aergerlich, weil das Modul offensichtlich da war.
+
+**Ursache:** Ein Modul mit **F=01** kommuniziert nur mit vollem Handshake (Auto-CTS an). Phase 0
+(Auto-CTS an) fand es -> aber die Detbaud-Bedingung haing zusaetzlich an `bt_get_flowcontrol()==1`;
+schlug die GTU-Abfrage fehl, wurde `detbaud` NICHT gesetzt -> Bypass-Scan (Phase A, Auto-CTS AUS)
+-> der kann ein F=01-Modul nicht ansprechen -> nichts -> Fallback.
+
+**Fix (btio.c Phase 0):** `detbaud=IF820_BAUD` wird jetzt schon gesetzt, sobald `/PING@460800`
+antwortet (Modul gefunden). Die F=01-Pruefung entscheidet nur noch, ob Phase B noch nachkonfiguriert
+(`fastpath`). Damit landet ein bereits konfiguriertes Modul nie mehr faelschlich im Legacy-Fallback.
+
+**Timeout-Korrektur (wichtig):** In `bt_command` ist ein Timeout **>10000** ein CRLF-Flag
+(`|pause|-10000`), KEIN 10-s-Wert. `10300` = "CRLF + 300 ms". Der Laird/RN4678-Fallback dauert
+real also ~5-6 s (nichts gefunden), nicht Minuten (frueher falsch dargestellt).
+
+**Legacy wie gewuenscht ueberarbeitet:**
+- Fallback jetzt mit Trace `" Fallback: kein IF820 -> kurze Laird/RN4678-Erkennung"`.
+- Wartezeiten gekuerzt: Laird-Loop osDelay 300->150 ms, RN4678-Silence-Gap 500->250 ms.
+- Neue Info-Codes: **I11016 "Laird-Modul nicht erkannt"**, **I11017 "RN4678-Modul nicht erkannt"**
+  (Doku/Diagnose-Codes.csv + dtc_codes.h + dtc_text.h via gen_dtc.py regeneriert). Werden im
+  Fallback geloggt; finaler Sammelcode bleibt F11010.
+
+Version -> 5.25.
+
+
+---
+
+## Update 5.26 - GTU-Abfrage robust (falsches "F noch nicht 01" in Phase 0 behoben)
+
+**Beobachtung (5.25):** Modul persistent auf 460800/F=01 (Phase-B-GTU zeigt `F=01`, "nichts
+schreiben/rebooten"). ABER Phase 0 meldete faelschlich "F noch nicht 01" -> deshalb liefen /DIS,
+Phase B, Phase C durch, obwohl alles passt. F=01 wird also KORREKT gespeichert - nur die ERSTE
+GTU-Abfrage (direkt nach dem /PING) kam ohne Antwort zurueck (-1 = unbekannt).
+
+**Ursache:** `bt_get_flowcontrol()` fragte GTU genau einmal ab. Direkt nach dem /PING ist die
+UART-Antwort noch nicht sauber lesbar (Puffer-/Timing-Nachlauf) -> Timeout -> -1 -> Code wertete
+das als "nicht F=01".
+
+**Fix (btio.c bt_get_flowcontrol):** bis zu 3 Versuche mit RX-Flush (`bxi=rxi`), Timeout 300->400 ms
+und 60 ms Settle zwischen den Versuchen. Damit liest Phase 0 F=01 zuverlaessig ->
+`fastpath` greift -> "bereits konfiguriert (F=01) -> fertig" -> /DIS/Phase B/Phase C entfallen.
+
+Version -> 5.26. Erwartung: ein konfiguriertes Modul ist ueber Phase 0 (fast) sofort durch,
+ohne Nachkonfiguration.
+
+
+---
+
+## Hinweis: btio.c war abgeschnitten (Build-Fehler) - wiederhergestellt
+
+Symptom (Keil): `btio.c(765): error #67: expected a "}"` + "last line of file ends without a
+newline". Ursache: die Datei war am Ende abgeschnitten - mitten in `set_bt_pin` (Laird-Zweig),
+4 schliessende Klammern fehlten (Editor/Linter-Artefakt, keine inhaltliche Ursache).
+
+Behebung: Der hintere, NIE geaenderte Teil (`set_bt_pin` bis Dateiende) wurde aus dem Git-Stand
+(`git show HEAD:sism555/btio.c`) zurueckgeholt und an den unveraenderten Kopf (alle 5.16-5.26-
+Aenderungen) angehaengt. Ergebnis: 783 Zeilen, 127/127 Klammern, alle Funktionen vorhanden.
+Die `concopy`-Warnung (unbenutzte Variable) stammt aus dem Originalcode und ist harmlos.
+
+
+---
+
+## Update 5.27 - init_bluetooth als klarer Prüf-dann-fixe-Ablauf (Anwender-Struktur)
+
+Neu strukturiert nach Anwender-Vorgabe - jede Eigenschaft einzeln pruefen, nur bei Bedarf
+setzen, am Ende genau EINMAL speichern/rebooten wenn etwas geaendert wurde:
+
+- **Erkennung:** Modul + Baud finden. Erst `/PING@460800` MIT Handshake (konfiguriertes Modul,
+  F=01). Kommt nichts -> Baud-Scan OHNE CTS (Werksmodul F=00 haelt CTS HIGH - deshalb zwingend
+  ohne Handshake).
+- **Schritt 1/2:** Baud 460800 + Flow Control F=01. `STU` setzt BEIDES gemeinsam (ein Kommando),
+  `GTU` liest beides. Nur wenn `Baud!=460800 || F!=01` -> `bt_set_flowcontrol()` (STU + /SCFG),
+  `changed=1`, danach Handshake-Modus.
+- **Schritt 3:** Name. `bt_get_name()` prueft; nur bei Abweichung `bt_set_name()` (SDN$ schreibt
+  Flash direkt), `changed=1`.
+- **Schritt 4:** Nur wenn `changed` -> `/RBT` + Verifikation `/PING` MIT Handshake (scheitert ->
+  F11009). Wenn nichts geaendert -> sofort fertig (kein Speichern, kein Reboot).
+
+**Wichtige Korrektur ggue. 5.16-5.26:** Die `GTU`-Abfrage laeuft jetzt NACH `/DIS` (nicht mehr
+direkt nach dem `/PING` wie im alten Phase 0) -> zuverlaessig. Damit verschwindet das falsche
+"F noch nicht 01". Der `fastpath`-Zweig entfaellt; die Idempotenz kommt jetzt sauber ueber
+`changed`.
+
+Ergebnis: konfiguriertes Modul -> Erkennung(Handshake) + GTU + GDN, alles ok, `changed=0` ->
+"nichts geaendert -> fertig" (kein Reboot). Werksmodul -> Scan(ohne CTS) -> setzen -> speichern ->
+Reboot -> verifizieren. Version -> 5.27.
+
+
+---
+
+## Update 5.28/5.29 - Saubere cmd-Ausgabe (formatierte Echos) + Reboot-Verifikation robust
+
+**Formatierung (Anwenderwunsch: Echos behalten, aber lesbar):** `bt_command` spiegelt Kommando/
+Antwort nicht mehr roh (alles zusammengeklebt), sondern schickt das Kommando NUR ans Modul und gibt
+formatiert je eine eigene Zeile am Terminal aus: `  > <gesendet>` und `  < <empfangen>`. (Das
+kurzzeitige `bt_quiet`-Experiment wieder entfernt - Echos bleiben sichtbar.)
+
+**Reboot-Bug behoben (W11015 nach Namensaenderung):** Nach `/RBT` war das Modul beim Verifikations-
+`/PING` noch am Booten -> CTS HIGH -> W11015 -> F11009. Fix:
+- `bt_reboot()` wartet nach dem Boot-Signal zusaetzlich 1,5 s (Modul-UART/RTS erst dann bereit).
+- Schritt-4-Verifikation pingt bis zu 4x mit 400 ms Pause statt nur einmal.
+
+**Hinweis Datei-Truncation:** btio.c wurde zwischendurch MEHRFACH am Ende abgeschnitten (mitten in
+set_bt_pin, 4 fehlende Klammern -> Keil `#67 expected "}"`). Ursache extern (Editor/Linter/Sync auf
+PC-Seite, nicht der Code). Jeweils via `git show HEAD:sism555/btio.c` (unveraenderter Schwanz)
+wiederhergestellt. Falls es erneut auftritt: sicherstellen, dass btio.c nicht parallel in einem
+anderen Editor offen ist/gespeichert wird. Version -> 5.29.
+
+
+---
+
+## Update 5.30 - WURZELURSACHE "kann nicht verbinden": CYSPP haing als Ausgang (IC54/PCA9554)
+
+**Symptom:** Nach Flashen von 5.29 auf dem Eval-Kit (wo SPP frueher lief) war das Geraet zwar
+sichtbar (VIASIS_...), aber Classic-SPP-Verbindung scheiterte. Nach vollem **Power-Cycle** ging es.
+
+**Ursache:** CYSPP laeuft ueber IC54 (PCA9554) Bit 7. Ein frueherer `bt_cmdmode()` (bei
+Konfiguration) setzt Bit 7 als **Ausgang HIGH**. Der PCA9554 behaelt seine Register ueber einen
+LPC-Reflash hinweg - nur ein echter Power-Cycle setzt ihn auf "alle Eingaenge". Beim 5.29-Boot war
+`test_BT()` erfolgreich -> `init_bluetooth()` (und damit `bt_release()`) lief NICHT -> CYSPP blieb
+als Ausgang HIGH -> das Modul konnte die Leitung beim SPP-Connect nicht auf LOW ziehen ->
+Verbindung scheitert. Power-Cycle setzt PCA9554 zurueck -> Modul kann treiben -> Verbindung geht.
+
+**Fix (main.c, Boot):** `if (fp.btmodem==IF820) bt_release();` am Anfang des BT-Boot-Blocks (vor
+test_BT). Damit ist CYSPP nach jedem Start garantiert Eingang -> Modul kann die Leitung treiben,
+auch nach reinem Reflash ohne Power-Cycle. Version -> 5.30.
+
+
+---
+
+## Update 5.31 - CYSPP/BT_LINK Live-Monitor im Testmenue (HW-Diagnose Mainboard)
+
+Symptom: SPP-Connect geht auf dem Eval-Kit, NICHT auf dem Mainboard mit Chip-Modul -> Verdacht
+CYSPP-Leitung (Mainboard war fuer RN4678-Statuspin ausgelegt; IF820-CYSPP muss auf IC54 Bit 7
+liegen).
+
+Neu: `bt_cyspp_monitor()` (btio.c) - liest IC54 Bit 7 (CYSPP/BT_LINK) alle ~120 ms und gibt bei
+Zustandswechsel eine Zeile aus (`CYSPP bit7 = HIGH/LOW`), Ende per Tastendruck (max ~30 s).
+Erreichbar ueber: Menue -> 6 Component tests -> 8 CYSPP/BT_LINK monitor. (Ende-Taste im Component-
+Menue jetzt '9'.)
+
+Anwendung am Mainboard: Monitor starten, per BT verbinden.
+- springt auf LOW -> Modul treibt CYSPP, Signal kommt am MCU/IC54 an -> Leitung ok.
+- bleibt HIGH (obwohl Modul-Pin laut Oszi LOW zieht) -> Signal kommt nicht an -> CYSPP-Netz/
+  falscher Modul-Pin auf dem Mainboard (RN4678-Statuspin != IF820-CYSPP-Position pruefen).
+
+Dateien: btio.c (+bt_cyspp_monitor), btio.h (Prototyp), sictxt.h (T_comp +Punkt 8),
+sicom.c (compmenu case '8', Ende '9'). Version -> 5.31.
+
+
+---
+
+## Update 5.32 - CYSPP-Monitor ins richtige Testmenue (Hauptmenue->3) verschoben
+
+5.31 hatte den Monitor faelschlich ins "Component tests" (Konfig-/Werksmenue) gelegt. Jetzt im
+normalen "Testfunktionen"-Menue (Hauptmenue -> 3) als Punkt 7 (zurueck -> 8). Umsetzung
+sprachunabhaengig ohne Eingriff in die mehrsprachigen Menuetexte: in sicom.c case 0x0003 nach
+putstr(T_estmenu) ein putstr("\n7. CYSPP monitor") + select('8',1); neuer case 0x0037 ->
+bt_cyspp_monitor(). Navigation korrekt (unbelegter Code 0x0038 -> default menu>>=4 + Post-Switch
+menu>>=4 -> Hauptmenue). compmenu wieder auf 7 Punkte/Ende '8' zurueckgebaut. Version -> 5.32.
+
+
+---
+
+## Update 5.37 - CYSPP-Steuerung per Schalter abschaltbar (Testmodus)
+
+Neuer Schalter `#define BT_CYSPP` in btio.h: 1=normal, 0=Testmodus. Bei 0 sind `bt_cmdmode()`
+(CYSPP HIGH/Command-Mode erzwingen) und `bt_release()` (Bit7 Eingang) per `#if BT_CYSPP`
+ausgeklammert -> Firmware treibt IC54 Bit7 NICHT mehr. Lesen (BT_LINK/get_com_status,
+bt_cyspp_monitor) bleibt aktiv. Aktuell auf 0 (Test); spaeter wieder 1.
+Hinweis: mit 0 erzwingt init_bluetooth keinen Command-Mode ueber CYSPP -> beim Konfigurieren keine
+offene BT-Verbindung; nach Flash einmal Power-Cycle (PCA9554 auf Eingang). Version -> 5.37.
+
+
+---
+
+## Update 5.39 - CYSPP als Pflicht bestaetigt -> BT_CYSPP zurueck auf 1
+
+Test mit BT_CYSPP=0 (5.37): keine BT-Verbindung moeglich, wenn die CYSPP-Leitung unterbrochen ist.
+Fazit: CYSPP (IC54 Bit7 <-> Modul) ist ZWINGEND fuer den SPP-Datenmodus - das Modul schaltet ohne
+CYSPP nicht in den Datenmodus. Damit ist das Mainboard-Problem erklaert: dort ist die CYSPP-Leitung
+unterbrochen -> HARDWARE-Fix noetig (Modul-CYSPP-Pin sauber auf IC54 Bit7 fuehren). BT_CYSPP wieder
+auf 1 (normal). Version -> 5.39.
+
+
+---
+
+## Update 5.41 - System-Freeze bei BT-Verbindung behoben (CTS-Busy-Spin -> Taskwechsel)
+
+**Symptom:** Geraet laeuft normal; SOBALD per BT verbunden wird, wird binnen kurzem ALLES traege
+(auch RS232: ~1 Zeichen / 0,5 s), BT quasi tot. Nach Power-Cycle wieder ok.
+
+**Ursache:** Bei aktiver BT-Verbindung geht die Ausgabe an UART0+UART1. In `putb()` wartet der
+UART1-Zweig vor jedem Byte auf CTS=LOW - als **Busy-Spin ohne Taskwechsel** (bis CTS_WAIT_MS=200 ms).
+Bei BT-Backpressure (Gegenstelle/Luftrate langsamer als 460800, oder marginale CTS-Leitung) bleibt
+CTS HIGH -> jedes Byte blockiert die volle Wartezeit und der Spin frisst die CPU -> der kooperative
+RTOS-Loop wird ausgehungert -> systemweit traege; RS232 haengt mit, weil es im selben putb steckt
+(~0,5 s/Zeichen = genau der CTS-Timeout).
+
+**Fix (sio.c putb):** In der CTS-Warteschleife `osDelay(1)` -> Taskwechsel zulassen (kein
+Busy-Spin), CTS_WAIT_MS 200 -> 50. Damit friert das System bei Backpressure nicht mehr ein; nur
+die BT-Ausgabe pacet sich ggf. langsamer. Version -> 5.41.
+
+Offen/separat: warum CTS bei Verbindung dauerhaft HIGH wird (Peer liest nicht / BT-Luftrate <
+460800 UART / CTS-Leitung marginal). Fuer sauberes Verhalten waere langfristig eine gepufferte/
+ISR-getriebene UART1-Ausgabe (nicht-blockierend) die Idealloesung.
+
+
+---
+
+## Update 5.42 - KORREKTUR: CTS/RTS laufen ueber Analog-MUX (IC13), nicht "direkt"
+
+**Befund (Schaltplan bestaetigt):** Die alte Doku (BT-Evalkit-Tasks.md) war falsch - dort stand
+CTS/RTS "direkt" und MUX "IC55/IC56". Tatsaechlich:
+
+- **IC18 (TS5A23157DGSR)** = MUX fuer Datenleitungen (RXD/TXD).
+- **IC13 (TS5A23157DGSR)** = MUX fuer **Flusssteuerung RTS/CTS**.
+  - MCU-CTS (P2.2, das putb() pollt) kommt ueber IC13 2Z(Pin6)<-2Y0 von BLT-CTS.
+  - MCU-RTS (P1.15) geht ueber IC13 1Z(Pin10)->1Y0 nach BLT-RTS.
+- Select beider Switches = **CS-A-FUNK = CSAF (P0.1)**: LOW=BT, HIGH=LTE/Funk.
+- **VCC beider Switches = V+D** (gemeinsame 3,3-V-Schiene).
+
+**Bedeutung fuer den "Board langsam nach ~1 min"-Fehler:** Beim DVK liegt CTS direkt am
+USB-Bridge; beim Mainboard laeuft CTS durch den Analog-Switch IC13. Sackt V+D beim BT-Senden ab
+(Brownout gemeinsame Schiene), wird IC13 hochohmig/undefiniert -> P2.2 liest HIGH -> putb()
+blockiert (bis CTS_WAIT_MS) -> System traege, RS232 troepfelt. Erholt sich die Spannung / BT
+trennt -> wieder normal. ~1 min ist KEIN Firmware-Timer (BT_TIMEOUT=6 min) -> elektrisch.
+
+**HW-Test:** im langsamen Abschnitt V+D am IC13/Modul + P2.2(CTS) mit Oszi ansehen: bricht V+D ein
+und geht CTS dabei HIGH -> Ursache bestaetigt. Abhilfe: eigener LDO/Stuetz-Elko fuers BT-Teil
+(wie beim DVK) bzw. Versorgung des Analog-MUX absichern.
+
+**Bezug BT-only-Sonderversion:** CSAF dauerhaft LOW zu halten (IC18/IC13 fest auf BT) beseitigt
+Umschalt-Glitches auf dem CTS/RTS-MUX - aber NICHT den Brownout (V+D bleibt geteilt).
+
+
+---
+
+## Update 5.43 - KORREKTUR der Isolierung: Board-Pfad ist ok, Verdacht = Onboard-Modul (RF/Power)
+
+**Neuer Testaufbau (Nutzer):** Das externe Eval-Kit-Modul wird MIT DEN BOARD-PINS versorgt und
+angesteuert (RxD, TxD, CTS, RTS, CYSPP auf die Eval-Kit-Bruecken). In diesem Aufbau laeuft BT
+einwandfrei. Das AUFGELOETETE Onboard-Modul dagegen wird nach ~1 min langsam.
+
+**Schlussfolgerung (korrigiert):** Damit durchlaeuft das funktionierende Eval-Kit-Modul dieselbe
+Board-Elektronik/Versorgung wie das defekte Onboard-Modul. Der frueher vermutete MUX (IC13) und
+der UART1-Pfad sind also NICHT der Unterschied - sie treiben das Eval-Kit-Modul sauber.
+Die Aussage aus 5.42 ("Eval-Kit umgeht IC13") gilt fuer diesen Aufbau NICHT.
+
+**Neuer Hauptverdacht = Onboard-Modul + unmittelbares Umfeld:**
+1. RF/Antenne: schlechte Funkstrecke -> Retransmits -> Luftrate << 460800 UART -> Modul-TX-Puffer
+   voll -> Modul zieht RTS -> unser CTS HIGH -> putb() bremst -> RS232 troepfelt; nach ~1 min
+   bricht Verbindung ab -> normal. (Passt exakt zum Zeitverhalten.)
+2. Lokale Versorgung/Entkopplung am Onboard-Modul (Eval-Kit hat eigene LDO+Stuetz-Cs).
+
+**Tests:** (a) Peer 5-10 cm neben Onboard-Modul -> laenger stabil? = RF. (b) INT-ANT vs EXT-ANT
+Variante + Ground-Plane/Keep-out pruefen. (c) V+D direkt am Onboard-Modul beim Senden per Oszi
+vs. Eval-Kit-Modul.
+
+Hinweis: IC13/IC18 (TS5A23157DGSR) als CTS/RTS- bzw. Daten-MUX bleiben korrekt dokumentiert
+(Schaltplan) - nur die Fehler-Zuordnung war falsch.
+
+**Nachtrag 5.43:** Nutzer versorgt Eval-Kit-Modul auch mit Board-VBAT/VDDIO -> gleiche Rails,
+laeuft. ABER: das Eval-Kit haengt damit auch seine grossen Stuetz-Cs an die Board-Schiene ->
+stabilisiert die Versorgung selbst. Onboard-Modul hat diese lokale Pufferung evtl. nicht ->
+lokaler Spannungseinbruch NUR am Modul beim TX-Peak (an der Quelle/Schiene nicht sichtbar).
+Billiger Entscheidungstest: Bulk-Elko 10-47 uF + 100 nF direkt an VBAT/VDDIO des Onboard-Moduls.
+Weg = Entkopplung/Power bestaetigt. Zusatz: Peer 5-10 cm ans Modul = RF/Antenne-Check;
+INT-ANT-Variante? Ground-Plane/Keep-out pruefen.
+
+**Nachtrag 5.43 (Datenblatt EZ-DS-Vela IF820 v2_2, Abschnitt 12):** INT-ANT-Variante, Peer nur
+40 cm entfernt -> Ausfall ist KEIN Reichweitenproblem. Zwei konkrete Datenblatt-Vorgaben zu pruefen:
+- 12.2 Antennen-Layout INT-ANT: (1) Modulkante buendig mit PCB-Kante; (2) >=15 mm GND-Flaeche
+  seitlich neben dem Modul. 12.1: keine Bauteile/High-Speed-Leitungen UNTER dem Funkteil, kein
+  Metall ueber der Antenne. -> Verstoss = verstimmte Antenne = schon auf 40 cm schlechte RF.
+- 12.1 Entkopplung woertlich: "put a 100nF capacitor on EACH power pin, as close as possible"
+  (VBAT + VDDIO) fuer korrekte interne PMU. Fehlt das/zu weit weg -> sporadischer Einbruch unter Last.
+Pruefreihenfolge Board: (1) Antennenzone (Rand? 15 mm GND frei? Kupfer/Bauteil unter Antenne?),
+(2) 100 nF je Power-Pin direkt am Modul + Bulk-Elko 10-47 uF. Eval-Kit erfuellt beide Regeln,
+Custom-Board vermutlich nicht -> erklaert "Eval-Kit ok, Onboard nach 1 min langsam".
+
+
+---
+
+## Update 5.44 - BT-Chip: Firmware-Version + Einstellungen abfragbar (Menue Bluetooth -> Information)
+
+**Wunsch:** Firmware des IF820 und dessen Einstellungen aus dem Geraet heraus auslesen.
+
+**Umsetzung:** `send_bt_info()` (btio.c) im IF820-Zweig erweitert. Bisher nur /PING. Jetzt zusaetzlich:
+- `/QFV` -> Firmware-/Stack-/Protokoll-/HW-Version (E=/S=/P=/H=). E byteweise hex = Version,
+  z. B. E=010412 12 -> 1.4.18.18.
+- `GTU`  -> UART-Einstellungen: Baud (B=), Flow Control (F=01 an / F=00 aus), 8N1 (D=08 etc.).
+- `GDN,T=00` -> BLE-Name; `GDN,T=01` -> Classic-Name.
+Antworten erscheinen als "> gesendet / < empfangen" am Terminal (bestehende Spiegelung in bt_command).
+
+**Bedienung:** Menue **Bluetooth -> Information** (sicom.c case 0x0511, ruft send_bt_info()).
+Kein neuer Menuepunkt noetig - semantisch die richtige Stelle. Neues Kommando-Text-Makro
+`T_qfv`/`T_qfvok` in btio.h.
+
+Hinweis: laeuft im Command-Mode (nicht waehrend aktiver CYSPP-SPP-Datenverbindung). Version -> 5.44.
+
+**Nachtrag 5.45:** send_bt_info() zusaetzlich MAC + CYSPP-Parameter:
+- `GBA` -> Bluetooth MAC-Adresse (A=<MAC>).
+- `.CYSPPGP` -> CYSPP-Parameter (E=enable, G=role, C=connkey, L=local_key, R=remote_key, M=mask).
+Neue Makros T_gba/T_gbaok, T_cypget/T_cypgetok in btio.h. Version -> 5.45.
+
+**Nachtrag 5.46 - FIX: BT-Info liess RX-Bytes ins Menue laufen (Menue raste durch):**
+Symptom: nach "Bluetooth -> Information" sprang das Menue wild zwischen Hauptmenues, phantom "0".
+Ursache: Eingabe- und Modul-Lesefunktionen teilen denselben RX-Ring (rbuf/bxi/rxi). bt_command
+matchte das Kommando-ECHO und kehrte zurueck, bevor die @R-Antwort ("...,0000,...") komplett da
+war -> die "0000"-Bytes blieben im Puffer und wurden vom Menue als Tasten gelesen.
+Fix: neue Helper bt_query_show() (Muster bt_scan_ping): Kommando senden, feste 400 ms warten,
+KOMPLETTE Roh-Antwort ans Terminal, danach bxi=rxi (Puffer leeren). Zusaetzlich finaler Flush
+(osDelay(50); bxi=rxi) vor uart1_release. Zeigt jetzt auch die vollen Werte (vorher am Match
+abgeschnitten). Version -> 5.46.
+
+
+---
+
+## Update 5.47 - BEFUND: Onboard-Module haben ALTE Firmware (1.4.12.12) vs Eval-Kit (1.4.18.18)
+
+Mit der neuen "Bluetooth -> Information"-Abfrage (5.46) beide Module verglichen. EINZIGER echter
+Unterschied = Firmware-Version des Chips (/QFV E-Feld):
+- Eval-Kit:  E=01041212 -> 1.4.18.18  (aktuelle GA3, = Projekt-Firmware in SupplierSourceCode)
+- Onboard:   E=01040C0C -> 1.4.12.12  (alt)
+Alles andere identisch: GTU B=460800, F=01 (Flow Control AN), 8N1; CYSPPGP E=02,G=00,C=0131,...;
+Stack S=03010000; Protokoll P=0104; HW H=F1. (Name/MAC erwartungsgemaess unterschiedlich.)
+
+PCN #2E (Release 1.4.18.18) behebt genau passende Bugs:
+- "Fix a lockup issue due in heavy UART loading."  <-- passt zu "laeuft 1 min, dann traege".
+- "Implement SBTP,F=1 to disable sniff feature. This improves SPP throughput."
+- "Add using CYSPP pin to exit SPP MODE (pull CYSPP high) -> back to command mode."  <-- unser
+  bt_cmdmode() setzt CYSPP HIGH; dieses Feature gibt es erst ab 1.4.18.18 -> erklaert, warum
+  CYSPP-HIGH auf altem 1.4.12.12 die SPP-Verbindung nicht trennte.
+
+=> HEISSER Kandidat fuer den "Board wird nach 1 min langsam"-Fehler, unabhaengig von Power/Antenne.
+Massnahme: Onboard-Module auf 1.4.18.18 flashen. Hinweis: Flashen ueber HCI-UART (BT_UART
+TXD/RXD/CTS/RTS) + Reset (Flow Control zwingend, CTS beim Reset LOW), if820_flasher_cli fuer
+lose/aufgeloetete Module (GUI nur DVK/Dongle). HCI-Pins am Mainboard herausgefuehrt? -> pruefen.
+
+**Nachtrag 5.47 - Downgrade-Test:** Um zu bestaetigen, dass die alte Modul-Firmware der Grund ist,
+soll testweise 1.4.12.12 aufs Eval-Kit (INT-ANT) geflasht werden.
+Download (GA1, interne Antenne):
+  https://github.com/Ezurio/Vela_IF820_Firmware/releases/download/v1.4.12.12/IF820_INT_ANT_v1.4.12.12.zip
+Flashen mit vorhandenem SupplierSourceCode/if820_flasher_gui-Windows-v2.1.0 (GUI erkennt DVK auto)
+oder CLI: if820_flasher_cli.exe -ce -f <..._141212_..._download.hex>. -ce setzt Konfig auf Werk zurueck
+-> Geraete-FW rekonfiguriert beim Boot (F=01, Name). Kontrolle via "Bluetooth -> Information": E=01040C0C.
+Erwartung: bricht Eval-Kit mit 1.4.12.12 auch nach ~1 min ein -> Firmware = Ursache -> Onboard-Module
+auf 1.4.18.18 flashen. Bleibt stabil -> doch Hardware (Power/Antenne).
+
+**Nachtrag 5.47 - 32-kHz-Quarz (Datenblatt EZ-DS v2_2):** IF820 hat internen 32-kHz-LPO, laeuft
+also OHNE externen Quarz. Ezurio empfiehlt aber externen 32,768-kHz-Quarz (XTALI_32K/XTALO_32K,
+Pin 4/5) ausdruecklich: "lowest power and highest timing accuracy" und - wichtig - "if not, LINK
+ISSUE may be occurred". => Fehlender Quarz ist ein weiterer heisser Kandidat fuer BT-Instabilitaet.
+Firmware: ohne Quarz -> int-lpo-Variante noetig; mit Quarz -> normale Variante. TODO: pruefen ob
+Onboard-Design 32-kHz-Quarz hat + passende Firmware-Variante. USB-Dongle hat keinen Quarz (int-lpo).
+
+
+---
+
+## Update 5.47b - BT-Timeout trennt Verbindung jetzt SAUBER per /DIS (statt nur virtuell)
+
+**Problem:** Der Inaktivitaets-Timeout (measure.c) trennte bisher nur virtuell: bt_cmdmode()
+(CYSPP-Puls) + Flags loeschen. Die SPP-Verbindung blieb am Modul oft bestehen (CYSPP blieb LOW,
+Peer nicht informiert, SPP-Slot belegt) - im CYSPP-Monitor beobachtet.
+
+**Fix:** Neue Funktion `bt_disconnect()` (btio.c), aufgerufen im Timeout-Pfad (measure.c):
+1. bt_cmdmode()  -> CYSPP HIGH -> PUART in Command-Mode
+2. osDelay(150)  -> Modul: SPP-Datenmodus -> Command-Mode
+3. bt_command(T_dis, T_disok, -300) -> `/DIS` (gap_disconnect): Modul baut Verbindung aktiv ab
+4. osDelay(50); bt_release(); bxi=rxi (RX-Reste verwerfen)
+Deklariert in btio.h. Defensiv: /DIS-Quittung egal -> es wird immer freigegeben (nie schlechter
+als vorher). Version -> 5.47.
+
+Abhaengigkeit: Schritt 1 (CYSPP-HIGH -> Command-Mode aus SPP heraus) ist erst ab Modul-FW
+1.4.18.18 zuverlaessig; auf 1.4.12.12 kann /DIS das Modul evtl. nicht erreichen -> weiteres
+Argument fuers Firmware-Update. Geaenderte Dateien: btio.c, btio.h, measure.c, sictxt.c.
+
+
+---
+
+## Update 5.48 - BT-Terminal-Junk bei MUX-Wechsel auf GSM/GPS unterdruecken (Software, versionssicher)
+
+**Symptom:** Auf einem per HyperTerminal verbundenen BT-Terminal erscheint 0xFF-Junk, sobald das
+Modem/GSM initialisiert. RS232 (UART0) zeigt gleichzeitig sauberen Modem-Start (EG91). => Modem/GSM
+sind in Ordnung; der Junk ist ein Nebeneffekt des geteilten UART1-MUX.
+
+**Ursache:** uart1_request(MUX_GSM/GPS) schaltet den Analog-MUX (IC18) weg von BT. Damit floatet
+die IF820-RXD (BLT-RXD). Das IF820 bleibt im SPP-Datenmodus und leitet das Leitungsrauschen
+transparent ueber Bluetooth weiter -> 0xFF-Flut am BT-Terminal.
+
+**Fix (hard.c, uart1_request):** Symmetrisches Command-Mode-Handling:
+- BT->GSM/GPS und BT verbunden (connect&BT_LINK) und IF820: vor dem MUX-Wechsel bt_cmdmode()
+  (CYSPP HIGH) -> Modul stoppt SPP-Weiterleitung.
+- Rueckkehr GSM/GPS->BT (prev_owner GSM/GPS) und IF820: bt_release() -> Weiterleitung/Status wieder aktiv.
+Guard ueber prev_owner, damit die init_bluetooth-Sequenz (eigenes cmdmode) NICHT gestoert wird;
+fp.btmodem==IF820 nur. I2C-Aufrufe ausserhalb der Critical Section.
+
+**Versionssicher:** CYSPP-HIGH-zum-SPP-Verlassen wirkt erst ab Modul-FW 1.4.18.18. Auf 1.4.12.12
+bleibt der Junk (Feature fehlt), aber der Code macht nichts kaputt. Firmware-unabhaengige Alternative
+bleibt ein HW-Pull-up auf der IF820-RXD. Version -> 5.48. Geaenderte Datei: hard.c, sictxt.c.

@@ -449,6 +449,34 @@ void GSM_Registration (void const *argument)					// Modem Einschaltung und Regis
  }	 
 }
 
+int gsm_nettime (uchar force)   // Quectel Netzzeit (AT+QLTS=2) -> zentrale Zeitsync; 1=gestellt
+{
+ int r=0; uchar cc=connect;
+ connect=UART1; putln(T_qlts); bxi=rxi;                  // Netzzeit abfragen
+ if (wait_message(T_qltsr,XMODEM_CHAR_TIMEOUT)>0)
+  if (wait_ok()>0)
+  {
+   text *q=cbuf; while (*q && *q!=0x22) q++;             // erste Quote der QLTS-Antwort
+   if (*q==0x22)
+   {
+    int y=0,mo,dy,h2,m2,s2,sign=1,tz=0;
+    q++;
+    while (*q>='0'&&*q<='9') { y=y*10+(*q-'0'); q++; }   // Jahr 2- o. 4-stellig
+    if (y<100) y+=2000;
+    if (*q=='/') q++;  mo=(q[0]-'0')*10+(q[1]-'0'); q+=2;
+    if (*q=='/') q++;  dy=(q[0]-'0')*10+(q[1]-'0'); q+=2;
+    if (*q==',') q++;  h2=(q[0]-'0')*10+(q[1]-'0'); q+=2;
+    if (*q==':') q++;  m2=(q[0]-'0')*10+(q[1]-'0'); q+=2;
+    if (*q==':') q++;  s2=(q[0]-'0')*10+(q[1]-'0'); q+=2;
+    if (*q=='-') { sign=-1; q++; } else if (*q=='+') q++;
+    while (*q>='0'&&*q<='9') { tz=tz*10+(*q-'0'); q++; } // Zeitzone in Viertelstunden
+    r=clock_set(dy,mo,(uint)y, h2,m2,s2, (int8_t)(sign*tz/4), SRC_LTE, force?(CLK_SET_UTC|CLK_FORCE):CLK_SET_UTC);
+   }
+  }
+ connect=cc;
+ return (r);
+}
+
 int test_registration (void)	// Prüfe ob Modem eingebucht ist
 {
  uchar retry=16;						// Anzahl Abfragewiederholungen
@@ -517,6 +545,7 @@ int test_registration (void)	// Prüfe ob Modem eingebucht ist
 		 }	
 		}
 		else iccid[0]='\0';			
+		gsm_nettime(0);						// LTE-Netzzeit (NITZ) best-effort -> Zeitsync
 		connect=concpy;						// Uart Status wiederherstellen
  		mqtt_con_err=0;						// reset Verbindungsfehler	
 		return (status);					// Ja, Status zurück 				   	  	

@@ -27,6 +27,9 @@
 #define DTC_BT_BTT_FAIL         11012   /* BT Verbindungstest fehlgeschlagen */
 #define DTC_BT_CR_FAIL          11013   /* BT Verbindungsaufbau fehlgeschlagen */
 #define DTC_BT_PIN_FAIL         11014   /* BT PIN setzen fehlgeschlagen */
+#define DTC_BT_CTS_TIMEOUT     11015   /* CTS Timeout beim Senden (Warning) */
+#define DTC_BT_LAIRD_NF        11016   /* Laird-Modul nicht erkannt (Info) */
+#define DTC_BT_RN_NF           11017   /* RN4678-Modul nicht erkannt (Info) */
 
 /* --- Subsystem 12: GSM/LTE (gsmio.c) ------------------------------ */
 #define DTC_GSM_NO_RESP         12001   /* Modem keine Antwort */

@@ -1,17 +1,17 @@
-/* Header Datei für sistxt.c, Projekt sis3003m */
+/* Header Datei fï¿½r sistxt.c, Projekt sis3003m */
 
 #ifndef SISTXT_H_
 #define SISTXT_H_
 
-// Aliase für compiler
+// Aliase fï¿½r compiler
 #include "hard.h"	
 
 /* Tabelle Aliase Sprachdatei(-erweiterungen)	*/
-#define d_f_i				1		// deutsch, französisch, italienische Texte
-#define e_f_nl			2		// englisch, französisch, niederländisch
-#define e_cz_sl			3		// englisch, französisch, slowenisch
+#define d_f_i				1		// deutsch, franzï¿½sisch, italienische Texte
+#define e_f_nl			2		// englisch, franzï¿½sisch, niederlï¿½ndisch
+#define e_cz_sl			3		// englisch, franzï¿½sisch, slowenisch
 #define e_es_pt 		4	  // englisch, spanisch, portugiesische Texte
-#define d_f_pl			5		// deutsch, französisch, polnische Texte
+#define d_f_pl			5		// deutsch, franzï¿½sisch, polnische Texte
 #define e_es_i			6		// englisch, spanische, italienische Texte
 
 #define no_oem			0
@@ -24,7 +24,7 @@
 
 #define ANZSPRACHEN 	3				// Anzahl definierter Programmsprachen
 
-// Definitionen Gerätenamen und Copyright 
+// Definitionen Gerï¿½tenamen und Copyright 
 #if (OEM == Krycer)
  #define T_name				"Trafficheck 3003M - "
  #define T_coprght		"Copyright Krycer bvba-sprl 2026\n"
@@ -175,7 +175,7 @@ extern text T_symdef[];
 extern text T_newgrp[];
 extern text T_notcon[];
 extern text T_usbdis[];
-// Mehrsprachige Texte GSM/GPRS Menüs etc.
+// Mehrsprachige Texte GSM/GPRS Menï¿½s etc.
 extern text T_yconf[];
 extern text T_vemail[];
 extern text T_mailcyc[5][44];
@@ -202,7 +202,7 @@ extern text T_auto[];
 
 // Feste einsprachige Texte, Tabellen und Konstanten
 extern text T_nil[];						// not in list
-extern text sense_tab[5];			  // Kanalauswahl MUX IC14 und IC19 Signalverstärkung
+extern text sense_tab[5];			  // Kanalauswahl MUX IC14 und IC19 Signalverstï¿½rkung
 extern text T_viasis[];
 extern text T_version[8];
 extern text T_12mode[5][8];
@@ -220,9 +220,9 @@ extern text T_vsc[];							// viaspeedcam
 extern text T_vspcam[3][6];
 extern text T_secret[];
 
-// Geräteidentifikation und anderes Einsprachiges
+// Gerï¿½teidentifikation und anderes Einsprachiges
 #define T_ident			"\n\nviasis3004 "
-#define T_viatext		"\n\nSistext"							// viatext wird bereits für alte viasis 3002 Elektronik eingesetzt
+#define T_viatext		"\n\nSistext"							// viatext wird bereits fï¿½r alte viasis 3002 Elektronik eingesetzt
 #define T_rtc		 		"\n\nRTC "
 #define T_utcr			"(UTC -11..12)"
 
@@ -240,7 +240,7 @@ extern text T_secret[];
 #define T_fldrv			"\nUSB flash disc configured:\n"
 #define T_fldis			"\nDisconnect USB flash disc now!\n"
 
-// Texte Werkmenü
+// Texte Werkmenï¿½
 #define T_hwrev			"HW Revision"
 #define T_sprache		"\nLanguage: "
 #define T_sende			"Radar frequency [MHz]"
@@ -279,7 +279,7 @@ extern text T_secret[];
 #define T_blue			"Select Bluetooth\n1. Laird 730SA\n2. RN4678"
 #define	T_gpstyp		"GPS Typ: "
 
-// Texte Werkmenü - I2C Komponententests
+// Texte Werkmenï¿½ - I2C Komponententests
 #define T_i2cfound	" devices found\n"
 #define T_i2cdev	 	"I2C device "
 #define T_i2creg		"\nRegister"
@@ -288,7 +288,7 @@ extern text T_secret[];
 #define T_devadr		"\nDevice address"
 #define T_duty			"LED duty cycle 1(0.5%) ... 200(100%) "
 
-// Werkmenü - Menü Schalter und Symbole
+// Werkmenï¿½ - Menï¿½ Schalter und Symbole
 #define T_conf 			"\nConfiguration:"
 #define T_tsym 			"Symbol display time"
 #define T_mswsym		"\n1. Define symbol groups\n2. Define symbols\n3. Test symbols\n4. Define switch groups\n5. Define switches\n6. Test switches"
@@ -467,7 +467,7 @@ extern text T_secret[];
 #define T_ble				"BLE"
 #define T_pin				"PIN = "
 
-// Sprachunabhängige Stringkürzel
+// Sprachunabhï¿½ngige Stringkï¿½rzel
 #define T_h			"h"
 #define T_MB		" MB"
 #define T_KB		" KB"
@@ -531,14 +531,14 @@ extern text T_secret[];
 #define E_gpsfix			"GPS position fix time exceeded"
 #define E_mqtt				"MQTT communication"
 
-// Rückgabe Ereignismeldungen
+// Rï¿½ckgabe Ereignismeldungen
 #define MAXMESSAGES			15		// Maximal Ereignismeldungen definiert
 #define POWER_ON				1			// 1. Einschaltmeldung
 #define MESSBEGINN			3			// 2. Messung begonnen
 #define SOMMERZEIT			5			// 3. Umstellung Winter- auf Sommerzeit
 #define WINTERZEIT			6			// 4. Umstellung Sommer- auf Winterzeit
 #define REBOOT					7			// Reboot Ereignis
-#define MEMFULL					11		// 5. Speicher voll, Daten werden überschrieben 	
+#define MEMFULL					11		// 5. Speicher voll, Daten werden ï¿½berschrieben 	
 #define BATTERYLOW			12		// 6. Batterie Unterspannung
 #define WERK_INIT				30		// 7. Werkinitialisierung der Parameter
 #define WATCHDOG_RESET	31		// 8. Watchdog reset
@@ -553,7 +553,7 @@ extern text T_secret[];
 extern const ushort evno[MAXMESSAGES];		// Liste der Ereignisnummern
 extern text * const evtxt[MAXMESSAGES];		// Liste der Ereignistexte
 
-// Rückgabe Fehlercodes 
+// Rï¿½ckgabe Fehlercodes 
 #define MAXERRORTEXT		28		// 28 Textfehlermeldungen definierbar
 #define XMODEM_REMOTECANCEL 		201		// 1
 #define XMODEM_RETRYEXCEED  		202		// 2
@@ -593,7 +593,7 @@ extern text * const errtxt [MAXERRORTEXT];	// zeigerliste Fehlertexte
 // Zeichenkettenlisten (Ausgabe mit putmstr(* text)
 extern text * const L_start[];	// Einschaltmeldung
 extern text * const L_winit[];	// Werkinitialisierung
-extern text * const L_conf[];		// Werksmenü Konfig.
+extern text * const L_conf[];		// Werksmenï¿½ Konfig.
 extern text * const L_info[]; 	// Information
 extern text * const L_dpp[];		// DPP einstellen
 extern text * const L_gsm[];		// Zeitplanung GSM/Email

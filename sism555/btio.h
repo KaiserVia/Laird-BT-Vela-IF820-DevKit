@@ -1,4 +1,4 @@
-/* Header Datei für btio.c, Projekt viasis3003 */
+/* Header Datei fï¿½r btio.c, Projekt viasis3003 */
 
 #ifndef BTIO_H_
 #define BTIO_H_
@@ -12,12 +12,14 @@
 #define T_laird		" Laird"
 #define T_if820	" IF820"
 
+#define BT_CYSPP  1   // CYSPP-Steuerung (IC54 Bit7): 1=normal (noetig! CYSPP ist Pflicht fuer SPP-Datenmodus), 0=Testmodus (Firmware fasst CYSPP nicht an -> BT verbindet NICHT). Test 5.37 bestaetigt: ohne CYSPP keine Verbindung.
+
 #define IF820_BAUD         460800	// <<< Betriebsbaudrate IF820 - HIER zentral aendern (460800 bewaehrt; hoeher nur mit Oszi-Check!)
 #define IF820_FACTORY_BAUD 115200	// Werks-Baud des IF820 (fix) - nur Erkennung/Erstkonfiguration
 #define BT_BAUD  (fp.btmodem==IF820 ? IF820_BAUD : (fp.btmodem==Laird ? 460800 : 307200))	// Betriebsbaudrate BT-Modul (IF820 = IF820_BAUD)
 #define GSM_BAUD gsmbaud		// einstellbare GSM-Baudrate (Variable gsmbaud, Default 460800)
 
-// Laird 730-SA Texte nur für Bluetooth AT Kommando Kommunikation
+// Laird 730-SA Texte nur fï¿½r Bluetooth AT Kommando Kommunikation
 #define T_AT		"AT\r"
 #define T_ATE0	"ATE0\r"
 #define T_ATI0	"ATI0\r"
@@ -44,7 +46,7 @@
 #define T_OK		"OK\r\n"			
 #define T_con		"CONNECT"
 
-// Microchip RN4678APL Texte für Bluetooth Kommunikation
+// Microchip RN4678APL Texte fï¿½r Bluetooth Kommunikation
 #define T_$			"$$$\r"
 #define T_cmdp	"CMD>"
 #define T_AOK		"AOK"
@@ -78,6 +80,12 @@
 // Ezurio Vela IF820 (EZ-Serial) Texte
 #define T_ping		"/PING\r"		// system_ping Kommando
 #define T_pingok	"/PING,0000"	// Erfolgsantwort @R,...,/PING,0000
+#define T_qfv      "/QFV\r"       // system_query_firmware_version -> @R,...,/QFV,0000,E=..,S=..,P=..,H=..
+#define T_qfvok    "/QFV"         // Antwort-Kennung (enthaelt Version E=/S=/P=/H=)
+#define T_gba      "GBA\r"        // system_get_bluetooth_address -> @R,...,GBA,0000,A=<MAC>
+#define T_gbaok    "GBA"          // Antwort-Kennung MAC-Adresse (A=)
+#define T_cypget   ".CYSPPGP\r"   // p_cyspp_get_parameters -> @R,...,.CYSPPGP,0000,E=..,G=..,C=..,L=..,R=..,M=..
+#define T_cypgetok "CYSPPGP"      // Antwort-Kennung CYSPP-Parameter
 #define T_gtu      "GTU\r"        // system_get_uart_parameters
 #define T_gtu_d    ",D="          // Feld direkt nach F= (zum Mitlesen von F)
 #define T_stu_post ",A=00,C=00,F=01,D=08,P=00,S=01\r"  // STU-Suffix: Flow Control AN, 8N1 (Baud aus IF820_BAUD)
@@ -94,7 +102,7 @@
 extern bool Init_BT_ch (uint baudrate);	// Konfiguriere uart1 und setze MUX Kanal auf BT modem
 extern bool bt_command (text * command, text * answer, int pause); // Bluetooth Kommando senden, Antwort empfangen
 extern void init_bluetooth (void);			// Bluetooth Modem initialisieren
-extern bool test_BT	(void);							// Prüfe ob BT Modul antwortet
+extern bool test_BT	(void);							// Prï¿½fe ob BT Modul antwortet
 extern void send_bt_info (void);				// Bluetooth Informationen ausgeben
 extern void set_bt_name (void);					// Setze Bluetooth device (friendly) name
 extern void set_bt_pin (void);					// Setze Pinnummer
@@ -107,6 +115,8 @@ extern bool bt_ensure_name (void);        // generisch: pruefen, bei Bedarf schr
 extern void bt_show_name (void);          // aktuellen BT-Namen vom Modul lesen + anzeigen
 extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-Mode erzwingen
 extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
+extern void bt_disconnect (void);         // IF820: offene Verbindung sauber trennen (Command-Mode + /DIS)
+extern void bt_cyspp_monitor (void);      // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) - Testmenue
 
 #endif // BTIO_H_
 

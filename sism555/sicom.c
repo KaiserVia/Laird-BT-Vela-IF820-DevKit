@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 //  FILE: sicom.c				PROJECT: sis3000M
 //-----------------------------------------------------------------------------
-//  COMMENTS:  Menüsteuerung, high-level I/O Routinen
+//  COMMENTS:  Menï¿½steuerung, high-level I/O Routinen
 //-----------------------------------------------------------------------------
 //  HARDWARE:   sis3003-MB, version H3
 //-----------------------------------------------------------------------------
@@ -37,10 +37,10 @@
 
 
 
-void firmware (void)		// Firmware Empfang, Prüfung und IAP Programmierung 
+void firmware (void)		// Firmware Empfang, Prï¿½fung und IAP Programmierung 
 {	
- int blno;					// Hilfsvariable Blocknummer-/Fehlerrückgabe
- int fehler=0;			// Hilfsvariable Fehlerrückgabe
+ int blno;					// Hilfsvariable Blocknummer-/Fehlerrï¿½ckgabe
+ int fehler=0;			// Hilfsvariable Fehlerrï¿½ckgabe
  int i;							// Laufvariable
  	
  Ledaus(); 					// Led abschalten
@@ -48,23 +48,23 @@ void firmware (void)		// Firmware Empfang, Prüfung und IAP Programmierung
  if ((flashsize==0)||((flashsize>8)&&(flashsize<=128))) puterror (DTC_SI_NO_FLASH, -1); // Flash fehlt oder zu klein
 	
  putln (T_fsend);											// Text "Send file with Xmodem (1k)...
- delete_protocol();										// Protokollzeiger im Parametersatz löschen
- delete_data();												// Messdatenzeiger im Parametersatz löschen	
+ delete_protocol();										// Protokollzeiger im Parametersatz lï¿½schen
+ delete_data();												// Messdatenzeiger im Parametersatz lï¿½schen	
 	
  if ((blno=xmodem_receive(FIRMWARE_MAX_FILESIZE,0))< 0)		// Empfang 1k Xmodem Daten
   puterror (DTC_SI_XMODEM_ERR, blno);								// Xmodem Fehlernummer als Detail ausgeben
  else  
  {    
-  if (file_is_firmware())				// Prüfe ob es sich um Firmware Datei handelt
+  if (file_is_firmware())				// Prï¿½fe ob es sich um Firmware Datei handelt
   {   
    put2str(T_rdat,T_check);			   // Text "Datei empfangen. Checking Firmware ..."
  
    osDelay(50);	
 
-   for (i=0;i<blno;i++)					// CRC eines jeden Datenblock im Flash prüfen
+   for (i=0;i<blno;i++)					// CRC eines jeden Datenblock im Flash prï¿½fen
    {	
     flash_pcom((uchar *)cbuf,pagepk*i,FLASH_R_ARRAY,BLOCKSIZE+2);		// Atmel Flash Seite(n) mit CRC lesen   	 
-    if ((fehler=crc((uchar *)cbuf, BLOCKSIZE+2)) != 0) break;				// CRC Überprüfung Flash Abbild	 	   	 
+    if ((fehler=crc((uchar *)cbuf, BLOCKSIZE+2)) != 0) break;				// CRC ï¿½berprï¿½fung Flash Abbild	 	   	 
    }  
 
    if (!fehler) 	// kein CRC Fehler?
@@ -83,9 +83,9 @@ void firmware (void)		// Firmware Empfang, Prüfung und IAP Programmierung
  }   
 }
 
-void identify (void)		// Ausgabe Geräteidentifikation
+void identify (void)		// Ausgabe Gerï¿½teidentifikation
 {
- if (fp.ex12==4) putstr(T_viatext);					// Text "Sistext" statt "viatext" - wird für altes viasis 3002 verwendet
+ if (fp.ex12==4) putstr(T_viatext);					// Text "Sistext" statt "viatext" - wird fï¿½r altes viasis 3002 verwendet
  else 
  {	 
   putstr(T_ident); 							 								// Text "viasis3004"
@@ -102,9 +102,9 @@ void identify (void)		// Ausgabe Geräteidentifikation
  newline();	
 }
 
-void speed_setting_menu (void)				// Menü Optionen Geschwindigkeitsanzeige
+void speed_setting_menu (void)				// Menï¿½ Optionen Geschwindigkeitsanzeige
 {
- uchar item='5';						// 4 Menüpunkte initial - 5. Zurück
+ uchar item='5';						// 4 Menï¿½punkte initial - 5. Zurï¿½ck
  newline();	
  put2str(T_vopt,T_dpkt);																									// Text "Optionen Geschwindigkeitsanzeige...
  putparameter (T_nk,0, (3<<16)|('1'<<8), &T_offon[fp.nk][0]);							// Parameter Nachkommastelle ausgeben	
@@ -112,27 +112,27 @@ void speed_setting_menu (void)				// Menü Optionen Geschwindigkeitsanzeige
  putparameter (T_vmax,fp.vmax[dset],(1<<16)|('3'<<8),&T_uall[fp.mph][0]);	// Ausgabe Maximalgeschwindigkeit	
  putparameter (T_vblk,fp.vblk[dset],(1<<16)|('4'<<8),&T_uall[fp.mph][0]);	// Schwelle blinkende Anzeige	
  
- if (fp.farben==3) 				// Mischfarbe zulässig?
+ if (fp.farben==3) 				// Mischfarbe zulï¿½ssig?
 	 putparameter (T_col2,fp.vmix[dset],(1<<16)|(item++<<8),&T_uall[fp.mph][0]);	// Schwelle Farbumschaltung lesen
 	 
  if (fp.farben>1)					// Mehr als eine Farbe definiert?
 	 putparameter (T_vcolor,fp.vcol[dset],(1<<16)|(item++<<8),&T_uall[fp.mph][0]); // Schwelle Farbumschaltung lesen
  	
- select (item,1);				// Menüauswahl senden
+ select (item,1);				// Menï¿½auswahl senden
 }
 
-void parametermenue	(void)	// Parametermenü
+void parametermenue	(void)	// Parametermenï¿½
 {
- putstr(T_optmenu);																								// Text Parametermenü
+ putstr(T_optmenu);																								// Text Parametermenï¿½
  putparameter (T_pset,dset+1,(1<<16)|('1'<<8),T_nil);							// Ausgabe Nummer des angezeigten Parametersatz
- put_menuitem (T_tmen, '2');																			// Menüpunkt "2. Zeitplanung .. ausgeben
+ put_menuitem (T_tmen, '2');																			// Menï¿½punkt "2. Zeitplanung .. ausgeben
  putparameter (T_bdir,0,(3<<16)|('3'<<8),&T_offon[fp.bdir][0]); 	// Ausgabe Status bidirektionale Erfassung
  put_menuitem (T_vopt, '4');																			// Optionen Geschwindigkeitsanzeige
  putparameter (T_brght,0,(3<<16)|('5'<<8),&T_brsel[fp.hoff][0]);	// Anzeigeoptimierung ausgeben	
- put_menuitem (T_ext, '6');																				// Menüpunkt "Schaltschwellen Erweiterungen.. ausgeben	
- putparameter (T_rsens,20*(fp.sense+1),(1<<16)|('7'<<8), T_perc);	// Parameter Radar sensitivity 0...4 für 20% - 100%	
+ put_menuitem (T_ext, '6');																				// Menï¿½punkt "Schaltschwellen Erweiterungen.. ausgeben	
+ putparameter (T_rsens,20*(fp.sense+1),(1<<16)|('7'<<8), T_perc);	// Parameter Radar sensitivity 0...4 fï¿½r 20% - 100%	
 
- select ('8',1);				// Menüauswahl senden
+ select ('8',1);				// Menï¿½auswahl senden
 }
 
 void info_interfaces (void)		// Ausgabe bei poweron gefundener Interfaces
@@ -144,14 +144,14 @@ void info_interfaces (void)		// Ausgabe bei poweron gefundener Interfaces
 	 if (fp.btmodem==Roving) putstr (T_rn4678);
 	 else if (fp.btmodem==Laird) putstr (T_laird);
    if (interfaces&(USB_LINK|GSM_LINK))	// USB oder GSM installiert?
-		 putstr(T_col);											// Trennzeichen anfügen
+		 putstr(T_col);											// Trennzeichen anfï¿½gen
    else newline ();											// sonst neue Zeile
  }		
  if (interfaces&USB_LINK)								// USB vorhanden?
  {
   putstr(T_usb); 												// Text "USB	
 	if (interfaces&GSM_LINK) 							// GSM installiert?
-		putstr(T_col);											// Trennzeichen anfügen
+		putstr(T_col);											// Trennzeichen anfï¿½gen
   else newline ();											// sonst neue Zeile
  }
  if (interfaces&GSM_LINK) 							// GSM/GPRS gefunden?
@@ -169,16 +169,16 @@ void info_interfaces (void)		// Ausgabe bei poweron gefundener Interfaces
  }	 
 }
 
-void gsmmenu (void)		// GSM/Email Menü
+void gsmmenu (void)		// GSM/Email Menï¿½
 {
  uchar i;												// Laufvariable
  char *Tp;	
 	
- putstr(T_gsmmen);							// Text Parametermenü
- put_menuitem (T_tmen, '1');		// Menüpunkt "1. Zeitplanung .. ausgeben
- put_menuitem (T_pinno,'2');		// Menüpunkt "2. Pinnummer .. ausgeben
+ putstr(T_gsmmen);							// Text Parametermenï¿½
+ put_menuitem (T_tmen, '1');		// Menï¿½punkt "1. Zeitplanung .. ausgeben
+ put_menuitem (T_pinno,'2');		// Menï¿½punkt "2. Pinnummer .. ausgeben
  putparameter (&T_service[2][0],0,(3<<16)|('3'<<8),&T_server[fp.servertyp][0]);	// Eingestellter Server
-  for (i=0;i<=3-fp.servertyp;i++)	// 3 oder 4 Menüpunkte Konfiguration APN, SMS, Server, Email nur bei SMTP
+  for (i=0;i<=3-fp.servertyp;i++)	// 3 oder 4 Menï¿½punkte Konfiguration APN, SMS, Server, Email nur bei SMTP
  {
   put_menuitem (T_yconf,(i+4)|0x30);	// Text "Konfiguration "
 	if (i==2) { putstr (&T_server[fp.servertyp][0]); putc ('-'); }	// Server SMTP oder MQTT 
@@ -191,11 +191,11 @@ void gsmmenu (void)		// GSM/Email Menü
 	else Tp= (char*)&T_nets[fp.radnet][0];													// GSM und UMTS
  } 	 
  putparameter (T_mfstd,0,(3<<16)|(((4+i++)|0x30)<<8),Tp);		// Automatische Netzauswahl ausgeben
- select((i+4)|0x30,1);					// Menüauswahl senden
+ select((i+4)|0x30,1);					// Menï¿½auswahl senden
 }
 
-void infomenu (uchar menu)	// Information als Menü oder Email Text ausgeben
-{														// Übergabe: menu - 0/1 wenn Ausgabe für Email/Menü erfolgen soll 
+void infomenu (uchar menu)	// Information als Menï¿½ oder Email Text ausgeben
+{														// ï¿½bergabe: menu - 0/1 wenn Ausgabe fï¿½r Email/Menï¿½ erfolgen soll 
  uchar akt_pset=0;					// Aktiver Parametersatz
  uchar val;	
 
@@ -204,7 +204,7 @@ void infomenu (uchar menu)	// Information als Menü oder Email Text ausgeben
  putmstr(L_info);				
  putstr(fp.hwVersion);											// Hardware Revision	
  put2str(T_serialno,T_dpkt);								// Text "Seriennummer...	
- if (isalpha(*fp.serno))  putstr(fp.serno);	// Gültige Seriennummer existiert? Ja, ausgeben 
+ if (isalpha(*fp.serno))  putstr(fp.serno);	// Gï¿½ltige Seriennummer existiert? Ja, ausgeben 
  newline();																	// Leerzeile
  if (menu) putparameter (T_betr,fp.hcount,(5<<16),T_h);	// Anzahl Betriebsstunden ausgeben	
  if (tasks&MESSTASK) akt_pset=pset+1;				// Abfragezeit ist Messzeit? Ja, task=Parametersatz+1  
@@ -219,8 +219,8 @@ void infomenu (uchar menu)	// Information als Menü oder Email Text ausgeben
  if (menu)
  { 
   newline();			// Leerzeile
-  put_menuitem (T_protocol, '1');	// Menütext "1. Protokoll...
-  put_menuitem (T_comment, '2');	// Menütext "2. Anmerkung...
+  put_menuitem (T_protocol, '1');	// Menï¿½text "1. Protokoll...
+  put_menuitem (T_comment, '2');	// Menï¿½text "2. Anmerkung...
  }
  else if (fp.gps && fp.gpsanz)		// GPS Module und Position vorhanden?
  {
@@ -230,37 +230,40 @@ void infomenu (uchar menu)	// Information als Menü oder Email Text ausgeben
  
  send_date_time (0,'3'*menu);				// Datum ausgeben
  putstr(T_col);		 
- if (DOW<7) putstr(&T_tag[DOW][0]);	// Wochentag gültig? Ja, ausgeben
+ if (DOW<7) putstr(&T_tag[DOW][0]);	// Wochentag gï¿½ltig? Ja, ausgeben
  send_date_time (1,'4'*menu);				// Zeit ausgeben
  if (menu) 
  {
-	put_menuitem (T_tzone, '5');			// Menüpunkt "5. Zeitzone
+	put_menuitem (T_tzone, '5');			// Menï¿½punkt "5. Zeitzone
 	putstr(T_dpkt); 
 	if (fp.utc<0) { val=-fp.utc; putc('-'); } // Zeitzone negativ Vorzeichen ausgeben
 	else val=fp.utc;														
   putnumber (val,0);	 							// Zeitzone ausgeben
   	 
-  putparameter (T_somwin,0,(3<<16)|('6'<<8),&T_zone[fp.s_w_zeit][0]); // Menütext "5. Sommer-/Winterzeit	
+  putparameter (T_somwin,0,(3<<16)|('6'<<8),&T_zone[fp.s_w_zeit][0]); // Menï¿½text "5. Sommer-/Winterzeit	
+  newline(); putstr("Zeitquelle: "); putstr(time_source_text());   // Quelle der aktuellen Zeit
+  put_menuitem ("Zeit jetzt synchronisieren", '7');               // erzwungener Abgleich
+  put_menuitem ("Automatische Zeit", '8'); putstr(": "); putstr(fp.autotime_off==1?"aus":"ein");
  }	 
 }	
 
 void werkeinstellung (uchar gesamt)		// Ausgabe der Werksparameter
-{							 												// Übergabe gesamt - 1/0 für alle/kurze Parameterauswahl
+{							 												// ï¿½bergabe gesamt - 1/0 fï¿½r alle/kurze Parameterauswahl
  // uchar i;				// Laufvariable
 
  putmstr(L_conf);															// Text "Configuration ...Serial number: ...
- if (isalpha(*fp.serno))  putln(fp.serno);		// Gültige Seriennummer existiert? Ja, ausgeben
+ if (isalpha(*fp.serno))  putln(fp.serno);		// Gï¿½ltige Seriennummer existiert? Ja, ausgeben
  else newline();	
  if (gesamt) putparameter(T_hwrev, 0, (7<<16),fp.hwVersion); 		// Harware Revision ausgeben		
  putstr(T_sprache+1);									// Text "Language: ...
- putln(&T_spritm[fp.sprache][0]);			// Gewählte Programmsprache
+ putln(&T_spritm[fp.sprache][0]);			// Gewï¿½hlte Programmsprache
  if (gesamt) putparameter(T_sende,fp.TxF,(1<<16),T_MHz); 	// Parameter Sendefrequenz
- putstr(T_dimm);											// Dimm/PWM Modus für LED
+ putstr(T_dimm);											// Dimm/PWM Modus fï¿½r LED
  putln(&T_dimsel[fp.pwm][0]);
  if (gesamt) 
  {
 	putparameter(T_battoff,fp.uoff,(1<<16),T_LF);		// Batteriespannungsoffset 
-  putparameter(T_parsets,fp.psets,(1<<16),T_LF);	// Anzahl Parametersätze
+  putparameter(T_parsets,fp.psets,(1<<16),T_LF);	// Anzahl Parametersï¿½tze
 	putparameter(T_ledcol,fp.ledcode,(1<<16),T_LF);  // Farbcode Led Farben 
  }
  putparameter(T_colors,fp.farben,(1<<16),T_nil);								// Anzahl Led Farben
@@ -299,25 +302,25 @@ void werkeinstellung (uchar gesamt)		// Ausgabe der Werksparameter
 #endif
 }
 
-void addplus_display_pages (void)			// Schaltergruppe Anzeigeseiten für Viasis Plus hinzufügen			
+void addplus_display_pages (void)			// Schaltergruppe Anzeigeseiten fï¿½r Viasis Plus hinzufï¿½gen			
 {
  uchar i;															// Laufvariable
 	
  memcpy(&fp.swgrname[0][0], &T_swgrp[0][0], SWGLEN);						// Gruppentext "Anzeigeseiten..." kopieren
- for (i=0;i<4;i++)																							// Schalterausgänge für 4 Anzeigseiten 
+ for (i=0;i<4;i++)																							// Schalterausgï¿½nge fï¿½r 4 Anzeigseiten 
  {
 	memcpy (&fp.swname[i][0],&T_swtyp[0][0], SWLEN);							//  Name Schaltausgang Anzeigeseite kopieren 	
   fp.swno[i]=i+1;										// Schalternummer									
 	fp.swexp[i]=1;										// Expander	
 	fp.swport[i]=24+i;								// Port 8...11 invertiert	
- }	// end 4 Schaltausgänge definieren	
+ }	// end 4 Schaltausgï¿½nge definieren	
  fp.nosw[0]=4;											// 4 Anzeigeseiten in 1. Schaltergruppe konfiguriert
  fp.swgrp=1;												// eine Schaltergruppe konfiguriert
- set_default_port ();								// Ändert default I2C Expander Porteinstellung
+ set_default_port ();								// ï¿½ndert default I2C Expander Porteinstellung
  reset_switches();									// Reset alle Schalter XXX
 } 
 
-void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
+void Werkskonfiguration (void)			// Gerï¿½tekonfiguration einlesen
 {
 
  int dummy;														// Hilfsvariable	
@@ -330,23 +333,23 @@ void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
  
  put2str(T_serial,T_ist);										// Text "Seriennummer = ...
  dummy=getline(cbuf,SERNO_LEN,'a');					// bis zu 8 alphanumerische Zeichen lesen
- if (dummy==1) fp.serno[0]='\0';						// Seriennummer löschen 
+ if (dummy==1) fp.serno[0]='\0';						// Seriennummer lï¿½schen 
  else if (dummy==SERNO_LEN) 								// 8 Zeichen gelesen?
-  memcpy(fp.serno,cbuf,SERNO_LEN+1);				// Ja, mit Terminierung übernehmen
+  memcpy(fp.serno,cbuf,SERNO_LEN+1);				// Ja, mit Terminierung ï¿½bernehmen
  put2str(T_hwrev,T_ist);										// Text "Hardware:...
  dummy=getline(cbuf,sizeof(fp.hwVersion)-1,'a');							// alphanumerische Zeichen lesen
- if (dummy>1) memcpy(fp.hwVersion,cbuf,sizeof(fp.hwVersion));	// Zeichen übernehmen
+ if (dummy>1) memcpy(fp.hwVersion,cbuf,sizeof(fp.hwVersion));	// Zeichen ï¿½bernehmen
  list_selection(T_sprache, &T_spritm[0][0], &fp.sprache, ANZSPRACHEN, sizeof(T_spritm[0]));	// Listenauswahl Anzeigesprache
  dummy=getnumber(T_sende, Min_TXF, Max_TXF);		// Sendefrequenz einlesen
  if (dummy >0) fp.TxF=dummy;					
  if (getuchar(T_battoff,0,10,&fp.uoff)<0) newline();												// Batteriespannungsoffset einlesen
  list_selection(T_dimm, &T_dimsel[0][0], &fp.pwm, 3, sizeof(T_dimsel[0]));	// Listenauswahl PWM modi
- getuchar(T_parsets,1,MAX_PARSET,&fp.psets);																// Anzahl Parametersätze einlesen 
+ getuchar(T_parsets,1,MAX_PARSET,&fp.psets);																// Anzahl Parametersï¿½tze einlesen 
  getuchar(T_ledcol,1,0x1F,&fp.ledcode);																			// LED Farbkodierung abfragen
  getuchar(T_colors,1,MAXFARBEN,&fp.farben);																	// Anzahl LED Farben einlesen
  switch (ja(T_spot))		// Led spot
  {
-  case 1:  fp.ledspot=test_ledspot(); break;	// Prüfe ob LED Spot Steuerchip erreichbar
+  case 1:  fp.ledspot=test_ledspot(); break;	// Prï¿½fe ob LED Spot Steuerchip erreichbar
   case -1: fp.ledspot=0; break;								// LED Spot deaktivieren
   default: newline();
  }
@@ -354,10 +357,10 @@ void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
  dummy=fp.ex12;																// Einstellung sichern	
  list_selection(T_12V, &T_12mode[0][0], &fp.ex12, 5, sizeof(T_12mode[0]));	// Listenauswahl 12V extern
  
- if (dummy^fp.ex12)													// Einstellung geändert?
-  if ((fp.ex12==2) || (fp.ex12==4))						// Einstellung auf Viasis Plus oder Viatext geändert
+ if (dummy^fp.ex12)													// Einstellung geï¿½ndert?
+  if ((fp.ex12==2) || (fp.ex12==4))						// Einstellung auf Viasis Plus oder Viatext geï¿½ndert
   {	 
-	 addplus_display_pages ();										// Schaltergruppe Anzeigeseiten für Viasis Plus hinzufügen
+	 addplus_display_pages ();										// Schaltergruppe Anzeigeseiten fï¿½r Viasis Plus hinzufï¿½gen
 	 if (fp.ex12==4) { fp.symgr=0; fp.symbol=0; }	// Keine Symbole mehr
   }
 
@@ -393,7 +396,7 @@ void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
  
  switch (ja(T_turn))										// Drehschalter?
  {
-  case 1: init_turnsw(); break;					// Drehschalter prüfen und Positionsausgabe										
+  case 1: init_turnsw(); break;					// Drehschalter prï¿½fen und Positionsausgabe										
   case -1: 	fp.turnsw=0;  break;				// Drehschalter deinstalliert
 	default: newline(); 
  }	 
@@ -405,12 +408,12 @@ void Werkskonfiguration (void)			// Gerätekonfiguration einlesen
     puterror(DTC_SI_PARAM_INIT, -1); // Initialisierungsfehler
 }
 
-void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
+void upload_file (void)								// Server Zertifikat ï¿½ber Flash ins Modem laden
 {	
- int blno=0;									// Anzahl 1k Datenblöcke
- int fehler=0;								// Hilfsvariable Prüfsummenfehler	
- int filecrc=0;								// CRC16 Prüfsumme der Datei bilden		
- uint filesize=BLOCKSIZE;			// Dateigrösse in Bytes
+ int blno=0;									// Anzahl 1k Datenblï¿½cke
+ int fehler=0;								// Hilfsvariable Prï¿½fsummenfehler	
+ int filecrc=0;								// CRC16 Prï¿½fsumme der Datei bilden		
+ uint filesize=BLOCKSIZE;			// Dateigrï¿½sse in Bytes
  uchar i;											// Laufvariable
  char fname[13];							// Puffer Dateiname	8.3 + '\0' = 13 Zeichen
 
@@ -421,7 +424,7 @@ void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
 	uart1_release(MUX_GSM);									// Release UART1, restore BT if connected
   clear_comchange ();	 										// Wirkung Modemeinschaltung beseitigen
 	putln (T_fsend);												// Text "Send file with Xmodem (1k)...
-  delete_data();													// Messdatenzeiger im Parametersatz löschen
+  delete_data();													// Messdatenzeiger im Parametersatz lï¿½schen
 	 
 	if ((blno=xmodem_receive(FIRMWARE_MAX_FILESIZE,MEASUREPAGE))<0)	// Xmodem Empfang
 	 puterror (DTC_SI_XMODEM_ERR, blno);																						// Xmodem Fehlernummer als Detail ausgeben
@@ -429,20 +432,20 @@ void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
   {
 	 put2str(T_rdat,T_check);			   // Text "File received. Checking checksums ..."
 	 osDelay(50);
-	 for (i=0;i<blno;i++)						// CRC eines jeden Datenblock im Flash prüfen
+	 for (i=0;i<blno;i++)						// CRC eines jeden Datenblock im Flash prï¿½fen
    {	
     flash_pcom((uchar *)cbuf,pagepk*i,FLASH_R_ARRAY,BLOCKSIZE+2);		// Atmel Flash Seite(n) mit CRC lesen   	 
-    if ((fehler=crc((uchar *)cbuf, BLOCKSIZE+2)) != 0) break;				// CRC Überprüfung Flash Abbild	 	   	 
+    if ((fehler=crc((uchar *)cbuf, BLOCKSIZE+2)) != 0) break;				// CRC ï¿½berprï¿½fung Flash Abbild	 	   	 
    }
    if (!fehler) 	// kein CRC Fehler?
    {	 
     putln (T_ok);
 		while (filesize--) if (cbuf[filesize]!=STRZ) break;					// Bytes letzter Block aufsummieren
-		filecrc=crcgen((uchar *)cbuf,filesize+1,filecrc); 					// Datei CRC über Bytes des letzten CRC Bilden  
-    filesize+=(blno-1)*BLOCKSIZE+1;		 													// Bytes übrige Blöcke addieren
+		filecrc=crcgen((uchar *)cbuf,filesize+1,filecrc); 					// Datei CRC ï¿½ber Bytes des letzten CRC Bilden  
+    filesize+=(blno-1)*BLOCKSIZE+1;		 													// Bytes ï¿½brige Blï¿½cke addieren
 		newline(); 
 		putstr (T_fsize);
-    putnumber (filesize,0);										// Dateigröße ausgeben									 
+    putnumber (filesize,0);										// Dateigrï¿½ï¿½e ausgeben									 
 		putstr (T_crc);
 		putnumber (filecrc,0x80);									// CRC16 der geladenen Datei ausgeben
    	newline();	  
@@ -470,22 +473,22 @@ void upload_file (void)								// Server Zertifikat über Flash ins Modem laden
  newline();	
 }
 
-void compmenu(void)		// Testmenü für Bauteile etc.
+void compmenu(void)		// Testmenï¿½ fï¿½r Bauteile etc.
 {
- int c=0;				// Hilfsvariable Menüauswahl
+ int c=0;				// Hilfsvariable Menï¿½auswahl
 
  do
  {
-  c=putmenu(T_comp,'8');			// Bauteil Testmenü senden, auf Auswahl warten
+  c=putmenu(T_comp,'8');			// Bauteil Testmenï¿½ senden, auf Auswahl warten
   switch (c)									// Auswahl auswerten
   {
-	 case '1': write_flash (); break;			// Flash Seiten mit virtuellen Daten beschreiben   	
+	 case '1': write_flash (); break;			// Flash Seiten mit virtuellen Daten beschreiben
    case '2': read_flash (); break;			// Flash Seiten lesen
-	 case '3': LED_font_test ();  break;	// LED Anzeigetest Ziffern	
+	 case '3': LED_font_test ();  break;	// LED Anzeigetest Ziffern
 	 case '4': LED_check ();  break;			// Schneller LED Test 7-Segment und Symbole
 	 case '5': i2c_scan	(); break;				// I2C Device Scan
 	 case '6': test_i2c_device (); break;	// Test I2C Devices
- 	 case '7': upload_file ();	break;		// Upload certificate	
+ 	 case '7': upload_file ();	break;		// Upload certificate
 	}
  } while ((c>0)&&(c!='8'));	// Abbruch
 }
@@ -498,12 +501,12 @@ void symbol_switches_info (void)	// Ausgabe der Schalter und Symbol Konfiguratio
  if (fp.symgr || fp.swgrp) 				// Led Symbol- oder Schaltgruppen definiert
  {
   putln(T_conf);									// Text "Configuration: ..    
-  for (sg=0;sg<fp.symgr;sg++)			// Für jede definierte Symbolgruppe 
+  for (sg=0;sg<fp.symgr;sg++)			// Fï¿½r jede definierte Symbolgruppe 
   {
    putstr (T_symled);			    		// Text "Led Symbole...
    putstr(&fp.symgrname[sg][0]);	// Bezeichner jeder Symbolgruppe ausgeben
    if (fp.nosym[sg])							// Symbol in Gruppe definiert?	
-    for (i=sym;i<sym+fp.nosym[sg];i++) // für jedes Symbol in Gruppe
+    for (i=sym;i<sym+fp.nosym[sg];i++) // fï¿½r jedes Symbol in Gruppe
     { 
      putstr(T_col);								// Trennstring
      putstr(T_symb);							// Text "Symbol.."
@@ -515,11 +518,11 @@ void symbol_switches_info (void)	// Ausgabe der Schalter und Symbol Konfiguratio
   if (fp.symbol) 			// Symbole definiert
    putparameter (T_tsym, fp.scycle, (5<<16), T_ms);	// Parameter Symbolwechselzeit ausgeben
  
-  for (sg=0;sg<fp.swgrp;sg++)								// Für jede definierte Schaltgruppe 
+  for (sg=0;sg<fp.swgrp;sg++)								// Fï¿½r jede definierte Schaltgruppe 
   {
    putstr(&fp.swgrname[sg][0]);									// Bezeichner jeder Schaltergruppe ausgeben
    if (fp.nosw[sg])															// Schalter in Gruppe definiert?	
-    for (sw=4*sg;sw<4*sg+fp.nosw[sg];sw++) 			// für jeden Schalter in Gruppe
+    for (sw=4*sg;sw<4*sg+fp.nosw[sg];sw++) 			// fï¿½r jeden Schalter in Gruppe
    { 
     putstr(T_col);															// Trennstring
     putstr(&fp.swname[sw][0]); 									// Schaltername
@@ -533,7 +536,7 @@ void symbol_switches_info (void)	// Ausgabe der Schalter und Symbol Konfiguratio
 
 void show_ledsymbols (void)	// Led Symbole anzeigen, siehe auch cfont.h
 {
- char items=0;						// Anzahl Listeneinträge
+ char items=0;						// Anzahl Listeneintrï¿½ge
  ushort wert;							// Hilfsvariable LED Fontauswahl 
  uchar i;									// Laufvariable
  int result=0;
@@ -541,35 +544,35 @@ void show_ledsymbols (void)	// Led Symbole anzeigen, siehe auch cfont.h
  putstr(T_showsym);										// Text "Show symbol.."
  for (i=0;i<fp.symbol;i++)	
  {
-  put_menuitem (T_symb, (i+1)|0x30); 	// Menüpunkt "1. Symbol.." usw.
+  put_menuitem (T_symb, (i+1)|0x30); 	// Menï¿½punkt "1. Symbol.." usw.
   putstr(&fp.symname[i][0]); 					// Symbolname
  }
  items=fp.symbol|0x30;
  select (items,0);										// Auswahl
  result=getc(TERMINAL_CHAR_TIMEOUT);	// Warte auf Zeichen max. 30 Sekunden  
  
- if ((result>'0')&&(result<=items)) 		// Gültige Eingabe?
+ if ((result>'0')&&(result<=items)) 		// Gï¿½ltige Eingabe?
  {
   newline();
   wert=fp.symfont[(result&0x0F)-1];
   putln(T_ende);											// Text Ende mit Return
   num_to_LED (wert,1);								// Font Wert nach LED Anzeigepuffer
   get_dimmung ();											// Dimmfaktor bestimmen
-  show_led_off (TERMINAL_CHAR_TIMEOUT, 0);	// LED Ausgabe Symbol für maximal 30 Sekunden
+  show_led_off (TERMINAL_CHAR_TIMEOUT, 0);	// LED Ausgabe Symbol fï¿½r maximal 30 Sekunden
  }
 }
 
 uchar get_symbols (uchar first, uchar last)	// Symbole einlesen
-{																						// Übergabe:	first - Index des ersten zu lesenden Symbols
+{																						// ï¿½bergabe:	first - Index des ersten zu lesenden Symbols
 																						//						last	-	Index des letzten zu lesenden Symbols
  uchar i;																		// Laufvariable	
- for (i=first;i<last;i++)														// Für jedes Symbol des Indexbereichs
+ for (i=first;i<last;i++)														// Fï¿½r jedes Symbol des Indexbereichs
  {
 	putstr(T_symname);																	// Eingabeaufforderung "Symbol name: "
-	if (!getline (&fp.symname[i][0], SYLEN-1,'a')) break;	// Symbolname einlesen, Abbruch wenn Länge null	   	  
+	if (!getline (&fp.symname[i][0], SYLEN-1,'a')) break;	// Symbolname einlesen, Abbruch wenn Lï¿½nge null	   	  
 	fp.symfont[i]=getnumber (T_font, 400, 503);					// Fontnummer des Symbols lesen
  }
- return(i);				// Rückgabe Anzahl eingelesener Symbole 
+ return(i);				// Rï¿½ckgabe Anzahl eingelesener Symbole 
 }	
 
 void symbol_redefine (void)			// Kundenschnittstelle Symbol Redefinition
@@ -586,7 +589,7 @@ void symbol_redefine (void)			// Kundenschnittstelle Symbol Redefinition
  else if (result>0) memcpy(&fp.symgrname[symgr][0],cbuf,SYGLEN);	// Eingabe ok, kopieren
  for (i=0;i<symgr;i++) sanz+=fp.nosym[i];				// Index erstes Symbol der Gruppe bestimmen
  result=get_symbols (sanz, sanz+fp.nosym[i]);		// Symbole einlesen	 
- if (result!=sanz+fp.nosym[i]) 	// Symbole unvollständig gelesen
+ if (result!=sanz+fp.nosym[i]) 	// Symbole unvollstï¿½ndig gelesen
   puterror (DTC_SI_PARAM_DEF_ERR, -1);	 
 	
  newline();	
@@ -600,7 +603,7 @@ void symbol_setup (void)				// Symboldefinition
 	
  fp.symbol=0;											// Reset Anzahl definierter Symbole
  
-   for (sg=0;sg<fp.symgr;sg++)		// für alle definierten Symbolgruppen 	 
+   for (sg=0;sg<fp.symgr;sg++)		// fï¿½r alle definierten Symbolgruppen 	 
    {
     putstr (T_symled);			    	// Text "Led Symbole...
     putln(&fp.symgrname[sg][0]);	// Bezeichner jeder Symbolgruppe ausgeben
@@ -622,7 +625,7 @@ void symbol_setup (void)				// Symboldefinition
 
 void set_symbols_switches(void)	// Setup LED Symbole und Schalter
 {
- int c,cc;					// Hilfsvariable Menüauswahl und 
+ int c,cc;					// Hilfsvariable Menï¿½auswahl und 
  uchar sg,sw;				// Hilfsvariable Listenauswahl Schaltgruppe, Schalter, Symbole 
  uchar i,l;					// Laufvariable
 
@@ -631,14 +634,14 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
   symbol_switches_info ();				// Ausgabe der Schalter und Symbol Konfiguration
   putstr(T_symsw);
   putc(':');
-  putln(T_mswsym);								// Menü Schalter und Symbole senden 
-	itemno('7');										// Menüpunkt für Symbolwechselzeit	 
+  putln(T_mswsym);								// Menï¿½ Schalter und Symbole senden 
+	itemno('7');										// Menï¿½punkt fï¿½r Symbolwechselzeit	 
   c=putmenu(T_tsym,'8');					// Symbolwechselzeit senden, auf Auswahl warten
 
 	if (c=='1')																					// Symbolgruppen definieren
   {
    getuchar (T_nosymgr, 0, NOSYGR, &fp.symgr);				// Anzahl installierter Symbolgruppen abfragen
-   for (i=0;i<fp.symgr;i++)														// Für jede Symbolgruppe
+   for (i=0;i<fp.symgr;i++)														// Fï¿½r jede Symbolgruppe
    {
     if (list_selection (T_tsymgr, &T_symgr1[0][0], &sg, 0x83, sizeof(T_symgr1[0]))<0)	// Listenauswahl?
 		{
@@ -660,8 +663,8 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
    {		 
     if (getuchar (T_noswgrp, 0, NOSWGR, &fp.swgrp)>0) 	// Anzahl installierter Schaltergruppen abfragen
 	  {	 
-	   for (i=0;i<NOSW;i++) fp.swexp[i]=0;								// Reset alle Schalter Expander Einträge	 
-     for (i=0;i<fp.swgrp;i++)														// Für jede Schaltergruppe
+	   for (i=0;i<NOSW;i++) fp.swexp[i]=0;								// Reset alle Schalter Expander Eintrï¿½ge	 
+     for (i=0;i<fp.swgrp;i++)														// Fï¿½r jede Schaltergruppe
      {
       if (list_selection (T_tswgrp, &T_swgrp[0][0], &sg, 0x85, sizeof(T_swgrp[0]))<0)	// Listenauswahl?
 		  {
@@ -681,10 +684,10 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
    {
 		if (c=='5')	// Schaltergruppen definieren
 		{
-		 for (i=4*sg;i<4*sg+4;i++) fp.swexp[i]=0;			// Reset alle Schalter Expander Einträge in Gruppe
+		 for (i=4*sg;i<4*sg+4;i++) fp.swexp[i]=0;			// Reset alle Schalter Expander Eintrï¿½ge in Gruppe
 		 fp.nosw[sg]=0;																// Reset Anzahl Schalter
      if (getuchar (T_nosw, 1, 4, &fp.nosw[sg])>0)	// Anzahl Schalter in der Gruppe abfragen
-			for (i=4*sg;i<4*sg+fp.nosw[sg];i++)					// Für jeden Schalter der Gruppe
+			for (i=4*sg;i<4*sg+fp.nosw[sg];i++)					// Fï¿½r jeden Schalter der Gruppe
 			{
 			 if (list_selection (T_tsw, &T_swtyp[0][0], &sw, 0x84, sizeof(T_swtyp[0]))<0)	// Listenauswahl Name Schalter?
 			 {																							// Keine Eingabe
@@ -697,7 +700,7 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
 			 if (getuchar (T_expno,1,2,&fp.swexp[i])<0) fp.nosw[sg]=0;					// Expander einlesen, reset Gruppe bei Timeout
 			 else if (getuchar (T_portno,0,31,&fp.swport[i])<0) fp.nosw[sg]=0;	// Expander Port einlesen, reset Gruppe bei Timeout
 			 else // wenn Schalterdefinition ok
-			 {		// Prüfe auf Expander oder LED Spot device
+			 {		// Prï¿½fe auf Expander oder LED Spot device
 	      if (((fp.swexp[i]==1)&& !(fp.i2cdev&IC58_b)) || ((fp.swexp[i]==2) && ((fp.i2cdev&ICLED_b)==0)))
 				{
 				 puterror(DTC_SI_I2C_EXP_ERR, -1);  // IC58 Expander Fehler oder fehlt
@@ -707,7 +710,7 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
 				}	// end Expander Fehler   
 			 }	// end Schalter ok  
 			} // end if jeder Schalter
-		 set_default_port ();			// Ändert default I2C Expander Porteinstellung
+		 set_default_port ();			// ï¿½ndert default I2C Expander Porteinstellung
 		 reset_switches();				// Reset alle Schalter XXX
 		} // end if Schaltergruppen definieren
 		else // Schalter testen
@@ -715,27 +718,27 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
 		 while(1)
 		 {
 			putstr(T_tsw);	
-			for (i=0;i<fp.nosw[sg];i++)										// Für jeden Schalter der Gruppe
+			for (i=0;i<fp.nosw[sg];i++)										// Fï¿½r jeden Schalter der Gruppe
 			{
 			 l=4*sg+i;																		// Index alle Schalter
-			 put_menuitem (&fp.swname[l][0], (i+1)|0x30);	// Menüpunkt ausgeben
+			 put_menuitem (&fp.swname[l][0], (i+1)|0x30);	// Menï¿½punkt ausgeben
 			 putc(' ');
 			 if (fp.swno[l]) putnumber(fp.swno[l],0);			// Schalternummmer ggf. ausgeben
 			}
 			i=(fp.nosw[sg]+1)|0x30;
 			cc=putmenu(T_nil,i);													// Ausgabe Auswahl
-			if (cc>'0' && cc<i)														// Gültige Eingabe
+			if (cc>'0' && cc<i)														// Gï¿½ltige Eingabe
 			{
-			 i=4*sg+(cc&0x0F)-1;			// Menüindex dekrementieren -> Schalterindex der Gruppe berechnen
+			 i=4*sg+(cc&0x0F)-1;			// Menï¿½index dekrementieren -> Schalterindex der Gruppe berechnen
 			 putparameter (T_expno, fp.swexp[i], 0, T_LF);
 			 putparameter (T_portno, fp.swport[i], 0, T_LF);
 			 num_to_LED (188,1);			// Anzeigecode 188 nach LED Anzeigepuffer
 			 show_led(-1,0);					// 188 ausgeben
-			 if (fp.ex12==3) FIO0SET = EX12_2;	// 12V extern für Viasis Plus FT einschalten	   	
+			 if (fp.ex12==3) FIO0SET = EX12_2;	// 12V extern fï¿½r Viasis Plus FT einschalten	   	
 			 set_exp_switch (i);			// Setzt definierten Schalter
-			 if (fp.ledspot) write_i2c_dev (ICLED,2,0xFF18);				// Max. Intensität setzen  
+			 if (fp.ledspot) write_i2c_dev (ICLED,2,0xFF18);				// Max. Intensitï¿½t setzen  
 			 wait_return ();				// Warte auf Return Eingabe
-			 if (fp.ex12==3) FIO0CLR = EX12_2;	// 12V extern für Viasis Plus FT abschalten
+			 if (fp.ex12==3) FIO0CLR = EX12_2;	// 12V extern fï¿½r Viasis Plus FT abschalten
 			 clear_all();						// Led samt Schalter aus	  
 			}
 			else break; // Abbruch
@@ -754,55 +757,55 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
  newline();	// Zeilenvorschub
 }
 
-void transmenu (void) 	// Transceiver & Verstärker Menü
+void transmenu (void) 	// Transceiver & Verstï¿½rker Menï¿½
 {
- int c=0;								// Hilfsvariable Menüauswahl
+ int c=0;								// Hilfsvariable Menï¿½auswahl
 
  do
  {
   newline();
 	test_battery(0);							// HF-/Analog-Spannungsversorgung messen  
-  putln(T_trx);									// Transceiver & Verstärkermenü senden	
-  putparameter (T_vtg, fp.u_hf, 5<<16, T_mVolt);		// Versorgung vor Menü ausgeben
-  c=putmenu(T_tmenu,'3');				// Restmenü senden, auf Auswahl warten
+  putln(T_trx);									// Transceiver & Verstï¿½rkermenï¿½ senden	
+  putparameter (T_vtg, fp.u_hf, 5<<16, T_mVolt);		// Versorgung vor Menï¿½ ausgeben
+  c=putmenu(T_tmenu,'3');				// Restmenï¿½ senden, auf Auswahl warten
   switch (c)										// Auswahl auswerten
   {
-   case '1': amplifier_adjust (); break;		// Abgleich Verstärker/Transceiver 	
-   case '2': transceiver_test (); 	break;	// Test Verstärker/Transceiver mit gedimmtem Display
+   case '1': amplifier_adjust (); break;		// Abgleich Verstï¿½rker/Transceiver 	
+   case '2': transceiver_test (); 	break;	// Test Verstï¿½rker/Transceiver mit gedimmtem Display
   } 
  } while ((c>0)&&(c!='3'));	// Abbruch 
 
  newline();	// Zeilenvorschub
 }
 
-void werkmenue (void) 	// Werksmenü
+void werkmenue (void) 	// Werksmenï¿½
 {
- volatile int c;				// Hilfsvariable Menüauswahl
+ volatile int c;				// Hilfsvariable Menï¿½auswahl
 
  newline();
  do
  {	 
 	InitWatchdog(LONG_WD_32);					// langes Watchdog Interval auf 32 Sekunden setzen 
-  werkeinstellung (0);							// Ausgabe ausgewählter Werksparameter
+  werkeinstellung (0);							// Ausgabe ausgewï¿½hlter Werksparameter
 	
-  put_menuitem (T_cconf,'1');				// Menüpunkt "1. Change configuration"
-  put_menuitem (T_symsw,'2');				// Menüpunkt "2. LED symbols and switches"
-  put_menuitem (T_bright,'3');			// Menüpunkt "3. LED brightness"
-  put_menuitem (T_trx,'4');					// Menüpunkt "4. Amplifier & Transceiver"
-  c=putmenu(T_kmenu,'8');						// Werksmenü senden, auf Auswahl warten
+  put_menuitem (T_cconf,'1');				// Menï¿½punkt "1. Change configuration"
+  put_menuitem (T_symsw,'2');				// Menï¿½punkt "2. LED symbols and switches"
+  put_menuitem (T_bright,'3');			// Menï¿½punkt "3. LED brightness"
+  put_menuitem (T_trx,'4');					// Menï¿½punkt "4. Amplifier & Transceiver"
+  c=putmenu(T_kmenu,'8');						// Werksmenï¿½ senden, auf Auswahl warten
 	 
 	switch (c)								// Auswahl auswerten
   {
-	 case '1': Werkskonfiguration (); break;	// Geräte-Konfiguration einlesen
+	 case '1': Werkskonfiguration (); break;	// Gerï¿½te-Konfiguration einlesen
 	 case '2': set_symbols_switches(); break;	// Setup LED Symbole und Schalter	
 	 case '3': Helligkeit(); break;						// Helligkeitseinstellung	
-	 case '4': transmenu (); break;						// Transceiver & Verstärker Menü			 			    	
+	 case '4': transmenu (); break;						// Transceiver & Verstï¿½rker Menï¿½			 			    	
 	 case '5': putstr(T_eraseall);						// Warnhinweis
 						 if (ja((char *)T_cont)>0)	  	// Fortfahren?
 						  if (InitParameter(1)==1) 			// Werkinititialisierung?
 								putmstr(L_winit);						// Ja, Meldung
 						 break;	
-   case '6': compmenu();		break;					// Testmenü für Bauteile etc.
+   case '6': compmenu();		break;					// Testmenï¿½ fï¿½r Bauteile etc.
 	 case '7': modem_com();		break;					// Befehlsmodus Modems
 	 default:	break;				 
   } // end switch 		
@@ -812,7 +815,7 @@ void werkmenue (void) 	// Werksmenü
 
 void specialmenu (void)			// Sondermenue
 {
- int c;				// Hilfsvariable Menüauswahl
+ int c;				// Hilfsvariable Menï¿½auswahl
  int result;
  uchar items;
 
@@ -820,7 +823,7 @@ void specialmenu (void)			// Sondermenue
  {	
   items='8';	 
   newline();	
-  putstr (T_smenu);				// Text "Sondermenü ...
+  putstr (T_smenu);				// Text "Sondermenï¿½ ...
   putparameter (T_mcyc, fp.mcycle, (1<<16)|('1'<<8), T_ms);							// Parameter Messzyklus ausgeben
   putparameter (T_acyc, fp.acycle, (1<<16)|('2'<<8), T_ms);							// Parameter Anzeigezyklus ausgeben
 	putparameter (T_units,0, (3<<16)|('3'<<8), &T_uall[fp.mph][0]);				// Messeinheit ausgeben 
@@ -854,13 +857,13 @@ void specialmenu (void)			// Sondermenue
    case '4': getuchar(T_vmmin, Defminspeed, Defmaxspeed, &fp.vmm);	// kleinste gemessene Geschwindigkeit einlesen    
  						 if (fp.vmm < 5) 														// Kleinste Messgeschwindigkeit < 5 
 						 {	 
-							fp.txrcon|=BW_B;													// Verstärker untere Grenzfrequenz auf 1,4 km/h reduzieren
-							t_amp_en=20;															// Messverzögerung Übersteuerungszeit Verstärker verlängern					 
+							fp.txrcon|=BW_B;													// Verstï¿½rker untere Grenzfrequenz auf 1,4 km/h reduzieren
+							t_amp_en=20;															// Messverzï¿½gerung ï¿½bersteuerungszeit Verstï¿½rker verlï¿½ngern					 
 						 }	 
 						 else 																			// Kleinste Messgeschwindigkeit >= 5 
 						 {	 
-							fp.txrcon&=~(BW_B);								  			// Verstärker untere Grenzfrequenz auf 8,1 km/h nach oben setzen
-							t_amp_en=10;															// Messverzögerung Übersteuerungszeit Verstärker verkürzen	 
+							fp.txrcon&=~(BW_B);								  			// Verstï¿½rker untere Grenzfrequenz auf 8,1 km/h nach oben setzen
+							t_amp_en=10;															// Messverzï¿½gerung ï¿½bersteuerungszeit Verstï¿½rker verkï¿½rzen	 
 						 }	 
 						 break;   
    case '5': getuchar(T_vcor, Def_vcor, MAX_VCOR, &fp.vcor);				// Geschwindigkeitskorrekturfaktor
@@ -877,52 +880,52 @@ void specialmenu (void)			// Sondermenue
  newline();	// Zeilenvorschub
 }
 
-int thrmenu (void)			// Menü Schaltschwellen Erweiterungen
+int thrmenu (void)			// Menï¿½ Schaltschwellen Erweiterungen
 {
- uchar item=0;														// Anzahl Menüpunkte
+ uchar item=0;														// Anzahl Menï¿½punkte
  uchar i;																	// Laufvariable Schaltergruppen
 
  if (fp.symgr||fp.swgrp)									// Symbole oder Schalter?
  {
-  putstr(T_ext);   												// Menütitel "Schaltschwellen ...
+  putstr(T_ext);   												// Menï¿½titel "Schaltschwellen ...
   putc(':');
  }
  else putstr(T_ninst);										// Nein, Text "Nicht installiert...
 
- for (i=0;i<fp.symgr;i++)									// Für jede definierte Symbolgruppe
+ for (i=0;i<fp.symgr;i++)									// Fï¿½r jede definierte Symbolgruppe
  {
-   put_menuitem(T_symled,(++item|0x30));	// Menüpunkt mit Namen der Symbolgruppe
+   put_menuitem(T_symled,(++item|0x30));	// Menï¿½punkt mit Namen der Symbolgruppe
    putstr(&fp.symgrname[i][0]);
  }
 
- for (i=0;i<fp.swgrp;i++)									// Für jede definierte Schaltergruppe
-   put_menuitem(&fp.swgrname[i][0],(++item|0x30));		// Menüpunkt mit Namen der Schaltgruppe
+ for (i=0;i<fp.swgrp;i++)									// Fï¿½r jede definierte Schaltergruppe
+   put_menuitem(&fp.swgrname[i][0],(++item|0x30));		// Menï¿½punkt mit Namen der Schaltgruppe
  
- if (fp.symgr) put_menuitem(T_symdef,(++item|0x30));	// Menüpunkt Symbol Neudefinition
+ if (fp.symgr) put_menuitem(T_symdef,(++item|0x30));	// Menï¿½punkt Symbol Neudefinition
 
- return(item);				// Rückgabe Anzahl Erweiterungen
+ return(item);				// Rï¿½ckgabe Anzahl Erweiterungen
 }
 
-void switchmenu (int grpno)		// Menü Ein-/Ausschaltschwellen Schaltergruppen
-{								// Übergabe	grpno - Schaltgruppennummer-1 (0..2)
+void switchmenu (int grpno)		// Menï¿½ Ein-/Ausschaltschwellen Schaltergruppen
+{								// ï¿½bergabe	grpno - Schaltgruppennummer-1 (0..2)
  uchar i;						// Laufvariable
  int grpoff=4*grpno;			// Hilfsvariable Gruppenoffset
- int c=0;						// Menüauswahlzeichen
+ int c=0;						// Menï¿½auswahlzeichen
  uchar anzsw=fp.nosw[grpno];	// Anzahl Schalter
- int items=(2*anzsw)|0x30;		// Anzahl Menüpunkte
+ int items=(2*anzsw)|0x30;		// Anzahl Menï¿½punkte
 
  do
  { 
   putstr(&fp.swgrname[grpno][0]);	// Bezeichner der Schaltergruppe ausgeben
   cbuf[1]='\0';						// Null Terminierung
-  for (i=0;i<anzsw;i++)				// Für jeden Schalter
+  for (i=0;i<anzsw;i++)				// Fï¿½r jeden Schalter
   {
    if (fp.swno[grpoff+i]) cbuf[0]=fp.swno[grpoff+i]|0x30; 	// Ggf. Schalternummer nach cbuf
    else cbuf[0]=0;					// Leerstring
    put_schwellwert (&fp.swname[grpoff+i][0],cbuf,&fp.vswi[dset][2*(grpoff+i)], i);	// Schaltschwellen ausgeben
   }
-  c=putmenu(T_nil,items+1);			// Menüabschluss senden und max. 30 Sekunden auf Auswahl warten
-  if (c>='1' && c<=items)			// Gültige Eingabe
+  c=putmenu(T_nil,items+1);			// Menï¿½abschluss senden und max. 30 Sekunden auf Auswahl warten
+  if (c>='1' && c<=items)			// Gï¿½ltige Eingabe
   {
    getuchar(T_thr,Defminspeed,Defmaxspeed+1,&fp.vswi[dset][2*grpoff+(c&0x0F)-1]);	// Schwellwert einlesen	   
    putc('\n');
@@ -930,13 +933,13 @@ void switchmenu (int grpno)		// Menü Ein-/Ausschaltschwellen Schaltergruppen
  } while ((c>0)&&(c!=items+1));		// Abbruch
 }
 
-void symbolmenu (int grp)	// Schaltschwellenmenü für Anzeigesymbole
-{							// Übergabe	grp - Symbolgruppe-1 (0..2)
+void symbolmenu (int grp)	// Schaltschwellenmenï¿½ fï¿½r Anzeigesymbole
+{							// ï¿½bergabe	grp - Symbolgruppe-1 (0..2)
 								
- int c=0;			// Zeichen Menüauswahl
+ int c=0;			// Zeichen Menï¿½auswahl
  uchar i;			// Laufvariable 
  uchar off=0;		// Hilfsvariable offset Speicherindex Symbol
- int mitem=(2*fp.nosym[grp])|0x30;			// Anzahl Menüpunkte
+ int mitem=(2*fp.nosym[grp])|0x30;			// Anzahl Menï¿½punkte
 
  for (i=0; i<grp;i++) off+=fp.nosym[i];	// Offset Speicherindex Symbol ermitteln
 
@@ -946,10 +949,10 @@ void symbolmenu (int grp)	// Schaltschwellenmenü für Anzeigesymbole
   putstr(&fp.symgrname[grp][0]);	// Bezeichner der Symbolgruppe ausgeben
   putc(':');
 
-  for (i=0;i<fp.nosym[grp];i++)	// Für alle Symbole im Menü
+  for (i=0;i<fp.nosym[grp];i++)	// Fï¿½r alle Symbole im Menï¿½
 	 put_schwellwert (T_symb,&fp.symname[off+i][0],&fp.vsym[dset][2*(i+off)], i);	// Schwellwerte ausgeben
-  c=putmenu(T_nil,mitem+1);			// Menüabschluss senden und max. 30 Sekunden auf Auswahl warten
-	if (c>='1' && c<=mitem)				// Gültige Eingabe
+  c=putmenu(T_nil,mitem+1);			// Menï¿½abschluss senden und max. 30 Sekunden auf Auswahl warten
+	if (c>='1' && c<=mitem)				// Gï¿½ltige Eingabe
 	{
 	 getuchar(T_thr,Defminspeed,Defmaxspeed+1,&fp.vsym[dset][2*off+(c&0x0F)-1]);	// Schwellwert einlesen	
 	 putc('\n');
@@ -957,8 +960,8 @@ void symbolmenu (int grp)	// Schaltschwellenmenü für Anzeigesymbole
  } while ((c>0)&&(c!=(mitem+1)));		// Abbruch
 }
 
-void get_thresholds (int auswahl)		// Einlesen von Geschwindigkeitsschwellen für Symbole und Schalter
-{																		// Übergabe auswahl - Menüauswahl
+void get_thresholds (int auswahl)		// Einlesen von Geschwindigkeitsschwellen fï¿½r Symbole und Schalter
+{																		// ï¿½bergabe auswahl - Menï¿½auswahl
  uchar i;				// Laufvariable
  int vgl=1;			// Vergleichswert
  
@@ -966,17 +969,17 @@ void get_thresholds (int auswahl)		// Einlesen von Geschwindigkeitsschwellen für
 
  for (i=0;i<NOSYGR;i++)			// Symbolgruppe 1 bis 3
   if (fp.symgr>=i+1)
-   if (auswahl==vgl++)	{ symbolmenu(i); return; }		// Symbol Schwellwertmenü(s)
+   if (auswahl==vgl++)	{ symbolmenu(i); return; }		// Symbol Schwellwertmenï¿½(s)
 
  for (i=0;i<NOSWGR;i++)			// Schaltgruppe 1 bis 3
   if (fp.swgrp>=i+1)
-   if (auswahl==vgl++)	{ switchmenu(i); return; }		// Schalter Schwellwertmenü		
+   if (auswahl==vgl++)	{ switchmenu(i); return; }		// Schalter Schwellwertmenï¿½		
 
  if (fp.symgr)						// Symbolgruppe(n) existiert?
   if (auswahl==vgl++)	
    symbol_redefine();			// Symbolgruppe neu definieren	
 
- if (auswahl==vgl) menu>>=4;	// Menü Return
+ if (auswahl==vgl) menu>>=4;	// Menï¿½ Return
 }
 
 void put_ascii_data (void)				// ASCII Messdaten ausgeben
@@ -984,7 +987,7 @@ void put_ascii_data (void)				// ASCII Messdaten ausgeben
  char c;														// Hilfsvariable Zeicheneingabe
  uchar zeile=1;											// Laufvariable Ausgabezeilen
  ushort mdseite=fp.md_start_page;		// Laufvariable Messdatenseite
- ushort mdadr;											// Laufvariable Messdatensätze
+ ushort mdadr;											// Laufvariable Messdatensï¿½tze
  ushort lastadr;										// letzte zu lesende Seitenadresse 
 
  while (1)		// Alle Seiten lesen
@@ -1000,13 +1003,13 @@ void put_ascii_data (void)				// ASCII Messdaten ausgeben
     memcpy (cbuf,(text*)&vbuf[0], fp.md_adr);		// Daten nach cbuf kopieren
 		lastadr=fp.md_adr;													// letzte zu lesende Datensatzadresse
    }
-   while (mdadr<lastadr)	// Alle Datensätze lesen
+   while (mdadr<lastadr)	// Alle Datensï¿½tze lesen
    {
     put_signed_float (((short)(cbuf[mdadr]<<8)+cbuf[mdadr+1]), 10, 0, fp.nk); // Geschwindigkeit mit Vorzeichen
 		put_date_time (&cbuf[mdadr+4]);					// Datum und Zeit aus Puffereintrag ausgeben
    	newline();				// Leerzeile
 
-		mdadr+=VSATZLEN;		// Datensatzlänge addieren
+		mdadr+=VSATZLEN;		// Datensatzlï¿½nge addieren
 		if (zeile++%20==0)
     {
      putln(T_weret);
@@ -1015,21 +1018,21 @@ void put_ascii_data (void)				// ASCII Messdaten ausgeben
     }
    }
    if ((mdseite==fp.md_page)&&(mdadr==fp.md_adr)) break; // aktueller Messdatenzeiger erreicht?
-   mdseite++;									   	// Nächste Messdatenseite
-   if (mdseite==PROTOCOLPAGE) mdseite=MEASUREPAGE;	// wenn Messdaten=Protokollseite -> Überlauf
+   mdseite++;									   	// Nï¿½chste Messdatenseite
+   if (mdseite==PROTOCOLPAGE) mdseite=MEASUREPAGE;	// wenn Messdaten=Protokollseite -> ï¿½berlauf
   } // end forever
 }
 
 bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden	
-{									// Übergaben:	anzwerte - Anzahl Messwerte im Speicher
+{									// ï¿½bergaben:	anzwerte - Anzahl Messwerte im Speicher
 									//						ziel - 0 Base64 codierte Direktausgabe
 									//									 1 Y-Modem Ausgabe
 									//									 2 USB flash disc Ausgabe
  int result=1;
  uchar blno=0;					// Blocknummer 8 Bit
  uint seite;						// Laufvariable Seiten
- uint pglen;						// Hilfsvariable Seitenlänge
- uint ind=0;						// Bytezähler Datenausgabe			
+ uint pglen;						// Hilfsvariable Seitenlï¿½nge
+ uint ind=0;						// Bytezï¿½hler Datenausgabe			
  
  ResetWDT();						// Watchdog reset
  
@@ -1041,15 +1044,15 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
  
  if (ziel==1)						// Ymodem 
  {	 
-  putnumber ((VTF_LEN+PARA_LEN+PROT_LEN+10*anzwerte),0);	// Dateilänge in Byte senden
-  while (cind<128) putc(0);								// Restlichen Header mit Nullen füllen
+  putnumber ((VTF_LEN+PARA_LEN+PROT_LEN+10*anzwerte),0);	// Dateilï¿½nge in Byte senden
+  while (cind<128) putc(0);								// Restlichen Header mit Nullen fï¿½llen
   redirect_char_Out(putb);								// Zeichenausgabe wieder an UART(s) leiten
   result=sendblock (SOH, blno++,1);				// Headerblock in cbuf ausgeben
  }
  else if (ziel==2)												// USB-Speicherstick
 	result=open_vtf_file (); 								// Erstelle VTF Datei 
 
- if (result>0) 														// Ymodem Übertragung ok, Direktausgabe oder USB vtf Datei offen?
+ if (result>0) 														// Ymodem ï¿½bertragung ok, Direktausgabe oder USB vtf Datei offen?
  {																				// VTF Dateiheader aufbauen
   cind=BLOCKSIZE; do cbuf[--cind]=0x20; while (cind);	// cbuf mit Leerzeichen initialisieren								
   redirect_char_Out(putcbuf);							// Zeichenausgabe in Puffer cbuf leiten
@@ -1060,13 +1063,13 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
   newline();
   read_date_time (TIME,cbuf+cind);				// Auslesezeit								  
   newline();
-  putnumber(fp.fileno,0x08);							// Dateinummer, 8 stellig, führende Leerzeichen
+  putnumber(fp.fileno,0x08);							// Dateinummer, 8 stellig, fï¿½hrende Leerzeichen
   newline();
-  putnumber(anzwerte,0x08);								// Anzahl Messwerte, 8 stellig, führende Leerzeichen
+  putnumber(anzwerte,0x08);								// Anzahl Messwerte, 8 stellig, fï¿½hrende Leerzeichen
   newline();
   putnumber(anzahl_protokoll_ereignisse(),0x08);	// Anzahl Protokollereignisse
   newline();
-  putnumber(PARA_LEN,0x08);								// Länge Parameter
+  putnumber(PARA_LEN,0x08);								// Lï¿½nge Parameter
   newline();
   putstr(fp.serno);												// Seriennummer
   cind=132; newline();
@@ -1075,20 +1078,20 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
   redirect_char_Out(putb);								// Zeichenausgabe wieder an UART(s) leiten
   result=btransfer (ziel, blno++);				// VTF Headerblock in cbuf ausgeben
 
-  if (result>0) 													// Übertragung ok?
+  if (result>0) 													// ï¿½bertragung ok?
   {																				// Parameterblock senden										
    result=modem_send_par (ziel, blno);		// Ausgabe 2k Parameter
    
-   if (result>0) 													// Übertragung ok?
+   if (result>0) 													// ï¿½bertragung ok?
    {
     blno=result;													// Blocknummer aktualisieren
 		result=modem_send_pro (ziel, blno);		// Protokoll 2k senden
 
-		if (result>0) 												// Übertragung ok?
+		if (result>0) 												// ï¿½bertragung ok?
     {
 		 blno=result;													// Blocknummer aktualisieren
      seite=fp.md_start_page;							// Messdaten senden
-     pglen=MD_PER_PG*VSATZLEN;						// Anzahl Datensätze pro Seite     
+     pglen=MD_PER_PG*VSATZLEN;						// Anzahl Datensï¿½tze pro Seite     
      cind=0; ind=0;												// Reset Pufferzeiger und Flash Seite Byteindex
      while (1)
      { 
@@ -1099,15 +1102,15 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
        else // > 1k			
        {
 				ind=BLOCKSIZE-cind;								// Platz in Puffer
-        copy_to_cbuf ((char *)vbuf, ind);	// Puffer füllen		
+        copy_to_cbuf ((char *)vbuf, ind);	// Puffer fï¿½llen		
 				result=btransfer (ziel, blno++);	// Messdaten in cbuf ausgeben
         if (result<0) break;	
         cind=0;														// Reset Pufferzeiger										
 				copy_to_cbuf ((char *)&vbuf[ind],fp.md_adr-ind);	// Restliche aktuelle Messdaten
        }
 			 if (cind)													// wenn Messdaten vorhanden
-        while (cind<BLOCKSIZE) cbuf[cind++]=CPMEOF;		// Messdatenblock auf 1k füllen
-       ind=pglen;	// nächstes Seitenlesen überspringen		
+        while (cind<BLOCKSIZE) cbuf[cind++]=CPMEOF;		// Messdatenblock auf 1k fï¿½llen
+       ind=pglen;	// nï¿½chstes Seitenlesen ï¿½berspringen		
       }
       else // bereits im Flash gesicherte Seite
       {   
@@ -1117,10 +1120,10 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
        P_fpar=(uchar *)&cbuf[cind];				// Zeiger auf Puffer
        flash_adress(0,seite);							// Messdatenseite addressieren
        flash_command (FLASH_R_MAIN, 8, ind);	// Seite nach cbuf lesen
-       cind+=ind;								// Pufferzeiger erhöhen    
+       cind+=ind;								// Pufferzeiger erhï¿½hen    
       }	// end aktuelle/gesicherte Seite
 
-      if (cind>=BLOCKSIZE) 								// 1k Blockgröße erreicht?
+      if (cind>=BLOCKSIZE) 								// 1k Blockgrï¿½ï¿½e erreicht?
       {
 			 result=btransfer (ziel, blno++);	// Messdaten in cbuf ausgeben
        if (result<0) break;								// Abbruch bei Fehler	
@@ -1141,15 +1144,15 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
         flash_command (FLASH_R_MAIN, 8, pglen-ind);	// Seitenrest nach cbuf lesen
         cind=pglen-ind;										// neuer Pufferindex 	
        } // end if Seitenrest
-      } // end if 1k Blockgröße erreicht
+      } // end if 1k Blockgrï¿½ï¿½e erreicht
       if (seite==fp.md_page) 							// bis aktuelle Messdatenseite gesendet?
       {
 			 if (ziel==0) putstr_b64 (cbuf, -1);		// Base64 Pufferausgabe beenden	
-       else if (ziel==1) ymodem_close ();			// ymodem Übertragung beenden			 
-       return (true);													// Rückgabe alles ok
+       else if (ziel==1) ymodem_close ();			// ymodem ï¿½bertragung beenden			 
+       return (true);													// Rï¿½ckgabe alles ok
       }
-      if ((seite+1)==PROTOCOLPAGE) seite=MEASUREPAGE;	// Überlauf
-      else seite++;		// nächste Flash Seite lesen
+      if ((seite+1)==PROTOCOLPAGE) seite=MEASUREPAGE;	// ï¿½berlauf
+      else seite++;		// nï¿½chste Flash Seite lesen
      } // end while (1) alle Messdaten(seiten) ausgeben  	
 		} // end if result>0
    } // end if result>0
@@ -1160,8 +1163,8 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
 }
 
 uint messdaten (uchar ausgabe)		// Anzahl Messdaten berechnen und ggf. ausgeben
-{																	// Übergabe: ausgabe - 0 keine Ausgabe, Rückgabe absolute Anzahl
-																	//										 1 keine Ausgabe, Rückgabe in Prozent
+{																	// ï¿½bergabe: ausgabe - 0 keine Ausgabe, Rï¿½ckgabe absolute Anzahl
+																	//										 1 keine Ausgabe, Rï¿½ckgabe in Prozent
 																	//										 2 Ausgabe Anzahl und Vbat
 																	//										 3 Terminalausgabe
  char c;																// Hilfsvariable Zeicheneingabe 
@@ -1169,10 +1172,10 @@ uint messdaten (uchar ausgabe)		// Anzahl Messdaten berechnen und ggf. ausgeben
  int anzmw=fp.md_page-fp.md_start_page;	// Anzahl beschriebener Flashseiten	
  
  if (anzmw<0) anzmw+=PROTOCOLPAGE;	// Max. Anzahl Messdatenseiten addieren
- anzmw*=MD_PER_PG;									// Anzahl Seitendatensätze (26,52,103)
- anzmw+=fp.md_adr/VSATZLEN;					// Datensätze aktuelle Seite addieren 
+ anzmw*=MD_PER_PG;									// Anzahl Seitendatensï¿½tze (26,52,103)
+ anzmw+=fp.md_adr/VSATZLEN;					// Datensï¿½tze aktuelle Seite addieren 
 
- if (!ausgabe) return(anzmw);				// Rückgabe Anzahl Messwerte
+ if (!ausgabe) return(anzmw);				// Rï¿½ckgabe Anzahl Messwerte
 	
  if (ausgabe==2) newline();		    	// Email-Ausgabe
  if (ausgabe>1)					    
@@ -1190,7 +1193,7 @@ uint messdaten (uchar ausgabe)		// Anzahl Messdaten berechnen und ggf. ausgeben
 	 send_vtf_file (anzmw, 1);				// VTF Datei per ymodem senden 
 	 osDelay(100);										// warte 100 ms Ymodem Ende
 	}	
-  if (ja(T_delete)>0) delete_data();					// Abfrage Daten löschen? Ja -> Messdaten im Speicher löschen
+  if (ja(T_delete)>0) delete_data();					// Abfrage Daten lï¿½schen? Ja -> Messdaten im Speicher lï¿½schen
  } // end ausgabe
  else 															// keine Ausgabe an Terminal
  {
@@ -1200,21 +1203,21 @@ uint messdaten (uchar ausgabe)		// Anzahl Messdaten berechnen und ggf. ausgeben
    anz_max=PROTOCOLPAGE*MD_PER_PG;								// Maximale Anzahl Messwerte berechnen
    anz_proz=(anzmw*100/anz_max)+1; 								// Speicher voll in %     
   }
-  if (ausgabe==1) return (anz_proz);							// Rückgabe Anzahl Messwerte in %
+  if (ausgabe==1) return (anz_proz);							// Rï¿½ckgabe Anzahl Messwerte in %
   putparameter(T_memfull,anz_proz,5<<16, T_perc);	// Formatiert mit Text ausgeben
   putbat(fp.u_in/10);															// Ausgabe Batteriespannung
  }
- return(anzmw);																		// Rückgabe Anzahl Messwerte 
+ return(anzmw);																		// Rï¿½ckgabe Anzahl Messwerte 
 } 
 
 void put_protocol (uchar ausgabe)	// ASCII Protokoll ausgeben
-{																	// Übergabe:	ausgabe - 0/1 für Email- / Terminalausgabe
+{																	// ï¿½bergabe:	ausgabe - 0/1 fï¿½r Email- / Terminalausgabe
  char c=0;												// Hilfsvariable Zeicheneingabe
- int result=0;										// Ergebnisvariable für Tabellensuche
+ int result=0;										// Ergebnisvariable fï¿½r Tabellensuche
  int number;											// Hilfsvariable zur Ereignis-/Fehlernummerermittlung
- int anzpro;											// Hilfsvariable Berechnung Protokollsätze
+ int anzpro;											// Hilfsvariable Berechnung Protokollsï¿½tze
  ushort prtseite=fp.pro_page;			// Laufvariable Protokollseite
- ushort byteadress=fp.pro_adr;		// Laufvariable Protokollsätze
+ ushort byteadress=fp.pro_adr;		// Laufvariable Protokollsï¿½tze
  uchar zeile=1;										// Laufvariable Ausgabezeilen
 
  if (!ausgabe) newline();
@@ -1231,12 +1234,12 @@ void put_protocol (uchar ausgabe)	// ASCII Protokoll ausgeben
  {  
   if (byteadress) memcpy (cbuf, probuf, byteadress);	// aktuelle Protokollseite nach cbuf
 
-  while (1)	// Protokolleinträge rückwärts lesen, d.h. letzte Einträge zuerst ausgeben
+  while (1)	// Protokolleintrï¿½ge rï¿½ckwï¿½rts lesen, d.h. letzte Eintrï¿½ge zuerst ausgeben
   {
 	 c=CR;													// Voreinstellung wg. Doppelschleifenausgang
-   while (byteadress)							// solange Einträge in Seite
+   while (byteadress)							// solange Eintrï¿½ge in Seite
    {
-    byteadress-=PSATZLEN;					// Einen Protokolleintrag zurück
+    byteadress-=PSATZLEN;					// Einen Protokolleintrag zurï¿½ck
     number=(cbuf[byteadress]<<8)+cbuf[byteadress+1];
     {                                       // Code -> Typ + Klartext aus Diagnose-Tabelle (alt+neu)
      char tp; const char *t = dtc_text(number, &tp);
@@ -1255,10 +1258,10 @@ void put_protocol (uchar ausgabe)	// ASCII Protokoll ausgeben
    } // end while Byteadress
    if (!is_CRLF(c)) break;
    if (prtseite==fp.pro_start_page) break;  
-   else if (prtseite==PROTOCOLPAGE) prtseite=PROTOCOLENDPG; 		// Überlauf
+   else if (prtseite==PROTOCOLPAGE) prtseite=PROTOCOLENDPG; 		// ï¿½berlauf
    else prtseite--;																							// Seite dekrementieren 
    byteadress=BLOCKSIZE/pagepk;																	// auf  Protokollseitenende+1
-   flash_pcom((uchar *)cbuf, prtseite, FLASH_R_MAIN, maxbyte);	// nächste Protokollseite lesen
+   flash_pcom((uchar *)cbuf, prtseite, FLASH_R_MAIN, maxbyte);	// nï¿½chste Protokollseite lesen
   } // end while (1)
  } 
  else if (c=='C')							// 1k (X)modemausgabe Aufforderung?
@@ -1269,80 +1272,80 @@ void put_protocol (uchar ausgabe)	// ASCII Protokoll ausgeben
    puterror (DTC_SI_COMM_ERR, result);					// Fehler ausgeben
  }
  if (ausgabe) 
-  if (ja(T_delete)>0) 	// Abfrage Daten löschen?
-   delete_protocol();		// Protokoll im Speicher löschen 
+  if (ja(T_delete)>0) 	// Abfrage Daten lï¿½schen?
+   delete_protocol();		// Protokoll im Speicher lï¿½schen 
 }
 
 void zeitplan (void)			// Zeiteinstellungen
 {
- put2str(T_tmen,T_dpkt);												// Text Menü Zeitplanung
- put_menuitem(T_led,'1');												// Menüpunkt "1. LED Anzeige: ...
+ put2str(T_tmen,T_dpkt);												// Text Menï¿½ Zeitplanung
+ put_menuitem(T_led,'1');												// Menï¿½punkt "1. LED Anzeige: ...
  putstr(&T_offon[fp.led[dset]][0]);							// Text ein/aus  
- put_menuitem(T_ontage,'2');										// Menüpunkt "2. Einschalttage: ...
+ put_menuitem(T_ontage,'2');										// Menï¿½punkt "2. Einschalttage: ...
  puttage(fp.eintage[dset]);											// Einschalttage ausgeben
- put_menuitem(T_tein,'3');											// Menüpunkt "3. Einschaltzeit: ...
+ put_menuitem(T_tein,'3');											// Menï¿½punkt "3. Einschaltzeit: ...
  put_signed_float (fp.tein[dset], 60, 0xC2, 2);	// Einschaltzeit ausgeben
- put_menuitem(T_taus,'4');											// Menüpunkt "4. Ausschaltzeit: ..
+ put_menuitem(T_taus,'4');											// Menï¿½punkt "4. Ausschaltzeit: ..
  put_signed_float (fp.taus[dset], 60, 0xC2, 2);	// Ausschaltzeit ausgeben
 }
 
 void gsm_zeit (void)			// Zeiteinstellungen Modem/Email
 {
- uchar items='5';																// Fünf Menüpunkte initial
- putmstr(L_gsm);																// Text Menü Zeitplanung GSM/Email
- put_menuitem(T_ontage,'1');										// Menüpunkt "1. Einschalttage: ...
+ uchar items='5';																// Fï¿½nf Menï¿½punkte initial
+ putmstr(L_gsm);																// Text Menï¿½ Zeitplanung GSM/Email
+ put_menuitem(T_ontage,'1');										// Menï¿½punkt "1. Einschalttage: ...
  puttage(fp.gsmtage);														// Einschalttage ausgeben
- put_menuitem(T_tein,'2');											// Menüpunkt "2. Einschaltzeit: ...
+ put_menuitem(T_tein,'2');											// Menï¿½punkt "2. Einschaltzeit: ...
  put_signed_float (fp.tgsmein, 60, 0xC2, 2);		// Einschaltzeit ausgeben
- put_menuitem(T_taus,'3');											// Menüpunkt "3. Ausschaltzeit: ..
+ put_menuitem(T_taus,'3');											// Menï¿½punkt "3. Ausschaltzeit: ..
  put_signed_float (fp.tgsmaus, 60, 0xC2, 2);		// Ausschaltzeit ausgeben
  if (fp.servertyp==SMTP)												// SMTP server?
  {	 	
-  put_menuitem(T_vemail,'4');										// Menüpunkt "4. Email Versand: ..
+  put_menuitem(T_vemail,'4');										// Menï¿½punkt "4. Email Versand: ..
   if (fp.mailmode>4) fp.mailmode=0;							// Nicht initialisierten Parameterblock, bei updates abfangen
   putstr(&T_mailcyc[fp.mailmode][0]); 						// Ausgabe Versandmodus
-  if (fp.mailmode>=2)														// Versand täglich, wöchentlich, monatlich
+  if (fp.mailmode>=2)														// Versand tï¿½glich, wï¿½chentlich, monatlich
   {
    newline();																		// Neue Zeile
-   itemno (items++);															// Menüpunkt "5.
-   put2str(T_time,T_dpkt);												// Menüpunkt Zeit: ..
+   itemno (items++);															// Menï¿½punkt "5.
+   put2str(T_time,T_dpkt);												// Menï¿½punkt Zeit: ..
    put_signed_float (fp.temail, 60, 0xC2, 2);		// Versandzeit ausgeben
-   if (fp.mailmode==3)														// Versand wöchentlich?
+   if (fp.mailmode==3)														// Versand wï¿½chentlich?
    {
     if (fp.ewtag>6) fp.ewtag=0;									// Nicht initialisierten Parameterblock, bei updates abfangen
-    put_menuitem(T_wtag,items++);								// Menüpunkt "6. Wochentag: ..
+    put_menuitem(T_wtag,items++);								// Menï¿½punkt "6. Wochentag: ..
     putstr (&T_tag[fp.ewtag][0]);								// Versand Wochentag ausgeben
    }
    if (fp.mailmode==4)														// Versand monatlich?
    {
     if (fp.emtag>28) fp.emtag=1;	    						// Nicht initialisierten Parameterblock, bei updates abfangen
-    putparameter (T_mtag,fp.emtag,(1<<16)|(items++<<8),T_nil);  // Menüpunkt "6. Tag des Monats: ..
+    putparameter (T_mtag,fp.emtag,(1<<16)|(items++<<8),T_nil);  // Menï¿½punkt "6. Tag des Monats: ..
    }
   }
  }	// end if SMTP server
  else items--;																	// Kein Email Versand bei MQTT	
- select(items,1);																// Menüauswahl senden 
+ select(items,1);																// Menï¿½auswahl senden 
 }
 
-int Set_parameter (uint blocks)		// Im flash abgelegte Parameterblocks prüfen und einlesen
-{																	// Übergabe blocks - Anzahl Parameterblocks
+int Set_parameter (uint blocks)		// Im flash abgelegte Parameterblocks prï¿½fen und einlesen
+{																	// ï¿½bergabe blocks - Anzahl Parameterblocks
  int result=blocks;									
  uint offset;				
  	
- if (blocks==2 || (blocks==5 && ((fp.ex12==2)||(fp.ex12==4))))		// 2k oder 5k(nur Plus) Xmodem Datenblöcke empfangen?
+ if (blocks==2 || (blocks==5 && ((fp.ex12==2)||(fp.ex12==4))))		// 2k oder 5k(nur Plus) Xmodem Datenblï¿½cke empfangen?
  { 
   flash_pcom ((uchar *)&cbuf, FREEPAGE+pagepk, FLASH_R_ARRAY, BLOCKSIZE); // Zweiten 1k Block nach cbuf    
   if (cbuf[0]==fp.pKennung)	// Datenblock mit Parameterkennung? 
   {
    if (fp.serno[0]==0)				// noch nicht initialisiertes viasis?
 	 {
-    memcpy ((char *)&fp.pKennung, &cbuf[0], sizeof(fp)-BLOCKSIZE);		// fp_Länge-1k variable Parameter kopieren
+    memcpy ((char *)&fp.pKennung, &cbuf[0], sizeof(fp)-BLOCKSIZE);		// fp_Lï¿½nge-1k variable Parameter kopieren
 	  flash_pcom ((uchar *)cbuf, FREEPAGE, FLASH_R_ARRAY, BLOCKSIZE); 	// Ersten 1k Block nach cbuf laden
 	  memcpy ((char *)&fp.Kennung, &cbuf[0], BLOCKSIZE);								// 1k feste Parameter kopieren
 	 }
 	 else											// Seriennummer im viasis bereits gesetzt
 	 {
-		flash_pcom ((uchar *)cbuf, FREEPAGE, FLASH_R_ARRAY, BLOCKSIZE); 	// Ersten 1k Block zurück nach cbuf
+		flash_pcom ((uchar *)cbuf, FREEPAGE, FLASH_R_ARRAY, BLOCKSIZE); 	// Ersten 1k Block zurï¿½ck nach cbuf
 		offset=(uint)&fp.serno-(uint)&fp.Kennung;
 		if ((cbuf[offset]==0)||																	// Seriennummer in Parameterdatei leer? Oder
 		(compare (fp.serno, cbuf,offset,offset+SERNO_LEN)>0))		// Seriennummervergleich positiv?
@@ -1351,12 +1354,12 @@ int Set_parameter (uint blocks)		// Im flash abgelegte Parameterblocks prüfen un
 		 memcpy ((char *)&fp.pKennung, &cbuf[0],(uint)&fp.gp - (uint)&fp.pKennung);	// 1k variable Parameter ohne GPS Datenfeld kopieren
 		} else result=DTC_SI_PARAM_INIT;	// Parameter Initialisierungsfehler
 	 }
-	 if ((result==2)||(result==5)) 					// Gültige Anzahl Blöcke übertragen, bisher kein Fehler
+	 if ((result==2)||(result==5)) 					// Gï¿½ltige Anzahl Blï¿½cke ï¿½bertragen, bisher kein Fehler
 	 {
     result=parameter_to_progmem();		 		// Schreibt Sicherungskopie der Parameter in LPC1766 Programmspeicher
 	  if (!result) puterror(DTC_SI_PARAM_INIT, -1);	// Initialisierungsfehler
-		else result=blocks; 															// Blockanzahl zurück nach result	
-	 } // end gültige Blockanzahl	
+		else result=blocks; 															// Blockanzahl zurï¿½ck nach result	
+	 } // end gï¿½ltige Blockanzahl	
 	 if ((result==5)&&((fp.ex12==2)||(fp.ex12==4)))			// Viasis Plus / Viatext - Datenblock, Textnachrichten und Sonderzeichen	 
 	  if (plus_com(1)<0) result=DTC_SI_PARAM_INIT;		// Upload nicht erfolgreich?
   }
@@ -1370,7 +1373,7 @@ int Set_parameter (uint blocks)		// Im flash abgelegte Parameterblocks prüfen un
 }
 
 void Parameter_transfer(uint timeout)	// Parameter down-/upload mit 1k xmodem
-{																			// Übergabe timeout - Wartezeit auf Zeichen in ms 
+{																			// ï¿½bergabe timeout - Wartezeit auf Zeichen in ms 
  int result=0;
  int c=getbyte(timeout);							// warte auf weiteres Zeichen	
  
@@ -1382,7 +1385,7 @@ void Parameter_transfer(uint timeout)	// Parameter down-/upload mit 1k xmodem
  else if (c==-1)	// keine Antwort -> Parameter upload
  {
   result=xmodem_receive(5*(BLOCKSIZE+2),FREEPAGE);	// Xmodem Empfang	
-	result=Set_parameter (result);										// Parameter prüfen und setzen				 
+	result=Set_parameter (result);										// Parameter prï¿½fen und setzen				 
  }  
 
  if (comstate&RS232_LINK) 					// Terminal angeschlossen?
@@ -1390,21 +1393,21 @@ void Parameter_transfer(uint timeout)	// Parameter down-/upload mit 1k xmodem
 
  if (result==2 || ((result==5) && ((fp.ex12==2)||(fp.ex12==4)))) 	// 2k oder 5k bei Plus/Viatext empfangen?
  {
-  set_default_port ();						// Ändert default I2C Expander Porteinstellung
+  set_default_port ();						// ï¿½ndert default I2C Expander Porteinstellung
   reset_switches();								// Reset alle Schalter
   timeupdate=1;										// Neuberechnung Parameter 
   newline();
   putln (T_parainit);							// Meldung "Parameter initialisation"..
   protocol(PARAMETER_INIT);				// protokollieren
  }
- else if (!((result==3)&&(c=='C'))) puterror (result, -1);  // Wenn nicht zwei Blöcke gesendet, Fehler ausgeben
+ else if (!((result==3)&&(c=='C'))) puterror (result, -1);  // Wenn nicht zwei Blï¿½cke gesendet, Fehler ausgeben
  newline();
 }
 
 void radiostatus (void) 		// Bericht Tasks und Verbindungen, GSM, MQTT und GPS Status ausgeben
 {
  uchar cres=0;
- uchar bt_time_cpy=bt_time;												// Notwendig da bt_time mit den ersten Versand zurück gesetzt wird.						
+ uchar bt_time_cpy=bt_time;												// Notwendig da bt_time mit den ersten Versand zurï¿½ck gesetzt wird.						
 	
  putstr (T_report);	putnumber (tasks,0); putstr(T_rp_conn); putnumber (connect,0x80); putstr(T_rp_thread); putnumber (osActiveThread,0x80); 
  putstr (";IC54="); putc (' '); putnumber (read_i2cdev (IC54, 0, 1),0x80); // Verbindungen, Tasks, Threadstatus kommt immer
@@ -1416,9 +1419,9 @@ void radiostatus (void) 		// Bericht Tasks und Verbindungen, GSM, MQTT und GPS S
  {	
   putstr (T_rp_gsm); if (FIO1PIN&GSMPWR) cres=1; else cres=0; putstr (T_rp_sup); putc(cres|0x30);  // Platinenversorgung
 	putstr (T_rp_gpwr); putnumber (gsmpower,0);			// GSM Modul ein/aus						 
-	putstr (T_rp_csq); putnumber (fp.csq,0); 				// GSM/UMTS Stärke Empfangssignal
+	putstr (T_rp_csq); putnumber (fp.csq,0); 				// GSM/UMTS Stï¿½rke Empfangssignal
   putstr (T_rp_sim); putnumber (simpinset,0);			// Pinnummernstatus
-	putstr (T_rp_wait); putnumber(wait_min,0);			// Warteminuten GSM/GPS Aktivität 
+	putstr (T_rp_wait); putnumber(wait_min,0);			// Warteminuten GSM/GPS Aktivitï¿½t 
 	newline();	 
   if (fp.servertyp==SMTP)															// Email Versandbetrieb?
 	{		
@@ -1435,7 +1438,7 @@ void radiostatus (void) 		// Bericht Tasks und Verbindungen, GSM, MQTT und GPS S
 	 putstr (T_rp_fail); putc(mqtt_fail|0x30);					// MQTT Fehlerstatus
 	 putstr (T_rp_pend);	putnumber (mqtt_mess_pend,0);	// MQTT Versandstatus - laufende, unquittierte Meldungen
    putstr (T_rp_tstat); putnumber (t_mqtt_status,0);	// Zeit MQTT Statusmeldung Versand > 5 = senden	
-	 putstr (T_rp_pid); putnumber (PacketId,0);	 				// Zähler PacketId 
+	 putstr (T_rp_pid); putnumber (PacketId,0);	 				// Zï¿½hler PacketId 
 	 putstr (T_rp_mstat); putnumber (mqtt_state,0);			// MQTT Status (Connected, Joined, ...)
 	 putstr (T_rp_man); putnumber (mqtt_manual,0);			// Manueller Betrieb bzw. Messdatenversand bei mehr als 5k Messdaten	
 	 newline();
@@ -1472,7 +1475,7 @@ void radiostatus (void) 		// Bericht Tasks und Verbindungen, GSM, MQTT und GPS S
  newline();	 
 }
 
-void debug_n_test (void)	// Debug and Testmenü
+void debug_n_test (void)	// Debug and Testmenï¿½
 {
  char c;		
  uint i;	
@@ -1480,14 +1483,14 @@ void debug_n_test (void)	// Debug and Testmenü
  InitWatchdog(LONG_WD_32);					// langes Watchdog Interval auf 32 Sekunden setzen 
 
  putstr(T_mqtt1);	
- putparameter (T_mq_sim,0,(0x03<<16)|('3'<<8), &T_offon[mqtt_md_simu][0]); 	// Menüpunkt Datensimulation mit Ein/Aus Zustand
- putparameter (T_mq_dbg,0,(0x03<<16)|('4'<<8), &T_offon[mqtt_debug][0]); 		// Menüpunkt MQTT Debug mit Ein/Aus Zustand
+ putparameter (T_mq_sim,0,(0x03<<16)|('3'<<8), &T_offon[mqtt_md_simu][0]); 	// Menï¿½punkt Datensimulation mit Ein/Aus Zustand
+ putparameter (T_mq_dbg,0,(0x03<<16)|('4'<<8), &T_offon[mqtt_debug][0]); 		// Menï¿½punkt MQTT Debug mit Ein/Aus Zustand
  c=putmenu(T_mqtt2,'9');
 	
  switch	(c)
   {
 	 case '1':  	gpsfix=60*fp.gpsintv+1; break;						// Starte GPS Bestimmung
-	 case '2': 	  i=test_registration();										// Prüfe auf Registrierung -> Nebenprodukt neuer CSQ Wert
+	 case '2': 	  i=test_registration();										// Prï¿½fe auf Registrierung -> Nebenprodukt neuer CSQ Wert
 								if (i==1) putln (T_regd);									// Eingebucht
 								else if (i==5) putln (T_roam); 						// Roaming
 								else putln (T_nreg);											// Nicht registriert
@@ -1517,81 +1520,81 @@ void debug_n_test (void)	// Debug and Testmenü
 
 void reset_bt_pin (void) { newline(); putstr(T_pin); menu=0; bt_pininit=1; }			// Pinauswertung
 
-void radionet_menu (void)														// Funknetzmenü
+void radionet_menu (void)														// Funknetzmenï¿½
 {
- putparameter (T_mfstd,0,(0x03<<16),T_nil);									// Menütitel
+ putparameter (T_mfstd,0,(0x03<<16),T_nil);									// Menï¿½titel
  putparameter (&T_nets[0][0],0,(0x02<<16)|('1'<<8), T_nil); 	// Ausgabe GSM/GPRS
  if (fp.gsm==UC15)	
   putparameter (&T_nets[1][0],0,(0x02<<16)|('2'<<8), T_nil); 	// UC15 Ausgabe UMTS/HSPA
  if (fp.gsm==EG91) 	
 	putparameter (&T_nets[2][0],0,(0x02<<16)|('2'<<8), T_nil); 	// EG91 Ausgabe LTE 
  putparameter (T_auto,0,(0x02<<16)|('3'<<8), T_nil);					// Auswahl "Automatisch"
- putparameter (T_sstr, fp.csq,(0x01<<16)|('4'<<8), T_nil);		// Signalstärke ausgeben
- select ('5',1);		// Menüauswahl	 
+ putparameter (T_sstr, fp.csq,(0x01<<16)|('4'<<8), T_nil);		// Signalstï¿½rke ausgeben
+ select ('5',1);		// Menï¿½auswahl	 
 }	
 
 void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n) 
 {
- uchar mensel=1;				// Hilfsvariable für Menüauswahl
- uchar cres=0;					// Hilfsvariable für Eingabe
- int result;						// Hilfsvariable für Menüsteuerung
+ uchar mensel=1;				// Hilfsvariable fï¿½r Menï¿½auswahl
+ uchar cres=0;					// Hilfsvariable fï¿½r Eingabe
+ int result;						// Hilfsvariable fï¿½r Menï¿½steuerung
 	
  if (bt_pininit==0)							// Keine Bluetooth Pinabfrage aktiviert?
  {	 
- if (c=='H') { menu=0; online=0; menrep=1; newline(); }		// Menüreset und Hauptmenüausgabe
+ if (c=='H') { menu=0; online=0; menrep=1; newline(); }		// Menï¿½reset und Hauptmenï¿½ausgabe
  if (c==ESC) if ((fp.ex12==2)||(fp.ex12==4)) { plus_com (0);	menrep=1; }	// Kommunikation Matrix controller 
  if (c==STRF) { radiostatus (); return;}									// Funkmodem und GPS Status ausgeben
  //if (c==STRT) { putstr("Reboot"); reboot(); }
 	
  if (!online && !simulation)											// Kein Online-Messmodus oder Simulation
  { 	
-	if (c=='V') { identify(); return;}												// Ausgabe Geräteidentifikation
-  if (c=='R') { menu>>=4; menrep=1; newline(); }						// eine Menüebene aufwärts;	
+	if (c=='V') { identify(); return;}												// Ausgabe Gerï¿½teidentifikation
+  if (c=='R') { menu>>=4; menrep=1; newline(); }						// eine Menï¿½ebene aufwï¿½rts;	
   if (c=='T') { date_time();																// Zeitinformation senden oder laden 
 								if (fp.vspcam && (fp.ex12==2) ) online=1;		// Im viaspeedcam Mode aktiviere Online Messmodus
 								return; }																		// erst nach Zeitabfrage durch den Matrix Controller	
 	
-  if (menu==0x0003)									// Versteckte Funktionen Testmenü
+  if (menu==0x0003)									// Versteckte Funktionen Testmenï¿½
   {
 	 if ((c==STRW)||(c==STRU)) clear_all ();									// Anzeige abschalten, Schalter reset
    if (c==STRW) { werkmenue(); menrep=1; } 									// Werkseinstellung	
-	 //if (c==STRZ) test_registration ();												// GSM Registrierung prüfen
+	 //if (c==STRZ) test_registration ();												// GSM Registrierung prï¿½fen
    if (c==STRU) { putln(T_firmup); firmware(); menrep=1;  }	// Firmware update
    if (c=='X') { InitParameter(2); return;}									// Reset Parameter auf Werkeinstellung
 	}
 	
-	if (menu==0x0004) 								// Versteckte Funktionen Parametermenü
+	if (menu==0x0004) 								// Versteckte Funktionen Parametermenï¿½
   {
 	 if (c==STRW) { Parameter_transfer(100);  menrep=1; }		// Parameter Xmodem up-/download
    if (c=='D') 	{ Parameter_transfer(30000);  menrep=1; }	// Parameter Xmodem up-/download	
-	 if (c==STRU) { specialmenu(); menrep=1; }			// Sondermenü
+	 if (c==STRU) { specialmenu(); menrep=1; }			// Sondermenï¿½
    if (c=='X') { InitParameter(2); return;}				// Reset Parameter auf Werkeinstellung
   }	
 	
 	if (c==STRG) {
-	 if ((menu==0x0052)||((menu==0x053))||((menu==0x0521))) { debug_n_test (); return; } }	// GSM/GPS/MQTT Test und Kommandomenü	
+	 if ((menu==0x0052)||((menu==0x053))||((menu==0x0521))) { debug_n_test (); return; } }	// GSM/GPS/MQTT Test und Kommandomenï¿½	
 	
-  if (!menrep)  					// Kein Menüwechsel
+  if (!menrep)  					// Kein Menï¿½wechsel
   {
-   if (isdigit(c))  			// Nur Menüauswahl 1 bis 9 zulassen   
+   if (isdigit(c))  			// Nur Menï¿½auswahl 1 bis 9 zulassen   
    {	
     putc (c);								// Zeichenecho     
     c&=0x0F;    	      	  // Maske 
-    menu=(menu<<4)|c;   		// Maskierte Menüauswahl hinzufügen    
+    menu=(menu<<4)|c;   		// Maskierte Menï¿½auswahl hinzufï¿½gen    
     newline(); newline();		// Zwei Zeilen vor       
    }  
-   else mensel=0; 				// nachfolgende Menüauswahl ignorieren 
+   else mensel=0; 				// nachfolgende Menï¿½auswahl ignorieren 
   }
-  else menrep=0; 				// Anforderung Menüausgabe löschen
+  else menrep=0; 				// Anforderung Menï¿½ausgabe lï¿½schen
  } // end kein online messen	
  
- if (mensel) switch (menu)							// Menüverteiler
+ if (mensel) switch (menu)							// Menï¿½verteiler
  {
-  case 0x0000:       			// Hauptmenüausgabe
+  case 0x0000:       			// Hauptmenï¿½ausgabe
   {
-	 putstr(T_main);				// Hauptmenüausgabe
-   select ('6',0);				// Menüauswahl senden
-   mensel=0; 							// Menüauswahl löschen und wiederholen
+	 putstr(T_main);				// Hauptmenï¿½ausgabe
+   select ('6',0);				// Menï¿½auswahl senden
+   mensel=0; 							// Menï¿½auswahl lï¿½schen und wiederholen
    break;
   }
 	case 0x0001:						// Datenausgabe
@@ -1606,18 +1609,18 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    {
 		online=1;						// Online Datenausgabe aktivieren	
 		putln(T_ende);			// Ausgabe Ende mit Return
-		mensel=0; 					// Menüauswahl löschen und wiederholen
+		mensel=0; 					// Menï¿½auswahl lï¿½schen und wiederholen
    }
    else if (is_CRLF(c) || c=='R') 
 		 online=0;  				// Abbruch "Online Messmodus"
-   else return;					// Andere Zeichen ohne Menüwiederholung ignorieren
+   else return;					// Andere Zeichen ohne Menï¿½wiederholung ignorieren
    break;
   } 	
-  case 0x0003:					// Testmenü
+  case 0x0003:					// Testmenï¿½
   {
-   putstr(T_estmenu);			// Testmenüausgabe
-   select ('7',1);				// Menüauswahl senden
-   mensel=0; 							// Menüauswahl löschen und wiederholen
+   putstr(T_estmenu); putstr("\n7. CYSPP monitor");			// Testmenï¿½ausgabe
+   select ('8',1);				// Menï¿½auswahl senden
+   mensel=0; 							// Menï¿½auswahl lï¿½schen und wiederholen
    break;
   }
 	case 0x0031:					// Anzeigetest
@@ -1654,17 +1657,17 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 		 } else pset=0;														// Nur ein Satz vorhanden	
 		 simulation=1;			// Simulationsbetrieb aktivieren	
 		 putln(T_ende);			// Ausgabe Ende mit Return
-		 mensel=0; 					// Menüauswahl löschen und wiederholen
+		 mensel=0; 					// Menï¿½auswahl lï¿½schen und wiederholen
 	  } 
 		else newline();			// Keine Eingabe -> neue Zeile
 	 } // end (noch) keine Simulation
-	 else if (is_CRLF(c) || c=='R' || c=='H')				//	Eingabe CR, 'H' oder 'R' während Simulation) 
+	 else if (is_CRLF(c) || c=='R' || c=='H')				//	Eingabe CR, 'H' oder 'R' wï¿½hrend Simulation) 
 	 {	 
 		simulation=2;  			// Ende "Simulationsmodus"
 		clear_all(); 				// Anzeige und Schalter reset
 		timeupdate=1;				// korrekten Parametersatz etc. wieder einstellen
 	 }	 
-   else return;					// Andere Zeichen ohne Menüwiederholung ignorieren
+   else return;					// Andere Zeichen ohne Menï¿½wiederholung ignorieren
    break;		 	 
 	}	
 	case 0x0036:					// Lichtsensor Test
@@ -1672,9 +1675,14 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    licht_test ();				// Test des Lichtsensors
    break;
   }
+	case 0x0037:					// CYSPP/BT_LINK Monitor (HW-Diagnose)
+  {
+   bt_cyspp_monitor ();		// Live-Anzeige IC54 Bit7
+   break;
+  }
 	case 0x0004:
   {		
-   parametermenue();				// Parametermenüausgabe          
+   parametermenue();				// Parametermenï¿½ausgabe          
    mensel=0;						
    break;
 	}	
@@ -1685,10 +1693,10 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
   }
   case 0x0042: 				   	//  Zeitplan Parametersatz einlesen 
   {
-   zeitplan ();															// Menü Zeiteinstellungen
-   select('5',1);														// Menüauswahl senden
+   zeitplan ();															// Menï¿½ Zeiteinstellungen
+   select('5',1);														// Menï¿½auswahl senden
    mensel=0;	
-   timeupdate=1;														// setze Minutenflag für Neubestimmung der Mess(zeit)aufgaben
+   timeupdate=1;														// setze Minutenflag fï¿½r Neubestimmung der Mess(zeit)aufgaben
    break;
   }
 	case 0x0421:					// Led Anzeige ein/aus
@@ -1698,7 +1706,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
   } 
   case 0x0422:					// Auswahl Einschalttage
   {
-   get_weekday(&fp.eintage[dset]);					// Wochentage für Messung einlesen
+   get_weekday(&fp.eintage[dset]);					// Wochentage fï¿½r Messung einlesen
    break;
   } 
   case 0x0423:					// Einschaltzeit
@@ -1718,7 +1726,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    list_selection(T_bdir, &T_offon[0][0], &fp.bdir,0x82, sizeof(T_offon[0]));	// Listenauswahl Anzeigemodi
    break;
   }
-	case 0x0044:							// Menü Optionen Geschwindigkeitsanzeige
+	case 0x0044:							// Menï¿½ Optionen Geschwindigkeitsanzeige
 	{	
 	 if (fp.ex12!=4)					// Kein Viatext?
 	 {	 											// Nur bei viasis mit numerischer Anzeige
@@ -1728,7 +1736,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    else putln(T_noacc);			// kein Zugriff bei Viatext 
 	 break;
   }
-	case 0x0441: 				   		// Nachkommastelle ändern
+	case 0x0441: 				   		// Nachkommastelle ï¿½ndern
   {
 	 list_selection(T_nk,&T_offon[0][0],&fp.nk, 0x82, sizeof(T_offon[0]));	 	// Listenauswahl Datenspeicherung	
 	 break;	
@@ -1754,14 +1762,14 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 		getuchar (T_col2, fp.vmin[dset], Defmaxspeed+1, &fp.vmix[dset]);	// Schwelle einlesen	
 	 else if (fp.farben>1)																// sonst Schwelle Farbumschaltung?
 		getuchar (T_vcolor, Defminspeed, Defmaxspeed+1, &fp.vcol[dset]);	// dto. einlesen 
-	 else menu>>=4;																				// auch nicht Return Parameter Menü
+	 else menu>>=4;																				// auch nicht Return Parameter Menï¿½
 	 break;
   } 																				
 	case 0x0446:							// Schwelle Farbumschaltung	
 	{	
 	 if (fp.farben==3) 			 															// Mischfarbschwelle erlaubt?	 
     getuchar (T_vcolor, Defminspeed, Defmaxspeed+1, &fp.vcol[dset]);	// Farbumschaltung hier einlesen   			
-	 else menu>>=4;																											// Return Parameter Menü
+	 else menu>>=4;																											// Return Parameter Menï¿½
    break;
   }		
 	case 0x0045:							// 	Anzeigeoptimierung
@@ -1771,10 +1779,10 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	}
 	case 0x0046: 				   		// Schaltschwellen Erweiterungen
   {
-   result=thrmenu();								// Erweiterungsmenü
+   result=thrmenu();								// Erweiterungsmenï¿½
    if (result>0) 
    {
-    select(++result|0x30,1);				// Menüauswahl senden
+    select(++result|0x30,1);				// Menï¿½auswahl senden
     mensel=0;
    }	
    break; 	 
@@ -1789,7 +1797,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	case 0x0468:
   case 0x0469:		
   {
-   get_thresholds (menu&0x0F);  		// Ausgabe Schwellwertmenüs
+   get_thresholds (menu&0x0F);  		// Ausgabe Schwellwertmenï¿½s
    break; 
   } 
   case 0x0047:											// Radar Empfindlichkeit
@@ -1798,25 +1806,25 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	 if (result>0) 
 	 {
 		fp.sense=(result/20)-1;									// 20% bis 100% in Stufe 0...4 umrechnen
-		fp.txrcon&=~(GAIN_INH|GAIN_A|GAIN_B);		// Kanalauswahl löschen
+		fp.txrcon&=~(GAIN_INH|GAIN_A|GAIN_B);		// Kanalauswahl lï¿½schen
 		fp.txrcon|=sense_tab[fp.sense];					// Kanalauswahl zuweisen
 	 }
 	 break;	
 	}  
-	case 0x0005:					// Radio Modem Menü
+	case 0x0005:					// Radio Modem Menï¿½
   { 
-   putstr(T_modem);									// Modemmenüausgabe
-   cres='3';												// zur Menüsteuerung	
+   putstr(T_modem);									// Modemmenï¿½ausgabe
+   cres='3';												// zur Menï¿½steuerung	
 	 if (interfaces&GPS_LINK)					// GPS Modem eingetragen?
    {	
-	  put_menuitem (T_mgps,'3');			// Menüpunkt "3. GPS ..." ausgeben
+	  put_menuitem (T_mgps,'3');			// Menï¿½punkt "3. GPS ..." ausgeben
 		cres++;
    }		 
-   select(cres,1);									// Menüauswahl senden
+   select(cres,1);									// Menï¿½auswahl senden
    mensel=0;	
    break; 
   }
-	case 0x0051:					// Bluetoothmenü
+	case 0x0051:					// Bluetoothmenï¿½
   {
    if (interfaces&BT_LINK)					// Modem initialisiert und eingetragen
    {    
@@ -1824,14 +1832,14 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 		 putln(T_noacc);								// kein Zugriff bei aktivem BT 
 		else   
 		{	           		
-     putstr(T_btmenu);							// Bluetooth Menüausgabe
-		 cres='3';											// zur Menüsteuerung
+     putstr(T_btmenu);							// Bluetooth Menï¿½ausgabe
+		 cres='3';											// zur Menï¿½steuerung
      if (fp.btmodem==Laird)					// Laird?
 		 { 			
-			put_menuitem (T_btname,'3');	// Gerätename nur bei Laird einstellbar
-			cres++;												// Ein Menüpunkt mehr 
+			put_menuitem (T_btname,'3');	// Gerï¿½tename nur bei Laird einstellbar
+			cres++;												// Ein Menï¿½punkt mehr 
 		 }	 
-		 select(cres,1);								// Menüauswahl senden
+		 select(cres,1);								// Menï¿½auswahl senden
      mensel=0;	
 		} 
    }
@@ -1848,14 +1856,14 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    set_bt_pin ();										// Setze Pinnummer
    break;											   
   }
-	case 0x0513:					// Bluetooth Gerätename
+	case 0x0513:					// Bluetooth Gerï¿½tename
   {
 	 if (fp.btmodem==Laird)						// Laird?
     set_bt_name ();									// Setze Bluetooth device (friendly) name
 	 else menu>>=4;		 
    break;
   }
-	case 0x0052:					// GSM/GPRS Menü
+	case 0x0052:					// GSM/GPRS Menï¿½
   {
    if (interfaces&GSM_LINK)					// Modem initialisiert und eingetragen
    {	
@@ -1867,14 +1875,14 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
   }
 	case 0x0521:					// Modem Zeitplan
   {
-   gsm_zeit();											// Menü mit Einstellungen aufbauen   
+   gsm_zeit();											// Menï¿½ mit Einstellungen aufbauen   
    mensel=0;	
-   timeupdate=1;										// setze Minutenflag für neue Bestimmung der GSM(zeit)aufgaben				
+   timeupdate=1;										// setze Minutenflag fï¿½r neue Bestimmung der GSM(zeit)aufgaben				
    break;
   }
 	case 0x5211: 					// GSM Einschalttage definieren
   {
-   get_weekday(&fp.gsmtage);				// Wochentage für GSM Einschaltung lesen   
+   get_weekday(&fp.gsmtage);				// Wochentage fï¿½r GSM Einschaltung lesen   
    break;
   }
   case 0x5212:					// GSM Einschaltzeit einlesen
@@ -1895,7 +1903,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
   {
 	 if (fp.servertyp==SMTP)										// SMTP Server?
     list_selection(T_vemail, &T_mailcyc[0][0], &fp.mailmode,0x85, sizeof(T_mailcyc[0]));
-	 else menu>>=4;															// sonst GSM Menü return
+	 else menu>>=4;															// sonst GSM Menï¿½ return
    break;
   }
 	case 0x5215:					// Email Versandzeit
@@ -1905,14 +1913,14 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
     if (get_date_time (T_time, T_fstime, 5)) 	// Versandzeit korrekt eingegeben?
 		 fp.temail=minutenwert(cbuf);							// in Minuten umrechnen und sichern
    }
-   else	menu>>=4;															// sonst GSM Menü return
+   else	menu>>=4;															// sonst GSM Menï¿½ return
    break;
   }
   case 0x5216:					// Email Versand Wochen- oder Monatstag
   {
 	 if (fp.servertyp==SMTP)
 	 {
-    if (fp.mailmode==3)												// Versand wöchentlich
+    if (fp.mailmode==3)												// Versand wï¿½chentlich
     {
      list_selection(T_wtag, &T_tag[0][0], &fp.ewtag, 0x87, sizeof(T_tag[0]));	// Listenauswahl Wochentag
     }
@@ -1921,17 +1929,17 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
      getuchar (T_mtag, 1, 28, &fp.emtag);			// Tag des Monats (1..28) einlesen 
 		 newline();
     }
-		else	menu>>=4;														// täglicher Versand GSM Menü return
+		else	menu>>=4;														// tï¿½glicher Versand GSM Menï¿½ return
 		break;
 	 } 	
-   else	menu>>=4;															// sonst GSM Menü return
+   else	menu>>=4;															// sonst GSM Menï¿½ return
    break;
   }
-	case 0x0522:					// Pinnummer setzen/rücksetzen
+	case 0x0522:					// Pinnummer setzen/rï¿½cksetzen
   {
    result=getnumber(T_pinno,0,9999);					// Pinnummer einlesen
    newline();
-   if (result>=0)															// Zulässige Pinnummer erhalten? 
+   if (result>=0)															// Zulï¿½ssige Pinnummer erhalten? 
    {
     fp.simpin=result;		  										// Ja, Pinnummer -> Parameterblock
 		fp.pinerr=0;															// reset Pinfehler, Pinnummer wird wieder gesetzt
@@ -1939,27 +1947,27 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    if (!(connect&(UART1|MQTT_LINK)))		  		// wenn keine GSM, MQTT oder BT Verbindung
    {
     if ((result>0) || ((gsmpower==0)&&(fp.simpin!=0))) atcpin (1, 1); // Pinnummer setzen
-		else  atcpin (0, 1);											// Pinnummer Status nur prüfen und ausgeben
+		else  atcpin (0, 1);											// Pinnummer Status nur prï¿½fen und ausgeben
     if (gsmpower) FIO0SET=GSM_DTR;						// Enable Modem Sleep		 
    }
-   else put2str(T_LF,T_noacc);								// kein Zugriff über GSM oder BT
+   else put2str(T_LF,T_noacc);								// kein Zugriff ï¿½ber GSM oder BT
    break;
   }
-	case 0x0523:						// Servertyp SMTP oder MQTT auswählen					
+	case 0x0523:						// Servertyp SMTP oder MQTT auswï¿½hlen					
   {
 	 if (!(connect&(UART1|MQTT_LINK)))		// Nur wenn keine GSM oder BT Verbindung
    {	
     result=list_selection(&T_service[2][0],&T_server[0][0],&cres,0xC2,sizeof(T_server[0]));
 	  if (result>0)
 	  {
-		 if (fp.servertyp!=cres)					// Servertyp geändert?
+		 if (fp.servertyp!=cres)					// Servertyp geï¿½ndert?
      {
-		  fp.servertyp=cres;							// Änderung übernehmen
-      set_server_default(cres);				// Default Parameter für Server setzen 	
+		  fp.servertyp=cres;							// ï¿½nderung ï¿½bernehmen
+      set_server_default(cres);				// Default Parameter fï¿½r Server setzen 	
 		 }		
     }		 
 	 }
-   else put2str(T_LF,T_noacc);								// kein Zugriff über GSM, BT bzw. bei MQTT Verbindung	
+   else put2str(T_LF,T_noacc);								// kein Zugriff ï¿½ber GSM, BT bzw. bei MQTT Verbindung	
    break;
   }
   case 0x0524:						// Konfiguration APN
@@ -1987,33 +1995,33 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
   }  
 	case 0x0528:						// UC15 Funknetzauswahl, sonst Return
 	{
-	 if ((fp.servertyp==MQTT)&&(menu==0x0528)) menu>>=4;			// Auswahl löschen
+	 if ((fp.servertyp==MQTT)&&(menu==0x0528)) menu>>=4;			// Auswahl lï¿½schen
 	 else
 	 {	 
     if (!(connect&UART1))							// wenn keine GSM oder BT Verbindung	
 		{	
-		 radionet_menu ();								// Funknetzmenü	
-		 mensel=0; 												// Menüauswahl löschen und wiederholen	
+		 radionet_menu ();								// Funknetzmenï¿½	
+		 mensel=0; 												// Menï¿½auswahl lï¿½schen und wiederholen	
 		}	
-    else put2str(T_LF,T_noacc);				// kein Zugriff über GSM oder BT
+    else put2str(T_LF,T_noacc);				// kein Zugriff ï¿½ber GSM oder BT
 	 }	
    break;	 
   }	
-  case 0x5271:						// Funknetzeinstellung ändern 		
+  case 0x5271:						// Funknetzeinstellung ï¿½ndern 		
 	case 0x5272:
 	case 0x5273:	
 	case 0x5281:								
 	case 0x5282:
 	case 0x5283:	change_radionet (menu&0x03);				
 								break;
-  case 0x5274:						// Ermittelt Signalstärke neu
+  case 0x5274:						// Ermittelt Signalstï¿½rke neu
 	case 0x5284:	test_registration ();		
 								break;
-	case 0x0053:						// GPS Menü
+	case 0x0053:						// GPS Menï¿½
 	{
 	 if (interfaces&GPS_LINK)						// GPS Interface installiert
    {
-		putstr(T_gpsmen);									// GPS Menü
+		putstr(T_gpsmen);									// GPS Menï¿½
 		putparameter (T_tposfix,0,(3<<16)|('4'<<8),T_nil);	// Ausgabe Position fix interval
 		if (gpsintv)
 		{
@@ -2021,10 +2029,10 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 		 putstr(T_h);	
     }	
     else putstr (&T_offon[0][0]);		
-		select('5',1);										// Menüauswahl senden
+		select('5',1);										// Menï¿½auswahl senden
 		mensel=0;			
    }
-   else menu>>=4;											// Nicht installiert, Auswahl löschen	 
+   else menu>>=4;											// Nicht installiert, Auswahl lï¿½schen	 
 	 break;	
   }		
 	case 0x0531:					// Ausgabe gespeicherter GPS Daten
@@ -2034,13 +2042,13 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	}	
 	case 0x0532:					// GPS GGA formatierte Datenausgabe
 	{
-	 if ((connect&UART1)&&(fp.gps==1)) putln(T_noacc);	// kein Zugriff über GSM oder BT bei GPS über MUX UART1	
+	 if ((connect&UART1)&&(fp.gps==1)) putln(T_noacc);	// kein Zugriff ï¿½ber GSM oder BT bei GPS ï¿½ber MUX UART1	
 	 else send_gps_GGA	();															// Formatierte Ausgabe des GPS NMEA GGA Datensatzes	
 	 break;	
 	}
 	case 0x0533:					// GPS NMEA Rohdatenausgabe
 	{
-	 if ((connect&UART1) &&(fp.gps==1)) putln(T_noacc);	// kein Zugriff über GSM oder BT bei GPS über MUX UART1
+	 if ((connect&UART1) &&(fp.gps==1)) putln(T_noacc);	// kein Zugriff ï¿½ber GSM oder BT bei GPS ï¿½ber MUX UART1
 	 else send_gps_raw ();															// GPS Rohdatenausgabe
 	 break;	
 	}
@@ -2050,10 +2058,10 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	 gpsintv=fp.gpsintv;	
 	 break;		
 	}
-	case 0x0006:					// Informationsmenü
+	case 0x0006:					// Informationsmenï¿½
   {   
-   infomenu(1);																// Menüaufruf
-   select('7',1);															// Menüauswahl senden
+   infomenu(1);																// Menï¿½aufruf
+   select('9',1);															// Menï¿½auswahl senden
    mensel=0;	
    break;  
   }
@@ -2069,9 +2077,10 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    if (get_date_time (T_date, T_fdate, 10)) 	// Datum korrekt eingegeben?
    {
     set_date(cbuf);														// wenn Ergebnis korrekt, dann Datum setzen
-    test_sommerzeit (1);											// Prüfe ob aktuelle Zeit Sommerzeit und setze ggf. Flag		 
+    clock_mark_manual();					// manuelle Eingabe als Zeitquelle vermerken
+    test_sommerzeit (1);											// Prï¿½fe ob aktuelle Zeit Sommerzeit und setze ggf. Flag		 
    }   	 
-   timeupdate=1;															// Zeitänderung, ggf. neue Aufgaben
+   timeupdate=1;															// Zeitï¿½nderung, ggf. neue Aufgaben
    break;   
   }
   case 0x0064: 				   			//  Uhrzeit einlesen
@@ -2079,9 +2088,10 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
    if (get_date_time (T_time, T_ftime, 8)) 	 // Zeit korrekt eingegeben?
    {
     set_time(cbuf);  			// wenn Ergebnis korrekt, dann Zeit setzen				
-	  test_sommerzeit (1);	// Prüfe ob aktuelle Zeit Sommerzeit und setze ggf. Flag
+    clock_mark_manual();					// manuelle Eingabe als Zeitquelle vermerken
+	  test_sommerzeit (1);	// Prï¿½fe ob aktuelle Zeit Sommerzeit und setze ggf. Flag
    }
-   timeupdate=1;					// Zeitänderung, ggf. neue Aufgaben
+   timeupdate=1;					// Zeitï¿½nderung, ggf. neue Aufgaben
    break;
   }
 	case 0x0065:						// UTC Zeitzone einlesen
@@ -2091,33 +2101,47 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	case 0x0066:								// Sommerzeit/Winterzeit Umstellung
   {
    list_selection(T_somwin, &T_zone[0][0], &fp.s_w_zeit,0x84, sizeof(T_zone[0]));	// Listenauswahl Anzeigemodi
-   test_sommerzeit (1);		// Prüfe ob aktuelle Zeit Sommerzeit und setze ggf. Flag
-   timeupdate=1;					// Zeitänderung, ggf. neue Aufgaben
+   test_sommerzeit (1);		// Prï¿½fe ob aktuelle Zeit Sommerzeit und setze ggf. Flag
+   timeupdate=1;					// Zeitï¿½nderung, ggf. neue Aufgaben
    break;
   }		
-	case 0x0037:						// Testmenü Return 
-  case 0x0048:						// Parametermenü Return 
-  case 0x0054:						// Modemmenü Return  	   
-  case 0x0067:						// Infomenü Return 
+	case 0x0067:						// Zeit jetzt synchronisieren (erzwungen)
+	{
+	 putln ("Zeitabgleich...");
+	 if (gsm_nettime(1)) { putstr("Zeit gestellt via "); putln(time_source_text()); }
+	 else putln ("Keine Netzzeit - GPS/Backend stellen die Uhr automatisch");
+	 timeupdate=1;
+	 break;
+	}
+	case 0x0068:						// Automatische Zeit ein/aus
+	{
+	 fp.autotime_off = (fp.autotime_off==1) ? 0 : 1;   // umschalten (0=ein,1=aus)
+	 putstr ("Automatische Zeit: "); putln (fp.autotime_off==1?"aus":"ein");
+	 break;
+	}
+	case 0x0038:						// Testmenï¿½ Return 
+  case 0x0048:						// Parametermenï¿½ Return 
+  case 0x0054:						// Modemmenï¿½ Return  	   
+  case 0x0069:						// Infomenï¿½ Return 
   case 0x0425:						// Zeitplan Return
 	case 0x0447:						// Geschindigkeitsanzeigeoptionen Return	
-  case 0x0514:						// Bluetooth Menü Return
+  case 0x0514:						// Bluetooth Menï¿½ Return
 	case 0x5217:						// GSM Zeitplan Return	
-  case 0x5275:						// Funknetzmenü MQTT Return
-	case 0x5285:						// Funknetzmenü SMTP Return	
-	case 0x0529:						// Funkmodem Menü return	
-	case 0x0535:						// GPS Menü Return
+  case 0x5275:						// Funknetzmenï¿½ MQTT Return
+	case 0x5285:						// Funknetzmenï¿½ SMTP Return	
+	case 0x0529:						// Funkmodem Menï¿½ return	
+	case 0x0535:						// GPS Menï¿½ Return
   default:		
   {
-   menu>>=4;						// Auswahl löschen
+   menu>>=4;						// Auswahl lï¿½schen
    break;
   }
  } // end if mensel switch menu 
 
- if (mensel)	// Menü 1. Stufe aufwärts?
+ if (mensel)	// Menï¿½ 1. Stufe aufwï¿½rts?
  {
-  menrep=1;					// Menü wiederholen
-  menu>>=4;					// Auswahl löschen
+  menrep=1;					// Menï¿½ wiederholen
+  menu>>=4;					// Auswahl lï¿½schen
  }
  } // end if bt_pininit == 0
  else // bt_pininit > 0 Bluetooth Pinnummerabfrage aktiviert
@@ -2135,8 +2159,8 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 
 	 if (fp.btpin==menu) // Erfolg?
 	 {	
-	  putstr (T_main);					// Hauptmenü senden
-		select ('6',0);						// Menüauswahl senden		
+	  putstr (T_main);					// Hauptmenï¿½ senden
+		select ('6',0);						// Menï¿½auswahl senden		
 		bt_pininit=0;							// Reset Pinnabfrage
 		menu=0; 
 	 }	 
