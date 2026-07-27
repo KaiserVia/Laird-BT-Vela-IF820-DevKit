@@ -151,9 +151,10 @@ int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, 
  switch (fp.btmodem)
  {
   case IF820:
-   strcpy(want,"N="); strcat(want,T_viasis); strcat(want,"_"); strcat(want,fp.serno);
-   if (!bt_command("GDN,T=00\r",want,300)) return (0);   // BLE-Name == VIASIS_<serno>?
+   strcpy(want,"N="); strcat(want,T_viasis); strcat(want,"_"); strcat(want,fp.serno);  // N=VIASIS_<serno>
    if (!bt_command("GDN,T=01\r",want,300)) return (0);   // BT-Classic-Name == VIASIS_<serno>?
+   strcat(want,"_BLE");                                  // -> N=VIASIS_<serno>_BLE
+   if (!bt_command("GDN,T=00\r",want,300)) return (0);   // BLE-Name == VIASIS_<serno>_BLE?
    return (1);
   case Roving:  return (-1);   // TODO: RN4678 GN-Abfrage
   case Laird:   return (-1);   // TODO: Laird AT+BTN? Abfrage
@@ -177,7 +178,7 @@ bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ ->
  switch (fp.btmodem)
  {
   case IF820:
-   strcpy(cmd,"SDN$,T=00,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"\r");
+   strcpy(cmd,"SDN$,T=00,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"_BLE"); strcat(cmd,"\r");  // BLE-Name: VIASIS_<serno>_BLE
    if (!bt_command(cmd,T_sdnok,1500)) return (FALSE);  // BLE-Name setzen (Flash-Write -> grosszuegiger Timeout)
     osDelay(300);                                       // Flash-Write von T=00 abschliessen lassen, bevor T=01 folgt
    strcpy(cmd,"SDN$,T=01,N="); strcat(cmd,T_viasis); strcat(cmd,"_"); strcat(cmd,fp.serno); strcat(cmd,"\r");
@@ -224,13 +225,59 @@ void bt_show_name (void)             // aktuellen BT-Namen vom Modul lesen und a
 //-----------------------------------------------------------------------------
 void bt_cmdmode (void)   // CYSPP HIGH treiben -> laufende SPP-Verbindung trennen + Command-Mode
 {
+#if BT_CYSPP
  write_i2c_dev(IC54, 2, (0x80<<8)|0x01);   // PCA9554 Output-Register (0x01): Bit 7 = HIGH
  write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);   // PCA9554 Config (0x03): Bit 7 = Ausgang, Bit 0-6 = Eingang
+#endif
 }
 
 void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesbar, bereit fuer Verbindung)
 {
+#if BT_CYSPP
  write_i2c_dev(IC54, 2, (0xFF<<8)|0x03);   // PCA9554 Config (0x03): alle Pins Eingang (Werks-/Init-Zustand)
+#endif
+}
+
+// IF820: offene BT/SPP-Verbindung SAUBER trennen.
+// Ablauf: CYSPP HIGH -> PUART in Command-Mode (ab FW 1.4.18.18 zuverlaessig), dann /DIS
+// (gap_disconnect) -> das Modul baut die Verbindung aktiv ab (Peer wird informiert, SPP-Slot frei).
+// Defensiv: quittiert das Modul /DIS nicht (z. B. alte FW 1.4.12.12), wird trotzdem freigegeben -
+// also nie schlechter als der bisherige reine CYSPP-Puls.
+void bt_disconnect (void)
+{
+ if (fp.btmodem!=IF820) return;
+ bt_cmdmode();                              // CYSPP HIGH -> Command-Mode
+ osDelay(150);                              // Modul Zeit geben: SPP-Datenmodus -> Command-Mode
+ bt_command(T_dis, T_disok, -300);          // /DIS still senden (kein Terminal-Spam), Antwort abwarten
+ osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
+ bt_release();                              // CYSPP wieder als Eingang
+ bxi=rxi;                                   // RX-Reste (/DIS-Antwort) verwerfen -> nichts ins Terminal/Menue
+}
+
+void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW-Diagnose (Testmenue)
+{
+ int st; uchar now, last=0xFF, sec=0;
+ bt_release();                              // sicherstellen: CYSPP als Eingang -> Modul kann treiben
+ putln("CYSPP/BT_LINK monitor (IC54 bit7). Now try to connect via BT. Key = exit (max 30s).");
+ for (sec=0; sec<255; sec++)                // laeuft bis Taste/comchange, aber begrenzt
+ {
+  st = read_i2cdev(IC54, 0, 1);             // IC54 Eingangsregister lesen
+  if (st < 0) putln(" I2C read error (IC54)");
+  else
+  {
+   now = (uchar)((st>>7)&1);                 // Bit7 = CYSPP-Leitung
+   if (now != last)                          // nur bei Aenderung ausgeben
+   {
+    putstr(" CYSPP bit7 = ");
+    putstr(now ? "HIGH (idle / not connected)" : "LOW  (connected / data mode)");
+    newline();
+    last = now;
+   }
+  }
+  ResetWDT();
+  if (getkey(120) >= 0) break;               // ~120 ms warten; Taste (1) oder comchange (0) -> Ende
+ }
+ newline(); putln(" CYSPP monitor ended");
 }
 
 //-----------------------------------------------------------------------------
@@ -301,7 +348,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  {
   uchar changed=0;
 
-  bt_msg("BT 5.29 init: command mode ok");
+  { uchar cc=connect; connect=concpy&~UART1; newline(); putstr(" BT init (fw "); putstr(T_version); putstr("): command mode ok"); connect=cc; }  // Version dynamisch aus T_version -> kein Auseinanderlaufen
 
   // --- Erkennung A: konfiguriertes Modul? /PING @460800 MIT Handshake ---
   cts_bypass=0;
@@ -577,16 +624,53 @@ bool test_BT	(void)							// Prï¿½fe ob BT Modul antwortet
  return(result);
 }	
 
+// IF820-Abfrage: Kommando senden, KOMPLETTE Roh-Antwort ans Terminal, RX-Puffer danach leeren.
+// Wichtig: feste Wartezeit statt Echo-Match (bt_command matcht sonst das Echo und laesst die
+// eigentliche @R-Antwort im Puffer -> Bytes landen als Tastendruck im Menue -> Menue rast durch).
+static void bt_query_show (char *cmd)
+{
+ char buf[128]; int n=0, i; uchar cc; uint deadline;
+ cc=connect; connect=concpy & ~UART1;                     // "> gesendet" nur ans Terminal (ohne CR)
+ newline(); putstr("  > ");
+ for (i=0; cmd[i] && cmd[i]!='\r' && cmd[i]!='\n'; i++) putc(cmd[i]);
+ connect=cc;
+ osDelay(2); bxi=rxi;                                     // alten Pufferinhalt verwerfen
+ cc=connect; connect=UART1; putstr(cmd); connect=cc;      // Kommando NUR ans Modul
+ deadline=mstimer+400;                                    // feste Antwortzeit (keine Echo-Abhaengigkeit)
+ while ((int)(deadline-mstimer)>0)
+ { ResetWDT();
+   while (bxi!=rxi && n<(int)sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+   osThreadYield();
+ }
+ buf[n]=0;
+ cc=connect; connect=concpy & ~UART1;                     // "< empfangen" nur ans Terminal
+ putstr("  < ");
+ if (!n) putstr("(no response)");
+ else for (i=0; i<n; i++) if (buf[i]>=32 && buf[i]<127) putc(buf[i]);
+ newline(); connect=cc;
+ bxi=rxi;                                                 // Rest sicher verwerfen -> keine Bytes ins Menue
+}
+
 void send_bt_info (void)							// Bluetooth Informationen ausgeben
-{	
+{
  bool result=FALSE;
  uint32_t baud=BT_BAUD;
- 
 
- if (fp.btmodem==IF820)                       // IF820: Basis-Info ausgeben
+
+ if (fp.btmodem==IF820)                       // IF820: Firmware-Version + Einstellungen abfragen
  {
-  if (Init_BT_ch(baud)) result=bt_command(T_ping,T_pingok,300);
-  if (result) { put2str(T_bt,T_if820); newline(); }
+  if (Init_BT_ch(baud)) result=bt_command(T_ping,T_pingok,300);   // Lebenszeichen (Command-Mode noetig)
+  if (result)
+  {
+   newline(); put2str(T_bt,T_if820); newline();                   // "BT: IF820"
+   bt_query_show(T_qfv);                                          // Firmware/Stack/Protokoll/HW (E=/S=/P=/H=)
+   bt_query_show(T_gtu);                                          // UART: Baud (B=), Flow Control (F=01/00), 8N1
+   bt_query_show("GDN,T=00\r");                                   // BLE-Name  (N=VIASIS_<serno>_BLE)
+   bt_query_show("GDN,T=01\r");                                   // Classic-Name (N=VIASIS_<serno>)
+   bt_query_show(T_gba);                                          // Bluetooth MAC-Adresse (A=)
+   bt_query_show(T_cypget);                                       // CYSPP-Parameter (E=enable,G=role,C=,L=,R=,M=)
+  }
+  osDelay(50); bxi=rxi;                                           // finaler Flush: keine Modulbytes ins Menue
   uart1_release(MUX_BT);
   if (!result) puterror(DTC_BT_PING,-1);
   return;
@@ -750,7 +834,7 @@ void set_bt_pin (void)							// Setze Pinnummer
 			connect=UART1; 
 			putstr (T_sr1);											// Reboot Command
 		  osDelay(1000);											// Warte 1s	
-		  fp.btpin=pin;												// PIN übernehmen		
+		  fp.btpin=pin;												// PIN ï¿½bernehmen		
 		  result=bt_command(T_$,T_cmdp,0);		// Sende $$$, warte auf CMD> prompt	
 			if (result) result = bt_command(T_min,T_end,0);	// Gehe in Datenmodus, END Nachricht erhalten? 			
 		 }	// end if Reboot 	
@@ -763,7 +847,7 @@ void set_bt_pin (void)							// Setze Pinnummer
 		putnumber(pin,0xC4);										// Pinnummer 4 digits senden 		
 	 	putc('"');															// Abschluss Pinnummer
 		result=bt_command (T_CR, T_OKNZ, 0); 		// Kommandoabschluss, warte auf OK Antwort
-    if (result) fp.btpin=pin;								// PIN übernehmen		 
+    if (result) fp.btpin=pin;								// PIN ï¿½bernehmen		 
    }		 
   }	// end if Init_BT_ch	
 	

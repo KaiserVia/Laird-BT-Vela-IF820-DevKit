@@ -1210,3 +1210,297 @@ set_bt_pin, 4 fehlende Klammern -> Keil `#67 expected "}"`). Ursache extern (Edi
 PC-Seite, nicht der Code). Jeweils via `git show HEAD:sism555/btio.c` (unveraenderter Schwanz)
 wiederhergestellt. Falls es erneut auftritt: sicherstellen, dass btio.c nicht parallel in einem
 anderen Editor offen ist/gespeichert wird. Version -> 5.29.
+
+
+---
+
+## Update 5.30 - WURZELURSACHE "kann nicht verbinden": CYSPP haing als Ausgang (IC54/PCA9554)
+
+**Symptom:** Nach Flashen von 5.29 auf dem Eval-Kit (wo SPP frueher lief) war das Geraet zwar
+sichtbar (VIASIS_...), aber Classic-SPP-Verbindung scheiterte. Nach vollem **Power-Cycle** ging es.
+
+**Ursache:** CYSPP laeuft ueber IC54 (PCA9554) Bit 7. Ein frueherer `bt_cmdmode()` (bei
+Konfiguration) setzt Bit 7 als **Ausgang HIGH**. Der PCA9554 behaelt seine Register ueber einen
+LPC-Reflash hinweg - nur ein echter Power-Cycle setzt ihn auf "alle Eingaenge". Beim 5.29-Boot war
+`test_BT()` erfolgreich -> `init_bluetooth()` (und damit `bt_release()`) lief NICHT -> CYSPP blieb
+als Ausgang HIGH -> das Modul konnte die Leitung beim SPP-Connect nicht auf LOW ziehen ->
+Verbindung scheitert. Power-Cycle setzt PCA9554 zurueck -> Modul kann treiben -> Verbindung geht.
+
+**Fix (main.c, Boot):** `if (fp.btmodem==IF820) bt_release();` am Anfang des BT-Boot-Blocks (vor
+test_BT). Damit ist CYSPP nach jedem Start garantiert Eingang -> Modul kann die Leitung treiben,
+auch nach reinem Reflash ohne Power-Cycle. Version -> 5.30.
+
+
+---
+
+## Update 5.31 - CYSPP/BT_LINK Live-Monitor im Testmenue (HW-Diagnose Mainboard)
+
+Symptom: SPP-Connect geht auf dem Eval-Kit, NICHT auf dem Mainboard mit Chip-Modul -> Verdacht
+CYSPP-Leitung (Mainboard war fuer RN4678-Statuspin ausgelegt; IF820-CYSPP muss auf IC54 Bit 7
+liegen).
+
+Neu: `bt_cyspp_monitor()` (btio.c) - liest IC54 Bit 7 (CYSPP/BT_LINK) alle ~120 ms und gibt bei
+Zustandswechsel eine Zeile aus (`CYSPP bit7 = HIGH/LOW`), Ende per Tastendruck (max ~30 s).
+Erreichbar ueber: Menue -> 6 Component tests -> 8 CYSPP/BT_LINK monitor. (Ende-Taste im Component-
+Menue jetzt '9'.)
+
+Anwendung am Mainboard: Monitor starten, per BT verbinden.
+- springt auf LOW -> Modul treibt CYSPP, Signal kommt am MCU/IC54 an -> Leitung ok.
+- bleibt HIGH (obwohl Modul-Pin laut Oszi LOW zieht) -> Signal kommt nicht an -> CYSPP-Netz/
+  falscher Modul-Pin auf dem Mainboard (RN4678-Statuspin != IF820-CYSPP-Position pruefen).
+
+Dateien: btio.c (+bt_cyspp_monitor), btio.h (Prototyp), sictxt.h (T_comp +Punkt 8),
+sicom.c (compmenu case '8', Ende '9'). Version -> 5.31.
+
+
+---
+
+## Update 5.32 - CYSPP-Monitor ins richtige Testmenue (Hauptmenue->3) verschoben
+
+5.31 hatte den Monitor faelschlich ins "Component tests" (Konfig-/Werksmenue) gelegt. Jetzt im
+normalen "Testfunktionen"-Menue (Hauptmenue -> 3) als Punkt 7 (zurueck -> 8). Umsetzung
+sprachunabhaengig ohne Eingriff in die mehrsprachigen Menuetexte: in sicom.c case 0x0003 nach
+putstr(T_estmenu) ein putstr("\n7. CYSPP monitor") + select('8',1); neuer case 0x0037 ->
+bt_cyspp_monitor(). Navigation korrekt (unbelegter Code 0x0038 -> default menu>>=4 + Post-Switch
+menu>>=4 -> Hauptmenue). compmenu wieder auf 7 Punkte/Ende '8' zurueckgebaut. Version -> 5.32.
+
+
+---
+
+## Update 5.37 - CYSPP-Steuerung per Schalter abschaltbar (Testmodus)
+
+Neuer Schalter `#define BT_CYSPP` in btio.h: 1=normal, 0=Testmodus. Bei 0 sind `bt_cmdmode()`
+(CYSPP HIGH/Command-Mode erzwingen) und `bt_release()` (Bit7 Eingang) per `#if BT_CYSPP`
+ausgeklammert -> Firmware treibt IC54 Bit7 NICHT mehr. Lesen (BT_LINK/get_com_status,
+bt_cyspp_monitor) bleibt aktiv. Aktuell auf 0 (Test); spaeter wieder 1.
+Hinweis: mit 0 erzwingt init_bluetooth keinen Command-Mode ueber CYSPP -> beim Konfigurieren keine
+offene BT-Verbindung; nach Flash einmal Power-Cycle (PCA9554 auf Eingang). Version -> 5.37.
+
+
+---
+
+## Update 5.39 - CYSPP als Pflicht bestaetigt -> BT_CYSPP zurueck auf 1
+
+Test mit BT_CYSPP=0 (5.37): keine BT-Verbindung moeglich, wenn die CYSPP-Leitung unterbrochen ist.
+Fazit: CYSPP (IC54 Bit7 <-> Modul) ist ZWINGEND fuer den SPP-Datenmodus - das Modul schaltet ohne
+CYSPP nicht in den Datenmodus. Damit ist das Mainboard-Problem erklaert: dort ist die CYSPP-Leitung
+unterbrochen -> HARDWARE-Fix noetig (Modul-CYSPP-Pin sauber auf IC54 Bit7 fuehren). BT_CYSPP wieder
+auf 1 (normal). Version -> 5.39.
+
+
+---
+
+## Update 5.41 - System-Freeze bei BT-Verbindung behoben (CTS-Busy-Spin -> Taskwechsel)
+
+**Symptom:** Geraet laeuft normal; SOBALD per BT verbunden wird, wird binnen kurzem ALLES traege
+(auch RS232: ~1 Zeichen / 0,5 s), BT quasi tot. Nach Power-Cycle wieder ok.
+
+**Ursache:** Bei aktiver BT-Verbindung geht die Ausgabe an UART0+UART1. In `putb()` wartet der
+UART1-Zweig vor jedem Byte auf CTS=LOW - als **Busy-Spin ohne Taskwechsel** (bis CTS_WAIT_MS=200 ms).
+Bei BT-Backpressure (Gegenstelle/Luftrate langsamer als 460800, oder marginale CTS-Leitung) bleibt
+CTS HIGH -> jedes Byte blockiert die volle Wartezeit und der Spin frisst die CPU -> der kooperative
+RTOS-Loop wird ausgehungert -> systemweit traege; RS232 haengt mit, weil es im selben putb steckt
+(~0,5 s/Zeichen = genau der CTS-Timeout).
+
+**Fix (sio.c putb):** In der CTS-Warteschleife `osDelay(1)` -> Taskwechsel zulassen (kein
+Busy-Spin), CTS_WAIT_MS 200 -> 50. Damit friert das System bei Backpressure nicht mehr ein; nur
+die BT-Ausgabe pacet sich ggf. langsamer. Version -> 5.41.
+
+Offen/separat: warum CTS bei Verbindung dauerhaft HIGH wird (Peer liest nicht / BT-Luftrate <
+460800 UART / CTS-Leitung marginal). Fuer sauberes Verhalten waere langfristig eine gepufferte/
+ISR-getriebene UART1-Ausgabe (nicht-blockierend) die Idealloesung.
+
+
+---
+
+## Update 5.42 - KORREKTUR: CTS/RTS laufen ueber Analog-MUX (IC13), nicht "direkt"
+
+**Befund (Schaltplan bestaetigt):** Die alte Doku (BT-Evalkit-Tasks.md) war falsch - dort stand
+CTS/RTS "direkt" und MUX "IC55/IC56". Tatsaechlich:
+
+- **IC18 (TS5A23157DGSR)** = MUX fuer Datenleitungen (RXD/TXD).
+- **IC13 (TS5A23157DGSR)** = MUX fuer **Flusssteuerung RTS/CTS**.
+  - MCU-CTS (P2.2, das putb() pollt) kommt ueber IC13 2Z(Pin6)<-2Y0 von BLT-CTS.
+  - MCU-RTS (P1.15) geht ueber IC13 1Z(Pin10)->1Y0 nach BLT-RTS.
+- Select beider Switches = **CS-A-FUNK = CSAF (P0.1)**: LOW=BT, HIGH=LTE/Funk.
+- **VCC beider Switches = V+D** (gemeinsame 3,3-V-Schiene).
+
+**Bedeutung fuer den "Board langsam nach ~1 min"-Fehler:** Beim DVK liegt CTS direkt am
+USB-Bridge; beim Mainboard laeuft CTS durch den Analog-Switch IC13. Sackt V+D beim BT-Senden ab
+(Brownout gemeinsame Schiene), wird IC13 hochohmig/undefiniert -> P2.2 liest HIGH -> putb()
+blockiert (bis CTS_WAIT_MS) -> System traege, RS232 troepfelt. Erholt sich die Spannung / BT
+trennt -> wieder normal. ~1 min ist KEIN Firmware-Timer (BT_TIMEOUT=6 min) -> elektrisch.
+
+**HW-Test:** im langsamen Abschnitt V+D am IC13/Modul + P2.2(CTS) mit Oszi ansehen: bricht V+D ein
+und geht CTS dabei HIGH -> Ursache bestaetigt. Abhilfe: eigener LDO/Stuetz-Elko fuers BT-Teil
+(wie beim DVK) bzw. Versorgung des Analog-MUX absichern.
+
+**Bezug BT-only-Sonderversion:** CSAF dauerhaft LOW zu halten (IC18/IC13 fest auf BT) beseitigt
+Umschalt-Glitches auf dem CTS/RTS-MUX - aber NICHT den Brownout (V+D bleibt geteilt).
+
+
+---
+
+## Update 5.43 - KORREKTUR der Isolierung: Board-Pfad ist ok, Verdacht = Onboard-Modul (RF/Power)
+
+**Neuer Testaufbau (Nutzer):** Das externe Eval-Kit-Modul wird MIT DEN BOARD-PINS versorgt und
+angesteuert (RxD, TxD, CTS, RTS, CYSPP auf die Eval-Kit-Bruecken). In diesem Aufbau laeuft BT
+einwandfrei. Das AUFGELOETETE Onboard-Modul dagegen wird nach ~1 min langsam.
+
+**Schlussfolgerung (korrigiert):** Damit durchlaeuft das funktionierende Eval-Kit-Modul dieselbe
+Board-Elektronik/Versorgung wie das defekte Onboard-Modul. Der frueher vermutete MUX (IC13) und
+der UART1-Pfad sind also NICHT der Unterschied - sie treiben das Eval-Kit-Modul sauber.
+Die Aussage aus 5.42 ("Eval-Kit umgeht IC13") gilt fuer diesen Aufbau NICHT.
+
+**Neuer Hauptverdacht = Onboard-Modul + unmittelbares Umfeld:**
+1. RF/Antenne: schlechte Funkstrecke -> Retransmits -> Luftrate << 460800 UART -> Modul-TX-Puffer
+   voll -> Modul zieht RTS -> unser CTS HIGH -> putb() bremst -> RS232 troepfelt; nach ~1 min
+   bricht Verbindung ab -> normal. (Passt exakt zum Zeitverhalten.)
+2. Lokale Versorgung/Entkopplung am Onboard-Modul (Eval-Kit hat eigene LDO+Stuetz-Cs).
+
+**Tests:** (a) Peer 5-10 cm neben Onboard-Modul -> laenger stabil? = RF. (b) INT-ANT vs EXT-ANT
+Variante + Ground-Plane/Keep-out pruefen. (c) V+D direkt am Onboard-Modul beim Senden per Oszi
+vs. Eval-Kit-Modul.
+
+Hinweis: IC13/IC18 (TS5A23157DGSR) als CTS/RTS- bzw. Daten-MUX bleiben korrekt dokumentiert
+(Schaltplan) - nur die Fehler-Zuordnung war falsch.
+
+**Nachtrag 5.43:** Nutzer versorgt Eval-Kit-Modul auch mit Board-VBAT/VDDIO -> gleiche Rails,
+laeuft. ABER: das Eval-Kit haengt damit auch seine grossen Stuetz-Cs an die Board-Schiene ->
+stabilisiert die Versorgung selbst. Onboard-Modul hat diese lokale Pufferung evtl. nicht ->
+lokaler Spannungseinbruch NUR am Modul beim TX-Peak (an der Quelle/Schiene nicht sichtbar).
+Billiger Entscheidungstest: Bulk-Elko 10-47 uF + 100 nF direkt an VBAT/VDDIO des Onboard-Moduls.
+Weg = Entkopplung/Power bestaetigt. Zusatz: Peer 5-10 cm ans Modul = RF/Antenne-Check;
+INT-ANT-Variante? Ground-Plane/Keep-out pruefen.
+
+**Nachtrag 5.43 (Datenblatt EZ-DS-Vela IF820 v2_2, Abschnitt 12):** INT-ANT-Variante, Peer nur
+40 cm entfernt -> Ausfall ist KEIN Reichweitenproblem. Zwei konkrete Datenblatt-Vorgaben zu pruefen:
+- 12.2 Antennen-Layout INT-ANT: (1) Modulkante buendig mit PCB-Kante; (2) >=15 mm GND-Flaeche
+  seitlich neben dem Modul. 12.1: keine Bauteile/High-Speed-Leitungen UNTER dem Funkteil, kein
+  Metall ueber der Antenne. -> Verstoss = verstimmte Antenne = schon auf 40 cm schlechte RF.
+- 12.1 Entkopplung woertlich: "put a 100nF capacitor on EACH power pin, as close as possible"
+  (VBAT + VDDIO) fuer korrekte interne PMU. Fehlt das/zu weit weg -> sporadischer Einbruch unter Last.
+Pruefreihenfolge Board: (1) Antennenzone (Rand? 15 mm GND frei? Kupfer/Bauteil unter Antenne?),
+(2) 100 nF je Power-Pin direkt am Modul + Bulk-Elko 10-47 uF. Eval-Kit erfuellt beide Regeln,
+Custom-Board vermutlich nicht -> erklaert "Eval-Kit ok, Onboard nach 1 min langsam".
+
+
+---
+
+## Update 5.44 - BT-Chip: Firmware-Version + Einstellungen abfragbar (Menue Bluetooth -> Information)
+
+**Wunsch:** Firmware des IF820 und dessen Einstellungen aus dem Geraet heraus auslesen.
+
+**Umsetzung:** `send_bt_info()` (btio.c) im IF820-Zweig erweitert. Bisher nur /PING. Jetzt zusaetzlich:
+- `/QFV` -> Firmware-/Stack-/Protokoll-/HW-Version (E=/S=/P=/H=). E byteweise hex = Version,
+  z. B. E=010412 12 -> 1.4.18.18.
+- `GTU`  -> UART-Einstellungen: Baud (B=), Flow Control (F=01 an / F=00 aus), 8N1 (D=08 etc.).
+- `GDN,T=00` -> BLE-Name; `GDN,T=01` -> Classic-Name.
+Antworten erscheinen als "> gesendet / < empfangen" am Terminal (bestehende Spiegelung in bt_command).
+
+**Bedienung:** Menue **Bluetooth -> Information** (sicom.c case 0x0511, ruft send_bt_info()).
+Kein neuer Menuepunkt noetig - semantisch die richtige Stelle. Neues Kommando-Text-Makro
+`T_qfv`/`T_qfvok` in btio.h.
+
+Hinweis: laeuft im Command-Mode (nicht waehrend aktiver CYSPP-SPP-Datenverbindung). Version -> 5.44.
+
+**Nachtrag 5.45:** send_bt_info() zusaetzlich MAC + CYSPP-Parameter:
+- `GBA` -> Bluetooth MAC-Adresse (A=<MAC>).
+- `.CYSPPGP` -> CYSPP-Parameter (E=enable, G=role, C=connkey, L=local_key, R=remote_key, M=mask).
+Neue Makros T_gba/T_gbaok, T_cypget/T_cypgetok in btio.h. Version -> 5.45.
+
+**Nachtrag 5.46 - FIX: BT-Info liess RX-Bytes ins Menue laufen (Menue raste durch):**
+Symptom: nach "Bluetooth -> Information" sprang das Menue wild zwischen Hauptmenues, phantom "0".
+Ursache: Eingabe- und Modul-Lesefunktionen teilen denselben RX-Ring (rbuf/bxi/rxi). bt_command
+matchte das Kommando-ECHO und kehrte zurueck, bevor die @R-Antwort ("...,0000,...") komplett da
+war -> die "0000"-Bytes blieben im Puffer und wurden vom Menue als Tasten gelesen.
+Fix: neue Helper bt_query_show() (Muster bt_scan_ping): Kommando senden, feste 400 ms warten,
+KOMPLETTE Roh-Antwort ans Terminal, danach bxi=rxi (Puffer leeren). Zusaetzlich finaler Flush
+(osDelay(50); bxi=rxi) vor uart1_release. Zeigt jetzt auch die vollen Werte (vorher am Match
+abgeschnitten). Version -> 5.46.
+
+
+---
+
+## Update 5.47 - BEFUND: Onboard-Module haben ALTE Firmware (1.4.12.12) vs Eval-Kit (1.4.18.18)
+
+Mit der neuen "Bluetooth -> Information"-Abfrage (5.46) beide Module verglichen. EINZIGER echter
+Unterschied = Firmware-Version des Chips (/QFV E-Feld):
+- Eval-Kit:  E=01041212 -> 1.4.18.18  (aktuelle GA3, = Projekt-Firmware in SupplierSourceCode)
+- Onboard:   E=01040C0C -> 1.4.12.12  (alt)
+Alles andere identisch: GTU B=460800, F=01 (Flow Control AN), 8N1; CYSPPGP E=02,G=00,C=0131,...;
+Stack S=03010000; Protokoll P=0104; HW H=F1. (Name/MAC erwartungsgemaess unterschiedlich.)
+
+PCN #2E (Release 1.4.18.18) behebt genau passende Bugs:
+- "Fix a lockup issue due in heavy UART loading."  <-- passt zu "laeuft 1 min, dann traege".
+- "Implement SBTP,F=1 to disable sniff feature. This improves SPP throughput."
+- "Add using CYSPP pin to exit SPP MODE (pull CYSPP high) -> back to command mode."  <-- unser
+  bt_cmdmode() setzt CYSPP HIGH; dieses Feature gibt es erst ab 1.4.18.18 -> erklaert, warum
+  CYSPP-HIGH auf altem 1.4.12.12 die SPP-Verbindung nicht trennte.
+
+=> HEISSER Kandidat fuer den "Board wird nach 1 min langsam"-Fehler, unabhaengig von Power/Antenne.
+Massnahme: Onboard-Module auf 1.4.18.18 flashen. Hinweis: Flashen ueber HCI-UART (BT_UART
+TXD/RXD/CTS/RTS) + Reset (Flow Control zwingend, CTS beim Reset LOW), if820_flasher_cli fuer
+lose/aufgeloetete Module (GUI nur DVK/Dongle). HCI-Pins am Mainboard herausgefuehrt? -> pruefen.
+
+**Nachtrag 5.47 - Downgrade-Test:** Um zu bestaetigen, dass die alte Modul-Firmware der Grund ist,
+soll testweise 1.4.12.12 aufs Eval-Kit (INT-ANT) geflasht werden.
+Download (GA1, interne Antenne):
+  https://github.com/Ezurio/Vela_IF820_Firmware/releases/download/v1.4.12.12/IF820_INT_ANT_v1.4.12.12.zip
+Flashen mit vorhandenem SupplierSourceCode/if820_flasher_gui-Windows-v2.1.0 (GUI erkennt DVK auto)
+oder CLI: if820_flasher_cli.exe -ce -f <..._141212_..._download.hex>. -ce setzt Konfig auf Werk zurueck
+-> Geraete-FW rekonfiguriert beim Boot (F=01, Name). Kontrolle via "Bluetooth -> Information": E=01040C0C.
+Erwartung: bricht Eval-Kit mit 1.4.12.12 auch nach ~1 min ein -> Firmware = Ursache -> Onboard-Module
+auf 1.4.18.18 flashen. Bleibt stabil -> doch Hardware (Power/Antenne).
+
+**Nachtrag 5.47 - 32-kHz-Quarz (Datenblatt EZ-DS v2_2):** IF820 hat internen 32-kHz-LPO, laeuft
+also OHNE externen Quarz. Ezurio empfiehlt aber externen 32,768-kHz-Quarz (XTALI_32K/XTALO_32K,
+Pin 4/5) ausdruecklich: "lowest power and highest timing accuracy" und - wichtig - "if not, LINK
+ISSUE may be occurred". => Fehlender Quarz ist ein weiterer heisser Kandidat fuer BT-Instabilitaet.
+Firmware: ohne Quarz -> int-lpo-Variante noetig; mit Quarz -> normale Variante. TODO: pruefen ob
+Onboard-Design 32-kHz-Quarz hat + passende Firmware-Variante. USB-Dongle hat keinen Quarz (int-lpo).
+
+
+---
+
+## Update 5.47b - BT-Timeout trennt Verbindung jetzt SAUBER per /DIS (statt nur virtuell)
+
+**Problem:** Der Inaktivitaets-Timeout (measure.c) trennte bisher nur virtuell: bt_cmdmode()
+(CYSPP-Puls) + Flags loeschen. Die SPP-Verbindung blieb am Modul oft bestehen (CYSPP blieb LOW,
+Peer nicht informiert, SPP-Slot belegt) - im CYSPP-Monitor beobachtet.
+
+**Fix:** Neue Funktion `bt_disconnect()` (btio.c), aufgerufen im Timeout-Pfad (measure.c):
+1. bt_cmdmode()  -> CYSPP HIGH -> PUART in Command-Mode
+2. osDelay(150)  -> Modul: SPP-Datenmodus -> Command-Mode
+3. bt_command(T_dis, T_disok, -300) -> `/DIS` (gap_disconnect): Modul baut Verbindung aktiv ab
+4. osDelay(50); bt_release(); bxi=rxi (RX-Reste verwerfen)
+Deklariert in btio.h. Defensiv: /DIS-Quittung egal -> es wird immer freigegeben (nie schlechter
+als vorher). Version -> 5.47.
+
+Abhaengigkeit: Schritt 1 (CYSPP-HIGH -> Command-Mode aus SPP heraus) ist erst ab Modul-FW
+1.4.18.18 zuverlaessig; auf 1.4.12.12 kann /DIS das Modul evtl. nicht erreichen -> weiteres
+Argument fuers Firmware-Update. Geaenderte Dateien: btio.c, btio.h, measure.c, sictxt.c.
+
+
+---
+
+## Update 5.48 - BT-Terminal-Junk bei MUX-Wechsel auf GSM/GPS unterdruecken (Software, versionssicher)
+
+**Symptom:** Auf einem per HyperTerminal verbundenen BT-Terminal erscheint 0xFF-Junk, sobald das
+Modem/GSM initialisiert. RS232 (UART0) zeigt gleichzeitig sauberen Modem-Start (EG91). => Modem/GSM
+sind in Ordnung; der Junk ist ein Nebeneffekt des geteilten UART1-MUX.
+
+**Ursache:** uart1_request(MUX_GSM/GPS) schaltet den Analog-MUX (IC18) weg von BT. Damit floatet
+die IF820-RXD (BLT-RXD). Das IF820 bleibt im SPP-Datenmodus und leitet das Leitungsrauschen
+transparent ueber Bluetooth weiter -> 0xFF-Flut am BT-Terminal.
+
+**Fix (hard.c, uart1_request):** Symmetrisches Command-Mode-Handling:
+- BT->GSM/GPS und BT verbunden (connect&BT_LINK) und IF820: vor dem MUX-Wechsel bt_cmdmode()
+  (CYSPP HIGH) -> Modul stoppt SPP-Weiterleitung.
+- Rueckkehr GSM/GPS->BT (prev_owner GSM/GPS) und IF820: bt_release() -> Weiterleitung/Status wieder aktiv.
+Guard ueber prev_owner, damit die init_bluetooth-Sequenz (eigenes cmdmode) NICHT gestoert wird;
+fp.btmodem==IF820 nur. I2C-Aufrufe ausserhalb der Critical Section.
+
+**Versionssicher:** CYSPP-HIGH-zum-SPP-Verlassen wirkt erst ab Modul-FW 1.4.18.18. Auf 1.4.12.12
+bleibt der Junk (Feature fehlt), aber der Code macht nichts kaputt. Firmware-unabhaengige Alternative
+bleibt ein HW-Pull-up auf der IF820-RXD. Version -> 5.48. Geaenderte Datei: hard.c, sictxt.c.

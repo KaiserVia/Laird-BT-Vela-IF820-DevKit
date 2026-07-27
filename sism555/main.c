@@ -37,7 +37,7 @@
 int main (void)
 {	
  uchar i=0;															// Laufvariable	
- uchar syserror=0;											// Sytemfehler für Smiley-Startanzeige	
+ uchar syserror=0;											// Sytemfehler fï¿½r Smiley-Startanzeige	
  int result;	
 		
  SystemCoreClockUpdate ();							// Setze SystemCoreClock Information
@@ -57,13 +57,13 @@ int main (void)
    transferzeit=0;											// Reset Sperrzeit Sommer- auf Winterzeit Umstellung
 	 gsmpower=0;													// GSM Modem ist aus
 	}		
-	if (i_reset!=BOOT_RES) i_reset=0;			// Watchdog reset Ursache Reset zurück setzen 	
+	if (i_reset!=BOOT_RES) i_reset=0;			// Watchdog reset Ursache Reset zurï¿½ck setzen 	
   gsmcall=0;														// Reset dial in Verbindung 
-	timeupdate=1;													// Zeitabhängige Aufgaben prüfen
+	timeupdate=1;													// Zeitabhï¿½ngige Aufgaben prï¿½fen
 	mqtt_md_simu=0;												// MQTT Messdatensimulation aus	 
 	mqtt_com=0;	 													// MQTT Kommunikation reset
 	mqtt_con_err=0;												// MQTT Verbindungsfehler reset
-  thread_comchange=0;										// Reset Schnittstellenwechsel während GSM/MQTT Verbindungsthread
+  thread_comchange=0;										// Reset Schnittstellenwechsel wï¿½hrend GSM/MQTT Verbindungsthread
   simpinset=0;													// Pinnummer reset	
 	while (i<3) certs[i++][0]=0;					// Zertifikatsliste nullen 
  }
@@ -99,7 +99,7 @@ int main (void)
    if (InitI2C_Devices() < 0)														// I2C Bauteile inititialisieren, fehlt eins? 
    {
     if (((fp.i2cdev&(IC37_b|IC54_b))!=(IC37_b|IC54_b)) 	// PCA Expander Analogsteuerung oder Schnittstellen-Link fehlt							
-		 || (!(fp.i2cdev&IC58_b&&(fp.ex12>=2))))						// PCA Expander I/O für Plus, FT oder Viatext fehlt
+		 || (!(fp.i2cdev&IC58_b&&(fp.ex12>=2))))						// PCA Expander I/O fï¿½r Plus, FT oder Viatext fehlt
 		 puterror (DTC_MA_I2C_DEVICE, fp.i2cdev);
     if ((fp.i2cdev&IC35_b)!=IC35_b) puterror (DTC_MA_I2C_DPP, -1);					// DPP fehlt
 	  if (!(fp.i2cdev&ICLED_b) && fp.ledspot) puterror (DTC_MA_TCA6507, -1);	// Fehler externe LED Spotlampe
@@ -110,15 +110,15 @@ int main (void)
 	{		 
 	 FIO2CLR =	DIS_TRB | G_SHIFT;			// EN\ 3V3 Anzeige - Treiber	
 	 LED_188 (); 												// LED Einschaltanzeige "188" 
-	 FIO2CLR = LE_TRB|DIS_TRB|G_SHIFT;	// Latch Enable LED Treiber, 3V3 Treiber aus, 74HC595 Ausgänge aktiv
+	 FIO2CLR = LE_TRB|DIS_TRB|G_SHIFT;	// Latch Enable LED Treiber, 3V3 Treiber aus, 74HC595 Ausgï¿½nge aktiv
    FIO2SET = PWM_TRB;									// PWM Pin Treiber HI	
 	}	
 	 
   if (flashsize!=0)																			// Flash vorhanden?
   {    
-	 flash_erase (PARAMETERPAGE, PARAMBLOCKS*pagepk);			// Parameterseiten im Flash löschen	
-	 flash_erase (fp.pro_page, 1);												// Aktuelle Protokollseite im Flash löschen
-   flash_erase (fp.md_page, 1);													// Aktuelle Messdatenseite im Flash löschen	
+	 flash_erase (PARAMETERPAGE, PARAMBLOCKS*pagepk);			// Parameterseiten im Flash lï¿½schen	
+	 flash_erase (fp.pro_page, 1);												// Aktuelle Protokollseite im Flash lï¿½schen
+   flash_erase (fp.md_page, 1);													// Aktuelle Messdatenseite im Flash lï¿½schen	
   }
  } // end if Kein Firmware update oder Sleep Power Down Reset	
  
@@ -136,7 +136,7 @@ int main (void)
     concpy=connect;		 
 		if (fp.gsm)															// GSM installiert?
 		{		
-		 Init_GSM_ch (GSM_BAUD); 																// Kommunikationskanal öffnen
+		 Init_GSM_ch (GSM_BAUD); 																// Kommunikationskanal ï¿½ffnen
  	   if (fp.servertyp==MQTT) MQTT_fast_disconnect (0);	// reset ggf. MQTT und Funkmodem
 		 else gsm_power(0);																	// sonst Funkmodem nur aus
 		}	
@@ -154,7 +154,9 @@ int main (void)
 	  if (fp.usb) interfaces|=USB_LINK;		// USB definiert?	Ja, USB registrieren			 
 		
     if (fp.btmodem)	{								// BT definiert?
-		 if (test_BT())	interfaces|=BT_LINK;		// Modem antwortet?		 
+		 if (fp.btmodem==IF820) bt_release();	// CYSPP (IC54 Bit7) auf Eingang -> Modul kann Leitung fuer SPP-Connect treiben
+		 									// (PCA9554 haelt sein Register ueber Reflash; sonst bleibt CYSPP evtl. als Ausgang HIGH haengen)
+		 if (test_BT())	interfaces|=BT_LINK;		// Modem antwortet?
 		 else {                                     // BT antwortet nicht (z. B. geaenderte Zielbaud)
 		   fp.btmodem=0; init_bluetooth();         // -> neu erkennen (Zwei-Baud) + ggf. auf IF820_BAUD umstellen
 		   if (fp.btmodem) interfaces|=BT_LINK; else syserror++; } }	
@@ -186,7 +188,7 @@ int main (void)
 		 else syserror++;	
 	  } // end GSM installiert 		
 		
-		if (syserror) num_to_LED (501,0);							// Sad smiley nach LED Anzeigepuffer
+				if (syserror) num_to_LED (501,0);							// Sad smiley nach LED Anzeigepuffer
 		else num_to_LED (503,0);											// Happy smiley nach LED Anzeigepuffer
 		show_led(2000,0);															// Dimmung und Led Schaltregler einschalten
 		
@@ -220,24 +222,24 @@ int main (void)
 	 flash_erase (fp.md_page,1);		// Muss wg. reset aller Messdatenzeiger
   } // end if firmware update	
 	
-	wait_min=Def_wait;				// Setze 3 Warteminuten für nächste GPS, Email, SMS Aktivität XXX
-	mailtosend=0;							// reset Email Versandaufträge
-	smstosend=0;							// reset SMS Versandaufträge
-	comchange=1;							// Initiale Prüfung Schnittstellen
+	wait_min=Def_wait;				// Setze 3 Warteminuten fï¿½r nï¿½chste GPS, Email, SMS Aktivitï¿½t XXX
+	mailtosend=0;							// reset Email Versandauftrï¿½ge
+	smstosend=0;							// reset SMS Versandauftrï¿½ge
+	comchange=1;							// Initiale Prï¿½fung Schnittstellen
   mqtt_md_simu=0;						// MQTT Messdatensimulation aus	
 	mqtt_com=0;	 													// MQTT Kommunikation reset
-  mailfail=0;								// reset Aufwärtszähler gescheiterte Mail
-  smsfail=0;								// reset Aufwärtszähler gescheiterte SMS
+  mailfail=0;								// reset Aufwï¿½rtszï¿½hler gescheiterte Mail
+  smsfail=0;								// reset Aufwï¿½rtszï¿½hler gescheiterte SMS
 	wait_sms=0; 							// reset Warteminuten SMS
   wait_mail=0;							// reset Warteminuten Email 	 
 	LastErrorEvent=0;					// Letztes protokolliertes Fehlereignis
-	if (fp.vmm<5) t_amp_en=20;	// Messverzögerung bei kleinsten gemessenen Geschwindigkeiten < 5 km/h vergrößern
+	if (fp.vmm<5) t_amp_en=20;	// Messverzï¿½gerung bei kleinsten gemessenen Geschwindigkeiten < 5 km/h vergrï¿½ï¿½ern
 	else t_amp_en=20;
  } // end if kein deep sleep reset			
  
  if (!(RSID&(POR|WDTR|EXTR))) protocol(BROWNOUT_ERROR);	// Brownout reset
   
- RSID|=RSID;									// Reset Identifikationsregister zurück setzen
+ RSID|=RSID;									// Reset Identifikationsregister zurï¿½ck setzen
  
  if (flashsize!=0)						// Flash vorhanden?
 	NVIC_EnableIRQ(EINT0_IRQn);	// Enable EINT0 Power Down Interrupt

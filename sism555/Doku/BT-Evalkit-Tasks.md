@@ -254,22 +254,28 @@ Konfiguration (Name, PIN, Baudrate) bleibt erhalten.
 ## Hardware-Schnittstelle im Geraet
 
 ```
-LPC1766 (MCU)          MUX (IC55/IC56)         BT-Modul
------------            -----------              ----------
-P2.0 TXD1  ------>    MUX Input    ------>     RXD
-P2.1 RXD1  <------    MUX Output   <------     TXD
-P2.2 CTS   <------    (direkt)     <------     CTS (Modul -> MCU)
-P1.15 RTS  ------>    (direkt)     ------>     RTS (MCU -> Modul)
+LPC1766 (MCU)        Analog-MUX (TS5A23157DGSR)      BT-Modul / LTE-Funk
+-----------          --------------------------      -------------------
+Daten:   IC18  (Select = CS-A-FUNK = CSAF, P0.1)
+ P2.1 RXD1 <--- IC18 1Z(Pin10) <--- 1Y0 = BLT-TXD   (bzw. 1Y1 = LTE-TXD)
+ P2.0 TXD1 ---> IC18 2Z(Pin6)  ---> 2Y0 = BLT-RXD   (bzw. 2Y1 = LTE-RXD)
 
-MUX-Steuerung:
+Flow:    IC13  (Select = CS-A-FUNK = CSAF, P0.1)   << CTS/RTS laufen AUCH ueber MUX!
+ P1.15 RTS ---> IC13 1Z(Pin10) ---> 1Y0 = BLT-RTS   (bzw. 1Y1 = LTE-RTS)
+ P2.2 CTS  <--- IC13 2Z(Pin6)  <--- 2Y0 = BLT-CTS   (bzw. 2Y1 = LTE-CTS)
+
+Select:  CS-A-FUNK = CSAF (P0.1):  LOW = BT ausgewaehlt, HIGH = LTE/Funk
+VCC beider Switches = V+D  (gemeinsame 3,3-V-Schiene -> Brownout wirkt auf CTS/RTS-Pfad!)
+
+MUX-Steuerung (Firmware):
+P0.1 CSAF  ------>    Select A (CS-A-FUNK) -> IC18 + IC13
 P0.0 CSBF  ------>    Select B
-P0.1 CSAF  ------>    Select A
                        CSAF=0, CSBF=0 = BT
-                       CSAF=1, CSBF=0 = GSM
+                       CSAF=1, CSBF=0 = GSM/LTE
                        CSAF=0, CSBF=1 = GPS
 
 Verbindungsstatus:
-BT Status-GPIO ------> IC54 (I2C Expander) Bit 7 -----> MCU liest per I2C
+BT Status-GPIO (CYSPP) ------> IC54 (I2C Expander) Bit 7 -----> MCU liest per I2C
 
 Power:
 PINMODE3 PULLDOWN -----> BT-Modul VCC Enable
