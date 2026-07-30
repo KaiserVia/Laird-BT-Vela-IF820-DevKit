@@ -27,6 +27,9 @@
 #include "dtc_text.h"	// generierte Code->Typ/Kurztext-Tabelle (aus Diagnose-Codes.csv)
 
 #define CTS_WAIT_MS 50           // max. Wartezeit auf CTS-LOW je Byte (ms) - bounded, kein Dauerhang
+#define BT_TXWAIT_MS 1000        // max. Wartezeit auf THRE (TX-FIFO frei) je Byte (5.59): grosszuegig,
+                                 // damit CTS-Rueckstau das Byte NICHT verwirft (Werksmodul/Dead-Fall
+                                 // faengt schon die CTS-Schleife mit CTS_WAIT_MS ab)
 volatile uchar cts_timeout=0;    // gesetzt in putb(), wenn CTS-Wait ablaeuft (Flow-Control/Verdrahtung)
 volatile uchar cts_bypass=0;     // 1 = CTS-Handshake ueberspringen (Bring-up/Werksmodul F=00; siehe init_bluetooth)
 volatile uchar bt_tx_stuck=0;    // Zaehler: TX-FIFO-Wait (THRE) lief in Timeout -> Sender steckt
@@ -73,13 +76,13 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 	{ uint _tt=mstimer;                    // TX-FIFO-Wait begrenzen (kein Dauerhang)
 	while (!(U1->LSR & THRE)) 		// Warte UART1 Transmitter FIFO leer?
   {
-	 if ((uint)(mstimer-_tt)>=50) { bt_tx_stuck++; return(-1); }   // THRE haengt >50 ms -> Sender steckt
-	 if (WDTV<1000)								// Abbruch 1ms vor Watchdog reset
-	 {
-		ResetWDT();								
-		return(-1);								
-	 }		 
-	}	
+	 // 5.59: Byte bei CTS-Rueckstau NICHT nach 50 ms verwerfen - das zerstoerte X/Y-Modem-Bloecke
+	 // (Neuversand -> noch langsamer, siehe TXstuck). THRE-Stau hier = echter Flow-Control-Rueckstau
+	 // -> warten (dead/Werksmodul faengt schon die CTS-Schleife oben ab).
+	 if ((uint)(mstimer-_tt)>=BT_TXWAIT_MS) { bt_tx_stuck++; return(-1); }  // erst nach langem Stau aufgeben
+	 if (WDTV<1000) { ResetWDT(); return(-1); }   // Abbruch 1ms vor Watchdog reset
+	 osThreadYield();                             // CPU abgeben statt spinnen (kein 50-ms-Busy-Block)
+	}
 	}
   U1->THR = ch;									// dann sofort senden
 	bt_tx_bytes++;                                 // Diagnose (5.53): gesendete Bytes als Bezugsgroesse

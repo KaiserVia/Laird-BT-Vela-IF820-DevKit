@@ -112,13 +112,14 @@
 #define T_sbtpok   "SBTP,0000"
 // --- 5.55: BLE-Advertising dauerhaft (Kunde kann jederzeit verbinden) ---
 // Werksdefault SAP: T=03,C=07,H=0030,D=001E,L=0800,O=003C,F=00 -> 30 s High + 60 s Low = stoppt nach 90 s.
-// Wir setzen L=12C0 (Low-Duty-Intervall 3 s), O=0000 (Low-Duty-Dauer UNENDLICH) und F=01
-// (Auto-Advertising bei Boot UND Disconnect).
-// -> erste 30 s schnelles High-Duty-Advertising, danach dauerhaft im Low-Duty-Intervall 3 s.
-// BEWUSST auch fuer Batteriegeraete (kein Netz/Batterie-Guard): Anforderung ist "Kunde kann
-// jederzeit verbinden". 3 s (0x12C0 = 4800 * 0,625 ms) ist der gewaehlte Strom-/Auffind-Kompromiss.
-// Bereich laut Doku: 0x0020 (20 ms) .. 0x4000 (10,24 s). Sparsamer -> L vergroessern.
-#define T_sap      "SAP,T=03,C=07,H=0030,D=001E,L=12C0,O=0000,F=01\r"
+// Wir setzen T=04 (REINES Low-Duty - KEINE High-Duty-Phase), L=12C0 (Intervall 3 s), O=0000
+// (Dauer UNENDLICH), F=01 (Auto-Advertising bei Boot UND Disconnect).
+// -> dauerhaft im 3-s-Takt, kaum Funkzeit.
+// WICHTIG (5.59): frueher T=03 (High-Duty-first) -> 30 ms Intervall fuer 30 s, bei JEDEM Disconnect
+// neu. Das teilte sich das eine Dual-Mode-Funkteil mit dem Classic-SPP-Download und machte ihn
+// extrem langsam. T=04 (Low-Duty-only) beseitigt die 30-ms-Contention, bleibt dauerhaft auffindbar.
+// BEWUSST auch fuer Batteriegeraete. 3 s (0x12C0 = 4800 * 0,625 ms). Bereich 0x0020..0x4000.
+#define T_sap      "SAP,T=04,C=07,H=0030,D=001E,L=12C0,O=0000,F=01\r"
 #define T_sapok    "SAP,0000"
 #define T_gap      "GAP\r"     // gap_get_adv_parameters -> ...,D=..,L=..,O=<low duration>,F=..
 #define T_gap_end  ",F="       // Parse-Anker fuer GAP: O-Feld ist bei ",F=" komplett in cbuf
@@ -160,7 +161,7 @@ extern bool bt_ensure_flowcontrol (void); // generisch: pruefen, setzen, verifiz
 extern int  bt_get_cod (void);            // CoD abfragen: -1=unbek., 0=abweichend, 1=== Zielwert IF820_COD
 extern bool bt_set_btcfg (void);          // IF820: Sniff AUS + CoD seriell -> RAM + /SCFG
 extern bool bt_ensure_btcfg (void);       // generisch: pruefen, bei Bedarf setzen, verifizieren
-extern int  bt_get_adv (void);            // Adv-Dauer abfragen: -1=unbek., 0=begrenzt, 1=unendlich (O=0000)
+extern int  bt_get_adv (void);            // Adv abfragen: -1=unbek., 0=abweichend, 1=T=04 low-duty + O=0000
 extern bool bt_set_adv (void);            // IF820: dauerhaftes Advertising -> RAM + /SCFG
 extern bool bt_ensure_adv (void);         // generisch: pruefen, bei Bedarf setzen, verifizieren
 extern int  bt_get_echo (void);           // Echo abfragen: -1=unbek., 0=an, 1=aus (M=0)

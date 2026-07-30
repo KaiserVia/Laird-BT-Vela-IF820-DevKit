@@ -203,17 +203,20 @@ bool bt_ensure_btcfg (void)          // pruefen (ueber CoD), bei Bedarf Sniff+Co
 // Idempotenz-Check ueber das O-Feld von GAP (zuverlaessig ruecklesbar, im Gegensatz zum
 // SBTP-Sniff-Flag). Nur IF820.
 //-----------------------------------------------------------------------------
-int bt_get_adv (void)                // -1 = keine Antwort, 0 = begrenzt, 1 = unendlich (O=0000)
+int bt_get_adv (void)                // -1 = keine Antwort, 0 = abweichend, 1 = T=04 (low-duty) UND O=0000
 {
- char *p;
+ char *pt, *po;
  if (fp.btmodem!=IF820) return (-1);
  { uchar tries;
    for (tries=0; tries<3; tries++)                     // wie GTU/GBTP: erster Versuch manchmal leer
    {
-    if (bt_command(T_gap,T_gap_end,400))               // GAP bis ",F=" -> O-Feld komplett in cbuf
+    if (bt_command(T_gap,T_gap_end,400))               // GAP bis ",F=" -> T- und O-Feld komplett in cbuf
     {
-     p = strstr(cbuf,",O=");                           // Low-Duty-Dauer (4 Hex)
-     if (p) return ((p[3]=='0'&&p[4]=='0'&&p[5]=='0'&&p[6]=='0') ? 1 : 0);  // O=0000 -> unendlich
+     pt = strstr(cbuf,",T=");                          // Adv-Typ (04 = low-duty-only)
+     po = strstr(cbuf,",O=");                          // Low-Duty-Dauer (0000 = unendlich)
+     if (pt && po)
+      return ((pt[3]=='0'&&pt[4]=='4' &&               // T=04  UND
+               po[3]=='0'&&po[4]=='0'&&po[5]=='0'&&po[6]=='0') ? 1 : 0);  // O=0000
     }
     osDelay(60);
    }

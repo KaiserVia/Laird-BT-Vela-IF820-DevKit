@@ -1991,3 +1991,38 @@ Config-Bereiche ist damit am Geraet bestaetigt. Rueckgelesene Zielwerte im Info-
 
 Damit sind 5.51-5.58 (CYSPP-Fix, Sniff aus, CoD seriell, dauerhaftes Advertising, Echo,
 Paketierung, Just-Works) am Geraet verifiziert und stabil. Config-Runde abgeschlossen.
+
+## Update 5.59 - Download wieder langsam: aggressives Advertising (High-Duty) war die Ursache
+
+**Befund:** Nach 5.58 war der Classic-SPP-Download wieder extrem langsam. Zaehler: lost=0s
+(putb sauber, NICHT die Bremse), aber TXstuck=11 (verworfene Bytes -> Blockneuversand). Die Zeit
+ging ins Warten auf die X/Y-Modem-ACKs = Funkstrecke.
+
+**Ursache = eigene Init-Aenderung (kein externer Faktor):** Das dauerhafte Advertising aus
+5.55/5.56 nutzte T=03 (Undirected HIGH duty) mit H=0030 = 30 ms Intervall fuer D=30 s, und F=01
+startet das bei JEDEM Disconnect neu. Der IF820 ist Dual-Mode mit EINEM Funkteil -> das
+High-Duty-Advertising (alle 30 ms) funkte gegen den Classic-Download an. Bei kurzen Link-Abrissen
+waehrend der Uebertragung (marginales RF / CYSPP-Float) feuerte es via F=01 immer wieder neu.
+Vor 5.55 (schneller 5.54-Lauf) stoppte Advertising nach 90 s -> keine Contention.
+
+**Hinweis:** Advertising mitten in einer Classic-Sitzung per /AX zu pausieren geht NICHT - das
+Modul ist dann im transparenten Datenmodus, ein Kommando ginge als Nutzdaten an den PC. Loesung
+daher rein ueber die Adv-Parameter.
+
+**Fix (5.59):**
+- **T=03 -> T=04** (Undirected LOW duty only, KEINE 30-ms-High-Duty-Phase). Advertising bleibt
+  dauerhaft (O=0000) und connectable im 3-s-Takt (L=12C0), aber kaum Funkzeit -> keine Contention.
+  Gate bt_get_adv prueft jetzt T=04 UND O=0000 (damit 5.55-5.58-Geraete mit T=03 sauber upgraden).
+- **TXstuck-Byte-Drop behoben** (sio.c putb): THRE-Wait-Timeout 50 ms -> BT_TXWAIT_MS 1000 ms +
+  osThreadYield. Bei echtem CTS-Rueckstau wird das Byte jetzt NICHT mehr verworfen (das zerstoerte
+  X/Y-Modem-Bloecke -> Neuversand). Der Dead-/Werksmodul-Fall wird weiter von der CTS-Schleife
+  (CTS_WAIT_MS=50) abgefangen, bevor die THRE-Schleife greift.
+
+**Geaenderte Dateien:** sio.c, btio.c, btio.h, sprachen/sictxt.c (-> 5.59).
+
+**Am Geraet zu verifizieren (nicht kompiliert/getestet):**
+1. Init: Step 3c schreibt einmal neu (T=03 alt -> T=04), Reboot; danach "already ok".
+2. Info-Menue: GAP zeigt T=04, O=0000.
+3. Download wiederholen -> sollte wieder schnell sein (Richtung 5.54: 4 MB < 15 min). TXstuck
+   sollte klein/0 bleiben. Falls WEITER langsam -> Advertising war doch nicht die Ursache, dann
+   PC-seitiges Sniff/Energieverwaltung oder RF pruefen.
