@@ -1945,3 +1945,23 @@ unabhaengig von A4 zu ueberdenken.
 
 Manufacturer-Data bleiben damit bewusst 00000000. Doku aktualisiert:
 IF820_Config_Kandidaten.md und ble-chip-response.md.
+
+## Update 5.57 - VERIFIKATION am Geraet (Modul-FW 1.4.12.12)
+
+Init-Log 5.57 bestaetigt alle drei neuen Schritte + zwei bemerkenswerte Befunde:
+
+- **Step 3d Echo aus:** SPEM,M=0 ok. Ab da zeigt der Log `< @R,...` OHNE vorangestelltes
+  Echo -> Echo ist wirklich aus, bt_command laeuft weiter (Token-Match echo-unabhaengig). Wie erwartet.
+- **Step 3e Paketierung:** `.CYSPPGK` lieferte **W=0A (10 ms)** als Ist-Wert - der Werksdefault
+  auf 1.4.12.12 ist also 10 ms, nicht die dokumentierten 5 ms (v2.2-Guide). Umso wichtiger der Fix:
+  auf W=01 (1 ms) gesetzt. Gate erkennt das kuenftig als "already ok".
+- **Step 3f Security - substanzieller Befund:** `GSBP` lieferte **M=41**, NICHT M=00. Dekodiert:
+  High-Nibble 4 (Classic: MITM nicht noetig, general bonding, auto-accept), **Low-Nibble 1 = BLE
+  "Required - General Bond"**. Das Modul verlangte also auf der BLE-Seite **Bonding** - potenzielle
+  Quelle fuer iOS-Pairing-Dialoge. A5 hat das auf M=00 (Just Works, kein Bond) gestellt. A5 war
+  hier also KEINE Kosmetik, sondern eine echte Aenderung.
+- **Step 4:** /RBT + Verify nach 3 Anlaeufen ok.
+
+Alle Gates lesen jetzt den Zielwert zurueck (Adv O=0000, Echo M=00, Paket W=01, Security M=00)
+-> beim naechsten Init muessen 3c-3f "already ok" liefern (kein zweiter Reflash/Reboot). DAS ist
+noch zu bestaetigen: einmal erneut booten und pruefen, dass keiner der Schritte nochmal schreibt.
