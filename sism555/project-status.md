@@ -1889,3 +1889,49 @@ Sonst unveraendert: T=03, D=001E (30 s High-Duty schnell), O=0000 (unendlich), F
 Erste 30 s nach Boot/Disconnect also weiterhin schnell auffindbar, danach dauerhaft im 3-s-Takt.
 
 **Geaenderte Dateien:** btio.h, sprachen/sictxt.c (-> 5.56). Nicht kompiliert, nicht getestet.
+
+---
+
+## Update 5.57 - App-Config im Init: Echo aus (A1), CYSPP-Paketierung (A2), Just-Works (A5)
+
+Umsetzung von drei Kandidaten aus `Doku/IF820_Config_Kandidaten.md`, selbstheilend im Init
+(Muster wie 5.54/5.55: get -> bei Bedarf set -> /SCFG, Idempotenz ueber ein ruecklesbares Feld).
+
+- **A1 Command-Echo aus** (`SPEM,M=0`): Der Guide empfiehlt Echo-aus fuer MCU-Hosts - der LPC
+  parst dann nur noch Antworten, nicht sein eigenes Echo. Werksdefault ist Echo AN, A1 schreibt
+  also beim ersten Init. Betrifft nur den UART-Command-Mode, nicht SPP/CYSPP-Daten. Gate: GPEM
+  M=00 (Raw-Tail-Read mit Retry, da M das letzte Feld ist).
+- **A2 CYSPP-Paketierung** (`.CYSPPSK,M=01,W=01,L=14,E=0D`): Werks-Wartewert 5 ms ist bei 460800
+  zu traege ("Safe Wait" laut Guide = 1 ms). Nur W -> 1 ms, uebrige Felder = Default. Verbessert
+  den BLE-Datenfluss Geraet->App. Gate: .CYSPPGK W=01 (Anker ",L=").
+- **A5 Just-Works festschreiben** (`SSBP,M=00,B=00,K=10,P=00,I=03,F=01`): sichert, dass NIE ein
+  OS-Pairing-Dialog erzwungen wird (No Input/No Output, kein MITM/Bond, Auto-Accept). Ist der
+  Werksdefault, wird nur explizit festgeschrieben. Gate: GSBP M=00 (Anker ",B=").
+
+Alle drei: Fehlschlag NICHT fatal (nur `putln`, kein `dtcerr`), Init laeuft weiter. Eingehaengt
+als Schritte 3d/3e/3f (nach 3c Advertising, vor Schritt 4 Reboot). `changed=1` -> bestehender
+Reboot+Verify macht sie live.
+
+**Code-Review (Subagent): commit-faehig.** Parsing/Anker/Feldreihenfolge gegen die Doku
+(ezserial.txt) bestaetigt (GPEM M letztes Feld; .CYSPPGK M,W,L,E; GSBP M,B,K,P,I,F). Graceful-
+Fail bestaetigt: fehlt ein Kommando auf 1.4.12.12, matcht der Antwort-Token nicht -> bt_command
+FALSE -> non-fatal. Nachbesserungen eingebaut: Retry in bt_get_echo (vermeidet unnoetigen
+Reboot), Kommentar zu A5 entschaerft (M-Werksdefault nicht dokumentiert).
+
+**NICHT umgesetzt - A4 (Seriennummer in Manufacturer-Data): bewusst zurueckgestellt.**
+Sicherheitsfund: die Zugangs-PIN IST die numerische Seriennummer (`fp.btpin =
+atoi(serno)*10000 + atoi(serno+4)`, geprueft an sicom.c). A4 wuerde diese Zahl roh in die
+Manufacturer-Data broadcasten. Sie steckt zwar schon (ableitbar) im Advertising-Namen, aber die
+Entscheidung, sie zusaetzlich roh zu senden, liegt beim Nutzer. Separater eigentlicher Befund:
+die App-Layer-PIN ist aus der oeffentlichen Seriennummer trivial ableitbar - schwaches Schema,
+unabhaengig von A4 zu ueberdenken.
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.57).
+
+**Am Geraet zu verifizieren (nicht kompiliert, nicht getestet):**
+1. Erst-Init zeigt "Step 3d: disable command echo" und "Step 3e: set CYSPP packetization",
+   Schritt 3f je nach Werksdefault. Danach Reboot; Re-Init alle drei "already ok".
+2. BT-Info-Menue: `GPEM M=00`, `.CYSPPGK W=01`, `GSBP M=00`.
+3. Existenz der Kommandos auf 1.4.12.12 pruefen - falls eine Warnung "could not set ..."
+   erscheint, kennt die alte Modul-FW das Kommando nicht (dann per Modul-FW-Update 1.4.18.18
+   nachziehen oder Schritt weglassen).

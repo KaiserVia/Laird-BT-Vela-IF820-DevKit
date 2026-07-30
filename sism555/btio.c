@@ -242,6 +242,82 @@ bool bt_ensure_adv (void)            // pruefen (ueber O-Feld), bei Bedarf setze
 }
 
 //-----------------------------------------------------------------------------
+// App-Config (5.57): Echo aus (A1), CYSPP-Paketierung (A2), Just-Works-Security (A5)
+//-----------------------------------------------------------------------------
+// A1 - Command-Echo: GPEM liefert M als LETZTES Feld -> Raw-Tail-Read (wie bt_get_cod).
+int bt_get_echo (void)               // -1 = keine Antwort, 0 = Echo an, 1 = Echo aus (M=00)
+{
+ char buf[48]; uchar n, t; char *p; uchar dconn=connect;
+ if (fp.btmodem!=IF820) return (-1);
+ for (t=0; t<3; t++)                                   // Retry: erster Read kann leer sein (vermeidet
+ {                                                     //         sonst einen unnoetigen Reflash+Reboot)
+  n=0; connect=UART1; putstr(T_gpem); bxi=rxi;         // GPEM ans Modul, RX-Marke
+  connect=dconn & ~UART1; osDelay(200);               // nichts spiegeln, Antwort abwarten
+  while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+  buf[n]=0; connect=dconn;
+  p=strstr(buf,"M=");                                  // Echo-Feld (im Header/GPEM kein "M=")
+  if (p) return ((p[2]=='0'&&p[3]=='0') ? 1 : 0);      // M=00 -> Echo aus
+  osDelay(60);
+ }
+ return (-1);
+}
+
+bool bt_set_echo (void)              // Command-Echo aus -> RAM, dann /SCFG
+{
+ if (fp.btmodem!=IF820) return (FALSE);
+ if (!bt_command(T_spem,T_spemok,300)) return (FALSE);     // SPEM,M=0 (Echo aus)
+ osDelay(20); bt_command(T_CR,T_scfgok,-60);
+ if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);    // dauerhaft sichern
+ return (TRUE);
+}
+
+// A2 - CYSPP-Paketierung: Wait-Feld ueber .CYSPPGK ruecklesbar (Anker ",L=" -> W komplett).
+int bt_get_pkt (void)                // -1 = keine Antwort, 0 = anders, 1 = W=01 (1 ms)
+{
+ char *p; uchar t;
+ if (fp.btmodem!=IF820) return (-1);
+ for (t=0; t<3; t++)
+ {
+  if (bt_command(T_cypgk,T_cypgk_end,400))
+  { p = strstr(cbuf,",W="); if (p) return ((p[3]=='0'&&p[4]=='1') ? 1 : 0); }  // W=01
+  osDelay(60);
+ }
+ return (-1);
+}
+
+bool bt_set_pkt (void)               // CYSPP-Wait auf 1 ms -> RAM, dann /SCFG
+{
+ if (fp.btmodem!=IF820) return (FALSE);
+ if (!bt_command(T_cypsk,T_cypskok,400)) return (FALSE);   // .CYSPPSK M=01,W=01,L=14,E=0D
+ osDelay(20); bt_command(T_CR,T_scfgok,-60);
+ if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);
+ return (TRUE);
+}
+
+// A5 - Security: M-Feld ueber GSBP ruecklesbar (Anker ",B=" -> M komplett). M=00 == Just Works.
+int bt_get_sec (void)                // -1 = keine Antwort, 0 = anders, 1 = Just-Works (M=00)
+{
+ char *p; uchar t;
+ if (fp.btmodem!=IF820) return (-1);
+ for (t=0; t<3; t++)
+ {
+  if (bt_command(T_gsbp,T_gsbp_end,400))
+  { p = strstr(cbuf,",M="); if (p) return ((p[3]=='0'&&p[4]=='0') ? 1 : 0); }  // M=00
+  osDelay(60);
+ }
+ return (-1);
+}
+
+bool bt_set_sec (void)               // Just-Works festschreiben -> RAM, dann /SCFG
+{
+ if (fp.btmodem!=IF820) return (FALSE);
+ if (!bt_command(T_ssbp,T_ssbpok,400)) return (FALSE);     // SSBP M=00,B=00,K=10,P=00,I=03,F=01
+ osDelay(20); bt_command(T_CR,T_scfgok,-60);
+ if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);
+ return (TRUE);
+}
+
+//-----------------------------------------------------------------------------
 // Generische Device-Name-Verwaltung  (Name = VIASIS_<serno>)
 //-----------------------------------------------------------------------------
 int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, -1 = unbekannt
@@ -540,6 +616,33 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
     bt_msg(" Step 3c: set permanent advertising");
     if (bt_set_adv()) { changed=1; bt_msg("   permanent advertising set (/SCFG)"); }
     else              bt_msg("   WARNING: could not set advertising (non-fatal)");
+   }
+
+   // --- Schritt 3d: Command-Echo aus (A1, MCU-Host) ---
+   if (bt_get_echo()==1) bt_msg(" Step 3d: command echo off already ok");
+   else
+   {
+    bt_msg(" Step 3d: disable command echo");
+    if (bt_set_echo()) { changed=1; bt_msg("   echo off (/SCFG)"); }
+    else               bt_msg("   WARNING: could not set echo (non-fatal)");
+   }
+
+   // --- Schritt 3e: CYSPP-Paketierung an 460800 (A2, Wait 5 ms -> 1 ms) ---
+   if (bt_get_pkt()==1) bt_msg(" Step 3e: CYSPP packetization already ok");
+   else
+   {
+    bt_msg(" Step 3e: set CYSPP packetization (W=1ms)");
+    if (bt_set_pkt()) { changed=1; bt_msg("   packetization set (/SCFG)"); }
+    else              bt_msg("   WARNING: could not set packetization (non-fatal)");
+   }
+
+   // --- Schritt 3f: Just-Works-Security festschreiben (A5) ---
+   if (bt_get_sec()==1) bt_msg(" Step 3f: just-works security already ok");
+   else
+   {
+    bt_msg(" Step 3f: set just-works security");
+    if (bt_set_sec()) { changed=1; bt_msg("   security set (/SCFG)"); }
+    else              bt_msg("   WARNING: could not set security (non-fatal)");
    }
 
    // --- Schritt 4: nur bei Aenderung speichern/rebooten + verifizieren ---

@@ -122,6 +122,27 @@
 #define T_sapok    "SAP,0000"
 #define T_gap      "GAP\r"     // gap_get_adv_parameters -> ...,D=..,L=..,O=<low duration>,F=..
 #define T_gap_end  ",F="       // Parse-Anker fuer GAP: O-Feld ist bei ",F=" komplett in cbuf
+// --- 5.57: App-Config aus IF820_Config_Kandidaten.md ---
+// A1: Command-Echo aus. Guide empfiehlt es fuer MCU-Hosts (der LPC muss dann nur Antworten
+//     parsen, nicht sein eigenes Echo). Werksdefault M=1 (an). Betrifft nur den Command-Mode.
+#define T_spem     "SPEM,M=0\r" // protocol_set_echo_mode (1/3)
+#define T_spemok   "SPEM,0000"
+#define T_gpem     "GPEM\r"     // protocol_get_echo_mode (1/4) -> ...,M=<00/01>  (M ist letztes Feld)
+// A2: CYSPP-Paketierung. Werksdefault W=5 ms ist bei 460800 zu traege ("Safe Wait" laut Guide
+//     = 1 ms). M=01 (Anticipate), L=14 (20 B), E=0D bleiben Werksdefault; nur W -> 1 ms.
+#define T_cypsk    ".CYSPPSK,M=01,W=01,L=14,E=0D\r"   // p_cyspp_set_packetization (10/7)
+#define T_cypskok  "CYSPPSK,0000"
+#define T_cypgk    ".CYSPPGK\r"                       // p_cyspp_get_packetization (10/8) -> M=,W=,L=,E=
+#define T_cypgk_end ",L="      // Parse-Anker: W-Feld ist bei ",L=" komplett in cbuf
+// A5: Just-Works festschreiben (schuetzt gegen versehentliches Verstellen -> kein OS-Pairing-
+//     Dialog). M=00 (kein MITM/Bond, Classic+BLE), B=00, K=10, P=00, I=03 (No Input/No Output),
+//     F=01 (Auto-Accept). Hinweis: der Werksdefault fuer das M-Feld ist im Guide NICHT dokumentiert;
+//     falls er bereits M=00 ist, schreibt A5 gar nicht - andernfalls einmaliger Write, danach
+//     liest GSBP M=00 zurueck -> kein Reflash-Loop.
+#define T_ssbp     "SSBP,M=00,B=00,K=10,P=00,I=03,F=01\r"  // smp_set_security_parameters (7/11)
+#define T_ssbpok   "SSBP,0000"
+#define T_gsbp     "GSBP\r"    // smp_get_security_parameters (7/12) -> M=,B=,K=,P=,I=,F=
+#define T_gsbp_end ",B="       // Parse-Anker: M-Feld ist bei ",B=" komplett in cbuf
 #define T_rbt      "/RBT\r"    // system_reboot
 #define T_dis      "/DIS\r"    // gap_disconnect - offene Verbindung sauber schliessen
 #define T_disok    "/DIS,0000"
@@ -142,6 +163,12 @@ extern bool bt_ensure_btcfg (void);       // generisch: pruefen, bei Bedarf setz
 extern int  bt_get_adv (void);            // Adv-Dauer abfragen: -1=unbek., 0=begrenzt, 1=unendlich (O=0000)
 extern bool bt_set_adv (void);            // IF820: dauerhaftes Advertising -> RAM + /SCFG
 extern bool bt_ensure_adv (void);         // generisch: pruefen, bei Bedarf setzen, verifizieren
+extern int  bt_get_echo (void);           // Echo abfragen: -1=unbek., 0=an, 1=aus (M=0)
+extern bool bt_set_echo (void);           // A1: Command-Echo aus -> RAM + /SCFG
+extern int  bt_get_pkt (void);            // Paketierung abfragen: -1=unbek., 0=anders, 1=W=01
+extern bool bt_set_pkt (void);            // A2: CYSPP-Wait auf 1 ms -> RAM + /SCFG
+extern int  bt_get_sec (void);            // Security abfragen: -1=unbek., 0=anders, 1=Just-Works (M=00)
+extern bool bt_set_sec (void);            // A5: Just-Works festschreiben -> RAM + /SCFG
 extern int  bt_get_name (void);           // 1=Name==VIASIS_<serno>, 0=anders, -1=unbek.
 extern bool bt_set_name (void);           // Name=VIASIS_<serno> schreiben (SDN$, Flash)
 extern bool bt_ensure_name (void);        // generisch: pruefen, bei Bedarf schreiben
