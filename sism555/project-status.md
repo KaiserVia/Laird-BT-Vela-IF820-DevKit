@@ -1873,3 +1873,19 @@ Low-Duty) ist der Strom-Kompromiss; falls Batterielaufzeit kritisch wird, L verg
 
 **Fuer die App-Seite** ist das die Antwort auf "BLE dauerhaft an" - siehe aktualisiertes
 `Doku/ble-chip-response.md`, Abschnitt 3b.
+
+---
+
+## Update 5.56 - Low-Duty-Advertising-Intervall auf 3 s
+
+**Entscheidung:** Das dauerhafte Low-Duty-Advertising aus 5.55 laeuft jetzt mit **3 s** statt
+1,28 s. Hintergrund: Es gibt firmware-seitig **kein** verlaessliches Merkmal, ob ein Geraet netz-
+oder batteriebetrieben ist (nur die gemessene Versorgungsspannung, die beim Boot nicht
+zwischen "geladene Batterie" und "Netz" unterscheidet). Daher EIN einheitlicher Wert fuer alle
+Geraete, bewusst richtung stromsparend gewaehlt.
+
+**Aenderung:** In `T_sap` (btio.h) `L=0800` (1,28 s) -> `L=12C0` (4800 * 0,625 ms = 3,0 s).
+Sonst unveraendert: T=03, D=001E (30 s High-Duty schnell), O=0000 (unendlich), F=01 (Auto-Adv).
+Erste 30 s nach Boot/Disconnect also weiterhin schnell auffindbar, danach dauerhaft im 3-s-Takt.
+
+**Geaenderte Dateien:** btio.h, sprachen/sictxt.c (-> 5.56). Nicht kompiliert, nicht getestet.
