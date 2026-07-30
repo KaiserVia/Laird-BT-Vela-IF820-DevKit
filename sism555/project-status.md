@@ -1965,3 +1965,16 @@ Init-Log 5.57 bestaetigt alle drei neuen Schritte + zwei bemerkenswerte Befunde:
 Alle Gates lesen jetzt den Zielwert zurueck (Adv O=0000, Echo M=00, Paket W=01, Security M=00)
 -> beim naechsten Init muessen 3c-3f "already ok" liefern (kein zweiter Reflash/Reboot). DAS ist
 noch zu bestaetigen: einmal erneut booten und pruefen, dass keiner der Schritte nochmal schreibt.
+
+## Update 5.58 - BT-Info-Menue zeigt die neuen Config-Werte
+
+send_bt_info() (Menue Bluetooth->Information) zeigt jetzt zusaetzlich GAP (Adv-Dauer O=),
+GPEM (Echo M=), .CYSPPGK (Paketierung W=) und GSBP (Security M=). Damit lassen sich die
+ab 5.55/5.57 gesetzten Werte direkt ablesen, ohne den Boot-Log abzuwarten:
+- GAP    -> O=0000  = dauerhaftes Advertising
+- GPEM   -> M=00    = Echo aus
+- .CYSPPGK -> W=01  = 1 ms Paketierung
+- GSBP   -> M=00    = Just Works
+Nur Anzeige, keine Logikaenderung.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.58).

@@ -940,6 +940,10 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
    bt_query_show(T_cypget);                                       // CYSPP-Parameter (E=enable,G=role,C=,L=,R=,M=)
    bt_query_show(T_gbtdc);                                        // Class of Device (C=) - Windows-Geraetekategorie
    bt_query_show(T_gbtp);                                         // Classic-Parameter, F Bit0 = Sniff-Mode
+   bt_query_show(T_gap);                                          // Adv-Parameter (5.55): O=0000 = dauerhaft
+   bt_query_show(T_gpem);                                         // Echo (5.57): M=00 = aus
+   bt_query_show(T_cypgk);                                        // CYSPP-Paketierung (5.57): W=01 = 1 ms
+   bt_query_show(T_gsbp);                                         // Security (5.57): M=00 = Just Works
    bt_show_counters();                                            // Durchsatz-Diagnose der laufenden BT-Sitzung
   }
   osDelay(50); bxi=rxi;                                           // finaler Flush: keine Modulbytes ins Menue
