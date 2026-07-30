@@ -1978,3 +1978,16 @@ ab 5.55/5.57 gesetzten Werte direkt ablesen, ohne den Boot-Log abzuwarten:
 Nur Anzeige, keine Logikaenderung.
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.58).
+
+## Update 5.58 - VERIFIKATION: Idempotenz am Geraet bestaetigt
+
+Zweiter Boot mit 5.58: alle Config-Schritte melden "already ok", kein Reflash, kein Reboot
+("Step 4: nothing changed -> done"). Die Selbstheilungs-/Idempotenz-Logik ueber ALLE
+Config-Bereiche ist damit am Geraet bestaetigt. Rueckgelesene Zielwerte im Info-Menue:
+- GAP L=12C0, O=0000  -> Advertising dauerhaft, 3 s
+- GPEM (Echo) aus     -> Log zeigt durchgehend `< @R,...` ohne Kommando-Echo
+- .CYSPPGK W=01       -> 1 ms Paketierung
+- GSBP M=00           -> Just Works
+
+Damit sind 5.51-5.58 (CYSPP-Fix, Sniff aus, CoD seriell, dauerhaftes Advertising, Echo,
+Paketierung, Just-Works) am Geraet verifiziert und stabil. Config-Runde abgeschlossen.
