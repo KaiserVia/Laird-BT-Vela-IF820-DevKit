@@ -1628,3 +1628,46 @@ der Minutentick kann sie also nicht unterbrechen. Alle vier `bt_cmdmode()`-Aufru
 **Offen / separat:** Read-Timeout auf `a47f7608-...` (Service 2, moduleigene GATT-DB) und
 Manufacturer-Payload im Advertising (`00 00 00 00`) - beides niedrige Prioritaet, siehe
 `Doku/ble-chip-response.md`.
+
+---
+
+## Update 5.52 - bt_cmdmode() modul-geguarded (kein Pegelkonflikt bei RN4678 / BT730)
+
+**Befund (Vorbedingung, nicht durch 5.51 entstanden):** IC54 Bit 7 ist bei **allen drei**
+BT-Modulen dieselbe physische Leitung (`BT_LINK`, hard.h). Nur beim IF820 ist sie
+**bidirektional** (CYSPP) und darf vom Host getrieben werden. Beim **RN4678** und beim
+**Laird BT730** ist sie ein reiner **Status-Ausgang des Moduls**.
+
+`init_bluetooth()` rief `bt_cmdmode()` bisher **unbedingt** auf - also auch, wenn ein RN4678
+oder BT730 steckt - und hielt die Leitung dann mindestens 600 ms als Ausgang HIGH gegen den
+Modulausgang. Folge: Pegelkonflikt fuer die Dauer der Init, und `BT_LINK` liest waehrenddessen
+faelschlich "nicht verbunden". In der Praxis bisher harmlos (laeuft beim Boot, wenn keine
+Verbindung besteht), aber unnoetig.
+
+**Fix:** Guard **in `bt_cmdmode()` selbst** (nicht an der Aufrufstelle), damit alle heutigen
+und kuenftigen Aufrufer automatisch abgedeckt sind:
+`if ((fp.btmodem==Roving) || (fp.btmodem==Laird)) return;`
+-> beim RN4678/BT730 ein No-Op. `fp.btmodem==0` (Erstboot, Modultausch, Erkennung noch nicht
+gelaufen) bleibt **bewusst erlaubt**: dort muss der Command-Mode erzwingbar sein, sonst
+scheitert die IF820-Erkennung an einem Modul, das noch im Datenmodus steht. Die Reihenfolge in
+`init_bluetooth()` passt dazu - `fp.btmodem` gilt beim Aufruf noch aus dem Flash und wird erst
+danach auf 0 gesetzt.
+
+`bt_release()` bleibt bewusst **ungeguarded**: "alle Pins Eingang" ist der Werks-/Init-Zustand
+von IC54 (identisch `i2cm.c`) und fuer RN4678/BT730 genau der benoetigte Zustand.
+
+**Konsistenz-Nebeneffekt:** Da `bt_cyspp_out` nur in `bt_cmdmode()` gesetzt wird, bleibt der
+Merker bei RN4678/BT730 dauerhaft 0 - die drei Sicherungen aus 5.51 (uart1_release,
+Minutentick, default-Zweig) sind dort ohnehin per `fp.btmodem==IF820` geguarded und feuern nie.
+
+**Modul-Vertraeglichkeit von 5.51/5.52 geprueft:** IC54 wird projektweit nur an drei Stellen
+beschrieben (`bt_cmdmode`, `bt_release`, `i2cm.c` Init) - es gibt also keinen weiteren Ausgang
+auf diesem Expander, der durch "alle Pins Eingang" umkonfiguriert werden koennte. Alle
+Neuerungen aus 5.51 sind entweder `fp.btmodem==IF820`-geguarded oder (Boot-`bt_release()` in
+main.c) modul-neutral bis leicht positiv.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (Version -> 5.52).
+
+**Nicht kompiliert, nicht am Geraet verifiziert.** RN4678 und BT730 sind auf diesem Branch
+seit Monaten nicht mehr am Geraet getestet - 5.52 verschlechtert dort nichts, ein echter
+Regressionstest der beiden Module steht aber weiter aus.

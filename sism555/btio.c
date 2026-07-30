@@ -233,6 +233,14 @@ volatile uchar bt_cyspp_out = 0;   // volatile: wird auch aus GSM-/MQTT-Thread g
 void bt_cmdmode (void)   // CYSPP HIGH treiben -> laufende SPP-Verbindung trennen + Command-Mode
 {
 #if BT_CYSPP
+ // Modul-Guard (5.52): IC54 Bit7 ist bei ALLEN drei BT-Modulen dieselbe Leitung (BT_LINK),
+ // aber nur beim IF820 bidirektional (CYSPP) und damit vom Host treibbar. Beim RN4678 und
+ // beim Laird BT730 ist sie ein reiner STATUS-AUSGANG des Moduls -> ein Host-Treiber waere
+ // ein Pegelkonflikt gegen den Modulausgang, und BT_LINK wuerde faelschlich "nicht
+ // verbunden" lesen. fp.btmodem==0 (Erstboot / Modultausch / Erkennung noch nicht gelaufen)
+ // ist bewusst erlaubt: dort MUSS der Command-Mode erzwingbar sein, sonst scheitert die
+ // IF820-Erkennung an einem Modul, das noch im Datenmodus steht.
+ if ((fp.btmodem==Roving) || (fp.btmodem==Laird)) return;
  write_i2c_dev(IC54, 2, (0x80<<8)|0x01);   // PCA9554 Output-Register (0x01): Bit 7 = HIGH
  write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);   // PCA9554 Config (0x03): Bit 7 = Ausgang, Bit 0-6 = Eingang
  bt_cyspp_out = 1;                         // Host treibt CYSPP -> Modul kann keinen Datenkanal oeffnen
@@ -348,7 +356,9 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  { uint sp=atoi(fp.serno+4);                // keine gueltige Seriennummer? -> BT-Name/PIN unmoeglich
    if (!isdigit((int)fp.serno[0]) || !sp)   // FRUEH erkennen, bevor das Modul angefasst wird
    { newline(); dtcerr(DTC_BT_NO_SERIAL); newline(); return; } }
- bt_cmdmode();                          // IMMER: aktive SPP-Verbindung ueber CYSPP (IC54 Bit7) kappen + Command-Mode erzwingen
+ bt_cmdmode();                          // aktive SPP-Verbindung ueber CYSPP (IC54 Bit7) kappen + Command-Mode erzwingen
+                                        // (5.52: bt_cmdmode() ist selbst modul-geguarded -> beim RN4678/BT730 ein No-Op,
+                                        //  fp.btmodem gilt hier noch aus dem Flash und wird erst unten auf 0 gesetzt)
  osDelay(600);                          // Modul Zeit geben: SPP abbauen und in Command-Mode wechseln
  connect&=~(UART1|BT_LINK);             // virtuelle BT-Verbindung loesen (Befehle -> Modul, nicht ueber SPP)
  fp.btmodem=0;                          // Reset -> Erkennung laeuft (erneut) durch
