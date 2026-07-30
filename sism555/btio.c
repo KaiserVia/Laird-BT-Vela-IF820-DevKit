@@ -197,6 +197,51 @@ bool bt_ensure_btcfg (void)          // pruefen (ueber CoD), bei Bedarf Sniff+Co
 }
 
 //-----------------------------------------------------------------------------
+// Dauerhaftes BLE-Advertising (5.55): das Modul stoppt ab Werk nach ~90 s. Der Kunde
+// kann aber jederzeit ans Geraet kommen -> Advertising darf nie aufhoeren. Umgesetzt
+// ueber SAP: Low-Duty-Dauer O=0000 (unendlich) + Auto-Advertising F=01 (Boot+Disconnect).
+// Idempotenz-Check ueber das O-Feld von GAP (zuverlaessig ruecklesbar, im Gegensatz zum
+// SBTP-Sniff-Flag). Nur IF820.
+//-----------------------------------------------------------------------------
+int bt_get_adv (void)                // -1 = keine Antwort, 0 = begrenzt, 1 = unendlich (O=0000)
+{
+ char *p;
+ if (fp.btmodem!=IF820) return (-1);
+ { uchar tries;
+   for (tries=0; tries<3; tries++)                     // wie GTU/GBTP: erster Versuch manchmal leer
+   {
+    if (bt_command(T_gap,T_gap_end,400))               // GAP bis ",F=" -> O-Feld komplett in cbuf
+    {
+     p = strstr(cbuf,",O=");                           // Low-Duty-Dauer (4 Hex)
+     if (p) return ((p[3]=='0'&&p[4]=='0'&&p[5]=='0'&&p[6]=='0') ? 1 : 0);  // O=0000 -> unendlich
+    }
+    osDelay(60);
+   }
+ }
+ return (-1);
+}
+
+bool bt_set_adv (void)               // dauerhaftes Advertising -> RAM, dann /SCFG (Flash)
+{
+ if (fp.btmodem!=IF820) { dtcerr(DTC_BT_UNKNOWN_TYPE); return (FALSE); }
+ if (!bt_command(T_sap,T_sapok,400)) return (FALSE);       // SAP: O=0000 (unendlich) + F=01 (Auto-Adv)
+ osDelay(20); bt_command(T_CR,T_scfgok,-60);               // setteln + Parser leeren vor /SCFG
+ if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);    // dauerhaft in Flash sichern
+ return (TRUE);
+}
+
+bool bt_ensure_adv (void)            // pruefen (ueber O-Feld), bei Bedarf setzen, verifizieren
+{
+ if (bt_get_adv()==1)
+ { putln(" BT-Adv: dauerhaft (bereits gesetzt)"); return (TRUE); }
+ if (!bt_set_adv())                                        // Fehlschlag NICHT fatal (nur Auffindbarkeit)
+ { putln(" BT-Adv: WARNUNG - Advertising nicht gesetzt"); return (FALSE); }
+ if (bt_get_adv()==1)
+ { putln(" BT-Adv: dauerhaft gesetzt und gesichert"); return (TRUE); }
+ putln(" BT-Adv: WARNUNG - Verifikation Advertising fehlgeschlagen"); return (FALSE);
+}
+
+//-----------------------------------------------------------------------------
 // Generische Device-Name-Verwaltung  (Name = VIASIS_<serno>)
 //-----------------------------------------------------------------------------
 int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, -1 = unbekannt
@@ -486,6 +531,15 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
     bt_msg(" Step 3b: disable sniff + set serial CoD");
     if (bt_set_btcfg()) { changed=1; bt_msg("   sniff off + serial CoD set (/SCFG)"); }
     else                bt_msg("   WARNING: could not set sniff/CoD (non-fatal)");
+   }
+
+   // --- Schritt 3c: BLE-Advertising dauerhaft (Kunde kann jederzeit verbinden) ---
+   if (bt_get_adv()==1) bt_msg(" Step 3c: permanent advertising already ok");
+   else
+   {
+    bt_msg(" Step 3c: set permanent advertising");
+    if (bt_set_adv()) { changed=1; bt_msg("   permanent advertising set (/SCFG)"); }
+    else              bt_msg("   WARNING: could not set advertising (non-fatal)");
    }
 
    // --- Schritt 4: nur bei Aenderung speichern/rebooten + verifizieren ---

@@ -1830,3 +1830,46 @@ Verbrauch haengt an anderen Parametern, die hier nicht angefasst werden.
 CTS-Blockade -> X/Y-Modem-Neuversand). Sitzt an einer heiklen Stelle, daher eigene Version, erst
 nachdem 5.54 gemessen ist - moeglicherweise ist der Drop nach dem Sniff-Fix gar nicht mehr
 relevant.
+
+---
+
+## Update 5.55 - BLE-Advertising dauerhaft + BESTAETIGUNG: Download-Problem geloest
+
+**Erfolgsmeldung zuerst:** Nach 5.54 (Sniff aus) konnten **4 MB in unter 15 Minuten** ueber
+Classic SPP heruntergeladen werden - vorher waeren das bei ~1 kB/s ueber eine Stunde gewesen.
+Der Sniff-Mode war die Ursache, der Fix ist am Geraet bestaetigt. Geraetedump nach 5.54:
+`GBTDC C=00001F00` (CoD seriell), `GBTP F=01` (Sniff aus - auf 12.12 IST das Flag ruecklesbar,
+anders als der v2.2-Guide fuer "current release" behauptet), `TXstuck=0` (keine verworfenen
+Bytes/Blockneuversande mehr), `lost=4s` ueber 519 kB (klein; der Anstieg von 0s auf 4s ist sogar
+ein SCHNELLIGKEITSindikator: die Daten fliessen jetzt schnell genug, dass der Modulpuffer
+volllaeuft und die CTS-Flusskontrolle einspringt).
+
+**Anforderung 5.55:** BLE muss **dauerhaft** advertisen - "man weiss nie, wann ein Kunde ans
+Geraet kommt". Ab Werk stoppt das Modul nach ~90 s (SAP-Default D=001E=30s High + O=003C=60s Low).
+
+**Umsetzung (Muster wie 5.54):** Neuer Schritt 3c in `init_bluetooth()`.
+- `bt_set_adv()`: `SAP,T=03,C=07,H=0030,D=001E,L=0800,O=0000,F=01` -> Low-Duty-Dauer O=0000
+  (unendlich) + F=01 (Auto-Advertising bei Boot UND Disconnect). Ergebnis: erste 30 s schnelles
+  High-Duty-Advertising, danach dauerhaft im stromsparenden Low-Duty-Intervall (1,28 s). Dann CR-
+  Flush + `/SCFG`.
+- `bt_get_adv()`: liest `GAP`, prueft das O-Feld (Anker `,F=` -> O komplett in cbuf, da O vor F).
+  Idempotenz zuverlaessig, da GAP im Gegensatz zum SBTP-Sniff-Flag ruecklesbar ist.
+- `bt_ensure_adv()`: pruefen/setzen/verifizieren.
+- Fehlschlag NICHT fatal (nur `putln`, kein `dtcerr`).
+
+**Bewusst fuer ALLE IF820-Geraite** (kein Netz/Batterie-Guard) - so gewuenscht. L=0800 (1,28 s
+Low-Duty) ist der Strom-Kompromiss; falls Batterielaufzeit kritisch wird, L vergroessern.
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.55).
+
+**Am Geraet zu verifizieren (nicht kompiliert, nicht getestet):**
+1. Beim Init erscheint "Step 3c: set permanent advertising", danach Reboot; beim naechsten Init
+   "already ok".
+2. BT-Info-Menue: `GAP` muss `O=0000` zeigen.
+3. Geraet laeuft >90 s, dann per App/BLE-Scanner pruefen: **muss weiterhin auffindbar sein.**
+4. Einmalig die reale GAP-Antwort gegenlesen und bestaetigen, dass das F-Feld hinter O steht
+   (Parser-Annahme; ueber EzSerialPort.py-Enums und das GTU-Muster erschlossen, nicht am Geraet
+   verifiziert).
+
+**Fuer die App-Seite** ist das die Antwort auf "BLE dauerhaft an" - siehe aktualisiertes
+`Doku/ble-chip-response.md`, Abschnitt 3b.

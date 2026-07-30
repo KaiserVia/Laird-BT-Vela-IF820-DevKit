@@ -122,9 +122,11 @@ Das Modul **advertised nach dem Boot nur ~90 Sekunden** (30 s High-Duty + 60 s L
 - Für einen reproduzierbaren Test: Gerät stromlos machen / rebooten und **innerhalb von 90 s**
   scannen und verbinden.
 
-Wir prüfen firmware-seitig, ob wir das Advertising für netzbetriebene Geräte auf **dauerhaft**
-stellen (`SAP,D=0,O=0`). Bei batteriebetriebenen Geräten bleibt es aus Stromgründen begrenzt.
-Sagt uns, ob dauerhaftes Advertising für euren Anwendungsfall gebraucht wird.
+**Erledigt (ab Firmware 5.55):** Das Advertising ist jetzt **dauerhaft** — das Gerät bewirbt sich
+die ersten 30 s im schnellen Intervall, danach unbegrenzt im stromsparenden Low-Duty-Intervall
+(~1,28 s), und startet nach jedem Disconnect automatisch neu. Ein Gerät ist damit **jederzeit
+auffindbar**, nicht nur im 90-s-Fenster nach dem Boot. Ihr müsst also nicht mehr innerhalb von
+90 s scannen — der Hinweis oben gilt nur für Geräte mit älterer Firmware (< 5.55).
 
 ## 3c. Kein OS-Pairing — jetzt mit Gerätedaten bestätigt
 

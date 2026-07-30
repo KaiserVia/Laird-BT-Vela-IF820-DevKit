@@ -110,6 +110,18 @@
 #define T_sbtdcok  "SBTDC,0000"
 #define T_sbtp_ns  "SBTP,T=7D00,D=02,C=01,F=01,S=02,V=0000,N=0000\r"// wie Werksdefault, aber F=01 = Sniff AUS
 #define T_sbtpok   "SBTP,0000"
+// --- 5.55: BLE-Advertising dauerhaft (Kunde kann jederzeit verbinden) ---
+// Werksdefault SAP: T=03,C=07,H=0030,D=001E,L=0800,O=003C,F=00 -> 30 s High + 60 s Low = stoppt nach 90 s.
+// Wir setzen O=0000 (Low-Duty-Dauer UNENDLICH) und F=01 (Auto-Advertising bei Boot UND Disconnect).
+// -> erste 30 s schnelles High-Duty-Advertising, danach dauerhaft im stromsparenden Low-Duty-Intervall
+// (L=0800 = 1,28 s). Uebrige Felder = Werksdefault.
+// BEWUSST auch fuer Batteriegeraete (kein Netz/Batterie-Guard): Anforderung ist "Kunde kann
+// jederzeit verbinden". L=0800 (1,28 s) ist der Strom-Kompromiss - deutlich sparsamer als kurze
+// Intervalle. Falls Batterielaufzeit kritisch wird, hier L vergroessern (z. B. 1000 = 2,56 s).
+#define T_sap      "SAP,T=03,C=07,H=0030,D=001E,L=0800,O=0000,F=01\r"
+#define T_sapok    "SAP,0000"
+#define T_gap      "GAP\r"     // gap_get_adv_parameters -> ...,D=..,L=..,O=<low duration>,F=..
+#define T_gap_end  ",F="       // Parse-Anker fuer GAP: O-Feld ist bei ",F=" komplett in cbuf
 #define T_rbt      "/RBT\r"    // system_reboot
 #define T_dis      "/DIS\r"    // gap_disconnect - offene Verbindung sauber schliessen
 #define T_disok    "/DIS,0000"
@@ -127,6 +139,9 @@ extern bool bt_ensure_flowcontrol (void); // generisch: pruefen, setzen, verifiz
 extern int  bt_get_cod (void);            // CoD abfragen: -1=unbek., 0=abweichend, 1=== Zielwert IF820_COD
 extern bool bt_set_btcfg (void);          // IF820: Sniff AUS + CoD seriell -> RAM + /SCFG
 extern bool bt_ensure_btcfg (void);       // generisch: pruefen, bei Bedarf setzen, verifizieren
+extern int  bt_get_adv (void);            // Adv-Dauer abfragen: -1=unbek., 0=begrenzt, 1=unendlich (O=0000)
+extern bool bt_set_adv (void);            // IF820: dauerhaftes Advertising -> RAM + /SCFG
+extern bool bt_ensure_adv (void);         // generisch: pruefen, bei Bedarf setzen, verifizieren
 extern int  bt_get_name (void);           // 1=Name==VIASIS_<serno>, 0=anders, -1=unbek.
 extern bool bt_set_name (void);           // Name=VIASIS_<serno> schreiben (SDN$, Flash)
 extern bool bt_ensure_name (void);        // generisch: pruefen, bei Bedarf schreiben
