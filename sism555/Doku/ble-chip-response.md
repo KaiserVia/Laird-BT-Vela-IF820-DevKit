@@ -2,7 +2,7 @@
 
 > **Adressat:** KI/Entwickler auf der **App-Seite** (Flutter `viagraph_app`, iOS).
 > **Absender:** Firmware-Seite (sism555, LPC1766, BT-Modul **Vela IF820 / Ezurio**).
-> **Geräte-Firmware sism555:** **5.56**. **Modul-Firmware (EZ-Serial):** **1.4.12.12** auf der
+> **Geräte-Firmware sism555:** **5.57**. **Modul-Firmware (EZ-Serial):** **1.4.12.12** auf der
 > getesteten Einheit (das Eval-Board lief mit 1.4.18.18 — für den BLE-Pfad kein relevanter
 > Unterschied festgestellt).
 > **Stand:** 2026-07-30.
@@ -78,9 +78,9 @@ falls ihr das Gerät auch in einem generischen BLE-Scanner seht, ist die Kategor
 **Version 5.55 / 5.56 — für euch direkt relevant:** BLE-Advertising ist jetzt **dauerhaft** (kein
 90-s-Stopp mehr), Low-Duty-Intervall 3 s. Details in Abschnitt 3b.
 
-Details: `project-status.md`, Kapitel „Update 5.51"–„Update 5.56".
+Details: `project-status.md`, Kapitel „Update 5.51"–„Update 5.57".
 
-> **Status:** Firmware ist **gebaut und am Gerät im Einsatz** (Version 5.56). Der Classic-SPP-Pfad
+> **Status:** Firmware ist **gebaut und am Gerät im Einsatz** (Version 5.57). Der Classic-SPP-Pfad
 > läuft stabil (Massendownloads erfolgreich) — das ist der direkte Beleg, dass die CYSPP-Leitung
 > **nicht mehr klemmt**, denn genau dieselbe Leitung blockierte vorher auch den BLE-Datenkanal.
 > **Damit ist der Retest auf eurer Seite jetzt sinnvoll** (vorher hatten wir darum gebeten zu
@@ -136,7 +136,7 @@ Praktischer Hinweis zum Scannen: Bei 3 s Advertising-Intervall kann es beim Scan
 Sekunden** dauern, bis euer Scan das erste Paket eines schon länger laufenden Geräts erwischt —
 das ist normal, kein Verbindungsproblem. Plant im Scan-Timeout also etwas Luft ein (z. B. ≥ 5 s).
 
-## 3c. Kein OS-Pairing — jetzt mit Gerätedaten bestätigt
+## 3c. Kein OS-Pairing — bestätigt und ab 5.57 festgeschrieben
 
 Wir haben die CYSPP-/Security-Parameter am Gerät ausgelesen:
 
@@ -145,11 +145,13 @@ Wir haben die CYSPP-/Security-Parameter am Gerät ausgelesen:
 ```
 
 `S=00` heißt **„kein authentifizierter Link erforderlich"** — der Client darf die CYSPP-Data-Char
-ohne Pairing/Bonding beschreiben und abonnieren. Zusammen mit den SMP-Defaults (IO-Capability
-„No Input/No Output", Auto-Accept) bedeutet das: **iOS soll beim Verbinden oder beim CCCD-Write
-keinen Passkey-/Pairing-Dialog zeigen.** Falls doch je einer erscheint, stimmt etwas nicht — dann
-bitte melden, das wäre ein echter Befund. Der Zugangsschutz bleibt ausschließlich die
-**App-Layer-PIN** (siehe 4b), nicht die BT-Sicherheitsebene.
+ohne Pairing/Bonding beschreiben und abonnieren. Zusammen mit den SMP-Parametern (IO-Capability
+„No Input/No Output", kein MITM/Bond, Auto-Accept) bedeutet das: **iOS soll beim Verbinden oder
+beim CCCD-Write keinen Passkey-/Pairing-Dialog zeigen.** Ab Firmware 5.57 schreiben wir diese
+Just-Works-Konfiguration beim Init **aktiv fest** (`SSBP,M=00,…,I=03,F=01`), damit sie nicht
+versehentlich verstellt werden kann. Erscheint auf iOS trotzdem je ein Pairing-Dialog, stimmt
+etwas nicht — dann bitte melden. Der Zugangsschutz bleibt ausschließlich die **App-Layer-PIN**
+(siehe 4b), nicht die BT-Sicherheitsebene.
 
 ## 3d. Durchsatz / MTU — was steuerbar ist und was nicht
 
@@ -157,8 +159,9 @@ bitte melden, das wäre ein echter Befund. Der Zugangsschutz bleibt ausschließl
   modulseitig **kein** MTU-Kommando, ebenso keins für Data-Length-Extension oder 2M-PHY. Ihr
   treibt die MTU also selbst hoch — gut so, nichts von uns nötig.
 - **Paketierung:** Der einzige modulseitige Durchsatz-Hebel ist die CYSPP-Paketierung
-  (`.CYSPPSK`). Der Werks-Wartewert (5 ms) ist bei unserer UART-Baud (460800) zu träge; wir
-  prüfen, ihn auf 1 ms zu setzen. Das betrifft die Richtung **Gerät→App**.
+  (`.CYSPPSK`). Der Werks-Wartewert (5 ms) ist bei unserer UART-Baud (460800) zu träge —
+  **ab Firmware 5.57 setzen wir ihn auf 1 ms** (Richtung Gerät→App). Falls euch der Durchsatz in
+  dieser Richtung wichtig ist: das ist damit optimiert, was modulseitig geht.
 - **Connection Interval:** dominiert den BLE-Durchsatz und wird von **iOS** vorgegeben (deckelt
   typisch bei 30 ms). Als Peripheral können wir nur ein kürzeres Intervall *anfragen* (`/UCP`),
   iOS darf ablehnen. Für Menü/Handshake ist das egal; nur bei großen Transfers relevant.
@@ -246,5 +249,5 @@ Verhalten und kein Bug.
   v2.2**, liegt im Repo unter `Documentation/EZ-GUIDE-EZ-SERIAL-VELA-IF820_v2_2.pdf` (Ezurio).
   Der Infineon-CYW20822-Guide ist BLE-only und für die Classic-Seite unvollständig.
 - [EZ-Serial Cable Replacement (CYSPP) Quick Start — Vela IF820 User Guide, Ezurio](https://lairdcp.github.io/guides/vela_if820_user_guide/1.0/ez_serial_cyspp.html)
-- Intern: `project-status.md` (Update 5.51–5.56), `Doku/IF820_EZSerial_Konzept_Mapping.md`,
+- Intern: `project-status.md` (Update 5.51–5.57), `Doku/IF820_EZSerial_Konzept_Mapping.md`,
   `Doku/UART1_Owner_StateMachine.md`, `Doku/IF820_Config_Kandidaten.md`

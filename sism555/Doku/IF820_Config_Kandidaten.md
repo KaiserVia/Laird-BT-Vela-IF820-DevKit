@@ -30,9 +30,19 @@ nicht einstellbar.
 
 ---
 
+## Umsetzungsstand (2026-07-30)
+
+- **A1, A2, A5 — umgesetzt in Firmware 5.57** (selbstheilend im Init, Schritte 3d/3e/3f).
+- **A3 — umgesetzt in 5.55/5.56** (dauerhaftes Advertising, Low-Duty-Intervall 3 s).
+- **A4 — zurückgestellt.** Sicherheitsfund: die Zugangs-PIN **ist** die numerische Seriennummer
+  (`fp.btpin = atoi(serno)*10000 + atoi(serno+4)`). A4 würde diese Zahl roh in die
+  Manufacturer-Data broadcasten. Entscheidung offen — siehe Notiz unter A4.
+
+---
+
 ## A. Klarer Gewinn — Empfehlung: übernehmen
 
-### A1 — Echo im Command-Mode aus (`SPEM,M=0`)
+### A1 — Echo im Command-Mode aus (`SPEM,M=0`)  ✅ umgesetzt (5.57)
 - **Default:** M=1 (Echo an).
 - **Vorschlag:** `SPEM,M=0`
 - **Nutzen:** Der Guide empfiehlt es ausdrücklich für MCU-Hosts: der LPC muss dann nur Antworten/
@@ -40,7 +50,7 @@ nicht einstellbar.
 - **Risiko:** keins. Betrifft nur den UART-Command-Mode, nicht den SPP-/CYSPP-Datenmodus.
 - **Wirkungsbereich:** beide Geräteklassen, unkritisch.
 
-### A2 — CYSPP-Paketierung an die Baud anpassen (`.CYSPPSK,W=01`)
+### A2 — CYSPP-Paketierung an die Baud anpassen (`.CYSPPSK,W=01`)  ✅ umgesetzt (5.57)
 - **Default:** M=1 (Anticipate), W=5 ms, L=20 Byte, E=0x0D.
 - **Vorschlag:** `.CYSPPSK,M=1,W=01,L=14` (nur Wait 5 ms → 1 ms).
 - **Nutzen:** Die Baud-Tabelle im Guide nennt für 460800 einen „Safe Wait" von **1 ms** für
@@ -57,16 +67,23 @@ nicht einstellbar.
 - **Risiko:** Dauer-Advertising kostet Strom → **nicht** pauschal für Batteriegeräte (siehe B2).
 - **Wirkungsbereich:** getrennt parametrieren, Netz vs. Batterie.
 
-### A4 — Seriennummer in die Manufacturer-Data (`.CYSPPSP …,L=<serno>`)
+### A4 — Seriennummer in die Manufacturer-Data (`.CYSPPSP …,L=<serno>`)  ⚠ ZURÜCKGESTELLT
 - **Default:** Company C=0x0131 (Cypress), local_key L=0 → **erklärt die beobachteten `00000000`**.
 - **Vorschlag:** `.CYSPPSP,E=2,G=0,C=0131,L=<serno_hex>,R=0,M=0,P=1,S=0,F=2`
-- **Nutzen:** Die Seriennummer erscheint im BLE-Advertising. Die App liest sie heute nur aus dem
-  Namen `VIASIS_<serno>_BLE`; die Manufacturer-Data wären ein sauberer, zweiter Kanal.
-- **Risiko:** gering. **Achtung:** `.CYSPPSP` trägt mehrere Felder (E/G/C/L/R/M/P/S/F) — beim
-  Setzen alle bewusst mitgeben, damit nicht E (Autostart) oder S (Security) versehentlich kippt.
-- **Wirkungsbereich:** BLE. Muss die Seriennummer je Gerät einsetzen (nicht statisch).
+- **Nutzen:** Die Seriennummer erschiene im BLE-Advertising. Die App liest sie heute aber schon
+  aus dem Namen `VIASIS_<serno>_BLE` — der Zusatznutzen ist also gering.
+- **SICHERHEITSFUND (neu):** Die **Zugangs-PIN ist die numerische Seriennummer**
+  (`fp.btpin = atoi(serno)*10000 + atoi(serno+4)`, geprüft in `btio.c`/`sicom.c`). Das `L`-Feld
+  ist zudem der CYSPP-„local_key". A4 würde diese PIN-gleiche Zahl **roh** ins Advertising legen.
+  Sie ist zwar aus dem Namen ohnehin ableitbar (wer die Formel kennt), aber roh gesendet wäre sie
+  direkt lesbar. Deshalb: **Entscheidung durch den Nutzer nötig.**
+- **Optionen:** (a) A4 überspringen (App nutzt weiter den Namen); (b) A4 mit der rohen Zahl (Info
+  ist ohnehin quasi öffentlich); (c) A4 mit einer anderen Kodierung, die nicht der rohen PIN
+  entspricht — dann muss die App die Kodierung kennen.
+- **Unabhängiger Befund:** Dass die PIN aus der öffentlichen Seriennummer trivial ableitbar ist,
+  ist ein schwaches Zugangsschema — sollte separat überdacht werden, egal wie A4 ausgeht.
 
-### A5 — Just-Works explizit festschreiben (`SSBP …` + CYSPP `S=0`)
+### A5 — Just-Works explizit festschreiben (`SSBP …` + CYSPP `S=0`)  ✅ umgesetzt (5.57)
 - **Default:** io=3 (No Input/No Output), BLE-Nibble 0x00 (no bond/no MITM), F=0x01 (auto-accept),
   CYSPP S=0 (kein authentifizierter Link) → **ist bereits unsere Wunschkonstellation**.
 - **Vorschlag:** `SSBP,M=00,B=0,K=10,P=0,I=03,F=01` (und CYSPP `S=0` beibehalten).
