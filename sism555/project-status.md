@@ -1549,3 +1549,82 @@ sprachen/sictxt.c (Version -> 5.50). Details in Doku/LTE_Fix.md.
 im Repo -> CSV und Header parallel von Hand gepflegt. Firmware hier nicht kompiliert -> in
 Keil bauen; QSIMSTAT-Antwortformat und Verhalten mit/ohne SIM am Geraet verifizieren
 (Checkliste in LTE_Fix.md).
+
+---
+
+## Update 5.51 - FIX: CYSPP blieb als Ausgang HIGH haengen -> BLE/SPP-Datenkanal unmoeglich
+
+**Symptom (von der App-Seite gemeldet, `Doku/ble-new-chip-bringup.md`):** iOS-App verbindet
+sich per BLE auf `VIASIS_<serno>_BLE` einwandfrei, Service Discovery und MTU-Negotiation (515)
+laufen, Writes werden mit ATT-Success quittiert - **aber sobald der Client Notifications oder
+Indications aktiviert (CCCD-Write `0x2902`), trennt das Modul die Verbindung sofort.**
+Reproduzierbar 3 von 3 Laeufen, unabhaengig von der Characteristic. Zusaetzlich: Writes
+vor dem Subscribe bewirken nichts (keine Antwort vom Geraet).
+
+**Ursache:** Der von der App entdeckte Service `65333333-a115-11e2-9e9a-0800200ca100` ist der
+**CYSPP-Service** des IF820. Der CCCD-Write ist der dokumentierte Trigger, der den
+CYSPP-**Datenmodus** startet. Laut EZ-Serial-Doku bleibt die Datenpipe offen, *"until the
+peripheral device disconnects, **or the CYSPP pin is de-asserted locally**"* - CYSPP ist
+low-aktiv, ein vom Host getriebenes HIGH bedeutet also "Datenkanal beenden".
+
+Genau das tat unsere Firmware: `uart1_request()` (hard.c) ruft bei Verdraengung von BT durch
+GSM/GPS bewusst `bt_cmdmode()` (CYSPP HIGH, Junk-Unterdrueckung beim MUX-Wechsel, Update
+5.48), gab die Leitung aber **nur auf dem Rueckweg GSM/GPS -> MUX_BT** wieder frei
+(Guard `prev_owner`). Faellt `BT_LINK` weg, waehrend GSM/GPS UART1 haelt, laeuft der Release
+in den else-Zweig von `uart1_release()` -> `uart1_owner = MUX_NONE` -> dieser Rueckweg kommt
+nie mehr -> **CYSPP bleibt bis zum Reboot als Ausgang HIGH.** Das ist selbstverriegelnd: das
+erzwungene HIGH trennt die BT-Verbindung, der Verbindungsverlust verhindert die Freigabe.
+Ergebnis: weder Classic-SPP noch BLE-CYSPP koennen danach einen Datenkanal aufbauen. Writes
+werden vom GATT-Server weiter mit ATT-Success quittiert, aber ohne Datenmodus verworfen -
+daher "Schreiben geht, Lesen nie".
+
+**Fix (3 Teile):**
+1. `btio.c` / `btio.h`: neuer Zustandsmerker `bt_cyspp_out` - wird in `bt_cmdmode()` gesetzt,
+   in `bt_release()` geloescht. Damit ist jederzeit bekannt, ob der Host die Leitung treibt.
+2. `hard.c`, `uart1_release()` else-Zweig: fuer Nicht-BT-Requester CYSPP freigeben, wenn es
+   noch getrieben wird. Kein Verlass mehr auf `prev_owner`. Guard `requester != MUX_BT`, damit
+   die `init_bluetooth()`-Sequenz (haelt CYSPP bewusst ueber eigene
+   `Init_BT_ch`/`uart1_release`-Paare HIGH) nicht gestoert wird.
+3. `measure.c`, Minutentick: Selbstheilung - besteht kein `BT_LINK` und ist
+   `uart1_owner != MUX_BT`, wird CYSPP freigegeben. **Bewusst ohne `bt_cyspp_out`-Abfrage:**
+   der Merker liegt im RAM (nach Reset 0), der PCA9554 haelt sein Config-Register aber ueber
+   Reset/Reflash - nur ohne Flag-Abfrage heilt auch ein aus der Vor-Reset-Phase
+   stehengebliebenes Hardware-HIGH. `bt_release()` ist idempotent (1x/Minute).
+   Damit ist diese ganze Bugklasse auf "heilt binnen einer Minute" reduziert, statt bis
+   zum Reboot BT-tot zu sein.
+
+**Haertung aus dem Code-Review (gleiche Version):**
+- `main.c`: `bt_release()` vor `get_com_status()` - laeuft bei **jedem** Reset-Grund.
+  `InitI2C_Devices()` (setzt Config 0xFF) ist bei `FIRM_UP_RES`/`SLEEP_RES` ausgeklammert
+  (`main.c` Zeile ~96) und das bisherige `bt_release()` hing nur am POR-Zweig - nach einem
+  **Reflash** blieb ein stehengebliebenes HIGH also bestehen (deckt sich mit dem bereits
+  dokumentierten Befund "PCA9554 haelt Register ueber Reflash").
+- `bt_release()`: loescht `bt_cyspp_out` **nur bei erfolgreichem I2C-Zugriff** - sonst gelten
+  die Sicherungen als erledigt, obwohl die Leitung weiter getrieben wird.
+- `bt_cyspp_out` ist `volatile` (wird auch aus dem GSM-/MQTT-Thread via `uart1_request()`
+  gesetzt, gelesen im Main-Thread).
+- `uart1_request()` `default:`-Zweig (ungueltiger Requester): gibt CYSPP frei statt getrieben
+  zurueckzukehren.
+
+**Vom Review geprueft und in Ordnung:** keine Rekursion (`uart1_release` -> `uart1_request`
+maximale Tiefe 1), kein CYSPP-Flattern (neuer Guard sitzt im else-Zweig und verlangt
+`!(connect&BT_LINK)`, ein neues `bt_cmdmode()` verlangt `bt_displaced` d. h. `BT_LINK` - schliesst
+sich gegenseitig aus), Include-Ketten vollstaendig, bei `BT_CYSPP 0` konsistent (Flag bleibt 0,
+Guards feuern nie). `init_bluetooth()`/`bt_disconnect()`/Minutentick laufen alle im Main-Thread,
+der Minutentick kann sie also nicht unterbrechen. Alle vier `bt_cmdmode()`-Aufrufpfade
+(btio.c init_bluetooth + bt_disconnect, sicom.c, hard.c) sind jetzt auf jedem Ausgang dicht.
+
+**Geaenderte Dateien:** btio.c, btio.h, hard.c, measure.c, main.c, sprachen/sictxt.c
+(Version -> 5.51), Doku/ble-chip-response.md (neu, Antwort an die App-Seite).
+
+**Am Geraet zu verifizieren (nicht kompiliert/getestet):**
+- Testmenue `bt_cyspp_monitor()` (IC54 Bit7) ueber RS232 laufen lassen, waehrend die App
+  verbindet und subscribed: Bit7 muss beim Notify-Enable auf **LOW** gehen und dort bleiben.
+- Vorher-Nachweis der Ursache: nach einer GSM/LTE-Session mit zwischenzeitlichem
+  BT-Verbindungsverlust muss Bit7 in der **alten** Firmware dauerhaft HIGH stehen.
+- Reihenfolge Provokation: BT verbinden -> GSM-Aktion ausloesen (UART1-Verdraengung) ->
+  BT trennen lassen -> GSM-Session beenden -> erneut per App verbinden + subscriben.
+
+**Offen / separat:** Read-Timeout auf `a47f7608-...` (Service 2, moduleigene GATT-DB) und
+Manufacturer-Payload im Advertising (`00 00 00 00`) - beides niedrige Prioritaet, siehe
+`Doku/ble-chip-response.md`.

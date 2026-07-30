@@ -39,6 +39,11 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - Zugangsschutz über bestehende **App-Layer-PIN** (kein BT-Passkey).
 - BT-Baud fix über `#define IF820_BAUD 460800` in `btio.h` (921600 verworfen — HW-Limit LPC1766).
 - BT-(Re)Konfig erzwingt Command-Mode selbst; Reconfig am besten über RS232.
+- **BLE-Datenkanal (5.51):** Der Service `65333333-…-0800200ca100`, den die App sieht, ist der
+  **CYSPP-Service** des IF820 (`…ca101` Acknowledged Data, `…ca102` Unacknowledged Data,
+  `…ca103` RX Flow Control) — jede Data-Char ist selbst bidirektional. Ein vom Host getriebenes
+  CYSPP-HIGH (IC54 Bit7) = „Datenkanal beenden"; blieb es haengen, war BT bis zum Reboot tot.
+  Gefixt + selbstheilend. Antwort an die App-Seite: `sism555/Doku/ble-chip-response.md`.
 - BT-Init (5.16) selbstheilend: erkennt Werksmodul/Modultausch (F=00), aktiviert Flow Control per `cts_bypass`-Bootstrap automatisch (STU F=01 + /SCFG + /RBT), verifiziert danach den CTS-Handshake; bleibt CTS trotzdem HIGH → `F11009` (echter Verdrahtungsfehler).
 
 ## Offene / zu beobachtende Punkte

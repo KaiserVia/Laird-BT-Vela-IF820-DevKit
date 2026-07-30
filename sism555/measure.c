@@ -163,6 +163,15 @@ void runcycle (void)				// Messzyklenbetrieb
 		 if (!transferzeit)	zeitumstellung();		// Pr�fe und f�hre ggf. Sommer-/Winterzeit Umstellung durch	
 		 else transferzeit--;										// Z�hle 60 Minuten Pr�fsperrzeit herunter
 		 if ((PINMODE3&PULLDOWN)!=PULLDOWN) PINMODE3|=PULLDOWN;	// Bluetooth abgeschaltet -> einschalten
+		 // IF820 (5.51) Selbstheilung: CYSPP darf im verbindungslosen Ruhezustand NIE als Ausgang
+		 // HIGH haengen - sonst kann das Modul weder SPP noch den BLE-CYSPP-Datenkanal aufbauen
+		 // (Datenpipe wird lokal de-asserted -> Trennung sofort beim Notify-Enable). Guard
+		 // uart1_owner!=MUX_BT schuetzt die init_bluetooth-Sequenz, die CYSPP bewusst HIGH haelt.
+		 // Bewusst OHNE bt_cyspp_out-Abfrage: der Merker liegt im RAM (nach Reset 0), der PCA9554
+		 // haelt sein Config-Register aber ueber Reset/Reflash. Nur so heilt auch ein aus der
+		 // Vor-Reset-Phase stehengebliebenes Hardware-HIGH. bt_release() ist idempotent (1x/Minute).
+		 if ((fp.btmodem==IF820) && !(connect&BT_LINK) && (uart1_owner!=MUX_BT))
+			bt_release();								// CYSPP freigeben -> BT/BLE wieder verbindbar
 		 if (connect&BT_LINK) 							// Bluetooth Verbindung und Funkmodem?
 		 {				
 			if (!bt_time) 								// Verbindungszeit  Bluetooth (BT_TIMEOUT) abgelaufen?

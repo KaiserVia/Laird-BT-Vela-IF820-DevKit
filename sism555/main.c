@@ -122,6 +122,14 @@ int main (void)
   }
  } // end if Kein Firmware update oder Sleep Power Down Reset	
  
+ // IF820 (5.51): CYSPP (IC54 Bit7) bei JEDEM Reset-Grund sicher als Eingang. Der PCA9554
+ // behaelt sein Config-Register ueber Reflash und Sleep-Reset; ein stehengebliebenes
+ // Ausgang-HIGH bedeutet fuer das Modul "Datenkanal beenden" -> BT/BLE dauerhaft
+ // unverbindbar. InitI2C_Devices() (setzt Config 0xFF) laeuft bei FIRM_UP_RES/SLEEP_RES
+ // NICHT, und main.c:157 haengt nur am POR-Zweig. Ohne fp-Guard, weil "alle Pins Eingang"
+ // der Werks-/Init-Zustand von IC54 ist (identisch i2cm.c) und andere BT-Module Bit7 nicht
+ // als Ausgang nutzen -> fuer RN4678/BT730 wirkungslos, nie schaedlich.
+ bt_release();																						// CYSPP freigeben, bevor der Interface-Status gelesen wird
  comstate=get_com_status();															// Status Datenschnittstellen einlesen
  Init_Ext_Intr();																				// Initialisiere externe Interrupts (ohne Freigabe)
  

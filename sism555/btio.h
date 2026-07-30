@@ -113,6 +113,7 @@ extern int  bt_get_name (void);           // 1=Name==VIASIS_<serno>, 0=anders, -
 extern bool bt_set_name (void);           // Name=VIASIS_<serno> schreiben (SDN$, Flash)
 extern bool bt_ensure_name (void);        // generisch: pruefen, bei Bedarf schreiben
 extern void bt_show_name (void);          // aktuellen BT-Namen vom Modul lesen + anzeigen
+extern volatile uchar bt_cyspp_out;       // 1 = Host treibt CYSPP (IC54 Bit7) als Ausgang HIGH -> Modul kann KEINEN Datenkanal oeffnen
 extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-Mode erzwingen
 extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
 extern void bt_disconnect (void);         // IF820: offene Verbindung sauber trennen (Command-Mode + /DIS)

@@ -488,7 +488,8 @@ uchar uart1_request (uchar requester, uint baud)	// Request UART1 resource
 	case MUX_BT:  MUX_BT_Select;  break;
 	case MUX_GSM: MUX_GSM_Select; break;
 	case MUX_GPS: MUX_GPS_Select; break;
-	default: return(FALSE);
+	// Defensiv (5.51): ungueltiger Requester -> CYSPP nicht getrieben zurueck lassen
+	default: if ((fp.btmodem==IF820) && bt_cyspp_out) bt_release(); return(FALSE);
  }
  Init_UART1(baud);											// Configure UART1 baud rate
  osDelay(3);														// Wait for MUX settling
@@ -522,6 +523,17 @@ void uart1_release (uchar requester)		// Release UART1 resource
 	MUX_BT_Select;												// MUX to BT (idle default state)
 	uart1_owner = MUX_NONE;								// No owner
 	__enable_irq();
+
+	// IF820 (5.51): CYSPP NICHT als Ausgang HIGH haengen lassen. uart1_request() setzt bei
+	// Verdraengung (bt_displaced) bewusst bt_cmdmode(), gab die Leitung aber NUR beim
+	// echten Rueckweg GSM/GPS->MUX_BT wieder frei. Faellt BT_LINK weg, waehrend GSM/GPS
+	// UART1 haelt, landet der Release hier -> Owner=MUX_NONE, dieser Rueckweg kommt nie
+	// mehr -> CYSPP bleibt bis zum Reboot HIGH und das Modul kann WEDER SPP NOCH den
+	// BLE-CYSPP-Datenkanal oeffnen (Verbindung wird beim Notify-Enable sofort getrennt).
+	// Nur fuer Nicht-BT-Requester, damit die init_bluetooth-Sequenz (haelt CYSPP bewusst
+	// ueber eigene Init_BT_ch/uart1_release-Paare HIGH) NICHT gestoert wird.
+	if ((requester != MUX_BT) && (fp.btmodem==IF820) && bt_cyspp_out)
+	 bt_release();												// CYSPP wieder Eingang -> Modul darf Datenkanal aufbauen
  }
 }
 

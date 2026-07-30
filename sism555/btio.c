@@ -223,18 +223,29 @@ void bt_show_name (void)             // aktuellen BT-Namen vom Modul lesen und a
 //-----------------------------------------------------------------------------
 // CYSPP-Steuerung (IC54/PCA9554 Bit 7): Command-Mode erzwingen / SPP trennen
 //-----------------------------------------------------------------------------
+// Zustandsmerker: treibt der HOST die CYSPP-Leitung gerade als Ausgang HIGH?
+// Wichtig, weil ein extern gehaltenes HIGH == "CYSPP lokal de-asserted" ist: Das Modul
+// baut dann WEDER SPP NOCH den BLE-CYSPP-Datenkanal auf bzw. beendet einen laufenden
+// sofort (EZ-Serial: "the data pipe will remain open until the peer disconnects, or the
+// CYSPP pin is de-asserted locally"). Bleibt die Leitung ungewollt Ausgang, ist BT tot.
+volatile uchar bt_cyspp_out = 0;   // volatile: wird auch aus GSM-/MQTT-Thread gesetzt (uart1_request)
+
 void bt_cmdmode (void)   // CYSPP HIGH treiben -> laufende SPP-Verbindung trennen + Command-Mode
 {
 #if BT_CYSPP
  write_i2c_dev(IC54, 2, (0x80<<8)|0x01);   // PCA9554 Output-Register (0x01): Bit 7 = HIGH
  write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);   // PCA9554 Config (0x03): Bit 7 = Ausgang, Bit 0-6 = Eingang
+ bt_cyspp_out = 1;                         // Host treibt CYSPP -> Modul kann keinen Datenkanal oeffnen
 #endif
 }
 
 void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesbar, bereit fuer Verbindung)
 {
 #if BT_CYSPP
- write_i2c_dev(IC54, 2, (0xFF<<8)|0x03);   // PCA9554 Config (0x03): alle Pins Eingang (Werks-/Init-Zustand)
+ // Flag NUR bei erfolgreichem I2C-Zugriff loeschen: sonst gelten die Sicherungen in
+ // uart1_release()/Minutentick als erledigt, obwohl die Leitung weiter getrieben wird.
+ if (write_i2c_dev(IC54, 2, (0xFF<<8)|0x03))  // PCA9554 Config (0x03): alle Pins Eingang (Werks-/Init-Zustand)
+  bt_cyspp_out = 0;                        // Leitung frei -> Modul darf CYSPP selbst auf LOW ziehen
 #endif
 }
 
