@@ -96,12 +96,20 @@
 #define T_sdnok    "SDN$,0000"
 #define T_gdn      "GDN\r"     // gap_get_device_name
 #define T_gbtdc    "GBTDC\r"   // bt_get_device_class (14/13) -> C=<24-Bit Class of Device>
-                               // Windows leitet Geraetekategorie/Icon daraus ab. Major Class 0x04 oder
-                               // Service-Bit Audio (0x200000) -> PC zeigt "Audiogeraet" statt seriell.
-                               // Setzen (noch nicht implementiert): SBTDC,C=<hex> + /SCFG
+                               // Windows leitet Geraetekategorie/Icon daraus ab. Werksdefault des IF820 ist
+                               // 0x00240418 = Major Class 0x04 (Audio/Video), Minor 0x06 (Kopfhoerer),
+                               // Service-Bits Audio+Rendering -> PC zeigt "Audiogeraet", legt keinen COM-Port an.
 #define T_gbtp     "GBTP\r"    // bt_get_parameters (14/11) -> T=supervision,D=discoverable,C=connectable,
-                               // F=flags,S=SCN,V=,N=  |  F Bit0: 0=Sniff-Mode AN (Werksdefault!), 1=aus.
-                               // Sniff-Mode ist der Hauptverdaechtige fuer die Latenz pro X/Y-Modem-Block.
+                               // F=flags,S=SCN,V=,N=  | ACHTUNG: das F-Feld ist laut Doku "always set to
+                               // 0 in the current release" -> Sniff-Zustand ist NICHT ueber GBTP ruecklesbar.
+                               // Nur informativ (D/C/S sind real). Idempotenz laeuft ueber die CoD (GBTDC).
+// --- 5.54: Classic-Konfiguration setzen (Durchsatz + Windows-Kategorie) ---
+#define IF820_COD  "00001F00"  // Ziel-Class-of-Device (8 Hex = 32 Bit wie GBTDC-Readback): uncategorized
+                               // (Major 0x1F, nicht Audio). SPP-COM-Port bleibt, da er am SDP-Service haengt.
+#define T_sbtdc    "SBTDC,C=" IF820_COD "\r"                        // bt_set_device_class (14/12)
+#define T_sbtdcok  "SBTDC,0000"
+#define T_sbtp_ns  "SBTP,T=7D00,D=02,C=01,F=01,S=02,V=0000,N=0000\r"// wie Werksdefault, aber F=01 = Sniff AUS
+#define T_sbtpok   "SBTP,0000"
 #define T_rbt      "/RBT\r"    // system_reboot
 #define T_dis      "/DIS\r"    // gap_disconnect - offene Verbindung sauber schliessen
 #define T_disok    "/DIS,0000"
@@ -116,6 +124,9 @@ extern void set_bt_pin (void);					// Setze Pinnummer
 extern int  bt_get_flowcontrol (void);    // Flow Control abfragen: -1=unbek.,0=aus,1=an
 extern bool bt_set_flowcontrol (void);    // RTS/CTS modulspezifisch aktivieren (+persist.)
 extern bool bt_ensure_flowcontrol (void); // generisch: pruefen, setzen, verifizieren
+extern int  bt_get_cod (void);            // CoD abfragen: -1=unbek., 0=abweichend, 1=== Zielwert IF820_COD
+extern bool bt_set_btcfg (void);          // IF820: Sniff AUS + CoD seriell -> RAM + /SCFG
+extern bool bt_ensure_btcfg (void);       // generisch: pruefen, bei Bedarf setzen, verifizieren
 extern int  bt_get_name (void);           // 1=Name==VIASIS_<serno>, 0=anders, -1=unbek.
 extern bool bt_set_name (void);           // Name=VIASIS_<serno> schreiben (SDN$, Flash)
 extern bool bt_ensure_name (void);        // generisch: pruefen, bei Bedarf schreiben

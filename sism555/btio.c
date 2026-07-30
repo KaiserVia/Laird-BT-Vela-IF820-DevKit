@@ -143,6 +143,60 @@ bool bt_ensure_flowcontrol (void)    // generisch: pruefen, bei Bedarf setzen, v
 }
 
 //-----------------------------------------------------------------------------
+// Classic-Konfiguration (5.54): Sniff-Mode AUS + Class of Device seriell
+//  - Sniff AUS  -> Modul lehnt vom PC angeforderten Stromsparmodus ab -> keine
+//                  ~300 ms Latenz pro X/Y-Modem-Block mehr (Download bleibt schnell,
+//                  unabhaengig davon, welcher PC/BT-Adapter Sniff anfordert).
+//  - CoD seriell-> Windows sieht kein "Audiogeraet" mehr (Werksdefault 0x240418 =
+//                  Kopfhoerer) und legt den SPP-COM-Port an.
+// Nur IF820. Wirkt NICHT auf BLE (Sniff ist ein reines Classic-Konzept) und NICHT auf
+// den unverbundenen Ruhezustand (Sniff gilt nur waehrend einer aktiven Verbindung) ->
+// Batteriegeraete ohne bestehende BT-Verbindung sind unbeeinflusst.
+//-----------------------------------------------------------------------------
+// CoD des Moduls lesen und mit dem Zielwert IF820_COD vergleichen. Raw-Tail-Read wie
+// bt_show_name(), weil C= das LETZTE Feld der GBTDC-Antwort ist (kein Folge-Anker fuer
+// wait_message). Das Sniff-Flag ist NICHT nutzbar (GBTP F liest immer 0), daher gilt die
+// CoD als Indikator: da CoD und Sniff in bt_set_btcfg() IMMER gemeinsam geschrieben werden,
+// bedeutet "CoD == Zielwert" auch "Sniff bereits aus".
+int bt_get_cod (void)                // -1 = keine Antwort, 0 = abweichend, 1 = == IF820_COD
+{
+ char buf[64]; uchar n=0, i; char *p; uchar dconn=connect;
+ if (fp.btmodem!=IF820) return (-1);
+ connect=UART1; putstr(T_gbtdc);                       // "GBTDC\r" an das Modul
+ bxi=rxi;                                              // RX-Marke
+ connect=dconn & ~UART1;                               // nichts zurueck ans Modul spiegeln
+ osDelay(200);                                         // Antwort abwarten (kurze, feste Antwort)
+ while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+ buf[n]=0; connect=dconn;
+ p=strstr(buf,"C=");                                   // CoD-Feld der GBTDC-Antwort
+ if (!p) return (-1);                                  // keine/keine verwertbare Antwort
+ p+=2;
+ for (i=0; i<8 && IF820_COD[i]; i++) if (p[i]!=IF820_COD[i]) return (0);  // 8 Hex vergleichen
+ return (1);
+}
+
+bool bt_set_btcfg (void)             // Sniff AUS + CoD seriell -> RAM, dann /SCFG (Flash)
+{
+ if (fp.btmodem!=IF820) { dtcerr(DTC_BT_UNKNOWN_TYPE); return (FALSE); }
+ if (!bt_command(T_sbtdc,T_sbtdcok,400)) return (FALSE);    // Class of Device -> seriell/unkategorisiert
+ if (!bt_command(T_sbtp_ns,T_sbtpok,400)) return (FALSE);   // Classic-Parameter mit Sniff-Bit F=01 (aus)
+ osDelay(20); bt_command(T_CR,T_scfgok,-60);                // setteln + Parser leeren vor /SCFG
+ if (!bt_command(T_scfg,T_scfgok,1000)) return (FALSE);     // dauerhaft in Flash sichern
+ return (TRUE);
+}
+
+bool bt_ensure_btcfg (void)          // pruefen (ueber CoD), bei Bedarf Sniff+CoD setzen
+{
+ if (bt_get_cod()==1)
+ { putln(" BT-Cfg: CoD seriell + Sniff aus (bereits gesetzt)"); return (TRUE); }
+ if (!bt_set_btcfg())                                       // Fehlschlag ist NICHT fatal (nur Optimierung)
+ { putln(" BT-Cfg: WARNUNG - Sniff/CoD nicht gesetzt"); return (FALSE); }
+ if (bt_get_cod()==1)
+ { putln(" BT-Cfg: CoD seriell + Sniff aus gesetzt und gesichert"); return (TRUE); }
+ putln(" BT-Cfg: WARNUNG - Verifikation CoD fehlgeschlagen"); return (FALSE);
+}
+
+//-----------------------------------------------------------------------------
 // Generische Device-Name-Verwaltung  (Name = VIASIS_<serno>)
 //-----------------------------------------------------------------------------
 int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, -1 = unbekannt
@@ -422,6 +476,16 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
     bt_msg(" Step 3: write name VIASIS_<serno>");
     if (bt_set_name()) { changed=1; bt_msg("   name set"); }
     else               { dtcerr(DTC_BT_NAME_SET); newline(); }
+   }
+
+   // --- Schritt 3b: Sniff-Mode aus + Class of Device seriell (Durchsatz + Windows-Kategorie) ---
+   // Idempotenz ueber die CoD (GBTDC), NICHT ueber das Sniff-Flag (GBTP F liest immer 0).
+   if (bt_get_cod()==1) bt_msg(" Step 3b: serial CoD + sniff off already ok");
+   else
+   {
+    bt_msg(" Step 3b: disable sniff + set serial CoD");
+    if (bt_set_btcfg()) { changed=1; bt_msg("   sniff off + serial CoD set (/SCFG)"); }
+    else                bt_msg("   WARNING: could not set sniff/CoD (non-fatal)");
    }
 
    // --- Schritt 4: nur bei Aenderung speichern/rebooten + verifizieren ---

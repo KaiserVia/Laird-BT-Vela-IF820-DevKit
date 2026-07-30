@@ -1753,3 +1753,80 @@ ID=19. BLE-Advertising stoppt nach 30 s + 60 s = **90 s** (aus den `SAP`-Werksde
    und Timeouts behalten). Ist `F=0` in `GBTP` -> `SBTP,F=1` (Sniff aus) + `/SCFG`.
 3. `GBTDC`: Major Device Class 0x04 oder Service-Bit 0x200000 -> `SBTDC` auf eine
    unkategorisierte/serielle Klasse, damit Windows das Geraet richtig einordnet.
+
+---
+
+## Update 5.54 - Sniff-Mode aus + Class of Device seriell (Init, selbstheilend)
+
+**Grundlage:** Messung aus 5.53 am Geraet (Firmware-Modul 1.4.12.12, QFV E=01040C0C):
+
+- `TX bytes=458961 ctswait=37 sleeps=661 lost=0s TXstuck=28` -> der `osDelay(1)`-CTS-Pfad in
+  `putb()` ist **entlastet** (nur 0,66 s ueber 459 kB). Mein urspruenglicher Hauptverdacht war
+  falsch - gut, dass gemessen wurde, statt Variante 1 blind zu bauen.
+- `GBTP ... F=00` -> **Sniff-Mode ist ab Werk AN.** Da putb ausscheidet, bleibt die Zeit nur im
+  Warten auf die X/Y-Modem-ACKs haengen (stop-and-wait, ein ACK je 1k-Block). Sniff blaeht den
+  Round-Trip pro Block auf ~300 ms auf -> aus ~3 min werden ~45-67 min. Passt zur gemessenen
+  Rate von ~1 kB/s (0,3 MB in 5 min).
+- `GBTDC C=00240418` -> dekodiert Major Class 0x04 (Audio/Video), Minor 0x06 (Kopfhoerer),
+  Service-Bits Audio+Rendering. **Das** ist der Grund, warum Windows das Geraet als Audiogeraet
+  fuehrt und keinen SPP-COM-Port anlegt.
+- `TXstuck=28`: 28 Bytes wurden nach 50 ms THRE-Timeout verworfen -> je verworfenes Byte ein
+  X/Y-Modem-Blockneuversand. Zweiter, unabhaengiger Bremsfaktor (separat, siehe unten).
+
+**Warum das intermittierend ist:** Sniff wird **ausgehandelt**, meist vom PC. `F=00` heisst nur
+"Modul erlaubt Sniff"; ob es aktiv wird, entscheidet der Windows-BT-Stack/die Energieverwaltung.
+Daher dasselbe Modul am einen PC schnell, am anderen zaeh (Eval-Board 18.18 ok, ein 12.12-Board
+gestern ok, dieses heute langsam). Ein Firmware-Upgrade auf 18.18 ist damit **kein** verlaesslicher
+Fix - die Variable liegt auf der PC-Seite.
+
+**Robuste Loesung (5.54):** Dem Modul Sniff **verbieten** (`SBTP,F=01`) -> es lehnt jede
+Sniff-Anforderung ab und bleibt voll empfangsbereit, unabhaengig vom PC. Zusaetzlich Class of
+Device auf seriell/unkategorisiert (`SBTDC,C=001F00`), damit Windows das Geraet richtig einordnet
+und den COM-Port anlegt. Beides selbstheilend im Init gesetzt, wie Name und Flow Control.
+
+**WICHTIGE Korrektur aus dem Code-Review (bevor committed):** Das GBTP-Flags-Feld ist laut
+Ezurio-Doku *"always set to 0 in the current release"* -> der **Sniff-Zustand ist nicht ueber
+GBTP ruecklesbar** (deckt sich mit dem Geraetedump: `F=00` trotz Werksdefault). Ein
+Idempotenz-Check ueber das Sniff-Flag haette daher bei JEDEM Boot fehlgeschlagen und jedes Mal
+Flash-Write + Reboot erzwungen. Die Pruefung laeuft deshalb ueber die **Class of Device**
+(GBTDC), die zuverlaessig lesbar ist. Da CoD und Sniff immer gemeinsam geschrieben werden, ist
+"CoD == Zielwert" ein verlaesslicher Indikator, dass auch Sniff bereits aus ist.
+
+**Umsetzung (analog `bt_ensure_flowcontrol`/`bt_ensure_name`):**
+- `bt_get_cod()`: liest `GBTDC` per Raw-Tail-Read (wie `bt_show_name`, weil `C=` das LETZTE Feld
+  ist -> kein Folge-Anker fuer `wait_message`) und vergleicht die 8 Hex-Ziffern mit `IF820_COD`
+  ("00001F00"). -1=keine Antwort, 0=abweichend, 1=Zielwert. Beleg, dass GBTDC auf 12.12
+  funktioniert: der 5.53-Menue-Dump lieferte `GBTDC,0000,C=00240418`.
+- `bt_set_btcfg()`: `SBTDC,C=00001F00` (CoD, 8 Hex wie Readback) -> `SBTP,...,F=01,...`
+  (Sniff aus, uebrige Felder = beobachteter Werksdefault T=7D00,D=02,C=01,S=02,V=0000,N=0000)
+  -> CR-Flush -> `/SCFG`. Struktur identisch zu `bt_set_flowcontrol()`.
+- `bt_ensure_btcfg()`: Pruefen ueber `bt_get_cod()`, bei Bedarf setzen, per `bt_get_cod()`
+  verifizieren.
+- Eingehaengt als **Schritt 3b** in `init_bluetooth()` (nach Name, vor dem /RBT), Idempotenz
+  ueber `bt_get_cod()`. Setzt `changed=1` -> der bestehende Reboot+Verify aus Schritt 4 macht
+  CoD/Name live.
+- **Fehlschlag ist NICHT fatal:** nur Warnung per `putln`, kein `dtcerr`, Init laeuft weiter -
+  Sniff/CoD sind Optimierung, keine Korrektheit. Kein neuer DTC-Code, keine Aenderung an den
+  generierten DTC-Tabellen.
+
+**Wirkungsbereich (bewusst eng):** Nur IF820. Sniff ist ein reines **Classic**-Konzept -> BLE/App
+unberuehrt. Sniff gilt nur waehrend einer aktiven Verbindung -> unverbundene Batteriegeraete
+(kein BT-Peer) sind im Stromverbrauch **nicht** betroffen; der Ruhe-/Advertising-/Deep-Sleep-
+Verbrauch haengt an anderen Parametern, die hier nicht angefasst werden.
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.54).
+
+**Am Geraet zu verifizieren (nicht kompiliert, nicht getestet):**
+1. 5.54 bauen/flashen. Beim BT-Init muss "Step 3b: disable sniff + set serial CoD" erscheinen,
+   danach der Reboot. Bei erneutem Init "Step 3b: ... already ok" (kein zweiter Flash-Write).
+2. BT-Info-Menue: `GBTDC` muss jetzt `C=00001F00` zeigen. (`GBTP` zeigt weiterhin `F=00` -
+   das Flag ist nicht ruecklesbar; das ist erwartet und KEIN Fehler. Ob Sniff wirklich aus ist,
+   zeigt sich nur am Durchsatz.)
+3. Download wiederholen -> Zeit sollte einbrechen (Zielgroesse: RS232-nah, ~wenige Minuten).
+   `bt_show_counters` gegenpruefen. Windows sollte das Geraet nicht mehr als Audiogeraet fuehren
+   und einen SPP-COM-Port anlegen (ggf. altes gekoppeltes Geraet einmalig entfernen).
+
+**Noch offen (separat):** `TXstuck` (50-ms-Byte-Drop in `putb()` verwirft Bytes bei laengerer
+CTS-Blockade -> X/Y-Modem-Neuversand). Sitzt an einer heiklen Stelle, daher eigene Version, erst
+nachdem 5.54 gemessen ist - moeglicherweise ist der Drop nach dem Sniff-Fix gar nicht mehr
+relevant.
