@@ -3,7 +3,7 @@
 > **Adressat:** KI/Entwickler auf der **App-Seite** (Flutter `viagraph_app`, iOS).
 > **Absender:** Firmware-Seite (sism555, LPC1766, BT-Modul **Vela IF820 / Ezurio**,
 > EZ-Serial-Firmware 1.4.18.18).
-> **Stand:** 2026-07-30, Firmware-Version **5.51**.
+> **Stand:** 2026-07-30, Firmware-Version **5.52**.
 >
 > **Kernaussage in einem Satz:** *Der Report war exakt richtig eingekreist — die Ursache lag
 > aber nicht in der GATT-Implementierung des Chips, sondern darin, dass unsere Host-Firmware
@@ -49,7 +49,9 @@ korrekt: bei fehlender Berechtigung käme ATT-Error `Insufficient Authentication
 
 ---
 
-## 2. Was firmware-seitig geändert wurde (Version 5.51)
+## 2. Was firmware-seitig geändert wurde
+
+**Version 5.51 — der eigentliche Fix:**
 
 1. Zustandsmerker `bt_cyspp_out` — es ist jetzt jederzeit bekannt, ob der Host die CYSPP-Leitung
    treibt.
@@ -57,11 +59,21 @@ korrekt: bei fehlender Berechtigung käme ATT-Error `Insufficient Authentication
 3. **Selbstheilung im Minutentakt:** wird CYSPP getrieben, obwohl keine BT-Verbindung besteht
    und die UART1 nicht dem BT-Modul gehört, gibt die Firmware die Leitung frei. Ein solcher
    Zustand hält also maximal eine Minute, statt bis zum Reboot.
+4. Freigabe zusätzlich beim Boot für **jeden** Reset-Grund — der Port-Expander behält sein
+   Konfigurationsregister über einen Reflash, ein hängengebliebener Zustand überlebte also
+   bisher sogar ein Firmware-Update.
 
-Details: `project-status.md`, Kapitel „Update 5.51".
+**Version 5.52 — Nebenbefund, für euch ohne Auswirkung:** Die CYSPP-Leitung ist geräteseitig
+dieselbe physische Leitung, die bei den beiden älteren BT-Modulen (RN4678, Laird BT730) ein
+reiner Statusausgang ist. Das Treiben ist jetzt auf den IF820 eingegrenzt. Betrifft nur die
+Altmodule, nicht den BLE-Pfad.
 
-> **Noch nicht am Gerät verifiziert.** Die Firmware ist noch nicht in Keil gebaut und nicht
-> getestet. Bitte den Retest erst nach unserer Freigabe fahren — wir melden uns.
+Details: `project-status.md`, Kapitel „Update 5.51" und „Update 5.52".
+
+> **Status:** Firmware **baut in Keil fehlerfrei** (0 Errors, 0 Warnings, Version 5.52).
+> **Am Gerät noch nicht verifiziert** — der Nachweis, dass die CYSPP-Leitung beim Notify-Enable
+> tatsächlich auf LOW geht, steht aus. Bitte den Retest erst nach unserer Freigabe fahren,
+> wir melden uns.
 
 ---
 

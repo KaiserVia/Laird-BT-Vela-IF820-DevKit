@@ -188,4 +188,55 @@ off-target nicht sinnvoll prüfbar und gehören nach B/C.
 
 ---
 
+## 7. Ressourcenbudget: was darf On-Target-Testcode kosten?
+
+Gemessen am Keil-Build von 5.52 (`Listings/sism.map`, `Objects/sism.build_log.htm`,
+2026-07-30 09:13, **0 Errors / 0 Warnings**) — LPC1766 @ 100 MHz, Cortex-M3:
+
+| Ressource | Belegt | Maximum | Frei | Auslastung |
+|---|---|---|---|---|
+| **Flash** (`LR_IROM1`) | 157 556 B | 262 144 B | **~102 kB** | 60 % |
+| **RAM lokal** (`RW_IRAM1` @0x10000000) | 13 384 B | 32 768 B | **~19 kB** | 41 % |
+| **RAM AHB** (`non_init` @0x2007C000) | 17 244 B | 32 736 B | **~15 kB** | 53 % |
+| Code+RO / RW / ZI | 135 300 / 22 348 / 420 / 29 384 B | | | |
+
+**Referenzgröße zum Kalibrieren:** Die komplette CYSPP-Logik aus 5.51+5.52 kostet laut Map
+`bt_cmdmode` = **48 B**, `bt_release` = **26 B**, `bt_cyspp_out` = **1 B RAM**. Ein
+Selbsttestschritt mit Registerrücklesen und Textausgabe liegt in derselben Größenordnung,
+grob **50–250 B**. Bei 102 kB freiem Flash sind das **einige Hundert Schritte** — Flash ist
+also **nicht** die Grenze, auch nicht annähernd.
+
+**Laufzeit.** `write_i2c_dev()`/`read_i2cdev()` sind blockierend, aber **hart begrenzt**
+(Timer-1-Timeout 200 µs pro Byte, danach `ARM_I2C_ABORT_TRANSFER`). Ein `bt_release()` kostet
+damit ≤ **0,4 ms** — auch im Fehlerfall, kein Hängerisiko. Die Selbstheilung aus 5.51 läuft
+1× pro Minute: **≈ 7 ppm CPU-Last.** Praktisch nicht messbar.
+
+**Die echten Grenzen sind nicht Flash und nicht Takt:**
+
+| Grenze | Wert | Konsequenz |
+|---|---|---|
+| **Watchdog** | 32 s (`LONG_WD_32`) | Ein blockierender Testablauf darf ohne `ResetWDT()` nie länger laufen. Bei Schritten mit `osDelay(600)` o. ä. gilt: `ResetWDT()` in jeden Schritt |
+| **Geteilter I2C-Bus** | IC37, IC54, IC58, IC35/DPP, LED-Treiber | Zyklische Selbsttests dürfen den Bus nicht belasten, während andere Teilnehmer ihn brauchen. On-Demand-Tests sind hier unkritisch |
+| **Geteilte UART1/MUX** | BT / GSM / GPS | Ein Test, der `uart1_request()` provoziert, muss den Owner am Ende sauber restaurieren — sonst testet man sich selbst kaputt |
+| **Thread-Stacks** | 256 / 256 / 512 Wörter (USB / GSM / MQTT) | Testcode gehört in den Main-Thread, nicht in die Threads. Tiefe Aufrufketten mit lokalen Puffern dort vermeiden |
+| **Wartungsaufwand** | — | Der wirklich knappe Posten. Nicht Bytes |
+
+**Abgeleitete Regeln:**
+
+1. **On-Demand-Tests (RS232-Menü): großzügig erlaubt.** Sie kosten ausschließlich Flash,
+   zur Laufzeit exakt null. Der komplette Selbsttest aus Vorschlag B (≈ 10–15 Schritte)
+   landet bei **1–3 kB**, also **1–3 % des freien Flash**. Unbedenklich.
+2. **Zyklische Selbstprüfungen: streng budgetieren.** Richtwert **≤ 1 ms Arbeit pro Sekunde**
+   (0,1 % CPU) und **niemals in einer ISR**. Die Minuten-Selbstheilung liegt vier
+   Größenordnungen darunter — es ist also reichlich Luft für weitere Prüfungen dieser Art,
+   solange sie im Minutentakt und nicht im Messzyklus hängen.
+3. **Nie zyklisch prüfen, was ein anderer Owner gerade benutzt.** Immer erst Owner/Link-Status
+   abfragen (Muster: `!(connect&BT_LINK) && uart1_owner!=MUX_BT`), dann handeln.
+4. **`#if BT_SELFTEST` um den Testblock**, damit er sich für ein Produktivimage notfalls
+   ausschließen lässt — bei 102 kB Reserve aber kein akuter Grund dazu.
+5. **PC-Tests (Vorschlag A) kosten auf dem Controller exakt nichts.** Das ist das stärkste
+   Argument, dort anzufangen: unbegrenzt viele Testfälle bei null Ressourcenverbrauch im Gerät.
+
+---
+
 *Angelegt 2026-07-30 nach Version 5.52. Noch keine Entscheidung getroffen.*
