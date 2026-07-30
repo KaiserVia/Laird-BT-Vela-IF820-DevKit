@@ -2,7 +2,7 @@
 
 > **Adressat:** KI/Entwickler auf der **App-Seite** (Flutter `viagraph_app`, iOS).
 > **Absender:** Firmware-Seite (sism555, LPC1766, BT-Modul **Vela IF820 / Ezurio**).
-> **Geräte-Firmware sism555:** **5.54**. **Modul-Firmware (EZ-Serial):** **1.4.12.12** auf der
+> **Geräte-Firmware sism555:** **5.56**. **Modul-Firmware (EZ-Serial):** **1.4.12.12** auf der
 > getesteten Einheit (das Eval-Board lief mit 1.4.18.18 — für den BLE-Pfad kein relevanter
 > Unterschied festgestellt).
 > **Stand:** 2026-07-30.
@@ -75,9 +75,12 @@ Altmodule, nicht den BLE-Pfad.
 Audiogerät ein). Betrifft primär den Classic-Pfad; für die BLE-App ohne direkte Auswirkung, aber
 falls ihr das Gerät auch in einem generischen BLE-Scanner seht, ist die Kategorie jetzt neutral.
 
-Details: `project-status.md`, Kapitel „Update 5.51"–„Update 5.54".
+**Version 5.55 / 5.56 — für euch direkt relevant:** BLE-Advertising ist jetzt **dauerhaft** (kein
+90-s-Stopp mehr), Low-Duty-Intervall 3 s. Details in Abschnitt 3b.
 
-> **Status:** Firmware ist **gebaut und am Gerät im Einsatz** (Version 5.54). Der Classic-SPP-Pfad
+Details: `project-status.md`, Kapitel „Update 5.51"–„Update 5.56".
+
+> **Status:** Firmware ist **gebaut und am Gerät im Einsatz** (Version 5.56). Der Classic-SPP-Pfad
 > läuft stabil (Massendownloads erfolgreich) — das ist der direkte Beleg, dass die CYSPP-Leitung
 > **nicht mehr klemmt**, denn genau dieselbe Leitung blockierte vorher auch den BLE-Datenkanal.
 > **Damit ist der Retest auf eurer Seite jetzt sinnvoll** (vorher hatten wir darum gebeten zu
@@ -122,11 +125,16 @@ Das Modul **advertised nach dem Boot nur ~90 Sekunden** (30 s High-Duty + 60 s L
 - Für einen reproduzierbaren Test: Gerät stromlos machen / rebooten und **innerhalb von 90 s**
   scannen und verbinden.
 
-**Erledigt (ab Firmware 5.55):** Das Advertising ist jetzt **dauerhaft** — das Gerät bewirbt sich
-die ersten 30 s im schnellen Intervall, danach unbegrenzt im stromsparenden Low-Duty-Intervall
-(3 s), und startet nach jedem Disconnect automatisch neu. Ein Gerät ist damit **jederzeit
-auffindbar**, nicht nur im 90-s-Fenster nach dem Boot. Ihr müsst also nicht mehr innerhalb von
-90 s scannen — der Hinweis oben gilt nur für Geräte mit älterer Firmware (< 5.55).
+**Erledigt (dauerhaftes Advertising ab 5.55, Intervall 3 s ab 5.56):** Das Advertising ist jetzt
+**dauerhaft** — das Gerät bewirbt sich die ersten 30 s im schnellen Intervall, danach unbegrenzt
+im stromsparenden Low-Duty-Intervall (**3 s**), und startet nach jedem Disconnect automatisch neu.
+Ein Gerät ist damit **jederzeit auffindbar**, nicht nur im 90-s-Fenster nach dem Boot. Ihr müsst
+also nicht mehr innerhalb von 90 s scannen — der Hinweis oben gilt nur für Geräte mit älterer
+Firmware (< 5.55).
+
+Praktischer Hinweis zum Scannen: Bei 3 s Advertising-Intervall kann es beim Scannen **einige
+Sekunden** dauern, bis euer Scan das erste Paket eines schon länger laufenden Geräts erwischt —
+das ist normal, kein Verbindungsproblem. Plant im Scan-Timeout also etwas Luft ein (z. B. ≥ 5 s).
 
 ## 3c. Kein OS-Pairing — jetzt mit Gerätedaten bestätigt
 
@@ -217,18 +225,18 @@ Verhalten und kein Bug.
 
 ## 7. Was wir von der App-Seite brauchen
 
-1. **Retest ist jetzt freigegeben** — 5.54 läuft am Gerät, der Classic-Pfad bestätigt, dass die
-   CYSPP-Leitung nicht mehr klemmt. Bitte **innerhalb von 90 s nach einem Geräte-Reboot** scannen
-   (Abschnitt 3b).
+1. **Retest ist jetzt freigegeben** — 5.56 läuft am Gerät, der Classic-Pfad bestätigt, dass die
+   CYSPP-Leitung nicht mehr klemmt. Ab 5.56 ist das Advertising dauerhaft (3 s), ihr könnt also
+   **jederzeit** scannen — plant beim Scan etwas Timeout-Luft ein (Abschnitt 3b).
 2. **Probe-Reihenfolge anpassen** (Abschnitt 4a) und **PIN-Handling in die Probe** aufnehmen (4b)
    — sonst ist der Retest nicht aussagekräftig. Erwartet als ersten `⇐`-Empfang die
    **unaufgeforderte PIN-Aufforderung**, nicht eine Antwort auf `H`/`V`.
 3. Beim Retest bitte notieren, **ob unmittelbar vorher eine Mobilfunk-Aktion lief** (LTE/MQTT/
    SMS). Das war der Auslöser des Bugs und ist der aussagekräftigste Testfall: BT verbinden →
    GSM-Aktion → BT trennen lassen → GSM-Session beenden → erneut verbinden + subscriben.
-4. Zwei kurze Rückfragen, damit wir passend konfigurieren: **(a)** braucht ihr **dauerhaftes
-   Advertising** (Abschnitt 3b)? **(b)** braucht ihr die **Seriennummer in der Manufacturer-Data**
-   (Abschnitt 6, Punkt 5), oder reicht der Advertising-Name?
+4. Noch eine offene Rückfrage: braucht ihr die **Seriennummer in der Manufacturer-Data**
+   (Abschnitt 6, Punkt 5), oder reicht sie euch aus dem Advertising-Namen `VIASIS_<seriennr>_BLE`?
+   (Dauerhaftes Advertising ist bereits erledigt — Abschnitt 3b.)
 
 ---
 
@@ -238,5 +246,5 @@ Verhalten und kein Bug.
   v2.2**, liegt im Repo unter `Documentation/EZ-GUIDE-EZ-SERIAL-VELA-IF820_v2_2.pdf` (Ezurio).
   Der Infineon-CYW20822-Guide ist BLE-only und für die Classic-Seite unvollständig.
 - [EZ-Serial Cable Replacement (CYSPP) Quick Start — Vela IF820 User Guide, Ezurio](https://lairdcp.github.io/guides/vela_if820_user_guide/1.0/ez_serial_cyspp.html)
-- Intern: `project-status.md` (Update 5.51–5.54), `Doku/IF820_EZSerial_Konzept_Mapping.md`,
+- Intern: `project-status.md` (Update 5.51–5.56), `Doku/IF820_EZSerial_Konzept_Mapping.md`,
   `Doku/UART1_Owner_StateMachine.md`, `Doku/IF820_Config_Kandidaten.md`
