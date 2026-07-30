@@ -1,4 +1,4 @@
-/* Header Datei fï¿½r sio.c, Projekt LPC1766 Test */
+/* Header Datei für sio.c, Projekt LPC1766 Test */
 
 #ifndef SIO_H_
 #define SIO_H_
@@ -44,24 +44,24 @@ extern void putln_ifexist (text * s); 											// Stringausgabe - wenn Null Te
 extern void newline (void); 																// neue Zeile
 extern void delchar (uchar anzahl);  												// Ausgabe Anzahl Delete Character
 extern void space (int anz);																// Ausgabe Anzahl Leerzeichen
-extern int is_CRLF (int c); 																// Prï¿½ft ob Zeichen Carriage return oder Line Feed
+extern int is_CRLF (int c); 																// Prüft ob Zeichen Carriage return oder Line Feed
 extern void putnumber(uint n, uchar format); 								// Formatierte Ganzzahlausgabe
 extern void put_uint32_big_end	(uint wert); 								// Ausgabe uint32 big endianness
-extern void itemno (uchar i); 															// Menï¿½nummer ausgeben
+extern void itemno (uchar i); 															// Menünummer ausgeben
 extern void select (char bis, uchar zuruck);  							// Sendet "Ihre Auswahl .." an Terminal
-extern void put_menuitem (text *s, char item);							// Menï¿½punkt ausgeben
+extern void put_menuitem (text *s, char item);							// Menüpunkt ausgeben
 extern int getkey (uint wartezeit); 												// Warteschleife, Abbruch bei Zeichenempfang
-extern uchar getkey1 (void);																// Rï¿½ckgabe Vergleich Empfangspuffer Indizes UART1
-extern uchar getkey2 (void);																// Rï¿½ckgabe Vergleich Empfangspuffer Indizes UART2
+extern uchar getkey1 (void);																// Rückgabe Vergleich Empfangspuffer Indizes UART1
+extern uchar getkey2 (void);																// Rückgabe Vergleich Empfangspuffer Indizes UART2
 extern int getbyte (uint wartezeit);												// Warte auf Zeichen von UART(s)
-extern int getc (uint timeout);															// Lï¿½sche Puffer und warte auf Eingaben von UART(s)
+extern int getc (uint timeout);															// Lösche Puffer und warte auf Eingaben von UART(s)
 extern uchar getline (char *buf, uchar n, uchar typ); 			// Zeile einlesen
-extern void readline(char *Ppar, uchar length, char type);  // Lies Zeile, ï¿½bernehme bei Eingabe
-extern int putmenu (text *s, char bis);											// Menï¿½abfrage
+extern void readline(char *Ppar, uchar length, char type);  // Lies Zeile, übernehme bei Eingabe
+extern int putmenu (text *s, char bis);											// Menüabfrage
 extern int getnumber (text * pk, uint min, uint max); 			// Eingabeaufforderung und Variable einlesen
 extern void getsignedchar (text *p1, text *p2, int8_t min, int8_t max, int8_t* par);	// signed int8t einlesen
 extern int getuchar (text *pk, uchar min, uchar max, uchar* parameter);	// Unsigned char Parameter einlesen
-extern int ja (text *s);																		// Prï¿½ft Eingabe ob Ja oder Nein
+extern int ja (text *s);																		// Prüft Eingabe ob Ja oder Nein
 extern void puterrstr_dtc (uchar ln, uint dtc);     /* Fehler <code> <subsystem> + Log */
 extern int  puterror_dtc (uint dtc, int errorval);  /* Fehlermeldung ausgeben, Wert zurueck */
 extern void dctext (uint dtc);                      /* dtcerr(code) - Fehler + Log */
@@ -69,11 +69,11 @@ extern const char *dtc_text (uint code, char *ptyp);/* Kurztext+Typ aus Diagnose
 extern void put_dtc (uint code);
 extern volatile uchar cts_bypass;                   /* 1 = CTS-Handshake ueberspringen (Bring-up) */
 extern volatile uchar bt_tx_stuck;                  /* TX-FIFO-Wait Timeout-Zaehler */
-extern volatile uchar cts_timeout;                  /* putb(): CTS-Wait abgelaufen (Flow-Control) */
-extern volatile uchar usb_tx_stuck;                 /* USB-CDC-Wait Timeout-Zaehler (Host holt nicht ab) */
-extern volatile uint bt_tx_bytes;                   /* Diagnose: an UART1 gesendete Bytes */
-extern volatile uint bt_cts_wait;                   /* Diagnose: Bytes, die auf CTS warten mussten */
-extern volatile uint bt_cts_sleep;                  /* Diagnose: osDelay(1)-Durchlaeufe (~ verlorene ms) */                    /* einheitliche Ausgabe F<code> <Kurztext> */
+extern volatile uchar cts_timeout;                  /* putb(): CTS-Wait abgelaufen (Flow-Control) */                    /* einheitliche Ausgabe F<code> <Kurztext> */
+extern volatile uchar usb_tx_stuck;                  /* USB-CDC-Wait Timeout-Zaehler (Host holt nicht ab) */
+extern volatile uint bt_tx_bytes;                    /* Diagnose: an UART1 gesendete Bytes */
+extern volatile uint bt_cts_wait;                    /* Diagnose: Bytes, die auf CTS warten mussten */
+extern volatile uint bt_cts_sleep;                   /* Diagnose: osDelay(1)-Durchlaeufe (~ verlorene ms) */
 extern void putparameter (text *s, uint wert, uint format, text *u);	// Parameterwerte formatiert ausgeben
 extern int list_selection	(text *titel, text *liste, uchar *Parameter, uchar items, uchar size);	// Listenauswahl
 extern void sendbuf(text * buf, ushort lastbyte);						// Puffer im Hexformat ausgeben
@@ -84,7 +84,7 @@ extern void put_schwellwert (text *Ps, text *Parr, uchar *wert, uchar ind);	// E
 extern void put_date_time (char *Pbuf);											// Datum und Zeit aus Puffereintrag ausgeben
 extern int uart_read (uint anz, uint st_out, ushort ind);		// Anzahl Bytes von UART nach Arbeitspuffer cbuf lesen
 extern void put_signed_float (int zahl, ushort teiler, uchar vor, uchar nach); // Zahl mit Vorzeichen und Nachkommastelle ausgeben
-extern void puttage(uchar eintag);													// Ausgabe der Wochentagskï¿½rzel 
+extern void puttage(uchar eintag);													// Ausgabe der Wochentagskürzel 
 extern void get_weekday (uchar *wparam);										// Wochentage einlesen
 extern int wait_message (text *Pt, uint timeout);						// Warte auf Nachricht in rbuf 
 extern int wait_message_2 (text *Pt, uint timeout, uchar uart);		// Warte auf Nachricht in rbuf oder gbuf
