@@ -31,6 +31,17 @@ volatile uchar cts_timeout=0;    // gesetzt in putb(), wenn CTS-Wait ablaeuft (F
 volatile uchar cts_bypass=0;     // 1 = CTS-Handshake ueberspringen (Bring-up/Werksmodul F=00; siehe init_bluetooth)
 volatile uchar bt_tx_stuck=0;    // Zaehler: TX-FIFO-Wait (THRE) lief in Timeout -> Sender steckt
 
+#define USB_WAIT_MS 50           // max. Wartezeit auf USB-CDC-Puffer je Byte (ms) - bounded, kein Dauerhang
+volatile uchar usb_tx_stuck=0;   // Zaehler: USB-CDC-Wait lief in Timeout -> Host holt nicht ab
+
+// Messzaehler BT-Durchsatz (5.53, NUR Diagnose - kein Eingriff ins Sendeverhalten).
+// Frage, die sie beantworten: Wie oft bremst das Modul per CTS, und wie viel Zeit kostet
+// der osDelay(1) pro gebremstem Byte? Ein Byte braucht bei 460800 Baud rund 22 us - jeder
+// osDelay(1) kostet also mindestens das 45-fache. Auswertung: bt_cts_sleep ~= verlorene ms.
+volatile uint bt_tx_bytes=0;      // an UART1 uebergebene Bytes
+volatile uint bt_cts_wait=0;      // davon Bytes, die auf CTS warten mussten
+volatile uint bt_cts_sleep=0;     // osDelay(1)-Durchlaeufe insgesamt (~= verlorene Millisekunden)
+
 int redirect_char_Out (int (*pchar_func)(int a)) // Umleitung Standard Ausgabe
 {																									// Must be once called before 
 																									// use of serial character I/O
@@ -52,10 +63,12 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
  {
 	if (!cts_bypass)                         // Bring-up/Werksmodul (F=00): CTS-Handshake ueberspringen
 	{ uint _ct0=mstimer;                     // CTS-Wartezeit begrenzen (Flow-Control/Verdrahtung)
+	 if (FIO2PIN & CTS) bt_cts_wait++;        // Diagnose (5.53): dieses Byte muss bremsen
 	 while (FIO2PIN & CTS)                    // Wait for CTS LOW (Modem empfangsbereit)
 	 {
 	  if ((uint)(mstimer-_ct0) >= CTS_WAIT_MS) { cts_timeout=1; return(-1); } // CTS bleibt High -> Flag + Abbruch
 	  if (WDTV<1000) { ResetWDT(); return(-1); }                             // Sicherheitsnetz Watchdog
+	  bt_cts_sleep++;                        // Diagnose (5.53): ein osDelay(1) = mind. 1 ms verloren
 	  osDelay(1);                            // WICHTIG: Taskwechsel zulassen -> kein System-Freeze bei BT-Backpressure (kein Busy-Spin)
 	 }
 	}
@@ -70,8 +83,9 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 	 }		 
 	}	
 	}
-  U1->THR = ch;									// dann sofort senden 
- }	
+  U1->THR = ch;									// dann sofort senden
+	bt_tx_bytes++;                                 // Diagnose (5.53): gesendete Bytes als Bezugsgroesse
+ }
  if (connect&UART2)	// Schnittstelle UART 2 - GPS Ausgabe  	
  {
 	if (PCONP&PCUART2) 							// Schnittstelle eingeschaltet?
@@ -81,8 +95,20 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 	}	 
  }  
  if (connect&USB_LINK)					// USB Host angeschlossen
-  do result=USBD_CDC_ACM_PutChar (0, ch);		// Zeichen -> USB	  
-		while (result!=ch);											// ggf. wiederholen
+ {
+	// 5.53: begrenzt. Vorher lief die Wiederholung UNBEGRENZT und OHNE Taskwechsel - steckt ein
+	// USB-Kabel, ist das CDC-Interface enumeriert, holt aber niemand die Daten ab (kein Terminal
+	// offen), dann drehte diese Schleife pro Byte endlos und blockierte das ganze System.
+	// osThreadYield() statt osDelay(1): gibt die CPU ab, erzwingt aber keine 1-ms-Pause je Byte
+	// (genau die Falle, die den BT-Durchsatz kostet - siehe Diagnosezaehler oben).
+	uint _ut=mstimer;
+	while ((result=USBD_CDC_ACM_PutChar (0, ch)) != ch)   // Zeichen -> USB, ggf. wiederholen
+	{
+	 if ((uint)(mstimer-_ut) >= USB_WAIT_MS) { usb_tx_stuck++; break; }  // Host holt nicht ab -> Byte verwerfen
+	 if (WDTV<1000) { ResetWDT(); break; }                              // Sicherheitsnetz Watchdog
+	 osThreadYield();                                                   // CPU abgeben, ohne Zwangspause
+	}
+ }
  return(1);
 }
 

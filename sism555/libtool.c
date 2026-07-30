@@ -52,13 +52,13 @@ const ushort crc_table[PAGE] = {
 0xFD2E,0xED0F,0xDD6C,0xCD4D,0xBDAA,0xAD8B,0x9DE8,0x8DC9,0x7C26,0x6C07,0x5C64,0x4C45,0x3CA2,0x2C83,0x1CE0,0x0CC1,
 0xEF1F,0xFF3E,0xCF5D,0xDF7C,0xAF9B,0xBFBA,0x8FD9,0x9FF8,0x6E17,0x7E36,0x4E55,0x5E74,0x2E93,0x3EB2,0x0ED1,0x1EF0};
 
-bool isalpha (char x)					// prüft auf alphanumerische Zeichen 				
+bool isalpha (char x)					// prï¿½ft auf alphanumerische Zeichen 				
 {
  if (x>=' ') if (x<='~') return (TRUE);
  return (FALSE);	 
 }
 
-bool isdigit (char x)					// prüft auf alphanumerische Zeichen 				
+bool isdigit (char x)					// prï¿½ft auf alphanumerische Zeichen 				
 {
  if (x>='0') if (x<='9') return (TRUE);
  return (FALSE);	 
@@ -79,25 +79,25 @@ uint atoi(char *str)					// Ascii String in Puffer to Integer Zahl
 		num *= 10;
 		num += (*str++ & 0x0F);
 	}
-	return (num);				// Rückgabe Zahl
+	return (num);				// Rï¿½ckgabe Zahl
 }
 
 void strcopy (text *s, char *t)	// Nullterminierte Zeichenkette kopieren
-{																// 	Übergabe 	*s	-	Zeiger auf Zeichenkette Quelle
+{																// 	ï¿½bergabe 	*s	-	Zeiger auf Zeichenkette Quelle
  while (*s) {*t=*s++; t++;}			//			 			*t - 	Zeiger auf Zeichenkette Ziel
  *t=0;		// Ziel Terminierung
 }
 
-void clean_cpy (text *s, char *t, uint8_t anz) 	// Nullterminierte Zeichenkette kopieren und restl. Zielarray löschen
-{																								// 	Übergabe 	*s	-	Zeiger auf Zeichenkette Quelle
+void clean_cpy (text *s, char *t, uint8_t anz) 	// Nullterminierte Zeichenkette kopieren und restl. Zielarray lï¿½schen
+{																								// 	ï¿½bergabe 	*s	-	Zeiger auf Zeichenkette Quelle
 																								//			 			*t  - Zeiger auf Zeichenkette Ziel
-																								//						anz - Länge Zielarray
+																								//						anz - Lï¿½nge Zielarray
  while (*s) {*t=*s++; t++; anz--;}							// Zeichen kopieren
  while (anz--) *t++=0;													// Terminieren und Restarray nullen
 }	
 
 void copy_to_cbuf (char *s, uint len)	// Zeichen nach cbuf kopieren
-{																			// Übergabe *s	-	Zeiger auf Zeichenkette
+{																			// ï¿½bergabe *s	-	Zeiger auf Zeichenkette
  while (len--) { cbuf[cind++]=*s++; }
 }
 
@@ -106,27 +106,27 @@ void str_to_cbuf (char *s)			// Nullterminierte Zeichenkette nach cbuf
  while (*s)	cbuf[cind++]=*s++;
 }
 
-ushort strlen_to_cbuf (char *s)				// Länge Zeichenkette ermitteln und nach cbuf
-{																			// Übergabe *s	-	Zeiger auf Zeichenkette
- ushort len=0;								// Hilfsvariable Länge
- while (*s++) len++;					// Solange Zeichen nicht Null Länge inkrementieren
+ushort strlen_to_cbuf (char *s)				// Lï¿½nge Zeichenkette ermitteln und nach cbuf
+{																			// ï¿½bergabe *s	-	Zeiger auf Zeichenkette
+ ushort len=0;								// Hilfsvariable Lï¿½nge
+ while (*s++) len++;					// Solange Zeichen nicht Null Lï¿½nge inkrementieren
  cbuf[cind++]=len>>8;					// MSB schreiben
  cbuf[cind++]=len;						// LSB schreiben	
- return(len);									// Rückgabe Länge der Zeichenkette 	
+ return(len);									// Rï¿½ckgabe Lï¿½nge der Zeichenkette 	
 }
 
-/* void cstrcpy (text * s, char *t, uint len)	// Zeichenkette der Länge len kopieren
-{																							// Übergabe *s	-	source pointer
+/* void cstrcpy (text * s, char *t, uint len)	// Zeichenkette der Lï¿½nge len kopieren
+{																							// ï¿½bergabe *s	-	source pointer
 																							// 					*t	-	target pointer
  while (len--) { *t=*s++; t++; }					
 } */
 
 uint16_t crcgen (uint8_t *Puffer, uint16_t anzahl, uint16_t oldcrc)	// Bilde CRC-16 mit oldcrc init
-{                      																							// Übergabe: Puffer - Pufferadresse
+{                      																							// ï¿½bergabe: Puffer - Pufferadresse
 																																		//			 			Anzahl - Anzahl Bytes 
 																																		//						oldcrc - crc register init
 // 						Crc-Parameter:   	Width 16 Bit, Polynom: 1021H
-//						Register-Init: oldcrc Übergabeparameter
+//						Register-Init: oldcrc ï¿½bergabeparameter
 //						Reflection-In: false, Reflection-Out: false
 //						XorOut: 0000, 	Check: 31C3h
                                        
@@ -137,7 +137,7 @@ uint16_t crcgen (uint8_t *Puffer, uint16_t anzahl, uint16_t oldcrc)	// Bilde CRC
   { 
    newcrc = (newcrc << 8) ^ crc_table[(newcrc>>8) ^ *(Puffer+ind)];
   }
- return (newcrc);                     // Rückgabe neuer CRC
+ return (newcrc);                     // Rï¿½ckgabe neuer CRC
 }
 
 uint16_t crc (uint8_t *Puffer, uint16_t anzahl)	{ return(crcgen (Puffer, anzahl, 0)); } // CRC-16 mit CRC Register init null
@@ -163,19 +163,19 @@ void DirSort (uchar n)			// Sortiert Periodendauern im Puffer
 }
 
 
-int number_exists (int nummer, const ushort *liste, uchar len) // Prüfe Fehler/Ereignis Liste auf Nummerneintrag
-{									  	// Übergabe	nummer - zu suchende Nummer
+int number_exists (int nummer, const ushort *liste, uchar len) // Prï¿½fe Fehler/Ereignis Liste auf Nummerneintrag
+{									  	// ï¿½bergabe	nummer - zu suchende Nummer
 											//			liste	- Startadresse Liste
-											//			len		- Listenlänge
+											//			len		- Listenlï¿½nge
  uchar i;							// Laufvariable
- if (!nummer) return(-1);									// Null unzulässig
- for (i=0;i<len;i++)											// Alle Einträge in Tabelle prüfen
-  if (nummer==*(liste+i)) return (i); 		// Existiert, dann Rückgabe Tabellenelement
+ if (!nummer) return(-1);									// Null unzulï¿½ssig
+ for (i=0;i<len;i++)											// Alle Eintrï¿½ge in Tabelle prï¿½fen
+  if (nummer==*(liste+i)) return (i); 		// Existiert, dann Rï¿½ckgabe Tabellenelement
  return(-1);	// Eintrag existiert nicht
 }
 
 void num_to_LED (uint wert, int farbe)	// Numerischen Wert in 7 Segment Anzeigesteuerwert wandeln
-{															// Übergaben:	farbe - 1/2/3 Grund/Warn oder Mischfarbe  	
+{															// ï¿½bergaben:	farbe - 1/2/3 Grund/Warn oder Mischfarbe  	
 															//						wert - numerischer Anzeigewert (< 500) oder Fontnummer
 															// Nummernkreise wert: 	0..199 Numerische Ziffern in Grund oder Warfarbe
 															//											200..399 Numerische Ziffern mit Dezimalstelle
@@ -197,7 +197,7 @@ void num_to_LED (uint wert, int farbe)	// Numerischen Wert in 7 Segment Anzeiges
  else																							// Kreissymbole
  {	
 	if (PINSEL4&PWM6)																// Anzeige ist an?
-   if (ledbuf[0]&COL1)														// bisherige Anzeige mit Grundfarbe (grün)?
+   if (ledbuf[0]&COL1)														// bisherige Anzeige mit Grundfarbe (grï¿½n)?
 	 { 	
 		 PINSEL4&=~PWM6; 															// Regler PWM aus
 		 NVIC_DisableIRQ(PWM1_IRQn);									// Disable PWM1 Interrupt
@@ -207,24 +207,24 @@ void num_to_LED (uint wert, int farbe)	// Numerischen Wert in 7 Segment Anzeiges
 		 {
 			ledbuf[0]|=DISCHRG;			 
 			Init_SPI();																	// SPI initialisieren	
-			while(i--)	sendspi	(ledbuf[i]);						// Daten über SPI versenden
+			while(i--)	sendspi	(ledbuf[i]);						// Daten ï¿½ber SPI versenden
       FIO2SET = LE_TRB;														// Latch Schiebedaten 74HC595 
 			while ((FIO2PIN & LE_TRB) == 0);						// Warte bis gesetzt 
-			FIO2CLR = LE_TRB;														// Latch reset -> LED Treiber MBI5039 Datenübernahme			 
+			FIO2CLR = LE_TRB;														// Latch reset -> LED Treiber MBI5039 Datenï¿½bernahme			 
 			PCONP&=~PCSSP1;	 														// SSP1 power disable
 		  PINSEL0&=~(MOSI|SCK|MISO);									// Deselect SSP1 Pinfunktionen 
 		 }	
 	   osDelay(50); 	  													// Schaltregler aus 50 ms warten
-		 PWMMCR&=~PWMMR0I;													// Lösche Interrupt bei vorausgehender Mischfarbdarstellung
+		 PWMMCR&=~PWMMR0I;													// Lï¿½sche Interrupt bei vorausgehender Mischfarbdarstellung
 		 NVIC_EnableIRQ(PWM1_IRQn);									// Ensable PWM1 Interrupt
 		 discharge=0; 															// Reset discharge Bit	
 	 } // end vorherige Anzeige mit Grundfarbe
 	 
-  if (wert<500) farbcode= COL3 | COL4;						// weiße Ziffernsymbole, roter Kreis
+  if (wert<500) farbcode= COL3 | COL4;						// weiï¿½e Ziffernsymbole, roter Kreis
   else if (wert<504)															// Sonderzeichen -  Kreissymbole
   {
-	 if (wert<502) farbcode= COL4;									// übrige rote Kreissymbole
-	 else if (wert<504)	farbcode=COL5; 							// grüne Kreissymbole
+	 if (wert<502) farbcode= COL4;									// ï¿½brige rote Kreissymbole
+	 else if (wert<504)	farbcode=COL5; 							// grï¿½ne Kreissymbole
 	 if (wert&0x01) code7=0x0FC00000;								// Smileys		
 	 else code7=0xF3C00000;  												// Haken und Ausrufezeichen
   }
@@ -242,18 +242,18 @@ void num_to_LED (uint wert, int farbe)	// Numerischen Wert in 7 Segment Anzeiges
    zahl/=10;											// Letzte Ziffer entfernen
 	 if ((farbcode&(COL1|COL2))!=0)		// Grund- oder Warnfarbe
 	 {	
-		switch (digit)								// Ziffernergänzungen	
+		switch (digit)								// Ziffernergï¿½nzungen	
 		{	 
 		 case 0: {										// Ziffer = 0
 							if (i)							// Zehnerstelle			 
 							{							
-							 if ((zahl&0x01)||((zahl>=2)&&(zahl<4))) code7|=(1<<29); // bei Wert>100 oder DP ergänzen
-							 else code7&=~(0x7F<<7); // sonst führende Null auf Zehnerstelle entfernen		
+							 if ((zahl&0x01)||((zahl>=2)&&(zahl<4))) code7|=(1<<29); // bei Wert>100 oder DP ergï¿½nzen
+							 else code7&=~(0x7F<<7); // sonst fï¿½hrende Null auf Zehnerstelle entfernen		
 							}	
-							else code7|=(1<<28);		// Einerstelle ergänzen
+							else code7|=(1<<28);		// Einerstelle ergï¿½nzen
 							break; } 
 		case 1: 
-		//case 4:	 													// 4 mit langem, rechteckigen, rechten Strich - in Grundfarbe nicht schön				 
+		//case 4:	 													// 4 mit langem, rechteckigen, rechten Strich - in Grundfarbe nicht schï¿½n				 
 		case 7:	 
 							{												// Ziffer = 7
 							if (i) code7|=(3<<19);	// Zehnerstelle
@@ -262,9 +262,9 @@ void num_to_LED (uint wert, int farbe)	// Numerischen Wert in 7 Segment Anzeiges
 		 					
 		}	 
 	 } // end if Grund- oder Warnfarbe
-   else if ((i==1) && (digit==0)) code7&=~(0x7F<<7); // Symbolziffern führende Null auf Zehnerstelle entfernen	 
+   else if ((i==1) && (digit==0)) code7&=~(0x7F<<7); // Symbolziffern fï¿½hrende Null auf Zehnerstelle entfernen	 
 	} // end for  
-  if (zahl&0x01) code7|=(0x20C0<<8);	// Hunderter Stelle? Ja -> Hund. Segmente mit Ergänzung
+  if (zahl&0x01) code7|=(0x20C0<<8);	// Hunderter Stelle? Ja -> Hund. Segmente mit Ergï¿½nzung
 	if (zahl>=2) 
 	{	
 	 if (zahl<4) code7|=(1<<16);				// Dezimalpunkt
@@ -277,20 +277,20 @@ void num_to_LED (uint wert, int farbe)	// Numerischen Wert in 7 Segment Anzeiges
 
 void get_dimmung (void)		// Umgebungshelligkeit messen und Dimmfaktor bestimmen
 {
- uchar spot_dim;										// Dimmung für LED Spot					 
+ uchar spot_dim;										// Dimmung fï¿½r LED Spot					 
  uint bright=get_brightness ();			// Umgebungshelligkeit messen
  uint sensor=(200000+bright*bright-bright*bright*bright/1515-525*bright)/1000; 
- dimm+=(sensor>>2)-(dimm>>2);				// Expo. Glättung
+ dimm+=(sensor>>2)-(dimm>>2);				// Expo. Glï¿½ttung
  if (fp.ledspot)			   						// LED Warnleuchte?
  {
   spot_dim=(uint)(dimm*15/200);	// Dimmfaktor 1...200 auf TCA6507 Dimmung 1...15 umrechnen
   if (spot_dim==0) spot_dim=1;	// kleinste Dimmstufe
-  write_i2c_dev (ICLED,2,(spot_dim<<12)|(spot_dim<<8)|0x18);	// Max. Intensität setzen
+  write_i2c_dev (ICLED,2,(spot_dim<<12)|(spot_dim<<8)|0x18);	// Max. Intensitï¿½t setzen
  }     
 }
 
 int show_led (int time, uchar hell)		// LED Anzeige bis Zeitablauf oder Eingabe
-{								 											// Übergaben:	time	-	Dauer in ms
+{								 											// ï¿½bergaben:	time	-	Dauer in ms
 																			//						hell	-	Helligkeit 0 = variabel oder 1...200 * 1/2%
  // Hinweis: Inhalt der LED Anzeigepuffer und Anzeigefarbe muss vor Aufruf festgelegt sein												
 	 
@@ -311,14 +311,14 @@ int show_led (int time, uchar hell)		// LED Anzeige bis Zeitablauf oder Eingabe
 	 }	 	
 	 else if (comchange) break;			// wenn time=0 Abbruch bei Schnittstellenwechsel
   } 		
-  if (bxi!=rxi) return(rbuf[++bxi]);	// Zeichen zurück
+  if (bxi!=rxi) return(rbuf[++bxi]);	// Zeichen zurï¿½ck
   return(-1);
  }
  return (0);		// time <0 Anzeige starten und nicht warten
 }
 
 int show_led_off (int time, uchar hell) 	// LED Anzeige bis Zeitablauf oder Eingabe
-{													  							// Übergabe siehe show_led
+{													  							// ï¿½bergabe siehe show_led
 																					// Funktion wie show_led aber Anzeige wird im
  int c;											  						// Anschluss abgeschaltet
  c=show_led (time, hell);		
@@ -326,7 +326,7 @@ int show_led_off (int time, uchar hell) 	// LED Anzeige bis Zeitablauf oder Eing
  return (c);
 }
 
-void LED_188 (void)		// 188 LED power on, Batterie- und Echtzeituhr Prüfung
+void LED_188 (void)		// 188 LED power on, Batterie- und Echtzeituhr Prï¿½fung
 {
  uchar col;				// Laufvariable
  uint i;
@@ -339,48 +339,48 @@ void LED_188 (void)		// 188 LED power on, Batterie- und Echtzeituhr Prüfung
  {
   num_to_LED(188,col);			  // 188 nach Anzeigepuffer
   if (col>fp.farben) break;
-  for (i=1;i<=128;i*=2)				// 2, 4, 8, 16, 32, .. Tastverhältnis in 1/2% Schritten 
+  for (i=1;i<=128;i*=2)				// 2, 4, 8, 16, 32, .. Tastverhï¿½ltnis in 1/2% Schritten 
 	 {
-    show_led (dauer,i);				// Tastverhältnis Dimmung von 1/2% bis 64%	   	
+    show_led (dauer,i);				// Tastverhï¿½ltnis Dimmung von 1/2% bis 64%	   	
 	 }	 
   if (col==1)
   {
-	 show_led (-1,RES_PWM);				// Tastverhältnis 100%	
+	 show_led (-1,RES_PWM);				// Tastverhï¿½ltnis 100%	
    wert=test_battery (0)/100;		// Batterietest	ohne Meldung
 	 osDelay (dauer);	   
   }
-  else show_led (dauer,RES_PWM);	// Tastverhältnis 100%   
+  else show_led (dauer,RES_PWM);	// Tastverhï¿½ltnis 100%   
 	Ledaus();												// Anzeige abschalten 
-	set_pwm (1,1);									// auf kleinstes Tastverhältnis zurück
+	set_pwm (1,1);									// auf kleinstes Tastverhï¿½ltnis zurï¿½ck
   osDelay (dauer);
  } 
  
  wert+=fp.uoff;									// Batteriespannungsoffset addieren
- num_to_LED(wert+200,1);				// Kommastelle hinzufügen
+ num_to_LED(wert+200,1);				// Kommastelle hinzufï¿½gen
  show_led  (-1,2*fp.hell[0]);		// Wert an Led-Schieberegister
  test_rtc (1);									// Test des Echtzeituhr Oszillators */
 }
 
-uint ledsymbol (uchar speed)	// Prüft Anzeigeschaltschwellen der LED Anzeigesymbole
-{								// Übergabe:	speed - gemessene Geschwindigkeit
+uint ledsymbol (uchar speed)	// Prï¿½ft Anzeigeschaltschwellen der LED Anzeigesymbole
+{								// ï¿½bergabe:	speed - gemessene Geschwindigkeit
  uchar i;						// Laufvariable Symbole
 
- for (i=0;i<fp.symbol;i++)		// Schaltschwellen aller definierten Symbole prüfen
+ for (i=0;i<fp.symbol;i++)		// Schaltschwellen aller definierten Symbole prï¿½fen
  {
   if (speed>=fp.vsym[pset][2*i])  	// Geschwindigkeit >= Einschaltschwelle
    if (speed<fp.vsym[pset][2*i+1])	// Geschwindigkeit < Ausschaltschwelle
-    return (fp.symfont[i]);			// Rückgabe Symbolfont  					
+    return (fp.symfont[i]);			// Rï¿½ckgabe Symbolfont  					
  }
  return (0);	// kein Symbol anzuzeigen
 }
 
 int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
-{									// Übergabe mode 	= 0	Transceiver aus
-									//					= 1 Transceiver und Verstärker ein
+{									// ï¿½bergabe mode 	= 0	Transceiver aus
+									//					= 1 Transceiver und Verstï¿½rker ein
 									// 					= 2 Zyklischer Messbetrieb
 									//					>= 3 Testmodus - wartet jede Stufe
 	
- ushort analog=(fp.txrcon&~(GAIN_INH))|(ANT_EN2|ANT_EN1|HF_EN);	// MUX Verstärkungsreduzierung
+ ushort analog=(fp.txrcon&~(GAIN_INH))|(ANT_EN2|ANT_EN1|HF_EN);	// MUX Verstï¿½rkungsreduzierung
  									
  if (mode)		// Einschalten?
  {
@@ -388,7 +388,7 @@ int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
   if (mode>1)
   { 
    if (mode==3) {putparameter(T_ic37, analog&~(GAIN_A|GAIN_B), (0x05<<16)|0x84, T_nil); getc (0); }   
-   analog|=HF_EN|AMP_EN|GAIN_A|GAIN_B|BW_A;		// Transceiver disabled ein, Verstärkung minimal
+   analog|=HF_EN|AMP_EN|GAIN_A|GAIN_B|BW_A;		// Transceiver disabled ein, Verstï¿½rkung minimal
    write_i2c_dev (IC37,3,(analog<<8)|0x02);  			
    if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); } 
    else getkey(DPWR);
@@ -397,8 +397,8 @@ int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
    if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); } 
    else getkey(DTXFEN);
   }  // end if zykl. Betrieb oder Testmodus
-  analog&=~(ANT_EN2|ANT_EN1|GAIN_A|GAIN_B);			// Transceiver enable und Minimal-Verstärkung reset
-  analog|=HF_EN|AMP_EN|AMP_BW|BW_A|(fp.txrcon&(GAIN_INH|GAIN_A|GAIN_B));	// 5V/3V3 ein, volle Bandbreite, eingestellte Verstärkung übernehmen 0x05E0
+  analog&=~(ANT_EN2|ANT_EN1|GAIN_A|GAIN_B);			// Transceiver enable und Minimal-Verstï¿½rkung reset
+  analog|=HF_EN|AMP_EN|AMP_BW|BW_A|(fp.txrcon&(GAIN_INH|GAIN_A|GAIN_B));	// 5V/3V3 ein, volle Bandbreite, eingestellte Verstï¿½rkung ï¿½bernehmen 0x05E0
   if (!write_i2c_dev (IC37,3,(analog<<8)|0x02)) return (-1);	   // Kein Erfolg Fehlerabbruch   
   if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); } 
   else getkey(t_amp_en);
@@ -412,12 +412,12 @@ int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
  return (1);	// Ergebnis ok
 }
 
-void set_measure_constants	(void)	// Konstanten für Messung anhand Parametereinstellung festlegen
+void set_measure_constants	(void)	// Konstanten fï¿½r Messung anhand Parametereinstellung festlegen
 {
  IFConst=fp.TxF;												// Transceiver Sendefrequenz 24000 ... 24250 MHz laden
  IFConst*=100000;
  IFConst/=IFDIV;													// 100 fache Dopplerkonstante (~4470 Hz/kmh)
- v_const=(100ul*CCLK)/(TDIV*IFConst/10);	// Konstante Geschwindigkeitsberechnung abhängig von Capture Zählerfrequenz
+ v_const=(100ul*CCLK)/(TDIV*IFConst/10);	// Konstante Geschwindigkeitsberechnung abhï¿½ngig von Capture Zï¿½hlerfrequenz
  
  if (fp.mph) 		// kmh in mph Umrechnung
  {
@@ -425,22 +425,22 @@ void set_measure_constants	(void)	// Konstanten für Messung anhand Parametereins
   v_const=1000*v_const/MILE;
  }
 
- v_const=v_const*fp.vcor/100;		// Geschwindigkeitskorrekturfaktor berücksichtigen
- t_mess_max=DPWR+DTXFEN+t_amp_en+(100000*(LenTm+2)/(fp.vmm*IFConst));		// Max. Messzeit abhängig von kleinster Messgeschwindigkeit	  
+ v_const=v_const*fp.vcor/100;		// Geschwindigkeitskorrekturfaktor berï¿½cksichtigen
+ t_mess_max=DPWR+DTXFEN+t_amp_en+(100000*(LenTm+2)/(fp.vmm*IFConst));		// Max. Messzeit abhï¿½ngig von kleinster Messgeschwindigkeit	  
 }
 
-uint display_mode_speed (uchar psatz)	// Prüfe Schwellen der Modi der Led Anzeige
-{										// Übergaben psatz - zu verwendender Parametersatz
+uint display_mode_speed (uchar psatz)	// Prï¿½fe Schwellen der Modi der Led Anzeige
+{										// ï¿½bergaben psatz - zu verwendender Parametersatz
 
  uchar speed=speed10/10;		// Messgeschwindigkeit oder simulierte Geschwindigkeit
- uint aspeed=0;					// Anzuzeigender Geschwindigkeitswert (für Fontdekodierung)	
+ uint aspeed=0;					// Anzuzeigender Geschwindigkeitswert (fï¿½r Fontdekodierung)	
 
  if (speed>=fp.vmin[psatz] && speed<=fp.vmax[psatz] && (fp.vmin[psatz]!=fp.vmax[psatz])) // LED Ausgabe?
  {
   aspeed=speed;		// Anzeige ist gemessener Geschwindigkeitswert
   if (fp.dmode)		// Differentieller Anzeigemodus
   {		 
-   if (speed>=(fp.vlim[psatz]+fp.voff))	// Tempolimit und Anzeigeoffset überschritten?
+   if (speed>=(fp.vlim[psatz]+fp.voff))	// Tempolimit und Anzeigeoffset ï¿½berschritten?
     aspeed=speed-fp.vlim[psatz];   		// Differenzgeschwindigkeit bilden
    else aspeed=0;		 		 
   }
@@ -455,9 +455,9 @@ uint display_mode_speed (uchar psatz)	// Prüfe Schwellen der Modi der Led Anzeig
  return (aspeed);
 }
 
-int farbe_numLED (uchar speed)		// Prüfe Schwellen für LED Farben der numerischen Anzeige
+int farbe_numLED (uchar speed)		// Prï¿½fe Schwellen fï¿½r LED Farben der numerischen Anzeige
 {																	// Modfizierte Sondersoftware Anzeig Grundfarbe und Mischfarbe getauscht
- uchar farbe=1;						// Anzeigefarbe ist zunächst Grundfarbe
+ uchar farbe=1;						// Anzeigefarbe ist zunï¿½chst Grundfarbe
 	
  if (fp.farben>=2)						// 2. Anzeigefarbe definiert
  {	  
@@ -474,7 +474,7 @@ void make_filename (void)		// Erstellt VTF Dateiname in cbuf
  redirect_char_Out(putcbuf);				// Zeichenausgabe in Puffer cbuf leiten
  putstr(T_sc);											// Beginn Dateiname "SC_" nach Puffer 
  if (isalpha(*fp.serno)) 						// Seriennummer definiert? 
-	{ putstr(fp.serno); putc('_'); } 	// Seriennummer des Geräts ausgeben, Trennzeichen
+	{ putstr(fp.serno); putc('_'); } 	// Seriennummer des Gerï¿½ts ausgeben, Trennzeichen
  read_date_time (DATE_NODEL, cbuf+cind);	// Datum TTMMJJ nach Puffer
  putc('_');																// Trennzeichen Dateinamenserweiterung
  putnumber (fp.fileno,0xC3);							// Dateinummer 3 stellig ausgeben
@@ -484,16 +484,16 @@ void make_filename (void)		// Erstellt VTF Dateiname in cbuf
 }
 
 int compare (text *v, text *buf, ushort start, ushort stop) // Suche Zeichenkette in Puffer
-{ 								   				// Übergaben:	v	-	Zeiger auf Null terminierte Suchzeichenkette
+{ 								   				// ï¿½bergaben:	v	-	Zeiger auf Null terminierte Suchzeichenkette
 														//				buf	-	Zeiger auf Puffer oder Zeichenkette
 														//				start - Startoffset Suche
 														//				stop  - Stopoffset Suche
- uchar len=0;   			// Länge übergebene Zeichenkette
+ uchar len=0;   			// Lï¿½nge ï¿½bergebene Zeichenkette
  uchar iden=0;      	// Anzahl Uebereinstimmungen
  text *p;							// Hilfszeiger
 
  p=v;
- while (*p++ != '\0') len++;							// Länge Zeichenkette
+ while (*p++ != '\0') len++;							// Lï¿½nge Zeichenkette
  p=v;
  while (start!=stop)           						// bis Empfangs- und Bearbeitungszeiger gleich
  {
@@ -504,36 +504,36 @@ int compare (text *v, text *buf, ushort start, ushort stop) // Suche Zeichenkett
  return (-1);                    					// kein Erfolg
 }
 
-bool file_is_firmware (void)		// Prüfen ob empfangene Datei Firmware
+bool file_is_firmware (void)		// Prï¿½fen ob empfangene Datei Firmware
 {	  
  uint *P_val;						// Pointer auf Interrupt Vektortabelle in Firmware
- uint sum=0;						// Aufaddierte Prüfsumme Vektortabelle
+ uint sum=0;						// Aufaddierte Prï¿½fsumme Vektortabelle
  uchar i;								// Laufvariable 
  	
  flash_pcom((uchar *)cbuf,0,FLASH_R_ARRAY,BLOCKSIZE);	// Erste Seite mit Firmware adressieren und Seite(n) lesen	
  P_val=(uint *)cbuf; 																	// auf Beginn Datenblock/Vektortabelle
 
 #if (NOCRPCHECK == 0)	
- switch (*(P_val+CRP_key/4))													// Code Read Protection (CRP) Schlüssel prüfen
+ switch (*(P_val+CRP_key/4))													// Code Read Protection (CRP) Schlï¿½ssel prï¿½fen
  {				
 	 case CRP2:	 
 	 case CRP3:				
-										break;														// CRP 2 und 3 immer zulässig	 
+										break;														// CRP 2 und 3 immer zulï¿½ssig	 
 	 case CRPNONE:
 	 case	CRP1:
 #if (DEBUGGING == 1)
-										break;														// nur zulässig bei Debug Versionen
+										break;														// nur zulï¿½ssig bei Debug Versionen
 #endif	 
-	 default:					return (false);										// CRP1, nicht definierter oder falscher Schlüssel unzulässig
+	 default:					return (false);										// CRP1, nicht definierter oder falscher Schlï¿½ssel unzulï¿½ssig
  }	 
 #endif 
- for (i=7;i<=10;i++) if (*(P_val+i)!=0) 							// prüfe ob reserved code words 7 bis 10 null
-  return (false); 																		// Fehlerrückgabe
+ for (i=7;i<=10;i++) if (*(P_val+i)!=0) 							// prï¿½fe ob reserved code words 7 bis 10 null
+  return (false); 																		// Fehlerrï¿½ckgabe
  
- for (i=0;i<7;i++) sum+=*(P_val+i);										// Prüfsumme addieren 
- *(P_val+7)-=sum;																			// Prüfsumme an Vektoradresse 0x0000001C schreiben
+ for (i=0;i<7;i++) sum+=*(P_val+i);										// Prï¿½fsumme addieren 
+ *(P_val+7)-=sum;																			// Prï¿½fsumme an Vektoradresse 0x0000001C schreiben
  
- addcrctoblock ((uchar *)cbuf, BLOCKSIZE); 						// Fügt neuen CRC an Datenblock in Puffer an
+ addcrctoblock ((uchar *)cbuf, BLOCKSIZE); 						// Fï¿½gt neuen CRC an Datenblock in Puffer an
  flash_pcom((uchar *)cbuf,0,FLASH_ERASE_WRITE_1,BLOCKSIZE+2);	// Erste Seite mit Firmware adressieren und Seite(n) schreiben
  return(true);													// Ergebnis wahr bei Erfolg
 }
@@ -553,8 +553,8 @@ void clear_comchange (void)		// Bereinige Schnittstellenwechsel z. B. nach Modem
  comchange=0;												// reset Flag Schnittstellenwechsel 
 }	
 
-void modem_terminal (uchar mode)	// Eingabeschnittstelle für Modem Kommunikation
-{																	// Übergabe mode - 2 UART2 Empfang an Terminal senden / 46 RN4678 installiert
+void modem_terminal (uchar mode)	// Eingabeschnittstelle fï¿½r Modem Kommunikation
+{																	// ï¿½bergabe mode - 2 UART2 Empfang an Terminal senden / 46 RN4678 installiert
  int c=0;												// Eingabezeichen	
 	
  bxi=rxi;												// Empfangsindizes UART1 gleich setzen
@@ -570,7 +570,7 @@ void modem_terminal (uchar mode)	// Eingabeschnittstelle für Modem Kommunikation
   if (bxi!=rxi) 					// Zeichenempfang?
   { 
    c=rbuf[++bxi];							// Empfangs- in Arbeitspuffer kopieren
-   cbuf[cind++]=c;						// Empfangs- in Arbeitspuffer kopieren, Klein- in Großbuchstaben wandeln	 
+   cbuf[cind++]=c;						// Empfangs- in Arbeitspuffer kopieren, Klein- in Groï¿½buchstaben wandeln	 
    cbuf[cind]=0;							// Zeichenkettenabschluss		
    if (is_CRLF(c)) 
    { 
@@ -616,26 +616,26 @@ void modem_com (void)						// Direkte Kommunikation mit Modems
  int result;	
 	
  InitWatchdog(LONG_WD_32);					// langes Watchdog Interval auf 32 Sekunden setzen
- if (connect&UART1) { put2str(T_LF,T_noacc);	return; }	// kein Zugriff über GSM,BT
+ if (connect&UART1) { put2str(T_LF,T_noacc);	return; }	// kein Zugriff ï¿½ber GSM,BT
  concpy=connect;
 	
- c=putmenu(T_sbaud,'5');						// Baudrate Abfrage Menü
+ c=putmenu(T_sbaud,'5');						// Baudrate Abfrage Menï¿½
  if ((c<'1')||(c>'4')) return;			// Abbruch ohne Auswahl
  if (c=='2') baud=115200;  
  else if (c=='3') baud=307200; 
  else if (c=='4') baud=460800;
  
- c=putmenu(T_smodem,'4');						// BT, GSM Auswahl Menü
+ c=putmenu(T_smodem,'4');						// BT, GSM Auswahl Menï¿½
  if ((c<'1')||(c>'3')) return;			// Abbruch wenn Auswahl nicht GSM, BT  oder GPS
  
  if (c=='1')
  {
-  cc=putmenu(T_blue,'3');	 					// Bluetooth Typ auswählen
+  cc=putmenu(T_blue,'3');	 					// Bluetooth Typ auswï¿½hlen
 	if ((cc<'1')||(cc>'2')) return; 
-	if (cc=='2') mode=46;							// RN4678 ausgewählt 
+	if (cc=='2') mode=46;							// RN4678 ausgewï¿½hlt 
 	Init_BT_ch (baud);								// Konfiguriere uart1 und setze MUX Kanal auf BT modem												
  }
- else if (c=='2')												// GSM/UMTS/LTE Modem ausgewählt? 
+ else if (c=='2')												// GSM/UMTS/LTE Modem ausgewï¿½hlt? 
  {
 	putln (T_gsmpower);								// Text "Power GSM/UMTS/LTE modem. Wait... 
 	if (fp.gsm==0) result = gsm_power (1);	// Kein Modem konfiguriert, dann nur einschalten
@@ -645,7 +645,7 @@ void modem_com (void)						// Direkte Kommunikation mit Modems
   {
    if (fp.gsm==0)
    {
-		Init_GSM_ch (baud);					// MUX GSM Kanal auswählen und UART1 konfigurieren 
+		Init_GSM_ch (baud);					// MUX GSM Kanal auswï¿½hlen und UART1 konfigurieren 
 	  if (FIO0PIN&GSM_DTR)				// Modem Sleep enabled?
 	  FIO0CLR=GSM_DTR;						// DTR  LO - Disable Modem Sleep 
    }			
@@ -666,7 +666,7 @@ void modem_com (void)						// Direkte Kommunikation mit Modems
  else if (c=='3')  							// GPS Auswahl
  { 
 	gps_power(2);
-	Init_UART2 (baud);						// UART2 auf gewählte Baud rate konfigurieren
+	Init_UART2 (baud);						// UART2 auf gewï¿½hlte Baud rate konfigurieren
 	mode=2;												// Leere Puffer
  }
  
@@ -674,7 +674,7 @@ void modem_com (void)						// Direkte Kommunikation mit Modems
  osDelay (1);	
  
  concpy=connect;					// aktive Ein-Ausgabeschnittstellen merken	
- modem_terminal (mode);	// Eingabeschnittstelle für Modem Kommunikation	 
+ modem_terminal (mode);	// Eingabeschnittstelle fï¿½r Modem Kommunikation	 
  if (c=='3') 							// Auswahl war GPS?
   gps_power(0);						// GPS abschalten und deselektieren 	 
  uart1_release(uart1_owner);	// Release UART1 regardless of current owner
@@ -693,15 +693,15 @@ void init_turnsw (void)	// Drehschalter Parametersatzwahl initialisieren
  putc(SPACE);												// Leerzeichen senden
  do
  {
-	delchar (1);												// Lösche letzte Ausgabe
+	delchar (1);												// Lï¿½sche letzte Ausgabe
   putnumber (get_turnswitch(),0x01);	// IC54 P0 auslesen	und wandeln	
 	c=getc(200);												// warte 200 ms auf Zeichen			
-	comchange=0;												// Schalteränderungen löschen
+	comchange=0;												// Schalterï¿½nderungen lï¿½schen
  } while (!is_CRLF(c));							// Ende bei Return Eingabe
  newline(); 	 
 }	
 
-void set_default_port (void)	// Ändert default I2C Expander Porteinstellung
+void set_default_port (void)	// ï¿½ndert default I2C Expander Porteinstellung
 {									 	
  ushort * def_port;						// Zeiger auf default Porteinstellung	
  uchar i,l;										// Laufvariable Schalter und Portpinnummer
@@ -711,16 +711,16 @@ void set_default_port (void)	// Ändert default I2C Expander Porteinstellung
  for (i=0;i<NOSW;i++)
  {
   if (fp.swexp[i]==1) def_port=&fp.defic58; // Zeiger auf Expander IC58 Defaulteinstellung
-  else continue;														// Kein gültiger oder physikalischer Schalter
+  else continue;														// Kein gï¿½ltiger oder physikalischer Schalter
 
   l=fp.swport[i];											// Portpinnummer
-  if (l<16) *def_port&=~(1<<l); 			// Default Portmaske ändern
+  if (l<16) *def_port&=~(1<<l); 			// Default Portmaske ï¿½ndern
   else *def_port|=(1<<(l-16));
  }
 }
 
-void set_exp_switch (uchar switchno)	// Setzt definierte Schalter über I2C Expander
-{																			// Übergabe Schalternummer 0 .. 11
+void set_exp_switch (uchar switchno)	// Setzt definierte Schalter ï¿½ber I2C Expander
+{																			// ï¿½bergabe Schalternummer 0 .. 11
  ushort def_port;						// Default Porteinstellung
  uint port;									// Porteinstellung
  uchar devadr;							// I2C Device Adresse
@@ -732,7 +732,7 @@ void set_exp_switch (uchar switchno)	// Setzt definierte Schalter über I2C Expan
 	 
  l=fp.swport[switchno];								// Portpinnummer
  if (l<16) port=def_port|(1<<l); 			// Schalter nicht invertiert, setzen
- else port=def_port&(~(1<<(l-16)));		// Schalter invertiert, rücksetzen
+ else port=def_port&(~(1<<(l-16)));		// Schalter invertiert, rï¿½cksetzen
 
  if (fp.swexp[switchno]==1) write_i2c_dev (devadr,3,((port<<8)|0x02));	// Ausgabe an I2C Expander 
  else if (fp.swexp[switchno]==2)
@@ -749,31 +749,31 @@ void set_exp_switch (uchar switchno)	// Setzt definierte Schalter über I2C Expan
  newline();
 }
 
-uchar nmea_checksum (text *s)		// XOR Prüfsumme GPS NMEA Nachricht bis * Abschlusszeichen
-{																// Übergabe: Zeiger auf erstes Zeichen hinter $
+uchar nmea_checksum (text *s)		// XOR Prï¿½fsumme GPS NMEA Nachricht bis * Abschlusszeichen
+{																// ï¿½bergabe: Zeiger auf erstes Zeichen hinter $
  uchar checksum=*s++;
 
- while ((*s!='*')&&(*s)) checksum^=*s++;	// Bilde Prüfsumme bis * oder Null Terminierung
+ while ((*s!='*')&&(*s)) checksum^=*s++;	// Bilde Prï¿½fsumme bis * oder Null Terminierung
  return (checksum);											
 }
 
 uint colonpos(text *s, uchar anz)		// Ermittle Byteposition hinter anz.ter Kommastelle in Zeichenkette
-{																		// Übergaben *s - Zeiger auf null terminierten Puffer oder String
+{																		// ï¿½bergaben *s - Zeiger auf null terminierten Puffer oder String
 																		//					anz - Anzahl Kommas
- uint pos=0;									// Anzahl geprüfter Bytes
+ uint pos=0;									// Anzahl geprï¿½fter Bytes
 	
  if (!anz) return(0);					// nulltes Komma ist illegal				
  while (*s) 									// Nullterminierung? 
  { 
   if (*s++==',') anz--;				// Zeichen ist Komma? Ja, dekrementiere Kommaanzahl
-   pos++;											// Inkrementiere Pufferzeiger und geprüfte Byteposition	
-  if (!anz) return(pos); 			// verlangte Kommazahl erreicht, Rückgabe Byteposition hinter Kommastelle
+   pos++;											// Inkrementiere Pufferzeiger und geprï¿½fte Byteposition	
+  if (!anz) return(pos); 			// verlangte Kommazahl erreicht, Rï¿½ckgabe Byteposition hinter Kommastelle
  }
  return (0);									// Kein Komma bis Nullterminierung			
 }
 
 uchar no_at (text *s)					// Sucht @ Zeichen in Zeichenkette
-{															// Übergabe *s - Zeiger auf Zeichenkette
+{															// ï¿½bergabe *s - Zeiger auf Zeichenkette
  if (!*s++) return (0);				// Nullstring 
 	
  while (*s)										// Ab 2. Zeichen 
@@ -790,11 +790,11 @@ void Helligkeit (void)			// Einstellung der LED Dimmung
  uchar hell;						// Helligkeitswert
  uchar max=MAXTAST+1;		// Schleifenendwert	
  uchar maxwert=100;			// Einstellbarer Maximalwert Helligkeit/Farbbalance
- uchar *fpp;						// Zeiger auf Helligkeit/Tastverhältnis im Parameterblock	
+ uchar *fpp;						// Zeiger auf Helligkeit/Tastverhï¿½ltnis im Parameterblock	
 
  putstr(T_bright);		// Text "Brightness
  	
- for (i=0;i<max;i++)								// für alle Anzeigefarben	mit eigenem Tastverhältnis
+ for (i=0;i<max;i++)								// fï¿½r alle Anzeigefarben	mit eigenem Tastverhï¿½ltnis
  {
   newline();
 	if (i!=MAXTAST)										
@@ -805,7 +805,7 @@ void Helligkeit (void)			// Einstellung der LED Dimmung
 	else 
 	{
 	 putstr(T_expwm);								// Externe PWM
-	 if (fp.ex12==3) 	 							// Festtext für Plus FT einschalten XXX für Plus fehlt
+	 if (fp.ex12==3) 	 							// Festtext fï¿½r Plus FT einschalten XXX fï¿½r Plus fehlt
 	 {
 		write_i2c_dev (IC58,3,(((fp.defic58|(0x0F<<1))<<8)|0x02));	// Alle Texte ein - Ausgabe an Expander IC58 
 		FIO0SET = EX12_2; 						// 12V extern Versorgung einschalten
@@ -819,9 +819,9 @@ void Helligkeit (void)			// Einstellung der LED Dimmung
 	 else { hell=fp.pwmex; fpp=&fp.pwmex; }  				
    putnumber(hell,3);													// Helligkeitswert ausgeben
 	 if (i<2) num_to_LED (hell,i+1);						// Grund-/Warnfarbe Wert in LED Anzeigewert wandeln
-   else if (i==2) num_to_LED (400+hell,0);		// Symbolziffern weiß im roten Kreis
-   else if (i==3) num_to_LED (503,0);					// Grüner Smiley		
-	 else if (i==MAXTAST) num_to_LED (hell,1);	// Tastverhältnis
+   else if (i==2) num_to_LED (400+hell,0);		// Symbolziffern weiï¿½ im roten Kreis
+   else if (i==3) num_to_LED (503,0);					// Grï¿½ner Smiley		
+	 else if (i==MAXTAST) num_to_LED (hell,1);	// Tastverhï¿½ltnis
 	 
    if (i!=MAXTAST) c=show_led (0,2*hell-1);		// LED Puffer anzeigen und Eingabe abwarten   
 	 else 																			// Abgleich externe LED		
@@ -834,17 +834,17 @@ void Helligkeit (void)			// Einstellung der LED Dimmung
    if (is_CRLF(c)) break;										// Abbruch
    if (c=='+') { if (hell<maxwert) *fpp=hell+1; }	
    if (c=='-') { if (hell>1) *fpp=hell-1; }
-   if (c==ESC) { if ((fp.ex12==2)||(fp.ex12==4)) plus_com(0); }			// ins Matrixmenü 
-   delchar(3);								// Letzte Ausgabe löschen      
+   if (c==ESC) { if ((fp.ex12==2)||(fp.ex12==4)) plus_com(0); }			// ins Matrixmenï¿½ 
+   delchar(3);								// Letzte Ausgabe lï¿½schen      
   } // end while
- } // end für jede Farbe
+ } // end fï¿½r jede Farbe
 
  clear_all ();									// Led Abschaltung
  newline();
 }
 
 int plus_com (uchar mode)		// Kommunikation mit Matrix Controller Platine
-{														// Übergabe mode - 0/1/2 für transparent/xmodem upload/xmodem download
+{														// ï¿½bergabe mode - 0/1/2 fï¿½r transparent/xmodem upload/xmodem download
  int result=-1;			// Hilfsvariable Ergebnis
  uint ic58port;			// Expander Portzustand	
  bool Term_state;		// Status Viasis - Matrix Schnittstelle  	
@@ -853,7 +853,7 @@ int plus_com (uchar mode)		// Kommunikation mit Matrix Controller Platine
  clear_all();																				// Led samt Regler und Schalter aus	
  PINSEL7 |= PWM3;																		// Externen PWM Ausgang wieder ein, sonst funktionieren Matrix Anzeigetestfunktionen bei BT, USB Verbindung nicht		
  Term_state=read_i2cdev (IC54, 0, 1) & RS232_LINK;	// Bestehende RS232 Verbindung zu Matrix (Invalid) ausmaskieren
- ic58port=read_i2cdev (IC58, 2, 3);									// Zustand Ausgänge IC58 lesen, Achtung Register 3 wg. Byteswap!	 		
+ ic58port=read_i2cdev (IC58, 2, 3);									// Zustand Ausgï¿½nge IC58 lesen, Achtung Register 3 wg. Byteswap!	 		
 	
  if (write_i2c_dev (IC58,3,(((ic58port&~0x8000)<<8)|0x02))) // Kommunikationsanforderung an Matrix gesendet?
  {
@@ -874,7 +874,7 @@ int plus_com (uchar mode)		// Kommunikation mit Matrix Controller Platine
 		plustrans=1;					// Direkte Kommunikation 
 		bpi=rpi;							// Reset Indizes Plus Buffer 
 		bxi=rxi;							// Reset Indizes "Terminal" Buffer 
-		msdelay=XMODEM_BLOCK_TIMEOUT;				// 3 s Intervall für Watchdog reset
+		msdelay=XMODEM_BLOCK_TIMEOUT;				// 3 s Intervall fï¿½r Watchdog reset
 		while (!comchange)		// Solange Kommunikation nicht beendet
     {
 		 if (bpi!=rpi) 				// Zeichen von Matrix?
@@ -899,39 +899,39 @@ int plus_com (uchar mode)		// Kommunikation mit Matrix Controller Platine
 			msdelay=XMODEM_BLOCK_TIMEOUT;		// 3 s Intervall 
 		 }		
 		}	// end while !comchange	
-		plustrans=0;																				// Direkte Kommunikation über pbuf beenden
+		plustrans=0;																				// Direkte Kommunikation ï¿½ber pbuf beenden
 		result=1;
    } 	
 	 else 
 	 {	 
 		if (mode==1) { result=plus_upload_old ();				// Upload von Textnachrichten und Sonderzeichen   
-		 if (waitcms (XMODEM_CHAR_TIMEOUT, '?')>=0)			// Hauptmenü empfangen?
+		 if (waitcms (XMODEM_CHAR_TIMEOUT, '?')>=0)			// Hauptmenï¿½ empfangen?
 		 {	
-		  putb('R');																		// Viamatrix Hauptmenü beenden
+		  putb('R');																		// Viamatrix Hauptmenï¿½ beenden
 		  waitcms (XMODEM_CHAR_TIMEOUT, ' ');						// Warte auf Trennzeichen
 		  waitcms (XMODEM_CHAR_TIMEOUT, LF);						// Warte auf Line feed von "Taste <ESC> .... 
 		 } }
-																										// Neue schnelle Schnittstellen für MQTT Betrieb
+																										// Neue schnelle Schnittstellen fï¿½r MQTT Betrieb
     else if (mode==2) result=plus_download ();			// Download von Textnachrichten und Sonderzeichen			
 		else if (mode==3) result=plus_upload ();				// Download von Textnachrichten und Sonderzeichen 
 	 }	 
   }	// end if msdelay - keine timeout	
  } // end if I2C Antwort	 
- write_i2c_dev (IC58,3,((ic58port|0x8000)<<8)|0x02); 	// Kommunikation sis3003 schließen
+ write_i2c_dev (IC58,3,((ic58port|0x8000)<<8)|0x02); 	// Kommunikation sis3003 schlieï¿½en
  if (Term_state==0) osDelay (10);											// Warte bis Matrix RS232 aus
  clear_comchange ();																	// Wechsel Schnittstellenstatus reset
  connect=concpy;																			// Schnittstellen wiederherstellen	
  if (result<0)
  {
   if (result==-1) puterror (DTC_LIB_HW_ERR,-1);			// Hardware Fehler eintragen
-	else if (result==MATRIX_PARAM_ERROR);							// Nichts machen, neg. Rückgabeergebnis führt zu Parameter Init error  
+	else if (result==MATRIX_PARAM_ERROR);							// Nichts machen, neg. Rï¿½ckgabeergebnis fï¿½hrt zu Parameter Init error  
 	else puterror (DTC_LIB_COMM_TIMEOUT, result);		// Kommunikationsfehler eintragen
  } 
  return(result);	
 }
 
 void md_simulation (uint anzahl, uchar terminal)		// Erzeuge Messdaten im Speicher
-{																										// Übergaben: Anzahl - Anzahl Messdaten
+{																										// ï¿½bergaben: Anzahl - Anzahl Messdaten
 																										//						terminal - bei 1 Terminalausgabe
  uint start=1;	
  int16_t wert, ii=1000;
@@ -941,7 +941,7 @@ void md_simulation (uint anzahl, uchar terminal)		// Erzeuge Messdaten im Speich
  uchar * vptr;
  uchar memful=0;	
 	
- if (terminal) putparameter (T_anzmw, start,(1<<16)|0x06, T_nil);	// Initialwert für Bildschirmausgabe
+ if (terminal) putparameter (T_anzmw, start,(1<<16)|0x06, T_nil);	// Initialwert fï¿½r Bildschirmausgabe
  if (messdaten(0))					// Bereits Messdaten im Speicher? 
  {
 	if (fp.md_adr==0)	// Messdatenzeiger steht auf Seitenanfang -> vbuf ist leer
@@ -960,7 +960,7 @@ void md_simulation (uint anzahl, uchar terminal)		// Erzeuge Messdaten im Speich
   {
 	 vptr=&vbuf[fp.md_adr];								// Zeiger auf Beginn Messdatensatz	
 		
-	 ss+=1+(T1TC&0x0F);										// Zeitwert erhöhen
+	 ss+=1+(T1TC&0x0F);										// Zeitwert erhï¿½hen
 	 if (ss>59) 
 	 { ss-=60; min++; if (min>59) 
 		 { min-=60; hh++; if (hh>23) 
@@ -995,51 +995,52 @@ void md_simulation (uint anzahl, uchar terminal)		// Erzeuge Messdaten im Speich
 		read_date_time (DATE_HEX, (char *)&vbuf[fp.md_adr+4]);	// Datum in Puffer schreiben
     read_date_time (TIME_HEX, (char *)&vbuf[fp.md_adr+7]);	// Zeit in Puffer schreiben
     vptr+=5;
-		*vptr++=start;							// Unterschiedliche Sekundenwerte für cloud erzeugen
+		*vptr++=start;							// Unterschiedliche Sekundenwerte fï¿½r cloud erzeugen
    }		 
 	 if (flashsize!=0) 									// Flash vorhanden?   
 	  if (mdata_to_flash ()) memful=1;		// Schreibe Messdaten in Flash  
 	 	 								
 	 if (terminal && ((start%100==0)||(start==anzahl))) // Bei Terminalausgabe, jedem hundertsten bzw. beim letzten Wert
-   {delchar(6); 																			// Ausgabe löschen	
+   {delchar(6); 																			// Ausgabe lï¿½schen	
     putnumber (start,6);															// Index ausgeben
 	  if (is_CRLF(getbyte(10))) break;									// Abbruch bei Return Eingabe 
    }			 
-  } while (start++<anzahl); 													// Bis Übergabe Anzahl erreicht
+  } while (start++<anzahl); 													// Bis ï¿½bergabe Anzahl erreicht
 	
  if (memful) protocol(MEMFULL);						// Speicher voll -> Protokollmeldung erzeugen
 }	
 
-void communication_change (void)					// Bearbeitung Schnittstellenwechsel, Änderung der Kommunikation oder Hexschalter
-{																					// wird über I2C Expander gemeldet
+void communication_change (void)					// Bearbeitung Schnittstellenwechsel, ï¿½nderung der Kommunikation oder Hexschalter
+{																					// wird ï¿½ber I2C Expander gemeldet
  uchar waitdelay = 250;										// Default Wartezeit bis zum Versand der Startnachricht
  uchar comstate_neu;	
- int state=get_com_status ();  						// Status I2C Expander IC54 Eingänge lesen
+ int state=get_com_status ();  						// Status I2C Expander IC54 Eingï¿½nge lesen
  uint32_t baud =BT_BAUD;										// Default BT Baudrate	
 	
  if (state>=0)														// IC54 erfolgreich gelesen? 	
  {
   comstate_neu=state;	 
 	
-	if ((comstate_neu^comstate)&BT_LINK&interfaces) // Bluetooth und Änderung Bluetoothverbindung?
+	if ((comstate_neu^comstate)&BT_LINK&interfaces) // Bluetooth und ï¿½nderung Bluetoothverbindung?
   {
    if ((comstate_neu&BT_LINK)==0) 	// Bluetooth neu verbunden? - BT_LINK ist low aktiv
    {      	 
 		if (connect&MQTT_LINK) 					// Besteht MQTT Verbindung?
 		{	
      comchange=0;														// reset Schnittstellenwechsel
-		 MQTT_fast_disconnect (1); 							// MQTT Serververbindung besteht? Schließe Verbindung mit Abmeldung sofort
-		 if (comchange) state=get_com_status(); // Verbindungsänderung GSM Modul abfangen
+		 MQTT_fast_disconnect (1); 							// MQTT Serververbindung besteht? Schlieï¿½e Verbindung mit Abmeldung sofort
+		 if (comchange) state=get_com_status(); // Verbindungsï¿½nderung GSM Modul abfangen
      if (state>=0) comstate_neu=state; 			
     }
 		else osDelay(200);
 		
 		if (Init_BT_ch (baud))					// Konfiguriere uart1 und setze MUX Kanal auf BT modem, bereit?
 		{	
-     startmessage=1; 				  
+     startmessage=1;
 		 if (fp.gps<2)gps_pending=0;						// Laufende GPS Positionsbestimmung bei Multiplex unterbrechen
 		 connect|=(UART1|BT_LINK);							// Daten an UART1 senden
-     bt_time=BT_TIMEOUT;					  				// Max. Bluetooth Verbindungszeit	ohne Empfang	
+		 bt_reset_counters();									// 5.53: Durchsatz-Diagnose je BT-Sitzung von vorn zaehlen
+     bt_time=BT_TIMEOUT;					  				// Max. Bluetooth Verbindungszeit	ohne Empfang
 		 if (fp.btmodem==Roving || fp.btmodem==IF820) bt_pininit=1;	// Pinabfrage erforderlich (RN4678 + IF820)
 		 
 #if (VSPCAM) 				 
@@ -1055,11 +1056,11 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, Änder
 		if (fp.vspcam && (connect&UART0)) online=1; 	// viaspeedcam und RS232 Verbindung -> online Messmodus
 #endif				
 	 }	
-	 comchange=0;											// Änderung Kommunikationsstatus bearbeitet
+	 comchange=0;											// ï¿½nderung Kommunikationsstatus bearbeitet
 	 thread_comchange=0;
   } // end BT connect/disconnect
 	 
-	if ((comstate_neu^comstate)&GSM_LINK&interfaces) // GSM vorhanden, Änderung GSM-Verbindung?
+	if ((comstate_neu^comstate)&GSM_LINK&interfaces) // GSM vorhanden, ï¿½nderung GSM-Verbindung?
   {		
    if (gsmpower && (fp.servertyp==SMTP))						// Modem eingeschaltet und kein MQTT-Verbindungsabbruch?
 	 {
@@ -1081,25 +1082,25 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, Änder
 			 sendbuf(cbuf,cind);															// Bei Fehler - echo Puffer
 			gsmcall=0;																				// Datenverbindung besteht nicht mehr
 			FIO0SET=GSM_DTR;																	// DTR HI - Enable Modem Sleep
-			connect&=~(UART1|GSM_LINK);												// Ausgabeverbindung löschen
+			connect&=~(UART1|GSM_LINK);												// Ausgabeverbindung lï¿½schen
 #if (VSPCAM)			
 			if (fp.vspcam && (connect&UART0)) online=1; 	// viaspeedcam und RS232 Verbindung -> online Messmodus
 #endif				
 	  } // end if gsmcall 		 
 	 } // end if Modem ein
-	 comchange=0;																			// Änderung Kommunikationsstatus bearbeitet
+	 comchange=0;																			// ï¿½nderung Kommunikationsstatus bearbeitet
 	 thread_comchange=0;
   } // end GSM connect/disconnect and power on/off
 
-	if ((comstate_neu^comstate)&RS232_LINK) 	// Änderung RS232 Terminal?
+	if ((comstate_neu^comstate)&RS232_LINK) 	// ï¿½nderung RS232 Terminal?
   {		 
    if (comstate_neu&RS232_LINK) 						// RS232 Terminal angeschlossen?
 	 {
     startmessage=1;												// Einschaltmeldung senden
 	  connect|=UART0;												// Daten an UART0 senden
-		wait_min=3;														// 3 Warteminuten für GPS-Positionsfix  
+		wait_min=3;														// 3 Warteminuten fï¿½r GPS-Positionsfix  
 		if (connect&MQTT_LINK) 								// MQTT Serververbindung besteht? 
-		 if (!mqtt_debug) mqtt_state=CLOSE;		// Kein MQTT Debug, dann Verbindung schließen
+		 if (!mqtt_debug) mqtt_state=CLOSE;		// Kein MQTT Debug, dann Verbindung schlieï¿½en
 #if (VSPCAM)			
 		if (fp.vspcam) online=1;								// viaspeedcam online Modus starten
 #endif					
@@ -1109,11 +1110,11 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, Änder
 		connect&=~UART0;			// kein Terminal (mehr) angeschlossen, Daten nicht an UART0 senden
 		mqtt_debug=0;					// Beende MQTT Debug Mode
 	 }	 
-	 comchange=0;								// Änderung Kommunikationsstatus bearbeitet
+	 comchange=0;								// ï¿½nderung Kommunikationsstatus bearbeitet
 	 thread_comchange=0;
-  } //end Terminal Änderung
+  } //end Terminal ï¿½nderung
 	 
-	if (comchange||thread_comchange)			// keine Datenschnittstelle geändert -> Drehschalter-Änderung
+	if (comchange||thread_comchange)			// keine Datenschnittstelle geï¿½ndert -> Drehschalter-ï¿½nderung
   {
 	 if (fp.turnsw)							// Drehschalter aktiviert?
 	 { 
@@ -1121,7 +1122,7 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, Änder
 		get_turnswitch();					 
 		timeupdate=1;							// Drehschalter neu lesen, legt aktiven Parametersatz fest 	  
 	 }	
-	 comchange=0;		 						// Änderung bearbeitet
+	 comchange=0;		 						// ï¿½nderung bearbeitet
    thread_comchange=0;	 
 	} 
 	 
@@ -1133,11 +1134,11 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, Änder
 	 if (bt_pininit) putstr (T_pin);  // Bluetooth Pinnummer Abfrage senden bei RN4674	 
 	 else
 	 {	 
-		putstr (T_main);					// Haupmenü an Terminal senden
-    select ('6',0);						// Menüauswahl senden
+		putstr (T_main);					// Haupmenï¿½ an Terminal senden
+    select ('6',0);						// Menï¿½auswahl senden
 	 }	 
-	 bxi=rxi;										// Evtl. Zeichen vor Verbindung löschen	
-	 menu=0;										// reset Menüauswahl	
+	 bxi=rxi;										// Evtl. Zeichen vor Verbindung lï¿½schen	
+	 menu=0;										// reset Menï¿½auswahl	
 #if (VSPCAM)		 
 	 if (!fp.vspcam) 	// viaspeedcam deaktiviert?
 #endif			
@@ -1153,10 +1154,10 @@ void reboot (void)							// Erzeuge Watchdog reset und starte CPU neu
 {
  i_reset=BOOT_RES;													// Setze Resetursache 
  Ledaus();																					// Disable Anzeige
- if (connect&MQTT_LINK) MQTT_fast_disconnect(1); 		// MQTT Verbindung sofort schließen	
+ if (connect&MQTT_LINK) MQTT_fast_disconnect(1); 		// MQTT Verbindung sofort schlieï¿½en	
  PCONP|=PCI2C0|PCSSP1;															// I2C0 und SSP1 Bus einschalten
- FIO1CLR = GSMPWR|USB_RPWR|PWRKEY|EN_ANA;						// GSM, USB und Analogversorgung (Transceiver,Verstärker) aus
- flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=0;							// Puffer mit Output Register 2, Port 0 und 1 null füllen
+ FIO1CLR = GSMPWR|USB_RPWR|PWRKEY|EN_ANA;						// GSM, USB und Analogversorgung (Transceiver,Verstï¿½rker) aus
+ flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=0;							// Puffer mit Output Register 2, Port 0 und 1 null fï¿½llen
  I2Cdrv->MasterTransmit(IC37>>1,flbuf,3,false);			// Puffer an IC37 senden -> 5V/3V3 Analogversorgung komplett aus	
  protocol(REBOOT);																	// Reboot protokollieren	
  flash_wbuf1 ((uchar *)&fp.Kennung, PARAMETERPAGE, sizeof(fp));	// Parameter sichern

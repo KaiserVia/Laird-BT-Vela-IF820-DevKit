@@ -676,6 +676,29 @@ static void bt_query_show (char *cmd)
  bxi=rxi;                                                 // Rest sicher verwerfen -> keine Bytes ins Menue
 }
 
+// Durchsatz-Diagnose (5.53): Zaehler aus putb() anzeigen. Nur Anzeige, kein Eingriff.
+// Lesart: Bremst das Modul haeufig per CTS, kostet jeder gebremste Byte mindestens 1 ms
+// (osDelay) statt der ~22 us Uebertragungszeit bei 460800 Baud. "lost" ist die dadurch
+// verlorene Zeit in Sekunden - steht die in der Groessenordnung der Downloaddauer, ist
+// die Ursache bewiesen.
+void bt_show_counters (void)
+{
+ uchar cc=connect; connect=concpy & ~UART1;      // nur ans Terminal, nicht ins Modul
+ putstr("  < TX bytes=");   putnumber(bt_tx_bytes,0);
+ putstr(" ctswait=");       putnumber(bt_cts_wait,0);
+ putstr(" sleeps=");        putnumber(bt_cts_sleep,0);
+ putstr(" lost=");          putnumber(bt_cts_sleep/1000,0); putstr("s");
+ putstr(" ctsTO=");         putnumber(cts_timeout,0);
+ putstr(" TXstuck=");       putnumber(bt_tx_stuck,0);
+ putstr(" USBstuck=");      putnumber(usb_tx_stuck,0);
+ newline(); connect=cc;
+}
+
+void bt_reset_counters (void)   // Zaehler nullen - je BT-Sitzung von vorn zaehlen
+{
+ bt_tx_bytes=0; bt_cts_wait=0; bt_cts_sleep=0; bt_tx_stuck=0; usb_tx_stuck=0;
+}
+
 void send_bt_info (void)							// Bluetooth Informationen ausgeben
 {
  bool result=FALSE;
@@ -694,6 +717,9 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
    bt_query_show("GDN,T=01\r");                                   // Classic-Name (N=VIASIS_<serno>)
    bt_query_show(T_gba);                                          // Bluetooth MAC-Adresse (A=)
    bt_query_show(T_cypget);                                       // CYSPP-Parameter (E=enable,G=role,C=,L=,R=,M=)
+   bt_query_show(T_gbtdc);                                        // Class of Device (C=) - Windows-Geraetekategorie
+   bt_query_show(T_gbtp);                                         // Classic-Parameter, F Bit0 = Sniff-Mode
+   bt_show_counters();                                            // Durchsatz-Diagnose der laufenden BT-Sitzung
   }
   osDelay(50); bxi=rxi;                                           // finaler Flush: keine Modulbytes ins Menue
   uart1_release(MUX_BT);

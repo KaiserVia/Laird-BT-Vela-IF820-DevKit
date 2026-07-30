@@ -1671,3 +1671,85 @@ main.c) modul-neutral bis leicht positiv.
 **Nicht kompiliert, nicht am Geraet verifiziert.** RN4678 und BT730 sind auf diesem Branch
 seit Monaten nicht mehr am Geraet getestet - 5.52 verschlechtert dort nichts, ein echter
 Regressionstest der beiden Module steht aber weiter aus.
+
+---
+
+## Update 5.53 - BT-Download 3x langsamer: Diagnose eingebaut + USB-Endlosschleife begrenzt
+
+**Symptom (Anwender):** Messdaten-Download (~400 000 Werte) ueber Classic SPP dauert **45 min**,
+frueher **15 min**. Dieselben Daten ueber **RS232: 13 min**.
+
+**Rechnung (X/Y-Modem, 1024-Byte-Bloecke, stop-and-wait, ein ACK pro Block, ~9 MB):**
+
+| | RS232 @115200 | BT @460800 |
+|---|---|---|
+| Zeit | 13 min | 45 min |
+| Bloecke | ~8 800 | ~8 800 |
+| Drahtzeit/Block | 89 ms | 22 ms |
+| Ist/Block | 89 ms | 307 ms |
+| **Totzeit/Block** | ~0 ms | **~285 ms** |
+
+RS232 ist exakt drahtgebunden - die Round-Trip-Zeit ist dort vernachlaessigbar. Ueber BT waere
+der Draht 4x schneller, es dauert aber 3,5x laenger. Das Problem ist also **Latenz, nicht
+Bandbreite**, und das Geraet ist entlastet (RS232 beweist, dass es die Daten viel schneller
+liefern kann).
+
+**Verdaechtiger 1 (eigener Code, `sio.c` `putb()`):** Der UART1-Zweig wartet **pro Byte** auf
+CTS und schlaeft dabei `osDelay(1)`. Ein Byte braucht bei 460800 Baud ~22 us - ein `osDelay(1)`
+kostet mindestens das 45-fache. Bei einem Bulk-Transfer bremst das Modul permanent (der
+Luftweg ist langsamer als der Draht), also trifft es sehr viele Bytes. `git log -S` datiert
+diese Zeile auf **94d175a, 2026-07-27** - genau das Zeitfenster der Verschlechterung. Der
+UART0-Zweig wartet dagegen mit engem Busy-Wait ohne `osDelay` - deshalb ist RS232 schnell.
+Bemerkenswert: Auto-CTS ist in Hardware aktiv (`U1->MCR |= (1<<7)`), die Softwareschleife ist
+fuer die Korrektheit also gar nicht noetig, nur fuer die Erkennung eines steckenden Moduls.
+
+**Verdaechtiger 2 (Modul, aus der Ezurio-Kommandoreferenz):** `SBTP` (bt_set_parameters, 14/10)
+hat ein Flags-Feld: *"Bit 0 - Disable sniff mode ... 0: Enable sniff mode (factory default)"*.
+**Sniff-Mode ist ab Werk AN.** Das ist genau die Signatur von ~300 ms Latenz pro Block.
+
+Beide wirken zusammen: Sniff macht den Luftweg langsam/schubweise -> CTS bremst haeufig ->
+`osDelay(1)` pro Byte verstaerkt es massiv.
+
+**Diese Version aendert das Sendeverhalten NICHT** (bewusste Anwenderentscheidung: erst messen,
+dann eingreifen). Eingebaut wurde:
+
+1. **Diagnosezaehler in `putb()`** (`sio.c`/`sio.h`): `bt_tx_bytes` (an UART1 gesendet),
+   `bt_cts_wait` (Bytes, die bremsen mussten), `bt_cts_sleep` (`osDelay(1)`-Durchlaeufe
+   ~= verlorene Millisekunden). Nullstellung bei jedem neuen BT-Connect
+   (`libtool.c`, `communication_change()`) -> Zaehler gelten je BT-Sitzung.
+2. **Anzeige** `bt_show_counters()` im BT-Info-Menue: `TX bytes / ctswait / sleeps / lost=<s> /
+   ctsTO / TXstuck / USBstuck`. Steht `lost` in der Groessenordnung der Downloaddauer, ist
+   Verdaechtiger 1 bewiesen.
+3. **Zwei neue Modulabfragen** im BT-Info-Menue: `GBTDC` (14/13, Class of Device) und `GBTP`
+   (14/11, Classic-Parameter inkl. Sniff-Flag). Damit ist Verdaechtiger 2 pruefbar und die
+   Windows-Fehlklassifikation (siehe unten) auslesbar.
+4. **USB-Endlosschleife begrenzt** (Variante 4): `putb()` wiederholte
+   `USBD_CDC_ACM_PutChar()` **unbegrenzt und ohne Taskwechsel**. Steckt ein USB-Kabel, ist CDC
+   enumeriert, holt aber niemand die Daten ab, drehte das pro Byte endlos und blockierte das
+   System. Jetzt: Timeout `USB_WAIT_MS`=50 ms, Zaehler `usb_tx_stuck`, und `osThreadYield()`
+   statt `osDelay(1)` - CPU abgeben ohne 1-ms-Zwangspause je Byte.
+
+**Nebenbefund Windows-Fehlklassifikation:** Der PC zeigt `VIASIS_26SC9996` als **Audiogeraet**
+und legt keinen SPP-COM-Port automatisch an. Recherche in der Ezurio-Kommandoreferenz
+(`Documentation/EZ-GUIDE-EZ-SERIAL-VELA-IF820_v2_2.pdf`, 220 S.): Die EZ-Serial-Firmware hat
+**ueberhaupt keine Audio-Profile** - 0 Treffer fuer A2DP/AVRCP/HFP/Audio in Guide und
+Datenblatt; ab Werk laufen genau **Classic SPP + CYSPP (BLE)**. Die Fehlklassifikation kann
+also nur aus der **Class of Device** kommen -> mit `GBTDC` auslesen, ggf. per `SBTDC,C=<hex>`
++ `/SCFG` korrigieren. Ein Windows-seitiger Haken im Dienste-Reiter ist **keine** Loesung
+(Kundenzumutung), sondern nur ein Messinstrument.
+
+**Ausserdem geklaert:** Der Infineon-Guide fuer den CYW20822 ist BLE-only (keine
+Classic-Kommandos). Die maßgebliche Referenz fuer den IF820 ist die **Ezurio**-Datei oben, die
+bereits im Repo unter `Documentation/` liegt. Classic-Kommandos: **BT-Gruppe ID=14**, SPP-Gruppe
+ID=19. BLE-Advertising stoppt nach 30 s + 60 s = **90 s** (aus den `SAP`-Werksdefaults
+`D=0x1E`, `O=0x3C`); per `SAP,D=0000,O=0000` unbegrenzt stellbar.
+
+**Geaenderte Dateien:** sio.c, sio.h, btio.c, btio.h, libtool.c, sprachen/sictxt.c (-> 5.53).
+
+**Naechste Schritte (in dieser Reihenfolge):**
+1. 5.53 bauen/flashen, BT-Download wiederholen, danach BT-Info-Menue aufrufen und
+   `lost=<s>`, `GBTDC` und `GBTP` notieren.
+2. Ist `lost` gross -> CTS-Wait umbauen (erst kurz eng pollen, dann erst schlafen; Freeze-Schutz
+   und Timeouts behalten). Ist `F=0` in `GBTP` -> `SBTP,F=1` (Sniff aus) + `/SCFG`.
+3. `GBTDC`: Major Device Class 0x04 oder Service-Bit 0x200000 -> `SBTDC` auf eine
+   unkategorisierte/serielle Klasse, damit Windows das Geraet richtig einordnet.

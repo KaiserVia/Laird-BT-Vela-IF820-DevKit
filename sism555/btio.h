@@ -95,6 +95,13 @@
 #define T_sdn      "SDN$,N="    // gap_set_device_name, $ = direkt in Flash
 #define T_sdnok    "SDN$,0000"
 #define T_gdn      "GDN\r"     // gap_get_device_name
+#define T_gbtdc    "GBTDC\r"   // bt_get_device_class (14/13) -> C=<24-Bit Class of Device>
+                               // Windows leitet Geraetekategorie/Icon daraus ab. Major Class 0x04 oder
+                               // Service-Bit Audio (0x200000) -> PC zeigt "Audiogeraet" statt seriell.
+                               // Setzen (noch nicht implementiert): SBTDC,C=<hex> + /SCFG
+#define T_gbtp     "GBTP\r"    // bt_get_parameters (14/11) -> T=supervision,D=discoverable,C=connectable,
+                               // F=flags,S=SCN,V=,N=  |  F Bit0: 0=Sniff-Mode AN (Werksdefault!), 1=aus.
+                               // Sniff-Mode ist der Hauptverdaechtige fuer die Latenz pro X/Y-Modem-Block.
 #define T_rbt      "/RBT\r"    // system_reboot
 #define T_dis      "/DIS\r"    // gap_disconnect - offene Verbindung sauber schliessen
 #define T_disok    "/DIS,0000"
@@ -118,6 +125,8 @@ extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-M
 extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
 extern void bt_disconnect (void);         // IF820: offene Verbindung sauber trennen (Command-Mode + /DIS)
 extern void bt_cyspp_monitor (void);      // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) - Testmenue
+extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
+extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
 
 #endif // BTIO_H_
 
