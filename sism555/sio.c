@@ -52,9 +52,7 @@ int redirect_char_Out (int (*pchar_func)(int a)) // Umleitung Standard Ausgabe
 
 int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 {
- int result=-1;
-	
- if (connect&UART0) 						// Schnittstelle UART 0 - Terminal aktiviert  	
+ if (connect&UART0) 						// Schnittstelle UART 0 - Terminal aktiviert
  { 
   while (!(U0->LSR & THRE)) {};	// Warte UART0 Transmitter FIFO leer? 
   U0->THR = ch;									// dann sofort senden	 
@@ -102,7 +100,7 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 	// osThreadYield() statt osDelay(1): gibt die CPU ab, erzwingt aber keine 1-ms-Pause je Byte
 	// (genau die Falle, die den BT-Durchsatz kostet - siehe Diagnosezaehler oben).
 	uint _ut=mstimer;
-	while ((result=USBD_CDC_ACM_PutChar (0, ch)) != ch)   // Zeichen -> USB, ggf. wiederholen
+	while (USBD_CDC_ACM_PutChar (0, ch) != ch)            // Zeichen -> USB, ggf. wiederholen
 	{
 	 if ((uint)(mstimer-_ut) >= USB_WAIT_MS) { usb_tx_stuck++; break; }  // Host holt nicht ab -> Byte verwerfen
 	 if (WDTV<1000) { ResetWDT(); break; }                              // Sicherheitsnetz Watchdog
