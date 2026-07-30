@@ -1935,3 +1935,13 @@ unabhaengig von A4 zu ueberdenken.
 3. Existenz der Kommandos auf 1.4.12.12 pruefen - falls eine Warnung "could not set ..."
    erscheint, kennt die alte Modul-FW das Kommando nicht (dann per Modul-FW-Update 1.4.18.18
    nachziehen oder Schritt weglassen).
+
+## Update 5.57b - Entscheidungen A4 / PIN-Schema (nur Doku)
+
+- **A4 (Seriennummer in Manufacturer-Data): verworfen.** Wird nicht umgesetzt. Die App liest die
+  Seriennummer aus dem Advertising-Namen; die PIN-gleiche Zahl wird nicht zusaetzlich gesendet.
+- **PIN-Schema (PIN == numerische Seriennummer): wird separat behandelt** (eigener Arbeitsstrang,
+  nicht Teil der IF820-Config-Liste).
+
+Manufacturer-Data bleiben damit bewusst 00000000. Doku aktualisiert:
+IF820_Config_Kandidaten.md und ble-chip-response.md.

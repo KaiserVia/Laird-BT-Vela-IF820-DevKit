@@ -34,9 +34,11 @@ nicht einstellbar.
 
 - **A1, A2, A5 — umgesetzt in Firmware 5.57** (selbstheilend im Init, Schritte 3d/3e/3f).
 - **A3 — umgesetzt in 5.55/5.56** (dauerhaftes Advertising, Low-Duty-Intervall 3 s).
-- **A4 — zurückgestellt.** Sicherheitsfund: die Zugangs-PIN **ist** die numerische Seriennummer
-  (`fp.btpin = atoi(serno)*10000 + atoi(serno+4)`). A4 würde diese Zahl roh in die
-  Manufacturer-Data broadcasten. Entscheidung offen — siehe Notiz unter A4.
+- **A4 — verworfen (Entscheidung 2026-07-30).** Die App liest die Seriennummer weiter aus dem
+  Advertising-Namen; die PIN-gleiche Zahl wird **nicht** zusätzlich broadcastet. Auslöser:
+  Sicherheitsfund, dass die Zugangs-PIN **die** numerische Seriennummer ist
+  (`fp.btpin = atoi(serno)*10000 + atoi(serno+4)`).
+- **PIN-Schema (PIN = Seriennummer):** wird **separat** behandelt (nicht Teil dieser Config-Liste).
 
 ---
 
@@ -67,7 +69,7 @@ nicht einstellbar.
 - **Risiko:** Dauer-Advertising kostet Strom → **nicht** pauschal für Batteriegeräte (siehe B2).
 - **Wirkungsbereich:** getrennt parametrieren, Netz vs. Batterie.
 
-### A4 — Seriennummer in die Manufacturer-Data (`.CYSPPSP …,L=<serno>`)  ⚠ ZURÜCKGESTELLT
+### A4 — Seriennummer in die Manufacturer-Data (`.CYSPPSP …,L=<serno>`)  ❌ VERWORFEN (2026-07-30)
 - **Default:** Company C=0x0131 (Cypress), local_key L=0 → **erklärt die beobachteten `00000000`**.
 - **Vorschlag:** `.CYSPPSP,E=2,G=0,C=0131,L=<serno_hex>,R=0,M=0,P=1,S=0,F=2`
 - **Nutzen:** Die Seriennummer erschiene im BLE-Advertising. Die App liest sie heute aber schon

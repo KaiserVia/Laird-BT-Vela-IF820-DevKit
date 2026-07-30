@@ -222,7 +222,7 @@ Verhalten und kein Bug.
 | 2. Security-Requirement der CCCD | Ausgeschlossen — bei fehlender Berechtigung käme ATT-Error, nicht Success |
 | 3. Read-Handler `a47f7608-…` | Gehört zur modul-eigenen GATT-DB (Service 2), nicht von uns implementiert. Für den Datenpfad ohne Bedeutung, wird nicht weiter verfolgt |
 | 4. TX/RX-Zuordnung dokumentieren | Erledigt, Abschnitt 3 |
-| 5. Manufacturer-Payload befüllen | **Ursache gefunden:** die Manufacturer-Data sind `C=0x0131` (Cypress) + `L=0` → daher die `00000000`. Wir können `L` per `.CYSPPSP` mit der Seriennummer füllen. **Frage an euch:** braucht ihr die Seriennummer in der Manufacturer-Data, oder reicht sie euch aus dem Advertising-Namen `VIASIS_<seriennr>_BLE`? Wenn gebraucht, bauen wir es ein |
+| 5. Manufacturer-Payload befüllen | **Entschieden: bleibt `00000000`.** Die Seriennummer steht im Advertising-Namen `VIASIS_<seriennr>_BLE` — bitte von dort lesen. Die Manufacturer-Data füllen wir bewusst **nicht** (die dort einzusetzende Zahl hängt mit dem geräteinternen Zugangs-PIN zusammen, daher kein Broadcast). Falls ihr die Seriennummer doch dort braucht, meldet euch — dann finden wir eine Kodierung, die nichts Sensibles preisgibt |
 
 ---
 
@@ -237,9 +237,8 @@ Verhalten und kein Bug.
 3. Beim Retest bitte notieren, **ob unmittelbar vorher eine Mobilfunk-Aktion lief** (LTE/MQTT/
    SMS). Das war der Auslöser des Bugs und ist der aussagekräftigste Testfall: BT verbinden →
    GSM-Aktion → BT trennen lassen → GSM-Session beenden → erneut verbinden + subscriben.
-4. Noch eine offene Rückfrage: braucht ihr die **Seriennummer in der Manufacturer-Data**
-   (Abschnitt 6, Punkt 5), oder reicht sie euch aus dem Advertising-Namen `VIASIS_<seriennr>_BLE`?
-   (Dauerhaftes Advertising ist bereits erledigt — Abschnitt 3b.)
+4. Keine offenen Rückfragen mehr von unserer Seite. Seriennummer bitte aus dem Advertising-Namen
+   `VIASIS_<seriennr>_BLE` lesen (Manufacturer-Data bleibt leer, siehe Abschnitt 6, Punkt 5).
 
 ---
 
