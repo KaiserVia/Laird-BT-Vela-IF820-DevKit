@@ -31,7 +31,7 @@
         <Selections>n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n:n</Selections>
       </EraseSettings>
       <FirmwareFile>
-        <File Path="yes">C:\viaTraffic\GitHub\Projects\Laird_BT_Vela-IF820-DevKit\sism555\sism.hex</File>
+        <File Path="yes">sism.hex</File>
       </FirmwareFile>
       <ProgramOptions>
         <Verify>true</Verify>
@@ -68,7 +68,7 @@
         <DisableSignatureCheck>false</DisableSignatureCheck>
       </Preferences>
       <Split1Distance>160</Split1Distance>
-      <Split2Distance>252</Split2Distance>
+      <Split2Distance>310</Split2Distance>
     </Programmer>
   </ProgramDocument>
   <StartPageForm>
@@ -81,7 +81,7 @@
     <Layout>&lt;?xml version="1.0" encoding="utf-16"?&gt;
 &lt;Layout&gt;
   &lt;Window Guid="47071a22-98aa-4346-8477-e67e37b01d67" LastFocused="0" DockedSize="200" PopupSize="0" FloatingLocation="-1, -1" FloatingSize="250, 400" LastOpenDockSituation="Docked" LastFixedDockSituation="Docked" LastFixedDockLocation="Right" LastFloatingWindowGuid="00000000-0000-0000-0000-000000000000" LastDockContainerCount="1" LastDockContainerIndex="0" DockedWorkingSize="250, 400" DockedWindowGroupGuid="7f7d8361-9ca0-4b59-be09-7c199fe7609a" DockedIndexInWindowGroup="0" DockedSplitPath="0" DocumentWorkingSize="250, 400" DocumentWindowGroupGuid="00000000-0000-0000-0000-000000000000" DocumentIndexInWindowGroup="0" DocumentSplitPath="0" FloatingWorkingSize="250, 400" FloatingWindowGroupGuid="00000000-0000-0000-0000-000000000000" FloatingIndexInWindowGroup="0" FloatingSplitPath="0" /&gt;
-  &lt;Window Guid="674f2f43-0337-4635-bf65-db1556b2e3d3" LastFocused="134285148633522405" DockedSize="200" PopupSize="0" FloatingLocation="-1, -1" FloatingSize="550, 400" LastOpenDockSituation="Document" LastFixedDockSituation="Document" LastFixedDockLocation="Right" LastFloatingWindowGuid="00000000-0000-0000-0000-000000000000" LastDockContainerCount="0" LastDockContainerIndex="0" DockedWorkingSize="250, 400" DockedWindowGroupGuid="00000000-0000-0000-0000-000000000000" DockedIndexInWindowGroup="0" DockedSplitPath="0" DocumentWorkingSize="250, 400" DocumentWindowGroupGuid="13c4cc3b-eac2-4310-8f1d-9a5528f64a94" DocumentIndexInWindowGroup="0" DocumentSplitPath="0" FloatingWorkingSize="250, 400" FloatingWindowGroupGuid="00000000-0000-0000-0000-000000000000" FloatingIndexInWindowGroup="0" FloatingSplitPath="0" /&gt;
+  &lt;Window Guid="674f2f43-0337-4635-bf65-db1556b2e3d3" LastFocused="134296261851835434" DockedSize="200" PopupSize="0" FloatingLocation="-1, -1" FloatingSize="550, 400" LastOpenDockSituation="Document" LastFixedDockSituation="Document" LastFixedDockLocation="Right" LastFloatingWindowGuid="00000000-0000-0000-0000-000000000000" LastDockContainerCount="0" LastDockContainerIndex="0" DockedWorkingSize="250, 400" DockedWindowGroupGuid="00000000-0000-0000-0000-000000000000" DockedIndexInWindowGroup="0" DockedSplitPath="0" DocumentWorkingSize="250, 400" DocumentWindowGroupGuid="13c4cc3b-eac2-4310-8f1d-9a5528f64a94" DocumentIndexInWindowGroup="0" DocumentSplitPath="0" FloatingWorkingSize="250, 400" FloatingWindowGroupGuid="00000000-0000-0000-0000-000000000000" FloatingIndexInWindowGroup="0" FloatingSplitPath="0" /&gt;
   &lt;Container Dock="4" ContentSize="200"&gt;
     &lt;SplitLayoutSystem WorkingSize="250, 400" SplitMode="0"&gt;
       &lt;ControlLayoutSystem WorkingSize="250, 400" Guid="7f7d8361-9ca0-4b59-be09-7c199fe7609a" Collapsed="0" SelectedControl="47071a22-98aa-4346-8477-e67e37b01d67"&gt;

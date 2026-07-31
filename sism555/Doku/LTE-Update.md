@@ -433,3 +433,44 @@ mit `ResetWDT()` bedienen (langer Lauf) und `LONG_WD_32` setzen.
 
 *Hinweis: Alle Empfehlungen sind additiv — die bestehende, funktionierende
 AT-Sequenz muss dafür nicht umgebaut werden.*
+
+---
+
+## 10. Umsetzungsplan (Reihenfolge)
+
+Prinzip: **einzeln umsetzen**, jede Stufe eigener Commit (`T_version`-Bump gemäß
+`CLAUDE.md`), dazwischen in Keil bauen und am Gerät testen. Reihenfolge nach
+Abhängigkeit und aufsteigendem Risiko — Kleines/Unabhängiges zuerst, die großen
+Brocken (Netzscan, Trigger) zuletzt, weil alles darauf aufbaut.
+
+### Stufe 0 — erledigt
+- **F12009 „SIM-Karte nicht erkannt"** (`AT+QSIMSTAT?` in `atcpin()`).
+  Umgesetzt in Commit `ea067ca` (BT 5.50). Doku: `LTE_Fix.md`.
+
+### Reihenfolge der offenen Punkte
+
+| # | Maßnahme | Kap. | Abhängig von | Aufwand/Risiko | Warum an dieser Stelle |
+|---|----------|------|--------------|----------------|------------------------|
+| 1 | `AT+QCSQ` messen + loggen (RSRP/SINR/RSRQ) | 5.1 | – | klein | Fundament: liefert die Messgröße, die der Netzscan (#6) zum Vergleichen braucht. Für sich allein schon nützlich (Diagnose). |
+| 2 | CEREG-Status 2/3/0 differenziert behandeln | 5.2 | – | klein | Lokale Änderung in `test_registration()`, unabhängig, sofort robustheitswirksam. |
+| 3 | `QIACT?`-Prüfung + Retry der Kontext-Aktivierung | 5.3 | – | klein | In sich geschlossen in `set_gprs_config()`. |
+| 4 | TCP-Keepalive aktivieren | 5.4 | – | klein | Eine Zeile in `mqtt.c` (State 10) aktivieren + testen. |
+| 5 | Exponentieller Backoff + Fehlerklassifizierung | 5.6 | (2) hilfreich | mittel | Nutzt die klareren Fehlerursachen aus #2; betrifft `wait_min`/`wait_mail`/`wait_sms`. |
+| 6 | `gsm_netscan()` — Netze scannen, bestes merken/locken | 7 | #1 (QCSQ) | groß | Kernstück. Braucht die Messgröße aus #1. Neue `fp`-Felder + CRC-Bereich. Einzeln, mit HW-Test. |
+| 7 | Menüpunkt „Besten LTE Empfang ermitteln" (manueller Trigger) | 8.3 | #6 | mittel | Ruft `gsm_netscan()` auf — muss also nach #6 kommen. Gut zum manuellen Verifizieren von #6. |
+| 8 | GPS-/empfangsgegatete Trigger-Automatik | 8.1/8.2 | #6, #7 | mittel | Automatischer Aufruf von `gsm_netscan()`; sinnvoll erst, wenn Scan + manueller Trigger stehen. |
+| — | Band-/RAT-Lock fest verdrahten | 5.5 | #6 | mittel | **Optional/später.** Ergebnis von #6 kann das Band automatisch setzen; harte Locks nur bei bekannter Netzlage. |
+| — | Timeouts | 5.7 | – | – | **Keine Code-Änderung.** Bei festem Standort bewusst NICHT kürzen (siehe 5.7). |
+
+### Empfohlene Commit-/Versionsschritte
+- **BT 5.51:** #1 QCSQ messen/loggen.
+- **BT 5.52:** #2 + #3 + #4 (kleine Robustheit, ggf. ein gebündelter Commit).
+- **BT 5.53:** #5 Backoff.
+- **BT 5.54:** #6 `gsm_netscan()` (großer Einzel-Commit).
+- **BT 5.55:** #7 Menüpunkt.
+- **BT 5.56:** #8 Trigger-Automatik.
+- (später) Band-Lock #5.5, wenn gewünscht.
+
+Nach jeder Stufe: Encoding der ISO-8859-Dateien prüfen (kein `\r\r\n`), in Keil
+bauen, am Gerät testen, `project-status.md` als `## Update <Version>` fortschreiben,
+Commit `BT <Version>: <Kurzbeschreibung>`.
