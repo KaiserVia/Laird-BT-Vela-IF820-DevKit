@@ -251,13 +251,97 @@ loading" und verbessert den SPP-Durchsatz.
 
 **Voraussetzung Hardware:** HCI-UART (Pins 24/25/26/27) **und** Reset (Pin 34) müssen erreichbar
 sein, Flow Control ist beim Flashen zwingend, und **CTS muss beim Reset LOW sein** (Datenblatt
-§11, S. 34, 115200 8N1). Ob das Mainboard diese Pins herausführt, ist offen.
-
-Nebenbefund: **R124 (10 kΩ Pull-up auf RST, Pin 34) ist nicht bestückt.** Kritisch ist das nicht
-— das Datenblatt (S. 31) bestätigt einen **internen** Pull-up am RST. Für einen sauberen
-Flash-Vorgang ist ein externer aber sicherer.
+§11, S. 34, 115200 8N1). Zum Reset-Pfad siehe Abschnitt 9a — er ist geklärt; die HCI-UART-Pins
+sind weiterhin offen.
 
 **Wahrscheinlichkeit, dass 1.4.18.18 die Lockups unter UART-Last behebt: 60 %.**
+
+---
+
+## 9a. RST_L (Pin 34) — auf dem Mainboard an nichts angeschlossen
+
+### Was der Pin ist
+
+Reiner **Hardware-Systemreset des Chips**. Eingang, aktiv LOW, mit **internem Pull-up**.
+Er startet das Modul neu, löscht aber **keine** Konfiguration — ein Werksreset ist
+ausschließlich Software (`system_factory_reset` / `/RFAC`, Guide S. 37 und S. 92).
+Nach einem Reset sendet EZ-Serial das Boot-Event `system_boot (BOOT, ID=2/1)` (Guide S. 13).
+
+**Nicht verwechseln mit P14** („GPIO for peripheral RST_L", MHF4 Pin 28). Das ist ein
+**Ausgang**, um externe Peripherie zurückzusetzen — nicht der Modulreset.
+
+### Belegstellen
+
+Datenblatt Tabelle 21, **S. 31** (integrierte Antenne — unsere Variante), Zeile wörtlich:
+
+> `34 | RST | RST_L | floating | I | VDDIO | Active-low system reset with internal pull-up resistor.`
+> `NOTE - Required for flashing EZ-Serial and HCI firmware.`
+
+Dieselbe Zeile in Tabelle 18, **S. 22**, für die MHF4-Variante mit **Pin 24**.
+Spaltenüberschriften auf S. 20: *Pin # | Name | EZ-Serial FW Default Function | **Pin When Not
+Used** | I/O | Voltage Ref. | Description*.
+
+### Wie muss er beschaltet werden? Gar nicht
+
+Die Spalte „Pin When Not Used" sagt **`floating`** — das Datenblatt erlaubt ausdrücklich, den
+Pin offen zu lassen. Die Referenzschaltungen **§9.4 (S. 25)** und **§10.4 (S. 33)** nennen je
+nur drei Punkte (100 nF an 3P0V/VDDIO, 32,768-kHz-Quarz, „BT_UART signals (x4) are required for
+flashing") — **RST kommt dort nicht vor.** In keinem der drei Herstellerdokumente gibt es eine
+Empfehlung für externen Pull-up, RC-Glied oder Host-GPIO.
+
+**Timing: existiert nicht.** Keine minimale Pulsbreite, keine Anstiegszeit, keine
+Boot-Verzögerung — in keinem der drei PDFs. Einzige verwandte Zahl: Guide S. 38,
+„Short delay while chipset reset and boot process occurs, **~150 ms**" (nach `/RFAC`).
+
+### Wann er gebraucht wird: beim Flashen
+
+Datenblatt **§11, S. 34**, wörtlich:
+
+> • Flashing uses BT_UART_TXD, BT_UART_RXD, BT_UART_CTS, BT_UART_RTS
+> • Flow control is mandatory.
+> • **Reset line is also required to be able to enter programming mode.**
+> • UART settings are 1152008N1
+> • **CTS needs to be low during a reset to enter programming mode.**
+
+### Befund am Mainboard V2
+
+Das Netz `N$160` enthält **genau zwei** Anschlüsse: `IC37.RST` und `R124` Pad 1.
+R124 (10 kΩ) führt auf `N$169`, also die Modulversorgung — es wäre ein externer Pull-up.
+**R124 ist in beiden Bestückungsvarianten als `populate="no"` eingetragen.**
+
+Damit hängt RST_L auf dem Mainboard an **nichts**. Zwei Konsequenzen:
+
+**1. Der LPC1766 kann das Modul nicht zurücksetzen.** Es existiert kein Pfad vom MCU zum
+Reset-Pin. Das erklärt den Eintrag in `project-status.md`, dass bei einem hängenden Modul nur
+ein echter Power-Cycle des ganzen Geräts hilft und ein Reflash des LPC das IF820 nicht mitnimmt.
+Zusammen mit „das IF820 hat keinen Enable-Pin" ist das der Grund für den offenen Backlog-Punkt
+„Power/Enable-Konzept".
+
+**2. Das freie R124-Pad ist der Zugang zu RST.** Pad 1 liegt auf `N$160`. Wer onboard flashen
+oder gezielt einen Reset auslösen will, lötet dort an — kein Feinpitch am Modul nötig.
+Ein bestücktes R124 (10 kΩ nach VDDIO) schadet nicht, ist aber nicht erforderlich, weil der
+interne Pull-up laut Datenblatt vorhanden ist.
+
+**Empfehlung:** Wenn ohnehin am Board gearbeitet wird, RST über das R124-Pad auf einen freien
+LPC-GPIO führen. Das macht das Modul aus der Firmware heraus resetbar und beseitigt die
+Abhängigkeit vom Power-Cycle des Gesamtgeräts.
+**Wahrscheinlichkeit, dass das die „Modul hängt, hilft nur stromlos"-Fälle auflöst: 75 %.**
+
+### Am DVK (`EZ-GUIDE-DVK-IF820_v2_0.pdf`)
+
+| Fundstelle | Inhalt |
+|---|---|
+| S. 10, Tabelle 4 | `J3.5 → Modulpin 34 → RST_L → RP2040 und Reset-Taster (SW301)` (Antennenvariante) |
+| S. 9, Tabelle 3 | `J2.23 → Modulpin 24 → RST_L` (MHF4-Variante) |
+| S. 8, Tabelle 2 | `SW301 Reset button for Vela IF820`; `SW2 Recovery button, used in combination with the reset button to ensure user can program the Vela IF820 over the HCI UART` |
+| S. 9 | `J2.11 / 36 / BT_UART_CTS / RP2040 and recovery button (SW2)` — SW2 setzt CTS LOW, genau die Regel „CTS low during reset" |
+| S. 16, Tabelle 6 | mikroBUS `J201.2 RST_L`, Jumper auf J3 Pin 5–6 (Antennenvariante) |
+
+**Kein dokumentiertes Pin-Kombination-Werksreset beim Booten.** Guide S. 37 erwähnt „a
+hardware-triggered factory reset" beiläufig, definiert dafür aber nirgends einen Pin.
+Ein Firmware-Reflash setzt dagegen alles zurück — Guide S. 67: „Updating firmware via this
+method **always returns to factory default settings** and removes any bonding data and custom
+GATT structure."
 
 ---
 
@@ -314,8 +398,10 @@ verhindert: 90 %.**
   (S. 25), Pin-/Enable-Wahrheitstabelle (S. 22, 26), §4.1.3/§4.2.1/§4.2.3 (S. 73–74),
   `.CYSPPSP` (S. 169–170), GPIO-Gruppe (S. 164–167), §8.1 (S. 216)
 - `Documentation/Ezurio_PCN #7C-2024_…Internal LPO.pdf`, `Ezurio_PCN #2E-2026_…1.4.18.18.pdf`
-- `Mainboard-V2-A1_13_07_2026.sch` — Netze `N$133`, `BLT-LINK`, `N$169`, `N$147`, `N$155`;
-  Variantendefinition `Abwärtskompatibel mit LTE` (current)
+- `Documentation/EZ-GUIDE-DVK-IF820_v2_0.pdf` — Tabelle 2 (S. 8), Tabelle 3 (S. 9),
+  Tabelle 4 (S. 10), Tabelle 6 (S. 16)
+- `Mainboard-V2-A1_13_07_2026.sch` — Netze `N$133`, `BLT-LINK`, `N$169`, `N$147`, `N$155`,
+  `N$160`; Variantendefinition `Abwärtskompatibel mit LTE` (current)
 - `sism555/Doku/HW_Massnahmen_IF820.md`, `sism555/project-status.md` (Updates 5.03, 5.14–5.16,
   5.41–5.43, 5.47–5.49, 5.51, 5.92), `sism555/Doku/BT_Teststrategie.md`,
   `sism555/Doku/IF820_Config_Kandidaten.md`, `sism555/Doku/ble-retest-1-negative.md`

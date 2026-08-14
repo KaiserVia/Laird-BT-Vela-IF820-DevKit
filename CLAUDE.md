@@ -13,7 +13,7 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
 - **Aktueller Branch:** `LTE-Update`
-- **Aktuelle Firmware-Version:** `T_version = "5.59"` (in `sism555/sprachen/sictxt.c`, Z. 27)
+- **Aktuelle Firmware-Version:** `T_version = "5.64"` (in `sism555/sprachen/sictxt.c`, Z. 27)
 - **Firmware-Quellcode:** `sism555/` (Hauptdatei BT: `btio.c` / `btio.h`)
 - **Liefer-/Herstellercode:** `SupplierSourceCode/` (u. a. Vela IF820 Firmware 1.4.18.18, als Submodul)
 - **Hersteller-PDFs:** `Documentation/` (Datenblatt, EZ-Serial-Guide, DVK-Guide, PCNs)
@@ -127,7 +127,18 @@ zwischen den Wegen und klärt zugleich, ob aktives LOW-Treiben Contention erzeug
   bringt nur mit passender Modul-FW etwas (15 % ohne FW-Wechsel) → zurückgestellt.
 - Antennen-Keep-out (Ausfall schon auf 40 cm) — 45 %, erst nach Entkopplung neu bewerten.
 - Modul-FW ist 1.4.12.12; 1.4.18.18 behebt „lockup under heavy UART loading" (60 %).
-  Setzt voraus, dass HCI-UART (Pins 24–27) + RST (Pin 34) erreichbar sind — ungeprüft.
+  Setzt voraus, dass HCI-UART (Pins 24–27) + RST (Pin 34) erreichbar sind — HCI-UART ungeprüft,
+  RST geklärt (siehe nächster Punkt).
+- **`RST_L` (Pin 34) hängt am Mainboard an nichts.** Netz `N$160` enthält nur `IC37.RST` und
+  `R124` Pad 1; **R124 (10 kΩ nach VDDIO) ist in beiden Varianten nicht bestückt**. Folgen:
+  (a) der LPC kann das Modul **nicht** zurücksetzen — deshalb hilft bei einem hängenden Modul
+  nur ein Power-Cycle des Gesamtgeräts, und ein LPC-Reflash nimmt das IF820 nicht mit;
+  (b) das **freie R124-Pad ist der Zugang zu RST** (kein Feinpitch nötig) — für Onboard-Flashen
+  oder um RST auf einen freien LPC-GPIO zu führen (75 %, dass das die „Modul hängt"-Fälle löst).
+  Beschaltung ist laut Datenblatt **nicht erforderlich**: Tabelle 21 S. 31 listet RST als
+  „Pin When Not Used: **floating**", mit internem Pull-up; die Referenzschaltungen §9.4/§10.4
+  erwähnen RST gar nicht. Kein Timing spezifiziert. Details in
+  `HW_Massnahmen_Bewertung_2026-08.md` Abschnitt 9a.
 - **Betriebsregel:** immer nur **eine** Versorgungsquelle (Board **oder** DVK-USB, nie beides).
   Verstöße haben bereits zwei Module und ein DVK zerstört (Back-Powering).
 - BLE-Durchsatz-Optionen A/B (Backlog, noch nicht umgesetzt).
