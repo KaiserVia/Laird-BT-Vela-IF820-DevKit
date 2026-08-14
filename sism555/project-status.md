@@ -2026,3 +2026,180 @@ daher rein ueber die Adv-Parameter.
 3. Download wiederholen -> sollte wieder schnell sein (Richtung 5.54: 4 MB < 15 min). TXstuck
    sollte klein/0 bleiben. Falls WEITER langsam -> Advertising war doch nicht die Ursache, dann
    PC-seitiges Sniff/Energieverwaltung oder RF pruefen.
+
+---
+
+## Update 5.60 - BT-Diagnose im Testmenue: Event-Sniff + CYSPP-Contention-Test
+
+**Hintergrund:** Logic-Analyzer-Messung (Anwender, 2026-08-10) an der CYSPP-Leitung
+(Modulseite, IF820 Pin 12) zeigt einen klaren Unterschied zwischen Classic und BLE:
+- **Classic:** CYSPP faellt beim Connect sauber auf LOW und bleibt dort (Referenz, funktioniert).
+- **BLE:** CYSPP bleibt ueber die gesamte Aufzeichnung (~20 s, inkl. eines TxD/RTS-Ausschlags
+  vermutlich beim Subscribe) durchgehend HIGH - faellt kein einziges Mal ab.
+
+Das bestaetigt empirisch den Kernverdacht aus `Doku/HW_Massnahmen_Bewertung_2026-08.md`
+(R77 fehlt -> nur der interne PCA9554-Pull-up haelt die Leitung HIGH). Offen bleibt aber, ob
+das HIGH selbst den GATT-Disconnect ausloest: laut EZ-Serial-Guide (S. 25-26) fuehrt ein
+dauerhaft HIGH stehendes CYSPP bei aktivem Autostart-Profil zu "keine Daten fliessen", nicht
+zwingend zu einem sofortigen Verbindungsabbruch. Um zwischen "Pin-Ursache" (Modul trennt lokal,
+gap_disconnected reason=0x0916) und "RF/Brownout" (Supervision-Timeout, reason=0x0908) zu
+unterscheiden, braucht es den rohen EZ-Serial-Event-Stream waehrend eines BLE-Subscribe-Versuchs
+- den gab es bisher nicht (kein UART1-Event-Parser im Projekt).
+
+**Umsetzung - zwei rein diagnostische, reversible Testmenue-Funktionen (btio.c/btio.h):**
+- `bt_event_sniff()`: liest bis zu 60 s lang roh vom UART1-RX-Ringpuffer mit (Muster wie
+  `bt_query_show()`/`bt_cyspp_monitor()`: eigene Terminal-Ausgabe ueber `connect=concpy&~UART1`,
+  nichts geht zurueck ans Modul), druckt alles druckbare 1:1 durch, filtert nur CR. Ziel:
+  waehrend App-Subscribe live `gap_connected` (C), `gatts_data_written` (W) und vor allem
+  `gap_disconnected` (DIS, mit reason=) sichtbar machen. Guard: nur `fp.btmodem==IF820` und
+  `uart1_owner==MUX_BT` (sonst wuerde bei aktiver GSM/GPS-Nutzung von UART1 deren Datenstrom
+  mitgelesen). Bricht bei Tastendruck/Comchange ab (Endlosschleifenschutz wie bei
+  `bt_cyspp_monitor`).
+- `bt_cyspp_contention_test()`: IC54 Bit7 (dieselbe Leitung wie CYSPP) fuer 500 ms aktiv als
+  Ausgang LOW getrieben (Gegenstueck zu `bt_cmdmode()`, das HIGH treibt), danach sofort
+  `bt_release()`. Fuer Messprotokoll Schritt 6 (`Doku/Messprotokoll_CYSPP_Diagnose.md`):
+  Delta-U ueber R78 (100 Ohm) waehrenddessen messen, um eine Bus-Contention mit einem evtl.
+  gleichzeitig treibenden Modul-Ausgang zu erkennen, bevor endgueltig zwischen Weg B (ohne R77)
+  und Weg C (mit R77) entschieden wird.
+- `bt_diag_menu()`: gemeinsamer Einstieg (ein Ziffernplatz im Testmenue war frei), fragt
+  1=Event-Sniff / 2=Contention-Test ab.
+
+**Menue:** Testmenue (`sicom.c` case 0x0003) um Punkt 8 "BT-Diagnose (Event-Sniff/Contention)"
+erweitert (`case 0x0038`, ruft `bt_diag_menu()`). Die bisherige Testmenue-Return-Case-Nummer
+verschiebt sich von 0x0038 auf 0x0039 (rein technisch, gleiches Verhalten wie zuvor - faellt in
+den bestehenden `default`-Zweig, `menu>>=4`). CYSPP-Monitor (Punkt 7, `case 0x0037`) unveraendert.
+
+**Bewusst NICHT invasiv:** Keine Aenderung an `init_bluetooth()`, `bt_cmdmode()`/`bt_release()`
+oder sonst am produktiven BT-Ablauf - beide neuen Funktionen sind reine Diagnose, nur ueber das
+Testmenue erreichbar, greifen nur waehrend ihres eigenen Aufrufs ein.
+
+**Geaenderte Dateien:** btio.c, btio.h, sicom.c, sprachen/sictxt.c (-> 5.60).
+
+**Am Geraet als Naechstes zu tun (nicht kompiliert/getestet):**
+1. Testmenue -> 8 -> 1 (Event-Sniff) starten, dann per App BLE verbinden + auf `...ca102`
+   subscriben. Erwartung: `gap_connected`/`gatts_data_written`-Events sichtbar, dann entweder
+   Daten oder `gap_disconnected,...,reason=0x0916` (Pin-Theorie bestaetigt) bzw. `reason=0x0908`
+   (eher RF/Brownout, siehe Massnahme 3/8 in `HW_Massnahmen_Bewertung_2026-08.md`).
+2. Danach Testmenue -> 8 -> 2 (Contention-Test) fuer Messprotokoll Schritt 6: Oszi auf CH1/CH2
+   (R77-Pad/R78-Pad) legen, Delta-U waehrend der 500 ms notieren.
+3. Ergebnis in `Doku/Messprotokoll_CYSPP_Diagnose.md` Schritt 6 eintragen bzw. den
+   Disconnect-Reason-Code hier als neues Update dokumentieren.
+
+---
+
+## Update 5.61 - FIX: bt_event_sniff() brach sofort ab (UART1 gehoerte GSM/GPS)
+
+**Symptom (erster Geraetetest von 5.60):** Testmenue -> 8 -> 1 brach sofort mit "UART1 gehoert
+aktuell nicht dem BT-Modul (GSM/GPS aktiv) - abgebrochen." ab, bevor ueberhaupt etwas mitgelesen
+werden konnte.
+
+**Ursache:** Denkfehler im Guard. `uart1_owner!=MUX_BT` ist der NORMALFALL im Ruhebetrieb (UART1
+haengt meist an GSM), kein Fehlerzustand - die urspruengliche 5.60-Fassung wertete das faelschlich
+als Abbruchgrund, statt sich die Leitung selbst zu holen.
+
+**Fix (btio.c, `bt_event_sniff()`):** Wie `send_bt_info()` es bereits vormacht, fordert die
+Funktion UART1 jetzt aktiv per `Init_BT_ch(BT_BAUD)` an (verdraengt GSM/GPS noetigenfalls ueber
+den MUX, exakt das bestehende, akzeptierte Verhalten anderer BT-Diagnosefunktionen) und gibt es
+am Ende per `uart1_release(MUX_BT)` wieder frei. Der vorherige Owner-Guard entfaellt komplett.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.61).
+
+**Am Geraet zu verifizieren:** Testmenue -> 8 -> 1 muss jetzt bis zu 60 s laufen (Abbruch nur per
+Taste), auch wenn direkt zuvor GSM aktiv war.
+
+---
+
+## Update 5.62 - FIX: bt_event_sniff() brach bei jedem Modul-Byte ab + verschluckte Menue-Eingaben
+
+**Symptom (zweiter Geraetetest von 5.61):** Event-Sniff brach weiterhin fast sofort ab
+("Event-Sniff beendet." kam quasi ohne Wartezeit). Zusaetzlich beobachtet: **waehrend** des
+BT-Tests bekam das Hauptmenue von sich aus Eingaben ("0", "0", "3", "5", ...) und navigierte
+selbststaendig, ohne dass jemand etwas eingegeben hatte.
+
+**Ursache - zwei zusammenhaengende Effekte:**
+1. `rbuf`/`bxi`/`rxi` ist EIN gemeinsamer Ringpuffer fuer UART0 (RS232-Terminal) UND UART1
+   (BT/GSM-Modul) - beide Interrupt-Handler (`hard.c` `UART0_IRQHandler`/`UART1_IRQHandler`)
+   schreiben hinein. `getkey()` (`sio.c`) bricht bei JEDEM neuen Byte in diesem Puffer ab, ohne
+   zwischen Terminal-Tastendruck und BT-Modul-Traffic zu unterscheiden.
+2. `bt_event_sniff()` (5.60/5.61) nutzte `getkey(100)` als Abbruchbedingung - bei laufendem
+   BT-Verkehr (also genau dem, was beobachtet werden soll) kommt praktisch sofort neuer Byte an,
+   `getkey()` bricht ab, und das dabei noch UNGELESENE Byte bleibt im Puffer stehen. Der normale
+   Menue-Zeichenleser (`getc()`/`getbyte()`, dieselben `bxi`/`rxi`) liest dieses Byte beim
+   naechsten Durchlauf und interpretiert es als Tastatureingabe - da EZ-Serial-Eventzeilen
+   (`@E,001A,...`) haeufig Ziffern enthalten, fuehrte das zu genau der beobachteten
+   selbststaendigen Menuenavigation.
+
+**Fix (btio.c, `bt_event_sniff()`):** `getkey()` komplett entfernt. Die Funktion laeuft jetzt
+FEST 30 Sekunden (300 * 100 ms `osDelay`, kein Fruehausstieg bei Traffic oder Taste), drainiert
+`bxi` weiterhin fortlaufend selbst, und verwirft am Ende explizit alle Restbytes (`bxi=rxi`)
+bevor sie zurueckkehrt und `connect` wiederherstellt - damit kann nichts mehr an den Menue-
+Zeichenleser durchsickern.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.62).
+
+**Am Geraet zu verifizieren:** Testmenue -> 8 -> 1 muss jetzt durchgehend 30 s lang Modul-Traffic
+zeigen (kein vorzeitiger Abbruch), und nach Ablauf darf das Hauptmenue NICHT von selbst
+weiternavigieren, auch wenn waehrenddessen viel BT-Verkehr lief.
+
+---
+
+## Update 5.63 - Event-Sniff mit Zeitstempel + erste echte Event-Auswertung (BLE-CYSPP)
+
+**Erster erfolgreicher Mitschnitt (5.62, Anwender):** Waehrend `ble_cyspp_probe.py` lief, zeigte
+der Event-Sniff:
+```
+@E,0035,C,C=01,A=9C971BE9FA3D,T=00,I=0006,L=0000,O=0064,B=00   <- gap_connected
+@E,000E,ASC,S=00,R=03
+@E,001A,W,C=01,H=0012,T=00,D=0100                               <- gatts_data_written = CCCD-Subscribe
+@E,000C,.CYSPP,S=01                                             <- CYSPP-Datenmodus GESTARTET
+@E,0010,DIS,C=01,R=0913                                         <- Disconnect
+@E,000E,ASC,S=04,R=01
+@E,000C,.CYSPP,S=00
+```
+**Wichtigster Befund:** `.CYSPP,S=01` erscheint direkt nach dem Subscribe (`W`) - CYSPP startet
+also tatsaechlich. Der Disconnect (`DIS,...,R=0913` = "Remote user terminated connection")
+kam laut Python-Log erst 8056 ms spaeter, exakt am Ende des Skript-eigenen 8-Sekunden-
+Lauschfensters - d. h. **das Skript selbst hat getrennt**, nicht das Modul. Dieser Durchlauf war
+also ein ECHTER Erfolg: CYSPP hielt die volle Beobachtungszeit.
+
+**Neuer Datenpunkt aus dem `gap_connected`-Event:** `O=0064` = Supervision-Timeout = 0x64 * 10 ms
+= **nur 1000 ms**. Ungewoehnlich kurz (ueblich sind 4-6 s) - ein einziger 1-Sekunden-Funkaussetzer
+(RF/Brownout) reicht, um die Verbindung zu killen. Passt zur Beobachtung, dass es in anderen
+Durchlaeufen NICHT hielt (Abbruch nach 5,1 s bzw. 5,0 s in fruaheren/spaeteren Laeufen) - eher
+Symptom einer instabilen HF-/Spannungslage als eines harten CYSPP-Pin-Logikfehlers.
+
+**Ungeklaerte Anomalie (Anwenderbeobachtung):** Beim naechsten Durchlauf erschien im RS232-Log
+nur `C -> ASC -> DIS -> ASC` (OHNE `W`/`.CYSPP`), obwohl das Python-Skript zeitgleich einen
+erfolgreichen Subscribe + einen ECHTEN 5,07-s-Abbruch meldete. Zeitliche Zuordnung zwischen
+RS232-Log und Python-Zeitstempeln war NICHT moeglich, weil dem Sniff bisher jeglicher Zeitstempel
+fehlte - die Ereignisse koennten aus einem ueberlappenden/vorherigen Verbindungszyklus stammen
+(die `client.connect()`-Aufrufe brauchen im Test 13-30 s, was Ueberlappungen zwischen
+Sniff-Fenster und Python-Durchlauf wahrscheinlich macht).
+
+**Fix/Erweiterung (btio.c, `bt_event_sniff()`):** Jede Zeile bekommt jetzt einen Zeitstempel
+`[NNNNms]` relativ zum Start des Sniffs (`mstimer`-Differenz), damit sich das Modul-Log kuenftig
+exakt mit den Millisekunden-Zeitstempeln von `ble_cyspp_probe.py` abgleichen laesst.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.63).
+
+**Am Geraet als Naechstes:** Sniff + Python-Skript nochmal parallel laufen lassen, jetzt mit
+Zeitstempeln auf beiden Seiten; pruefen ob `.CYSPP,S=01` / `DIS,...,reason=` bei den
+"echten" Fruehabbruechen (~5 s) ebenfalls auftaucht und mit welchem reason-Code. Danach:
+Recherche, mit welchem EZ-Serial-Kommando sich der Supervision-Timeout (`O=0064`, 1000 ms) auf
+einen groesseren, saferen Wert setzen laesst (vermutlich ueber die GAP-Verbindungsparameter-
+Praeferenz, die die 0x2A04-Characteristic fuellt).
+
+---
+
+## Update 5.64 - Event-Sniff-Laufzeit 30s -> 180s
+
+**Anmerkung Anwender:** `ble_cyspp_probe.py --runs 3` (Standard) braucht bei diesem Setup deutlich
+laenger als 30 s - allein der Verbindungsaufbau dauert 13-30 s PRO Durchlauf, dazu 8 s Lauschzeit
+und 6 s Pause je Durchlauf, macht in Summe leicht 1,5-2+ Minuten fuer alle drei Durchlaeufe. Die
+bisherigen 30 s (5.62/5.63) deckten also nur einen Bruchteil eines kompletten Testlaufs ab.
+
+**Fix (btio.c, `bt_event_sniff()`):** Laufzeit auf 1800*100 ms = 180 s (3 min) verlaengert - deckt
+einen kompletten "--runs 3"-Durchlauf komfortabel ab. Sonst keine Verhaltensaenderung (weiterhin
+feste Laufzeit ohne Fruehausstieg, siehe 5.62-Fix; Zeitstempel je Zeile, siehe 5.63).
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.64).

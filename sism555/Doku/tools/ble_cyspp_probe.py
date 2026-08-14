@@ -27,7 +27,7 @@ Aufruf
 ------
   python ble_cyspp_probe.py
   python ble_cyspp_probe.py --runs 3
-  python ble_cyspp_probe.py --name VIASIS_26SC9996 --runs 3 --csv ergebnis.csv
+  python ble_cyspp_probe.py --name VIASIS_26SC9996 --runs 3 --csv ergebnis.csvy
   python ble_cyspp_probe.py --address AA:BB:CC:DD:EE:FF
   python ble_cyspp_probe.py --scan-only
 

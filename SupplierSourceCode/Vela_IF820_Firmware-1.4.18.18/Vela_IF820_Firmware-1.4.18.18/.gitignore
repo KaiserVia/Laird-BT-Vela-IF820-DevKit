@@ -27,5 +27,8 @@ interactive_console_output.xml
 mfg_output/
 *mfg_results*.txt
 
+*.kvdat
+
 dist/
 build/
+tests/BLE_SPP_Simulation/artifacts/

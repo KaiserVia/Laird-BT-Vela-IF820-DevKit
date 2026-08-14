@@ -21,10 +21,11 @@ import logging
 import socket
 import time
 import sys
+from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
-sys.path.append('./common_lib/libraries')
+sys.path.append(str(Path(__file__).resolve().parent / 'common_lib' / 'libraries'))
 import EzSerialPort as ez_port
 from If820Board import If820Board
 
@@ -32,6 +33,9 @@ SPP_DATA = b'abcdefghijklmnop'
 OTA_LATENCY = 0.5
 RFCOMM_TIMEOUT = 15.0
 BT_PIN = '00297'
+GAP_NAME_TYPE_BLE = 0
+GAP_NAME_TYPE_BT_CLASSIC = 1
+BLE_ADV_INTERVAL = 400
 
 
 def _mac_list_to_str(mac_list) -> str:
@@ -40,6 +44,11 @@ def _mac_list_to_str(mac_list) -> str:
     if isinstance(mac_list, (list, bytes, bytearray)):
         return ':'.join(f'{b:02X}' for b in reversed(mac_list))
     return str(mac_list)
+
+
+def _device_names(mac: str) -> tuple[str, str]:
+    address = mac.replace(':', '').upper()
+    return f'IF820_{address}_BT', f'IF820_{address}_BLE'
 
 
 # ─── GUI ────────────────────────────────────────────────────────────────────
@@ -82,6 +91,7 @@ def ask_connection_mode() -> str:
 
 def show_pairing_instructions(mac: str):
     """Popup mit Kopplungsanleitung. Blockiert bis User 'OK' klickt."""
+    classic_name, _ = _device_names(mac)
     win = tk.Tk()
     win.title('Windows-Kopplung erforderlich')
     win.resizable(False, False)
@@ -94,7 +104,7 @@ def show_pairing_instructions(mac: str):
         f'Bitte das Gerät jetzt in Windows koppeln:\n\n'
         f'1. Windows → Einstellungen → Bluetooth & Geräte\n'
         f'2. "Gerät hinzufügen" → Bluetooth\n'
-        f'3. Gerät  EZ-Serial "{mac[-8:]}"  wählen\n'
+        f'3. Gerät "{classic_name}" wählen\n'
         f'   (vollständige MAC: {mac})\n'
         f'4. Koppeln — PIN eingeben: {BT_PIN}\n\n'
         f'⚠ WICHTIG: Keinen COM-Port konfigurieren!\n'
@@ -148,6 +158,75 @@ def set_bt_pin(board: If820Board, pin: str):
     If820Board.check_if820_response(board.p_uart.CMD_STORE_CONFIG, ez_rsp)
 
 
+def set_neutral_bt_device_class(board: If820Board):
+    """Clear audio service and class flags from the Bluetooth Classic CoD."""
+    logging.info('[IF820] Setze neutrale BT-Gerateklasse (kein Audio)...')
+    board.p_uart.send(b'sbtdc,c=0000\r')
+    time.sleep(0.3)
+    board.p_uart.clear_rx_queue()
+
+
+def configure_dual_mode_names(board: If820Board, mac: str):
+    """Store separate Bluetooth Classic and BLE names derived from the MAC."""
+    classic_name, ble_name = _device_names(mac)
+
+    cmd = board.p_uart.CMD_GAP_STOP_ADV
+    ez_rsp = board.p_uart.send_and_wait(cmd)
+    If820Board.check_if820_response(cmd, ez_rsp)
+    cmd = board.p_uart.EVENT_GAP_ADV_STATE_CHANGED
+    ez_rsp = board.p_uart.wait_event(cmd)
+    If820Board.check_if820_response(cmd, ez_rsp)
+
+    for name_type, name in ((GAP_NAME_TYPE_BT_CLASSIC, classic_name),
+                            (GAP_NAME_TYPE_BLE, ble_name)):
+        cmd = board.p_uart.CMD_GAP_SET_DEVICE_NAME
+        ez_rsp = board.p_uart.send_and_wait(cmd, type=name_type, name=name)
+        If820Board.check_if820_response(cmd, ez_rsp)
+
+    # Include the BLE name in the advertisement so it is visible to scanners.
+    advertisement = [0x02, 0x01, 0x06, len(ble_name) + 1, 0x09]
+    advertisement.extend(ble_name.encode('ascii'))
+    cmd = board.p_uart.CMD_GAP_SET_ADV_DATA
+    ez_rsp = board.p_uart.send_and_wait(cmd, data=advertisement)
+    If820Board.check_if820_response(cmd, ez_rsp)
+
+    cmd = board.p_uart.CMD_GAP_SET_ADV_PARAMETERS
+    ez_rsp = board.p_uart.send_and_wait(
+        cmd,
+        mode=ez_port.GapAdvertMode.NA.value,
+        type=ez_port.GapAdvertType.UNDIRECTED_HIGH_DUTY_CYCLE.value,
+        channels=ez_port.GapAdvertChannels.CHANNEL_ALL.value,
+        high_interval=BLE_ADV_INTERVAL,
+        high_duration=0,
+        low_interval=BLE_ADV_INTERVAL,
+        low_duration=0,
+        flags=ez_port.GapAdvertFlags.ALL.value,
+        directAddr=[0, 0, 0, 0, 0, 0],
+        directAddrType=ez_port.GapAddressType.PUBLIC.value)
+    If820Board.check_if820_response(cmd, ez_rsp)
+
+    cmd = board.p_uart.CMD_STORE_CONFIG
+    ez_rsp = board.p_uart.send_and_wait(cmd)
+    If820Board.check_if820_response(cmd, ez_rsp)
+
+    cmd = board.p_uart.CMD_GAP_START_ADV
+    ez_rsp = board.p_uart.send_and_wait(
+        cmd,
+        mode=ez_port.GapAdvertMode.NA.value,
+        type=ez_port.GapAdvertType.UNDIRECTED_HIGH_DUTY_CYCLE.value,
+        channels=ez_port.GapAdvertChannels.CHANNEL_ALL.value,
+        high_interval=BLE_ADV_INTERVAL,
+        high_duration=0,
+        low_interval=BLE_ADV_INTERVAL,
+        low_duration=0,
+        flags=ez_port.GapAdvertFlags.ALL.value,
+        directAddr=[0, 0, 0, 0, 0, 0],
+        directAddrType=ez_port.GapAddressType.PUBLIC.value)
+    If820Board.check_if820_response(cmd, ez_rsp)
+    logging.info(f'[IF820] BT Classic name: {classic_name}')
+    logging.info(f'[IF820] BLE name: {ble_name}')
+
+
 def factory_reset(board: If820Board) -> str:
     """Factory Reset → Reboot → PIN setzen → MAC auslesen. Gibt MAC zurück."""
     logging.info('[IF820] Factory Reset...')
@@ -161,9 +240,11 @@ def factory_reset(board: If820Board) -> str:
     board.p_uart.clear_rx_queue()
 
     set_bt_pin(board, BT_PIN)
+    set_neutral_bt_device_class(board)
 
     mac = read_bt_mac(board)
     logging.info(f'[IF820] BT Classic MAC: {mac}')
+    configure_dual_mode_names(board, mac)
     return mac
 
 

@@ -481,6 +481,86 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
  newline(); putln(" CYSPP monitor ended");
 }
 
+// Roher EZ-Serial-Event-Mitschnitt auf UART1 (Diagnose, Testmenue): druckt alles, was am
+// Modul ankommt, unveraendert am Terminal aus - OHNE es zu interpretieren und OHNE es ans
+// Modul zurueckzusenden. Ziel: waehrend ein BLE-Client verbindet/subscribed, die rohen
+// @E,...-Eventzeilen sichtbar machen (v.a. gap_connected "C", gatts_data_written "W" beim
+// CCCD-Write, und vor allem gap_disconnected "DIS" mit dem reason=-Code - der unterscheidet
+// "lokal/Modul-initiiert" (0x0916, passt zur CYSPP-Pin-Theorie) von "Supervision-Timeout"
+// (0x0908, eher RF/Brownout).
+//
+// WICHTIG (5.62-Fix): KEIN getkey()/Traffic-abhaengiger Abbruch. rbuf/bxi/rxi ist EIN
+// gemeinsamer Ringpuffer fuer UART0 (Terminal) UND UART1 (BT/GSM, siehe hard.c ISRs) -
+// getkey() bricht bei JEDEM neuen Byte ab, auch bei BT-Modul-Traffic. Genau der soll hier
+// aber laufend beobachtet werden -> die Funktion brach bisher bei der ersten Modul-Zeile
+// sofort ab, und das dabei ungelesene Byte landete anschliessend im normalen Menue-Zeichen-
+// leser (getc()/getbyte(), dieselben bxi/rxi) und wurde dort faelschlich als Tastatureingabe
+// verarbeitet -> selbststaendige Menuenavigation. Fix: feste Laufzeit, kein Fruehausstieg.
+void bt_event_sniff (void)
+{
+ uchar cc; int loop; char c; uint t0; bool bol=TRUE;   // bol = Zeilenanfang (fuer Zeitstempel)
+ if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (verdraengt GSM/GPS falls noetig,
+                                               // wie bei send_bt_info() - MUX schaltet auf BT)
+ cc=connect; connect=concpy & ~UART1;         // Ausgabe nur ans Terminal, nichts zurueck ans Modul
+ putln("Event-Sniff: rohe Modul-Ausgabe, feste Laufzeit 180s (laeuft NICHT vorzeitig ab). Jetzt BLE/Classic verbinden.");
+ t0=mstimer;                                  // Referenzzeitpunkt fuer relative Zeitstempel (ms seit Start)
+ bxi=rxi;                                     // sauberer Start, alte Reste verwerfen
+ for (loop=0; loop<1800; loop++)              // 1800 * 100 ms = 180 s (3 min), FEST - deckt einen
+                                               // kompletten "--runs 3"-Durchlauf von ble_cyspp_probe.py ab
+                                               // (Connect allein dauert bei diesem Setup 13-30 s je Versuch)
+ {
+  while (bxi!=rxi)
+  {
+   c = rbuf[++bxi];
+   if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
+   if (bol) { putc('['); putnumber(mstimer-t0,0); putstr("ms] "); bol=FALSE; }  // Zeitstempel je Zeile
+   putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
+   if (c=='\n') bol=TRUE;
+  }
+  ResetWDT();
+  osDelay(100);
+ }
+ bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
+ newline(); putln(" Event-Sniff beendet (180s abgelaufen).");
+ connect=cc;
+ uart1_release(MUX_BT);                       // UART1 wieder freigeben (GSM/GPS koennen zurueck)
+}
+
+// Contention-Test (Messprotokoll_CYSPP_Diagnose.md, Schritt 6): IC54 Bit7 (CYSPP-Leitung)
+// fuer kurze Zeit aktiv als Ausgang LOW treiben - Gegenstueck zu bt_cmdmode() (das HIGH
+// treibt). Ziel: am R78 (100 Ohm, Serienwiderstand in der CYSPP-Leitung) die Spannungs-
+// differenz zwischen Host- und Modulseite messen, um eine Bus-Contention zu erkennen, falls
+// das Modul die Leitung gleichzeitig anders treibt. Bewusst kurz gehalten (<1s), danach sofort
+// bt_release() (alle Pins Eingang, Werks-/Init-Zustand).
+void bt_cyspp_contention_test (void)
+{
+#if BT_CYSPP
+ if ((fp.btmodem==Roving) || (fp.btmodem==Laird)) { putln(" nur IF820 (Modul-Guard)"); return; }
+ putln("Contention-Test: IC54 Bit7 wird 500 ms aktiv LOW getrieben - jetzt Delta-U ueber R78 messen.");
+ write_i2c_dev(IC54, 2, (0x00<<8)|0x01);      // PCA9554 Output-Register (0x01): Bit 7 = LOW
+ write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);      // PCA9554 Config (0x03): Bit 7 = Ausgang
+ osDelay(500);                                // kurz halten (< 1 s laut Messprotokoll)
+ bt_release();                                // sofort zurueck: alle Pins Eingang
+ putln(" Contention-Test beendet, Leitung wieder Eingang.");
+#else
+ putln(" BT_CYSPP nicht aktiv (Testmodus) - Contention-Test uebersprungen.");
+#endif
+}
+
+// Sammel-Einstieg Testmenue (ein Ziffernplatz fuer zwei Diagnosen): waehlt zwischen dem
+// rohen Event-Mitschnitt und dem Contention-Test aus dem Messprotokoll.
+void bt_diag_menu (void)
+{
+ int c;
+ putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Messprotokoll Schritt 6)");
+ c = getc(TERMINAL_CHAR_TIMEOUT);
+ if (c=='1' || c=='2') putc((char)c);
+ newline();
+ if (c=='1') bt_event_sniff();
+ else if (c=='2') bt_cyspp_contention_test();
+}
+
 //-----------------------------------------------------------------------------
 // Gebremste IF820-Erkennung: /PING auf EINER Baud mit HARTER Zeitgrenze +
 // Roh-RX-Dump am Terminal. Kein Haenger mehr, wenn bei falscher Baud Muell

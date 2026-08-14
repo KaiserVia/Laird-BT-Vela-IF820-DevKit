@@ -1618,8 +1618,8 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
   } 	
   case 0x0003:					// Testmen�
   {
-   putstr(T_estmenu); putstr("\n7. CYSPP monitor");			// Testmen�ausgabe
-   select ('8',1);				// Men�auswahl senden
+   putstr(T_estmenu); putstr("\n7. CYSPP monitor\n8. BT-Diagnose (Event-Sniff/Contention)");	// Testmen�ausgabe
+   select ('9',1);				// Men�auswahl senden
    mensel=0; 							// Men�auswahl l�schen und wiederholen
    break;
   }
@@ -1678,6 +1678,11 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	case 0x0037:					// CYSPP/BT_LINK Monitor (HW-Diagnose)
   {
    bt_cyspp_monitor ();		// Live-Anzeige IC54 Bit7
+   break;
+  }
+	case 0x0038:					// BT-Diagnose: Event-Sniff / Contention-Test (HW-Diagnose)
+  {
+   bt_diag_menu ();			// Auswahl der beiden Diagnosen
    break;
   }
 	case 0x0004:
@@ -2119,7 +2124,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
 	 putstr ("Automatische Zeit: "); putln (fp.autotime_off==1?"aus":"ein");
 	 break;
 	}
-	case 0x0038:						// Testmen� Return 
+	case 0x0039:						// Testmen� Return
   case 0x0048:						// Parametermen� Return 
   case 0x0054:						// Modemmen� Return  	   
   case 0x0069:						// Infomen� Return 

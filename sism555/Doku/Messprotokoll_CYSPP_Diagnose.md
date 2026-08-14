@@ -57,7 +57,7 @@ Gerät booten, **nichts** verbinden, 30 s warten.
 
 | | CH1 (Hostseite) | CH2 (Modulseite) |
 |---|---|---|
-| Spannung | __________ V | __________ V |
+| Spannung | _____3.438_____ V | ___3.441_______ V |
 
 Erwartung nach aktueller Theorie: **beide ≈ 3,3 V** (interner ~100-kΩ-Pull-up des PCA9554).
 
