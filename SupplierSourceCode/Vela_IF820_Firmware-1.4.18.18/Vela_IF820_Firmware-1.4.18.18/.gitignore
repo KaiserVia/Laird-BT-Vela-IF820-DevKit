@@ -32,3 +32,4 @@ mfg_output/
 dist/
 build/
 tests/BLE_SPP_Simulation/artifacts/
+tests/Bluetooth-Simulation/Testreports

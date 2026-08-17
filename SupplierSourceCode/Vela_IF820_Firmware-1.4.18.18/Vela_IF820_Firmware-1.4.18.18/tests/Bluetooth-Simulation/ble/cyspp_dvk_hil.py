@@ -11,16 +11,17 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
 import threading
 import time
 import struct
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 import tkinter as tk
 
-SOURCE_ROOT = Path(__file__).resolve().parents[2]
+SOURCE_ROOT = Path(__file__).resolve().parents[3]
 sys.path.append(str(SOURCE_ROOT / 'common_lib' / 'libraries'))
 
 from bleak import BleakClient, BleakScanner
@@ -56,7 +57,7 @@ class HilRun:
                  transfer_wire_rate_bps: int, transfer_protocol: str,
                  transfer_window: int, transfer_retries: int):
         self.data = {
-            'run_id': datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ'),
+            'run_id': datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
             'pin_mode': pin_mode,
             'pin_level': None,
             'if820_mac': None,
@@ -115,13 +116,15 @@ class HilRun:
 
     def event(self, message: str) -> None:
         self.data['events'].append({
-            'time': datetime.now(timezone.utc).isoformat(timespec='milliseconds'),
+            'time': datetime.now().astimezone().isoformat(timespec='milliseconds'),
             'message': message,
         })
         logging.info('[HIL] %s', message)
 
     def write_report(self) -> Path:
-        artifact_dir = Path(__file__).resolve().parent / 'artifacts'
+        artifact_dir = Path(os.environ.get(
+            'BLUETOOTH_TEST_REPORT_DIR',
+            Path(__file__).resolve().parents[1] / 'Testreports' / 'direct'))
         artifact_dir.mkdir(exist_ok=True)
         report = artifact_dir / f"cyspp-{self.data['run_id']}-{self.data['pin_mode']}.json"
         report.write_text(json.dumps(self.data, indent=2), encoding='ascii')
@@ -131,7 +134,9 @@ class HilRun:
         transfer = self.data['transfer']
         if transfer is None:
             return None
-        artifact_dir = Path(__file__).resolve().parent / 'artifacts'
+        artifact_dir = Path(os.environ.get(
+            'BLUETOOTH_TEST_REPORT_DIR',
+            Path(__file__).resolve().parents[1] / 'Testreports' / 'direct'))
         artifact_dir.mkdir(exist_ok=True)
         report = artifact_dir / (
             f"cyspp-transfer-{self.data['run_id']}-{self.data['pin_mode']}.md")
@@ -425,7 +430,7 @@ def receive_transfer(board: If820Board, transfer_started: threading.Event,
         time.sleep(0.01)
     transfer['uart_bytes_received'] = len(received)
     assess_transfer(bytes(received), expected, transfer)
-    transfer['completed_at'] = datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+    transfer['completed_at'] = datetime.now().astimezone().isoformat(timespec='milliseconds')
     if transfer['started_at'] is not None:
         transfer['duration_seconds'] = round(time.monotonic() - transfer['_started_monotonic'], 3)
     transfer['status'] = 'passed' if (
@@ -442,7 +447,8 @@ def prepare_if820(board: If820Board, reset_module: bool, cccd_written: threading
                   transfer_started: threading.Event, transfer_send_complete: threading.Event,
                   receiver_ready: threading.Event, receiver_complete: threading.Event,
                   expected_payloads: list[dict[int, bytes] | None], run: HilRun,
-                  received_from_pc: list[bytes]) -> None:
+                  received_from_pc: list[bytes], app_write_ready: threading.Event,
+                  app_data_written: threading.Event) -> None:
     try:
         if reset_module:
             run.event('Factory reset requested.')
@@ -462,9 +468,19 @@ def prepare_if820(board: If820Board, reset_module: bool, cccd_written: threading
         command = board.p_uart.EVENT_GAP_CONNECTED
         check_response(command, board.p_uart.wait_event(command, rxtimeout=60))
         run.event('BLE connected.')
-        command = board.p_uart.EVENT_GATTS_DATA_WRITTEN
-        check_response(command, board.p_uart.wait_event(command, rxtimeout=30))
-        run.event('CCCD write observed.')
+        deadline = time.monotonic() + 30
+        while True:
+            command = board.p_uart.EVENT_GATTS_DATA_WRITTEN
+            response = board.p_uart.wait_event(
+                command, rxtimeout=max(1, deadline - time.monotonic()))
+            check_response(command, response)
+            data = bytes(response[1].payload.data)
+            if data == b'\x01\x00':
+                break
+            run.event(f'Ignoring non-CYSPP GATT write {data.hex()}.')
+            if time.monotonic() >= deadline:
+                raise TimeoutError('Timed out waiting for CYSPP notification CCCD write.')
+        run.event('CYSPP notification CCCD write (0100) observed.')
         cccd_written.set()
 
         board.p_uart.send(MCU_PROMPT)
@@ -473,8 +489,12 @@ def prepare_if820(board: If820Board, reset_module: bool, cccd_written: threading
             receive_transfer(board, transfer_started, transfer_send_complete,
                              receiver_ready, receiver_complete, expected_payloads, run)
             return
-        time.sleep(1.0)
         board.p_uart.clear_rx_queue()
+        app_write_ready.set()
+        if not app_data_written.wait(15):
+            run.data['uart_receive_mode'] = 'app_write_timeout'
+            run.event('Timed out waiting for the app simulator data write.')
+            return
         time.sleep(1.0)
         received = board.p_uart.read()
         if received:
@@ -513,6 +533,8 @@ async def run_hil_test(board: If820Board, reset_module: bool, pin_mode: str,
     transfer_send_complete = threading.Event()
     receiver_ready = threading.Event()
     receiver_complete = threading.Event()
+    app_write_ready = threading.Event()
+    app_data_written = threading.Event()
     expected_payloads: list[dict[int, bytes] | None] = [None]
     received_from_pc: list[bytes] = []
     received_from_if820: list[bytes] = []
@@ -534,7 +556,8 @@ async def run_hil_test(board: If820Board, reset_module: bool, pin_mode: str,
     threading.Thread(target=prepare_if820,
                    args=(board, reset_module, cccd_written, transfer_started,
                        transfer_send_complete, receiver_ready, receiver_complete,
-                       expected_payloads, run, received_from_pc),
+                       expected_payloads, run, received_from_pc, app_write_ready,
+                       app_data_written),
                      daemon=True).start()
 
     deadline = time.time() + 30
@@ -590,15 +613,25 @@ async def run_hil_test(board: If820Board, reset_module: bool, pin_mode: str,
                 return
             run.event('Enabling notifications on CYSPP ...ca102.')
             await client.start_notify(characteristic, on_notification)
-            await asyncio.to_thread(cccd_written.wait, 15)
+            if not await asyncio.to_thread(cccd_written.wait, 15):
+                run.data['result'] = 'cccd_event_timeout'
+                run.event(
+                    'IF820 did not report the CYSPP CCCD write within 15 seconds; '
+                    'not sending application data.')
+                return
             await asyncio.sleep(1.0)
             if not client.is_connected:
                 run.data['result'] = 'disconnected_after_subscribe'
                 run.event('BLE link closed after notification enable.')
                 return
             if run.data['transfer'] is None:
+                if not await asyncio.to_thread(app_write_ready.wait, 10):
+                    run.data['result'] = 'uart_receiver_not_ready'
+                    run.event('IF820 UART receiver was not ready for application data.')
+                    return
                 run.event(f'App simulator writes {APP_DATA!r}.')
                 await client.write_gatt_char(characteristic, APP_DATA, response=False)
+                app_data_written.set()
                 await asyncio.sleep(2.0)
             else:
                 prompt_deadline = time.monotonic() + 15
@@ -620,7 +653,7 @@ async def run_hil_test(board: If820Board, reset_module: bool, pin_mode: str,
                 transfer['write_without_response_limit'] = write_limit
                 transfer['frames_sent'] = len(frames)
                 transfer['wire_bytes_sent'] = sum(len(frame) for frame in frames)
-                transfer['started_at'] = datetime.now(timezone.utc).isoformat(timespec='milliseconds')
+                transfer['started_at'] = datetime.now().astimezone().isoformat(timespec='milliseconds')
                 transfer['_started_monotonic'] = time.monotonic()
                 transfer['status'] = 'sending'
                 transfer_started.set()
@@ -822,7 +855,7 @@ def main() -> int:
     parser.add_argument('-d', '--debug', action='store_true')
     args = parser.parse_args()
     logging.basicConfig(format='%(asctime)s [%(module)s] %(levelname)s: %(message)s',
-                         level=logging.DEBUG if args.debug else logging.INFO)
+                         level=logging.DEBUG if args.debug else logging.WARNING)
 
     pin_mode = args.pin or ask_pin_mode()
     if pin_mode is None:
@@ -840,7 +873,7 @@ def main() -> int:
         logging.critical('No IF820 board found.')
         return 1
     board = boards[0]
-    boot_event = board.open_and_init_board()
+    boot_event = board.open_and_soft_reset_board()
     try:
         uninitialize_sta()
         asyncio.run(run_hil_test(
@@ -848,7 +881,7 @@ def main() -> int:
             args.uart_flow_control, run))
     finally:
         board.probe.gpio_to_input(board.CYSPP)
-        board.close_ports_and_reset()
+        board.close_ports_and_reset(reset_probe=False)
         if run.data['transfer'] is not None:
             run.data['transfer'].pop('_started_monotonic', None)
         logging.info('HIL report: %s', run.write_report())

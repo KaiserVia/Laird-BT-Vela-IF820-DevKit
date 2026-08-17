@@ -20,13 +20,13 @@ mode when it finishes.
 Run from the firmware directory:
 
 ```powershell
-python tests/BLE_SPP_Simulation/cyspp_dvk_hil.py --pin low --new-module
-python tests/BLE_SPP_Simulation/cyspp_dvk_hil.py --pin high --new-module
-python tests/BLE_SPP_Simulation/cyspp_dvk_hil.py --pin input --new-module
-python tests/BLE_SPP_Simulation/cyspp_dvk_hil.py --pin input --transfer-bytes 40960
-python tests/BLE_SPP_Simulation/cyspp_dvk_hil.py --pin input --transfer-bytes 40960 --transfer-window 4 --transfer-retries 3
-python tests/BLE_SPP_Simulation/cyspp_dvk_hil.py --pin input --transfer-bytes 40960 --transfer-protocol burst
-python tests/BLE_SPP_Simulation/cyspp_dvk_hil.py --pin input --transfer-bytes 40960 --uart-flow-control
+python tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py --pin low --new-module
+python tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py --pin high --new-module
+python tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py --pin input --new-module
+python tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py --pin input --transfer-bytes 40960
+python tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py --pin input --transfer-bytes 40960 --transfer-window 4 --transfer-retries 3
+python tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py --pin input --transfer-bytes 40960 --transfer-protocol burst
+python tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py --pin input --transfer-bytes 40960 --uart-flow-control
 ```
 
 `--new-module` intentionally issues a factory reset and is required for the

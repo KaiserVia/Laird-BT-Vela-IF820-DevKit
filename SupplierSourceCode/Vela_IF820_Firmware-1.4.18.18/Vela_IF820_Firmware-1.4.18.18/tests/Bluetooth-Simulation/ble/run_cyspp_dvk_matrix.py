@@ -5,7 +5,7 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 
@@ -59,7 +59,7 @@ def write_markdown(matrix: list[dict], transfer_case: dict, timestamp: str) -> P
     lines = [
         '# CYSPP DVK Pin Matrix',
         '',
-        f'Generated: `{timestamp}` UTC',
+        f'Generated (local time): `{timestamp}`',
         f'IF820 module firmware (read using /QFV): `{firmware}`',
         '',
         'The PC simulated the BLE app. The DVK probe simulated the MCU-owned',
@@ -174,7 +174,7 @@ def main() -> int:
     transfer_case, transfer_exit_code = run_case('input', args.transfer_bytes)
     exit_codes.append(transfer_exit_code)
 
-    timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     json_path = ARTIFACT_DIRECTORY / f'cyspp-matrix-{timestamp}.json'
     aggregate = {
         'if820_module_firmware': transfer_case.get('if820_module_firmware'),
