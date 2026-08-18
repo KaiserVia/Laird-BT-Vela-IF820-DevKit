@@ -720,26 +720,44 @@ void bt_cyspp_contention_test (void)
 // wird bei gesetztem comchange jetzt communication_change() selbst aufgerufen (macht die echte
 // Verarbeitung UND loescht comchange danach) - mit derselben Schutzbedingung wie in measure.c
 // (`!osActiveThread`, GSM/MQTT-Verbindungsthread nicht stoeren).
+// TEMPORAER (Alt-Firmware-Vergleichstest): setzt das Modul per /RFAC auf Werkszustand zurueck,
+// damit eine alte MCU-Firmware (z. B. 5.50) das Modul wieder frisch/passend erkennen und
+// konfigurieren kann - das Modul behaelt seine EZ-Serial-Konfiguration sonst dauerhaft im
+// eigenen Speicher, unabhaengig davon, welche MCU-Firmware geflasht ist. Danach Power-Cycle
+// und gewuenschte Firmware flashen - deren eigene Werksmodul-Erkennung (F=00) uebernimmt den Rest.
+void bt_factory_reset (void)
+{
+ if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ Init_BT_ch(BT_BAUD);
+ putln("Factory-Reset (/RFAC) - Modul wird auf Werkszustand zurueckgesetzt, Baud -> 115200.");
+ if (bt_command(T_rfac,T_rfacok,1000)) putln(" /RFAC bestaetigt (@R,...,/RFAC,0000).");
+ else putln(" keine /RFAC-Bestaetigung erhalten (evtl. andere Baud/Zustand?).");
+ uart1_release(MUX_BT);
+ putln("Bitte jetzt Power-Cycle machen (langes Stromlos) und danach die gewuenschte Firmware flashen.");
+}
+
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
- putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)   9 = zurueck");
+ putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
+ putln("              4 = Factory-Reset (/RFAC, Alt-FW-Vergleich!)   9 = zurueck");
  putstr(" comchange_count: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69, CYSPP-Diagnose)
  for (tries=0; tries<20; tries++)
  {
   if (comchange)                            // echten Schnittstellenwechsel richtig verarbeiten
   { if (!osActiveThread) communication_change(); else clear_comchange(); }
   c = getc(TERMINAL_CHAR_TIMEOUT);
-  if (c=='1' || c=='2' || c=='3' || c=='9') break;
+  if (c=='1' || c=='2' || c=='3' || c=='4' || c=='9') break;
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
  putstr(" comchange_count danach: "); putnumber(comchange_count,0);           // TEMPORAER (5.69)
  putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(", "); putnumber(tries,0); putstr(" Versuche)"); newline();
- if (c=='1' || c=='2' || c=='3' || c=='9') { putc((char)c); newline(); }
+ if (c=='1' || c=='2' || c=='3' || c=='4' || c=='9') { putc((char)c); newline(); }
  else { newline(); putln(" keine gueltige Eingabe (staendiger Schnittstellenwechsel?) - abgebrochen."); }
  if (c=='1') bt_event_sniff();
  else if (c=='2') bt_cyspp_contention_test();
  else if (c=='3') bt_transfer_echo();
+ else if (c=='4') bt_factory_reset();
  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
 }
 

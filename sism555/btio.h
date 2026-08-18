@@ -80,6 +80,9 @@
 // Ezurio Vela IF820 (EZ-Serial) Texte
 #define T_ping		"/PING\r"		// system_ping Kommando
 #define T_pingok	"/PING,0000"	// Erfolgsantwort @R,...,/PING,0000
+#define T_rfac		"/RFAC\r"		// system_factory_reset - TEMPORAER (nur Testmenue 8->4, Alt-FW-Vergleich):
+									// setzt Modul komplett auf Werkszustand zurueck (auch Baud -> 115200!)
+#define T_rfacok	"/RFAC,0000"	// Erfolgsantwort @R,...,/RFAC,0000
 #define T_qfv      "/QFV\r"       // system_query_firmware_version -> @R,...,/QFV,0000,E=..,S=..,P=..,H=..
 #define T_qfvok    "/QFV"         // Antwort-Kennung (enthaelt Version E=/S=/P=/H=)
 #define T_gba      "GBA\r"        // system_get_bluetooth_address -> @R,...,GBA,0000,A=<MAC>
@@ -195,7 +198,8 @@ extern void bt_sniff_poll (void);         // nicht-blockierendes Nachlesen - 1x 
 extern void bt_transfer_echo (void);      // BLE-CYSPP-Transfer-Test: CRC/Seq-Frames empfangen+ACK - Testmenue
                                            // TEMPORAER (5.67) - wieder entfernen, wenn CYSPP-Diagnose fertig ist
 extern void bt_cyspp_contention_test (void); // IC54 Bit7 kurz aktiv LOW (Messprotokoll Schritt 6) - Testmenue
-extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Test - Testmenue
+extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Test / Factory-Reset - Testmenue
+extern void bt_factory_reset (void);      // TEMPORAER: /RFAC - Modul-Werksreset fuer Alt-FW-Vergleichstest
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
 extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
 

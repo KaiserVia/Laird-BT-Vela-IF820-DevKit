@@ -3024,3 +3024,24 @@ Schwall verursacht, den 5-10s-Verbindungen nicht zeigen) ist weiterhin nicht mit
 Mitschnitt bewiesen - nur die Fix-Wirkung (Wiederfreigabe + schnelleres Draining) ist unabhaengig
 vom genauen Ausloeser wirksam. Bei Interesse: Event-Sniff (jetzt nicht-blockierend, 5.81) waehrend
 eines 40s-Idle-Tests mitlaufen lassen, um den tatsaechlichen Byte-Schwall zu erfassen.
+
+## Update 5.84: TEMPORAER - Factory-Reset-Diagnose (Testmenue 8->4) fuer Alt-FW-Vergleichstest
+
+**Anlass:** Anwender wollte pruefen, ob der 40s-Idle-Haenger auch mit einer sehr alten
+Firmware (5.50, letzter Stand vor Beginn der BLE-CYSPP-Untersuchung) auftritt - dazu wurde
+5.50 in einem separaten Worktree-Ordner (`../branch-550`) ausgecheckt und gebaut. Verbindungs-
+versuch scheiterte aber: das Modul behaelt seine EZ-Serial-Konfiguration (Name, Advertising,
+Pairing etc.) dauerhaft im eigenen Speicher, unabhaengig von der geflashten MCU-Firmware - nach
+allen Aenderungen von 5.51 bis 5.83 passt der Modul-Zustand nicht mehr zu dem, was 5.50 beim
+Start erwartet (RS232 lief normal, aber am Modul/BT tat sich nichts).
+
+**Fix/Ergaenzung (btio.c/btio.h):** Neue TEMPORAERE Diagnosefunktion `bt_factory_reset()`
+(Testmenue 8->4), sendet `/RFAC` (system_factory_reset) - setzt das Modul auf Werkszustand
+zurueck (auch Baud -> 115200). Nach Power-Cycle sollte JEDE Firmware-Version (auch alte) das
+Modul ueber die ohnehin vorhandene Werksmodul-Erkennung (F=00) wieder frisch und passend
+konfigurieren.
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.84).
+
+**Wieder entfernen** sobald der Alt-FW-Vergleichstest abgeschlossen ist (gleiche Kategorie wie
+die anderen temporaeren Testmenue-Diagnosen, siehe CLAUDE.md-Aufraeum-Punkt).
