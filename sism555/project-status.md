@@ -2602,3 +2602,35 @@ und wurde zurueckgenommen (siehe Konversation) - der tatsaechliche Fehler liegt 
 LOW), und RS232 sollte nicht mehr traege werden. Falls doch nochmal reproduzierbar: pruefen, ob
 zum Zeitpunkt des Disconnects zufaellig Testmenue -> 8 offen war (das ist die einzige Stelle,
 die je den fehlerhaften Pfad ausgeloest haben kann).
+
+**Am Geraet bestaetigt:** Anwender hat BT-Classic-Connect/Disconnect via Windows/HyperTerminal
+erneut getestet - funktioniert jetzt wieder sofort, kein Haengen mehr.
+
+---
+
+## Update 5.73 - Schritt 3 CYSPP-Plan: kein bt_cmdmode() mehr in init_bluetooth()
+
+**Aenderung (btio.c, `init_bluetooth()`):** Der unbedingte `bt_cmdmode()`-Aufruf am Anfang
+(CYSPP HIGH treiben, um vor der Modul-Erkennung/Rekonfiguration den Command-Mode zu erzwingen)
+ist entfernt, ebenso das zugehoerige `osDelay(600)`.
+
+**Bewusste Nebenwirkung (Rueckbau auf den Stand vor Update 5.05):** Besteht beim Aufruf von
+`init_bluetooth()` eine aktive BT/BLE-Verbindung, wird das Modul nicht mehr zwangsweise in den
+Command-Mode gebracht - die Erkennung darunter scheitert dann einfach (Modul bleibt transparent,
+`/PING` kommt auf keiner Baud durch), wie vor Update 5.05 dokumentiert. Reconfig waehrend einer
+aktiven Verbindung braucht dann wieder manuelles Trennen oder Konfiguration ueber RS232 (Update
+5.04 hatte das bereits als akzeptierte Einschraenkung dokumentiert). Der weitaus haeufigere Fall
+- Boot-Selbstheilung bzw. Reconfig OHNE aktive Verbindung - ist von dieser Aenderung nicht
+betroffen: `init_bluetooth()` laeuft in dem Fall unveraendert durch.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.73).
+
+**Am Geraet zu testen (Schritt 3 aus dem Plan):**
+1. Normaler Boot mit bereits korrekt konfiguriertem Modul: `test_BT()` muss weiterhin sofort
+   erfolgreich sein, `init_bluetooth()` wird gar nicht erst aufgerufen (unveraendertes Verhalten).
+2. Erzwungene Neuerkennung (z. B. Modul auf Werksbaud zuruecksetzen oder `fp.btmodem=0` im
+   Konfigmenue, OHNE aktive BT-Verbindung): `init_bluetooth()` muss weiterhin sauber durchlaufen
+   (Schritte 1-4, 3a-3g).
+3. Reconfig-Versuch WAEHREND aktiver BT-Verbindung (Menue "Bluetooth?y"): akzeptiertes neues
+   Verhalten ist ein sauberer Fehlschlag/Hinweis statt automatischem Kill - pruefen, dass das
+   nicht z. B. haengt, sondern sauber abbricht.

@@ -802,10 +802,12 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  { uint sp=atoi(fp.serno+4);                // keine gueltige Seriennummer? -> BT-Name/PIN unmoeglich
    if (!isdigit((int)fp.serno[0]) || !sp)   // FRUEH erkennen, bevor das Modul angefasst wird
    { newline(); dtcerr(DTC_BT_NO_SERIAL); newline(); return; } }
- bt_cmdmode();                          // aktive SPP-Verbindung ueber CYSPP (IC54 Bit7) kappen + Command-Mode erzwingen
-                                        // (5.52: bt_cmdmode() ist selbst modul-geguarded -> beim RN4678/BT730 ein No-Op,
-                                        //  fp.btmodem gilt hier noch aus dem Flash und wird erst unten auf 0 gesetzt)
- osDelay(600);                          // Modul Zeit geben: SPP abbauen und in Command-Mode wechseln
+ // Schritt 3 CYSPP-Plan (5.73): kein bt_cmdmode() mehr - DVK-Nachweis, CYSPP darf NIE aktiv
+ // getrieben werden, auch nicht kurz zum Command-Mode-Erzwingen. Bewusster Rueckbau auf den
+ // Stand vor Update 5.05: besteht eine aktive BT/BLE-Verbindung, scheitert die Erkennung unten
+ // einfach (Modul bleibt transparent, /PING kommt auf keiner Baud durch) - Reconfig waehrend
+ // einer aktiven Verbindung braucht dann wieder manuelles Trennen oder RS232 (wie vor 5.05
+ // dokumentiert und akzeptiert).
  connect&=~(UART1|BT_LINK);             // virtuelle BT-Verbindung loesen (Befehle -> Modul, nicht ueber SPP)
  fp.btmodem=0;                          // Reset -> Erkennung laeuft (erneut) durch
  // ===========================================================================
