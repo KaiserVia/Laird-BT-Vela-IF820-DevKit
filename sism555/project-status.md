@@ -2929,3 +2929,28 @@ Event-Sniff-Fassung, wurde aber NICHT auf das neue Poll-Modell umgebaut (komplex
 Frame-Parser mit Zustandsmaschine, aufwendiger als reines Byte-Durchreichen). Da dieser Test
 ohnehin als temporaerer Diagnose-Code zur Entfernung vorgesehen ist (siehe CLAUDE.md), nur bei
 konkretem Bedarf nachziehen.
+
+## Update 5.82: FIX Hauptmenue navigiert selbststaendig beim (fremdinitiierten) BT-Trennen
+
+**Symptom (Anwenderbeobachtung):** Klickt der verbundene Client (HyperTerminal/viagraph) auf
+"Trennen", navigiert das RS232-Hauptmenue direkt danach von selbst, ohne jede Tastatureingabe -
+beobachtet als Zeichenfolge `0`, `0`, `1` (aus dem Zeitmenue zurueck ins Hauptmenue, dann in
+"1. Datenausgabe").
+
+**Ursache:** Dieselbe Bugklasse wie die PIN-Endlosschleife (5.79/5.80/5.81) - der gemeinsame
+UART0/UART1-Ringpuffer (`rbuf`/`bxi`/`rxi`) unterscheidet nicht zwischen echten Tastatur-
+eingaben und rohem Modul-Protokolltext. Beim (fremdinitiierten) Trennen sendet das Modul noch
+Event-/Statustext ueber UART1 (Ziffern darin, z. B. Teil einer Disconnect-Meldung), der beim
+`communication_change()`-Uebergang "Bluetooth Verbindung beendet" bisher NICHT verworfen wurde -
+im Gegensatz zu `bt_disconnect()` (unser eigenes, gezieltes Trennen ueber `/DIS`), das genau
+deshalb schon immer `bxi=rxi;` am Ende macht. Der fehlende Flush im automatisch erkannten
+Trennen-Zweig liess die Rohbytes unveraendert bei `mainmenu()` als Tastatureingaben ankommen.
+
+**Fix (`libtool.c`, `communication_change()`):** Im Zweig "Bluetooth Verbindung beendet" wird
+jetzt ebenfalls `bxi=rxi;` gesetzt - Rest im Puffer wird verworfen, analog zu `bt_disconnect()`.
+
+**Geaenderte Dateien:** libtool.c, sprachen/sictxt.c (-> 5.82).
+
+**Am Geraet zu verifizieren:** BT verbinden, PIN eingeben, dann ueber den Client (HyperTerminal/
+viagraph) trennen - das RS232-Hauptmenue sollte danach unveraendert stehen bleiben, keine
+selbststaendige Navigation mehr.
