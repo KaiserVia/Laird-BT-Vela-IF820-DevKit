@@ -2398,3 +2398,33 @@ Diagnose-Code fuer die BLE-CYSPP-Untersuchung, kein produktives Feature. Wird wi
 sobald die CYSPP-Diagnose abgeschlossen ist (siehe Aufraeum-Punkt weiter unten im Dokument /
 CLAUDE.md-Backlog). Betrifft: `bt_transfer_echo()`, `crc32_calc()`, `bt_send_ack()` (btio.c),
 die zugehoerige `extern`-Deklaration (btio.h) und Menuepunkt 8->3 in `bt_diag_menu()`.
+
+---
+
+## Update 5.68 - FIX: bt_diag_menu() gab bei Stoerbytes kommentarlos auf
+
+**Symptom (Anwender):** Testmenue -> 8 (BT-Diagnose) mehrfach gewaehlt, aber die Auswahl
+1/2/3 kam nie zur Wirkung - direkt nach der Anzeige "BT-Diagnose: 1 = ... 3 = ..." sprang das
+Menue kommentarlos zurueck zum Testmenue, ohne dass eine Ziffer sichtbar eingegeben wurde. Erst
+beim vierten Versuch klappte "1" (Event-Sniff).
+
+**Ursache:** `bt_diag_menu()` nutzte `getc()` fuer die Ziffernabfrage - `getc()`/`getbyte()`
+lesen vom selben gemeinsamen UART0/UART1-Ringpuffer (`rbuf`/`bxi`/`rxi`) wie GSM-/BT-Modul-
+Traffic (identische Ursache wie der 5.62-Fix bei `bt_event_sniff()`). Ein einzelnes Stoerbyte
+(z. B. GSM-Chatter), das genau in dem Moment ankam, in dem der Anwender "1"/"2"/"3" eingeben
+wollte, wurde als "ungueltige Eingabe" gewertet - die Funktion gab sofort auf und kehrte zum
+Testmenue zurueck, ohne den Anwender ueberhaupt zum Zug kommen zu lassen.
+
+**Fix (btio.c, `bt_diag_menu()`):** Bis zu 20 Versuche: ungueltige Zeichen werden jetzt
+ignoriert und die Eingabe wiederholt, statt beim ersten Stoerbyte aufzugeben. Nur ein echter
+Timeout/Comchange (kein Zeichen ueberhaupt, `getc()` liefert < 0) beendet die Schleife vorzeitig.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.68).
+
+**Am Geraet zu verifizieren:** Testmenue -> 8 -> Ziffer eingeben muss jetzt zuverlaessig beim
+ersten Versuch funktionieren, auch wenn GSM im Hintergrund aktiv ist.
+
+**Zum Smoke-Test-Ergebnis des Anwenders (2 von 3 Laeufen "device_not_found", einer mit
+manuellem Abbruch beim Verbinden):** passt weiterhin zum bekannten Bild instabiler/langsamer
+Verbindungsaufbauten (siehe 5.60-5.66) - vermutlich RF/Brownout, nicht durch dieses Menue-Problem
+verursacht. Bitte nach 5.68 nochmal neu testen, jetzt ohne die Menue-Fehlbedienung als Stoerfaktor.

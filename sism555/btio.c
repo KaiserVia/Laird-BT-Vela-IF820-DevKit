@@ -698,13 +698,24 @@ void bt_cyspp_contention_test (void)
 #endif
 }
 
-// Sammel-Einstieg Testmenue (ein Ziffernplatz fuer zwei Diagnosen): waehlt zwischen dem
-// rohen Event-Mitschnitt und dem Contention-Test aus dem Messprotokoll.
+// Sammel-Einstieg Testmenue (ein Ziffernplatz fuer die BT-Diagnosen): waehlt zwischen Event-
+// Mitschnitt, Contention-Test und Transfer-Test.
+// WICHTIG (5.68-Fix): getc() liest vom selben gemeinsamen UART0/UART1-Ringpuffer wie GSM/BT-
+// Traffic (siehe 5.62-Fix bei bt_event_sniff). Ein einzelnes Stoerbyte (z. B. GSM-Chatter waehrend
+// der Anwender noch "1"/"2"/"3" eingeben wollte) wurde bisher als "ungueltige Eingabe" gewertet
+// und die Funktion kehrte KOMMENTARLOS zum Testmenue zurueck, ohne dass der Anwender das Auswahl-
+// Fenster ueberhaupt gesehen hatte. Jetzt: Stoerbytes werden ignoriert und die Eingabe wiederholt
+// (bis zu 20x), statt beim ersten falschen Byte aufzugeben.
 void bt_diag_menu (void)
 {
- int c;
+ int c=-1; uchar tries;
  putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
- c = getc(TERMINAL_CHAR_TIMEOUT);
+ for (tries=0; tries<20; tries++)
+ {
+  c = getc(TERMINAL_CHAR_TIMEOUT);
+  if (c=='1' || c=='2' || c=='3') break;
+  if (c<0) break;                          // echter Timeout/Comchange -> nicht weiter versuchen
+ }
  if (c=='1' || c=='2' || c=='3') putc((char)c);
  newline();
  if (c=='1') bt_event_sniff();
