@@ -343,13 +343,27 @@ int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, 
 }
 
 void bt_reboot (void)   // IF820: /RBT senden + auf Boot warten (Classic-Name wird dann live)
-{
- uchar cc=connect, w;
- connect|=UART1; putstr(T_rbt); connect=cc;          // /RBT senden
+{                        // TEMPORAER (5.85): Boot-Ausgabe jetzt sichtbar statt verworfen (vorher
+                          // bxi=rxi direkt nach dem Warten - was das Modul in dieser Zeit sagt,
+                          // war nie zu sehen). Damit laesst sich ein Reboot-Verify-Fehlschlag
+                          // (F11018) live nachvollziehen.
+ uchar cc, w; char c; uint t0=mstimer; bool bol=TRUE;
+ cc=connect; connect|=UART1; putstr(T_rbt); connect=cc;   // /RBT senden
  bxi=rxi;
- for (w=0; w<6; w++) { osDelay(1000); ResetWDT(); putc('.'); if (bxi!=rxi) break; }  // auf Boot-Ausgabe warten
- osDelay(1500); ResetWDT();                          // Modul fertig booten lassen (UART/RTS erst dann bereit)
- newline(); bxi=rxi;                                 // RX leeren
+ cc=connect; connect=concpy & ~UART1;      // Rohausgabe nur ans Terminal, nichts zurueck ans Modul
+ for (w=0; w<8; w++)                       // ~8s Gesamtwartezeit (vorher 6s+1.5s, hier durchgehend
+ {                                          // mitgelesen statt nur teilweise verworfen)
+  osDelay(1000); ResetWDT();
+  while (bxi!=rxi)
+  {
+   c = rbuf[++bxi];
+   if (c=='\r') continue;                  // CR ueberspringen, LF traegt den Zeilenumbruch
+   if (bol) { putc('['); putnumber(mstimer-t0,0); putstr("ms] "); bol=FALSE; }
+   putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
+   if (c=='\n') bol=TRUE;
+  }
+ }
+ newline(); connect=cc; bxi=rxi;
 }
 
 bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ -> RAM+Flash)
@@ -940,14 +954,19 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
       for (v=0; v<4 && !result; v++)
       { Init_BT_ch(IF820_BAUD); bt_command(T_CR,T_pingok,-60);
         result=bt_command(T_ping,T_pingok,300);
-        if (!result) { bt_msg("   waiting for module after reboot..."); osDelay(400); } } }
-    if (!result)                        // nach mehreren Versuchen keine Antwort -> echter Fehler
-    {
-     newline(); dtcerr(DTC_BT_UART_INIT); newline();   // F11009 CTS/RTS pruefen
-     fp.btmodem=0; connect&=~(UART1|BT_LINK);
-     bt_release(); uart1_release(MUX_BT); connect=concpy; clear_comchange(); return;
+        if (!result) { bt_msg("   waiting for module after reboot..."); osDelay(400); } }
+      if (!result)                      // nach mehreren Versuchen keine Antwort -> echter Fehler
+      {
+       // FIX (5.85): eigener, spezifischerer Fehlercode statt des generischen DTC_BT_UART_INIT -
+       // damit dieser konkrete Fall (Modul antwortet nach /RBT nicht) im Protokoll von anderen
+       // BT-UART-Init-Fehlern unterscheidbar ist.
+       newline(); dtcerr(DTC_BT_REBOOT_VERIFY); newline();   // F11018
+       fp.btmodem=0; connect&=~(UART1|BT_LINK);
+       bt_release(); uart1_release(MUX_BT); connect=concpy; clear_comchange(); return;
+      }
+      bt_msg("   verify after reboot OK");
+      puterror_dtc(DTC_BT_REBOOT_VERIFY_OK, v);   // I11019 - nur geloggt, wenn Retries noetig waren (v>0)
     }
-    bt_msg("   verify after reboot OK");
    }
    else bt_msg(" Step 4: nothing changed -> done (no save/reboot)");
 

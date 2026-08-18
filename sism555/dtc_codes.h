@@ -30,6 +30,8 @@
 #define DTC_BT_CTS_TIMEOUT     11015   /* CTS Timeout beim Senden (Warning) */
 #define DTC_BT_LAIRD_NF        11016   /* Laird-Modul nicht erkannt (Info) */
 #define DTC_BT_RN_NF           11017   /* RN4678-Modul nicht erkannt (Info) */
+#define DTC_BT_REBOOT_VERIFY    11018   /* Reboot-Verifikation (/RBT) fehlgeschlagen */
+#define DTC_BT_REBOOT_VERIFY_OK 11019   /* Reboot-Verifikation nach Retries erfolgreich (Info) */
 
 /* --- Subsystem 12: GSM/LTE (gsmio.c) ------------------------------ */
 #define DTC_GSM_NO_RESP         12001   /* Modem keine Antwort */

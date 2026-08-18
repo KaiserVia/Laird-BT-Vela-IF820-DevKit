@@ -3045,3 +3045,39 @@ konfigurieren.
 
 **Wieder entfernen** sobald der Alt-FW-Vergleichstest abgeschlossen ist (gleiche Kategorie wie
 die anderen temporaeren Testmenue-Diagnosen, siehe CLAUDE.md-Aufraeum-Punkt).
+
+## Update 5.85: Reboot-Verify nach Werksreset schlug fehl - Diagnose erweitert (F11018/I11019)
+
+**Beobachtung (direkt nach dem 5.84-Factory-Reset-Test):** Die automatische Werksmodul-
+Reprovisionierung (Baud, Name, Sniff aus, Advertising, CYSPP, Security) lief komplett
+fehlerfrei durch bis Schritt 4 (`/RBT` - Reboot, um die neuen Einstellungen zu uebernehmen).
+Danach antwortete das Modul auf kein einziges `/PING` mehr -> `F11009`. Das ist vermutlich das
+erste Mal, dass wir das seit Langem vermutete "Modul faellt komplett aus"-Verhalten (CLAUDE.md)
+direkt beim Auftreten erwischt haben, statt nur die Nachwirkungen zu sehen.
+
+**Problem bei der Analyse:** `bt_reboot()` (btio.c) wartete bisher bis zu 6s auf irgendeine
+Boot-Ausgabe (brach frueher ab, sobald etwas ankam), wartete pauschal weitere 1,5s und verwarf
+danach den kompletten Empfangspuffer ungelesen (`bxi=rxi`) - was das Modul in dieser Zeit
+tatsaechlich sagte, war nirgends sichtbar. Dieselbe Bugklasse (Modul-Ausgabe wird still
+verworfen statt angezeigt) wie an mehreren anderen Stellen dieser Session.
+
+**Fix/Ergaenzung (btio.c):**
+1. `bt_reboot()` liest jetzt durchgehend ~8s lang mit und gibt alles mit Zeitstempel am
+   Terminal aus (TEMPORAER, wie Event-Sniff), statt es zu verwerfen - beim naechsten
+   Reboot-Verify-Fehlschlag sehen wir, was das Modul (falls ueberhaupt etwas) sendet.
+2. Neuer, spezifischerer Fehlercode **F11018** "Reboot-Verifikation fehlgeschlagen" ersetzt an
+   dieser Stelle das generische `DTC_BT_UART_INIT` (F11009) - landet wie gewohnt sowohl am
+   Terminal als auch im persistenten Protokoll (`dctext()`/`protocol()`), auch wenn RS232 nicht
+   live mitgelesen wird.
+3. Neuer Info-Code **I11019** "Reboot-Verifikation nach Retries ok" wird geloggt (mit Anzahl der
+   benoetigten Versuche als Wert), wenn die Verifikation zwar Wiederholungen brauchte, aber am
+   Ende erfolgreich war - damit sind auch "knapp geschafft"-Faelle im Protokoll sichtbar, nicht
+   nur harte Fehlschlaege.
+
+**Geaenderte Dateien:** btio.c, dtc_codes.h, Doku/Diagnose-Codes.csv, dtc_text.h (generiert via
+`tools/gen_dtc.py`), sprachen/sictxt.c (-> 5.85).
+
+**Am Geraet zu verifizieren:** Werksreset (Testmenue 8->4) + Power-Cycle wiederholen, bis der
+Reboot-Verify-Fehlschlag erneut auftritt (falls reproduzierbar) - diesmal sollte am Terminal
+sichtbar sein, was das Modul nach `/RBT` tatsaechlich sendet (Boot-Banner? nichts? Fehler-Event?),
+und im Protokoll sollte F11018 mit Zeitstempel auftauchen.

@@ -65,6 +65,8 @@ static const dtc_entry_t dtc_table[] = {
   {11015,'W',"CTS Timeout"},
   {11016,'I',"Laird-Modul nicht erkannt"},
   {11017,'I',"RN4678-Modul nicht erkannt"},
+  {11018,'F',"Reboot-Verifikation fehlgeschlagen"},
+  {11019,'I',"Reboot-Verifikation nach Retries ok"},
   {12001,'F',"Modem keine Antwort"},
   {12002,'F',"SIM-PIN-Problem"},
   {12003,'F',"GSM Verbindung Timeout"},

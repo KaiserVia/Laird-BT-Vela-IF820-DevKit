@@ -119,3 +119,5 @@ Code;Typ;Subsystem;Kurztext;Ursache;Abhilfe;SeitVersion;Status
 11015;W;Bluetooth;CTS Timeout;CTS blieb High beim Senden (Flow-Control-Verdrahtung falsch/vertauscht oder Modul aus);RTS/CTS gekreuzt verdrahten, Modul-Versorgung pruefen;5.14;aktiv
 11016;I;Bluetooth;Laird-Modul nicht erkannt;Fallback-Erkennung: kein Laird BT730 auf den Testbaudraten;Normal auf IF820-Geraet; nur relevant bei Laird-Hardware;5.25;aktiv
 11017;I;Bluetooth;RN4678-Modul nicht erkannt;Fallback-Erkennung: kein RN4678 gefunden;Normal auf IF820-Geraet; nur relevant bei RN4678-Hardware;5.25;aktiv
+11018;F;Bluetooth;Reboot-Verifikation fehlgeschlagen;Modul antwortet nach /RBT (Uebernahme neuer Config) nicht innerhalb der Wartezeit;Power-Cycle mit laengerer Stromlos-Zeit, ggf. laenger warten;5.85;aktiv
+11019;I;Bluetooth;Reboot-Verifikation nach Retries ok;Modul brauchte nach /RBT mehrere Versuche, hat aber geantwortet (Anzahl Versuche als Wert);Nur zur Beobachtung, kein Fehler;5.85;aktiv
