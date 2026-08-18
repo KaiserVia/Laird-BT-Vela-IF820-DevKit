@@ -2203,3 +2203,142 @@ einen kompletten "--runs 3"-Durchlauf komfortabel ab. Sonst keine Verhaltensaend
 feste Laufzeit ohne Fruehausstieg, siehe 5.62-Fix; Zeitstempel je Zeile, siehe 5.63).
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.64).
+
+---
+
+## ⚠ KURSWECHSEL - DVK-Nachweis: CYSPP-Ursache ist Firmware, nicht Hardware (Doku-Korrektur, kein Codechange)
+
+**Quelle:** `Doku/ble-Dvk-request.md` - Ergebnis unabhaengiger, ausfuehrlicher Tests auf einem
+IF820-DVK (andere KI-Session, Debug-Probe auf GPIO 19 = If820Board.CYSPP). Reproduzierbar bei
+identischer CYSPP-Konfiguration:
+
+| Zustand der Host-CYSPP-Leitung | Ergebnis |
+|---|---|
+| aktiv LOW | Fehler - kein nutzbarer Datenpfad |
+| aktiv HIGH | Fehler - BLE-Schreiben erscheinen als EZ-Serial-GATT-Events, nicht als UART-Nutzdaten |
+| **Eingang / hochohmig** | **Pass** - CCCD 0100, UART<->BLE transparent |
+
+**Das kippt die bisherige Kernannahme:** Ein gemessenes HIGH ist KEIN Beweis fuer den
+richtigen Zustand - aktiv HIGH und hochohmig sind beide als HIGH messbar, verhalten sich am
+IF820 aber nachweislich unterschiedlich. Die bisherige Verdaechtigung "R77 (Pull-down) fehlt,
+daher liegt CYSPP nur ueber den PCA9554-Pull-up auf HIGH" (`HW_Massnahmen_Bewertung_2026-08.md`)
+ist damit NICHT der Kernfehler. Der tatsaechliche Fehler: unsere Firmware treibt die Leitung
+ueber `bt_cmdmode()` (IC54 Bit 7 als Ausgang HIGH) an mehreren Stellen AKTIV, was laut DVK-Test
+explizit verboten ist - auch wenn der Pegel dabei "richtig" (HIGH) aussieht.
+
+**Betroffene Stellen (noch NICHT geaendert, nur identifiziert):**
+- `bt_disconnect()` (btio.c:449) - SPP-Trennung erzwingen
+- `init_bluetooth()` (btio.c:617) - Reconfig-Command-Mode erzwingen
+- `uart1_request()` (hard.c:483) - beim Verdraengen von BT durch GSM/GPS (`bt_displaced`)
+- Bluetooth-Deinstallieren (sicom.c:376, case -1)
+
+Alle vier widersprechen der DVK-bestaetigten Regel "Leitung nie aktiv treiben - auch nicht bei
+UART1-Muxwechsel oder Fehler-/Timeout-Pfaden". Die DVK-Doku fordert zusaetzlich: Bit 7 muss
+ab Boot/Reset sofort auf Eingang stehen (PCA9554 haelt seinen Zustand ueber einen reinen
+MCU-Reflash - deckt sich mit unserem 5.51-Fund "PCA9554 haelt Register ueber Reflash"), und es
+braucht eine Recovery ohne Reboot, falls Bit 7 doch mal als Output haengen bleibt.
+
+**Wichtig - auch unser eigener `bt_cyspp_contention_test()` (5.60) bestaetigt implizit den
+DVK-Befund:** aktives LOW-Treiben ist laut DVK ebenfalls ein Fehlerzustand, nicht nur HIGH.
+
+**Konsequenz fuer die bisherige Doku:** `HW_Massnahmen_Bewertung_2026-08.md` und
+`Messprotokoll_CYSPP_Diagnose.md` (Wege A/B/C, R77/P27-Umverdrahtung) sind als Loesungsweg
+ueberholt - mit Hinweis-Box am Dateianfang markiert, aber nicht geloescht (Messhistorie).
+**Voraussichtlich ist KEINE Hardware-Aenderung noetig**, nur eine Firmware-Ueberarbeitung von
+`bt_cmdmode()`/den vier Aufrufstellen. `CLAUDE.md` entsprechend aktualisiert.
+
+**Naechster Schritt (Entscheidung mit Anwender, noch nicht umgesetzt):** Ersatz-Mechanismus fuer
+"Command-Mode erzwingen"/"SPP trennen" finden, der CYSPP NICHT aktiv treibt - z. B. ueber
+`/DIS` direkt (falls im Datenmodus sendbar) oder ueber die im DVK-Dokument vorgeschlagene
+Zustandsregel (Boot/Reset/Advertising/Connect/Disconnect/Muxwechsel -> immer Eingang) plus
+Wartezeit statt aktivem Treiben. Betrifft moeglicherweise auch die Zuverlaessigkeit der
+Classic-SPP-Trennung (Timeout-Disconnect, Reconfig-waehrend-BT-Verbindung), die bisher auf
+`bt_cmdmode()` beruht - hier vorsichtig vorgehen, da Classic aktuell funktioniert.
+
+**Umsetzungsplan (freigegeben):** 4 Aufrufstellen von `bt_cmdmode()`, ein Schritt pro Version,
+jeweils mit eigenem Test am Geraet, bevor der naechste Schritt beginnt (Plan-Details siehe
+Session-Verlauf): 1) `hard.c uart1_request()` GSM-Verdraengung, 2) `bt_disconnect()`
+(BT-Timeout), 3) `init_bluetooth()` (Reconfig-Anfang), 4) `sicom.c` BT-Deinstallieren.
+Danach 5) Recovery-Fenster in `measure.c` von 60 s auf wenige Sekunden verkuerzen, 6) Abschlussdoku.
+
+---
+
+## Update 5.65 - Schritt 1: kein bt_cmdmode() mehr beim GSM/GPS-Verdraengen (hard.c)
+
+**Aenderung (hard.c, `uart1_request()`):** Der Block, der bei Verdraengung des IF820 von UART1
+durch GSM/GPS waehrend einer aktiven BT-Verbindung (`bt_displaced`) `bt_cmdmode()` (CYSPP HIGH)
+aufrief, ist ersatzlos entfernt (samt der jetzt ungenutzten `bt_displaced`-Variable). Dieser Pfad
+feuerte bisher AUTOMATISCH und UNSICHTBAR jedes Mal, wenn GSM/GPS UART1 brauchte, waehrend BT
+verbunden war - der wahrscheinlichste Erklaerungsansatz fuer die bisher beobachtete Zufaelligkeit
+der BLE-Testergebnisse (mal haelt die Verbindung 8 s, mal bricht sie nach 5 s ab).
+
+**Bewusste Nebenwirkung:** Der urspruengliche Zweck dieses Codes (Update 5.48: Terminal-Junk
+unterdruecken, wenn die IF820-RXD beim Mux-Wegschalten floatet) faellt weg. Auf einem per
+Classic-SPP verbundenen Terminal kann waehrend eines GSM/GPS-Mux-Wechsels wieder kurz
+Zeichenmuell auftreten - rein kosmetisch, kein Verbindungsabbruch. Ein sauberer Ersatz (Host-
+seitiges Verwerfen statt Treiben von CYSPP) ist separat vorgesehen, aber nicht Teil dieses
+Schritts.
+
+Der Rueckweg (GSM/GPS -> BT: `bt_release()` bei echter Rueckkehr) bleibt unveraendert - er tat
+bereits das Richtige (freigeben statt treiben).
+
+**Geaenderte Dateien:** hard.c, sprachen/sictxt.c (-> 5.65).
+
+**Am Geraet zu testen (Reihenfolge siehe Plan):**
+1. `ble_cyspp_probe.py --runs 5` parallel mit Event-Sniff (Testmenue 8->1, 180 s) - Ziel:
+   `.CYSPP,S=01` haelt konsistent ueber die volle Lauschzeit, kein spontaner Abbruch mehr nach
+   ~5 s.
+2. Konkurrenztest: BT verbinden (Classic oder BLE), dann eine GSM-Aktion ausloesen, die UART1
+   braucht, waehrenddessen `bt_cyspp_monitor` (Testmenue 7) beobachten - Bit7 darf nicht auf
+   "HIGH (Ausgang)" wechseln, BT-Verbindung darf nicht abreissen.
+3. Classic-SPP-Regression: normale Menuebedienung ueber Bluetooth, auch waehrend eines
+   GSM-Mux-Wechsels - kurzer Zeichenmuell ist akzeptiert, ein echter Abbruch nicht.
+
+---
+
+## Update 5.66 - BLE robuster: kuerzeres Advertising + Verbindungsparameter-Praeferenz (PPCP)
+
+**Anlass:** Tests zeigten sehr lange (13-47 s) und teils fehlschlagende Verbindungsaufbauten,
+sowie in den Event-Logs unterschiedliche, vom Central (Windows) frei gewaehlte Supervision-
+Timeouts (einmal 1 s, einmal 9,6 s) - wir hatten dafuer bisher ueberhaupt keine eigene
+Konfiguration gesetzt. Anwenderwunsch: Robustheit erhoehen, Stromsparen ist aktuell zweitrangig.
+Zwei unabhaengige, kleine Config-Schritte nach bekanntem A1/A2/A5-Muster (get -> set -> /SCFG
+bzw. RAM -> verifizieren, Fehlschlag nicht fatal):
+
+**1) Advertising-Intervall verkuerzt (btio.h `T_sap`):** Low-Duty-Intervall `L=` von 3 s
+(0x12C0, Update 5.56) auf **200 ms** (0x0140) gesenkt - schnellerer Verbindungsaufbau. Bleibt
+weit unter der 5.59-Grenze (30 ms High-Duty, die die Classic-SPP-Kontention verursacht hatte),
+also keine erneute Funk-Kontention zu erwarten. `bt_get_adv()` prueft jetzt zusaetzlich das
+L-Feld (vorher nur T und O) - sonst haetten bereits konfigurierte Geraete (5.55-5.59, L=12C0)
+den neuen Wert nie automatisch uebernommen, weil ihr T/O bereits als "ok" gegolten haette.
+
+**2) Verbindungsparameter-Praeferenz neu gesetzt (btio.c `bt_ensure_connparams()`):** Bisher
+wurde die BLE-Standard-Characteristic "Peripheral Preferred Connection Parameters" (0x2A04,
+GAP-Service) NIE beschrieben - der Central bestimmt Intervall/Latency/Timeout bisher komplett
+selbst. Guide (Kap. 3.8.1.5): "select a longer supervision timeout, shorter connection
+interval, and/or lower slave latency value to achieve required connection stability." Neuer
+Zielwert (8 Byte, SIG-Format, little-endian): Intervall 15-30 ms, Slave-Latency 0 (nie
+aussetzen), Supervision-Timeout **6 s** (vs. den beobachteten 1 s in einer BLE-Sitzung).
+Geschrieben ueber die generische `/WLH` (gatts_write_handle) API auf Handle 0x0007 - laut
+EZ-Serial-Guide-Referenzbeispiel (Kap. 3.8) der Value-Handle von 0x2A04 im Standard-GATT-Layout
+(GAP-Service wird beim Stack-Init immer zuerst angelegt, unsere CYSPP-/App-Services bekommen
+spaeter hoehere Handles). Sicherheitsnetz: `bt_get_connparams()` verifiziert vor dem Schreiben
+die Antwortlaenge (PPCP ist IMMER genau 8 Byte/16 Hex-Zeichen - keine andere Standard-
+Characteristic hat zufaellig dieselbe Laenge); bei unplausibler Laenge wird NICHT geschrieben
+(Warnung statt moeglicher Beschaedigung einer falschen Characteristic). Kein `/SCFG`, da reiner
+RAM-Wert des lokalen GATT-Servers - wird deshalb bei jedem Init neu gesetzt (kein Flash-Write,
+daher unkritisch). Trotzdem nicht garantiert wirksam: der Central KANN diesen Hint ignorieren
+(Windows/iOS teils eigene Defaults, Android meist zuverlaessig).
+
+Beide Werte jetzt auch im BT-Info-Menue sichtbar (`GAP` zeigt L=, neue Zeile fuer `/RLH,H=0007`
+zeigt D=).
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.66).
+
+**Am Geraet zu verifizieren:**
+1. BT-Info-Menue: `GAP` muss `L=0140` zeigen, neue `/RLH`-Zeile muss `D=0C00180000005802` zeigen.
+2. `ble_cyspp_probe.py` mehrfach: Verbindungsaufbau sollte spuerbar schneller sein als vorher
+   (13-47 s). Im Event-Sniff sollte das naechste `gap_connected`-Event (`C,...,O=`) idealerweise
+   `O=0258` (6 s) zeigen, falls Windows die Praeferenz uebernimmt - falls nicht, ist das ein Hin-
+   weis, dass Windows sie ignoriert (kein Fehler unsererseits, siehe Einschraenkung oben).
+3. Classic-SPP-Regression weiterhin unauffaellig.

@@ -203,19 +203,21 @@ bool bt_ensure_btcfg (void)          // pruefen (ueber CoD), bei Bedarf Sniff+Co
 // Idempotenz-Check ueber das O-Feld von GAP (zuverlaessig ruecklesbar, im Gegensatz zum
 // SBTP-Sniff-Flag). Nur IF820.
 //-----------------------------------------------------------------------------
-int bt_get_adv (void)                // -1 = keine Antwort, 0 = abweichend, 1 = T=04 (low-duty) UND O=0000
+int bt_get_adv (void)                // -1 = keine Antwort, 0 = abweichend, 1 = T=04 (low-duty) UND O=0000 UND L=Ziel
 {
- char *pt, *po;
+ char *pt, *po, *pl;
  if (fp.btmodem!=IF820) return (-1);
  { uchar tries;
    for (tries=0; tries<3; tries++)                     // wie GTU/GBTP: erster Versuch manchmal leer
    {
-    if (bt_command(T_gap,T_gap_end,400))               // GAP bis ",F=" -> T- und O-Feld komplett in cbuf
+    if (bt_command(T_gap,T_gap_end,400))               // GAP bis ",F=" -> T-, L- und O-Feld komplett in cbuf
     {
      pt = strstr(cbuf,",T=");                          // Adv-Typ (04 = low-duty-only)
+     pl = strstr(cbuf,",L=");                          // Low-Duty-Intervall (5.6x: Ziel 0140 = 200 ms)
      po = strstr(cbuf,",O=");                          // Low-Duty-Dauer (0000 = unendlich)
-     if (pt && po)
+     if (pt && pl && po)
       return ((pt[3]=='0'&&pt[4]=='4' &&               // T=04  UND
+               pl[3]=='0'&&pl[4]=='1'&&pl[5]=='4'&&pl[6]=='0' &&  // L=0140 UND
                po[3]=='0'&&po[4]=='0'&&po[5]=='0'&&po[6]=='0') ? 1 : 0);  // O=0000
     }
     osDelay(60);
@@ -242,6 +244,51 @@ bool bt_ensure_adv (void)            // pruefen (ueber O-Feld), bei Bedarf setze
  if (bt_get_adv()==1)
  { putln(" BT-Adv: dauerhaft gesetzt und gesichert"); return (TRUE); }
  putln(" BT-Adv: WARNUNG - Verifikation Advertising fehlgeschlagen"); return (FALSE);
+}
+
+//-----------------------------------------------------------------------------
+// Verbindungsparameter-Praeferenz (5.6x, PPCP/0x2A04) - siehe btio.h fuer Herleitung/Werte.
+// Raw-Tail-Read wie bt_get_cod(), weil D= das letzte Feld der /RLH-Antwort ist. Laengencheck
+// (16 Hex = 8 Byte) als Plausibilitaetspruefung gegen einen falschen Handle - PPCP ist die
+// einzige Standard-Characteristic in dieser Groesse (Device Name laenger, Appearance 2 Byte,
+// Service-Changed 4 Byte); bei falscher Laenge wird NICHT geschrieben (koennte sonst eine
+// andere Characteristic ueberschreiben).
+//-----------------------------------------------------------------------------
+int bt_get_connparams (void)         // -1 = keine/unplausible Antwort (falscher Handle?), 0 = abweichend, 1 = Zielwert
+{
+ char buf[48]; uchar n=0; char *p; uchar dconn=connect;
+ if (fp.btmodem!=IF820) return (-1);
+ connect=UART1; putstr(T_rlh_ppcp);                    // "/RLH,H=0007\r" an das Modul
+ bxi=rxi;                                              // RX-Marke
+ connect=dconn & ~UART1;                               // nichts zurueck ans Modul spiegeln
+ osDelay(200);                                         // Antwort abwarten
+ while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+ buf[n]=0; connect=dconn;
+ p=strstr(buf,",D=");                                  // Nutzdaten-Feld der RLH-Antwort
+ if (!p) return (-1);
+ p+=3;
+ if (strlen(p)<16) return (-1);                        // falsche Laenge -> Handle-Annahme vermutlich falsch
+ return (strncmp(p,IF820_PPCP_VALUE,16)==0) ? 1 : 0;
+}
+
+bool bt_set_connparams (void)        // Zielwerte -> /WLH (reiner RAM-Wert, kein /SCFG)
+{
+ if (fp.btmodem!=IF820) return (FALSE);
+ return bt_command(T_wlh_ppcp,T_wlhok,400);
+}
+
+bool bt_ensure_connparams (void)     // pruefen, nur bei plausiblem Handle setzen, verifizieren
+{
+ int cur=bt_get_connparams();
+ if (cur==1)
+ { putln(" BT-ConnParams: bereits gesetzt (15-30ms/Latency 0/6s Timeout)"); return (TRUE); }
+ if (cur==-1)                                              // unplausible Laenge -> lieber nichts anfassen
+ { putln(" BT-ConnParams: WARNUNG - Handle 0007 unplausibel, uebersprungen"); return (FALSE); }
+ if (!bt_set_connparams())                                 // Fehlschlag NICHT fatal (nur Robustheits-Hint)
+ { putln(" BT-ConnParams: WARNUNG - Setzen fehlgeschlagen"); return (FALSE); }
+ if (bt_get_connparams()==1)
+ { putln(" BT-ConnParams: gesetzt (15-30ms/Latency 0/6s Timeout)"); return (TRUE); }
+ putln(" BT-ConnParams: WARNUNG - Verifikation fehlgeschlagen"); return (FALSE);
 }
 
 //-----------------------------------------------------------------------------
@@ -728,6 +775,10 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
     else              bt_msg("   WARNING: could not set security (non-fatal)");
    }
 
+   // --- Schritt 3g: Verbindungsparameter-Praeferenz (Robustheit) - RAM-Wert, KEIN /SCFG,
+   //     traegt daher NICHT zu "changed" bei (kein Reboot noetig, bei jedem Init neu gesetzt) ---
+   bt_ensure_connparams();
+
    // --- Schritt 4: nur bei Aenderung speichern/rebooten + verifizieren ---
    if (changed)
    {
@@ -1027,6 +1078,7 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
    bt_query_show(T_gpem);                                         // Echo (5.57): M=00 = aus
    bt_query_show(T_cypgk);                                        // CYSPP-Paketierung (5.57): W=01 = 1 ms
    bt_query_show(T_gsbp);                                         // Security (5.57): M=00 = Just Works
+   bt_query_show(T_rlh_ppcp);                                     // Verbindungsparameter-Praeferenz (5.6x): D=0C00180000005802
    bt_show_counters();                                            // Durchsatz-Diagnose der laufenden BT-Sitzung
   }
   osDelay(50); bxi=rxi;                                           // finaler Flush: keine Modulbytes ins Menue
