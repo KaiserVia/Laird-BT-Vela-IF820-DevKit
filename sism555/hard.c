@@ -459,7 +459,6 @@ uchar uart1_owner = MUX_NONE;				// Current UART1 owner, default: no owner
 uchar uart1_request (uchar requester, uint baud)	// Request UART1 resource
 {																											// Returns TRUE if granted
  uchar prev_owner;											// bisheriger Owner (fuer IF820 Command-Mode-Handling)
- uchar bt_displaced = 0;								// IF820 wird von UART1 verdraengt?
  __disable_irq();												// Critical section: protect owner + connect
  prev_owner = uart1_owner;								// merken, woher wir kommen
  if (uart1_owner == requester)						// Already owns UART1?
@@ -469,18 +468,16 @@ uchar uart1_request (uchar requester, uint baud)	// Request UART1 resource
 	return(TRUE);
  }
  if (uart1_owner == MUX_BT)							// BT currently owns UART1?
- {
 	connect &= ~UART1;										// Suspend BT terminal output
-	if ((requester != MUX_BT) && (connect & BT_LINK) && (fp.btmodem==IF820))
-	 bt_displaced = 1;										// IF820 verliert UART1 an GSM/GPS
- }
  uart1_owner = requester;								// Claim ownership atomically
  __enable_irq();												// End critical section
 
- // IF820 in Command-Mode nehmen, BEVOR der MUX wegschaltet: sonst floatet die IF820-RX ueber
- // den MUX und das Modul leitet Leitungsrauschen als Junk ueber SPP weiter. Wirkt ab Modul-FW
- // 1.4.18.18; auf 1.4.12.12 wirkungslos, aber harmlos. I2C -> ausserhalb der Critical Section.
- if (bt_displaced) bt_cmdmode();
+ // DVK-Nachweis (ble-Dvk-request.md, 2026-08-10): CYSPP darf NIE aktiv getrieben werden, auch
+ // nicht kurz beim UART1-Muxwechsel - ein hier frueher per bt_cmdmode() erzwungenes HIGH (Update
+ // 5.48, gegen Terminal-Junk beim GSM/GPS-Wegschalten) hat exakt das getan, was den BLE-CYSPP-
+ // Datenkanal nachweislich verhindert. Ersatzloser Rueckbau; der Junk-Effekt (rein kosmetisch,
+ // nur auf einem Classic-SPP-Terminal waehrend eines Mux-Wechsels) ist eine bewusst akzeptierte
+ // Nebenwirkung, siehe Plan/project-status.md.
 
  osDelay(3);														// Wait for last byte to finish
  switch (requester)											// Switch MUX to requested channel
