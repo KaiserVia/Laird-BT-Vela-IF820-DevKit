@@ -109,6 +109,21 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
 
 ## Offene / zu beobachtende Punkte
 
+- **BACKLOG-Idee (2026-08-18, NICHT umgesetzt, bewusst zurueckgestellt) - Classic und BLE
+  getrennt behandeln (Transport-Erkennung):** Aktuell unterscheidet die Firmware nicht, ob eine
+  BT-Verbindung Classic SPP oder BLE ist - `BT_LINK`/CYSPP-Pin ist ein einziges, transport-
+  neutrales Signal ("irgendein transparenter Datenkanal ist aktiv"). Um das zu unterscheiden,
+  muesste die Firmware die `@E,...`-Ereignisse des Moduls auswerten (gap_connected fuer BLE vs.
+  ein eigenes Classic-Connect-Ereignis) - das erfordert, CYSPP-Autostart abzuschalten
+  (`.CYSPPSP E=1` statt `E=2`) und den Uebergang in den Datenmodus selbst per Zustandsmaschine
+  zu steuern (`.CYSPPSTART`). Das ist inhaltlich dasselbe groessere Vorhaben wie "Option B" im
+  BLE-Durchsatz-Backlog (project-status.md) - kein kleiner Zusatz, sondern ein Umbau in der
+  Groessenordnung der gesamten bisherigen CYSPP-Untersuchung, mit echtem Regressionsrisiko fuer
+  das aktuell zuverlaessig funktionierende Classic SPP (Phase 1 legt BEIDE Transporte lahm, bis
+  die Zustandsmaschine fertig ist). Fuer das aktuelle Problem (CYSPP-Treiben bei bewusstem
+  Trennen) nicht noetig - dort spielt der Transport keine Rolle, weil die Verbindung ohnehin
+  beendet wird. Nur bei einem spaeteren, konkreten Bedarf (z. B. der BLE-Durchsatz-Wunsch) neu
+  bewerten.
 - **⚠ NEU (2026-08-18) - BT-Modul faellt gelegentlich komplett aus** (separates Problem, NICHT
   Teil der BLE-CYSPP-Untersuchung): Anwenderbeobachtung "manchmal geht das einfach nicht mehr".
   **Fehlerbild:** `/PING` scheitert (Modul antwortet gar nicht mehr, kein Baud-Scan findet es).
