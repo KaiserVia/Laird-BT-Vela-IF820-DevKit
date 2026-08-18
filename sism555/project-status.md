@@ -2735,3 +2735,39 @@ siehe Update 5.74).
 **Am Geraet zu verifizieren:** Normalbetrieb unauffaellig (Selbstheilung ist idempotent, laeuft
 jetzt nur oefter). Funktional nicht einfach isoliert testbar (der Fall "Host treibt HIGH und
 haengt" ist selten) - vor allem beobachten, ob Regressionen bei GSM/BT-Umschaltung auftreten.
+
+---
+
+## Update 5.77 - Schritt 5 TEMPORAER ZURUECKGENOMMEN (Verdacht: 5.76 verursachte erneutes Haengen)
+
+**Symptom (Anwender, sauber reproduziert):** Geraet aus -> RS232 verbinden -> Geraet an -> BT-
+Hyperterminal verbinden -> 40 s warten -> BT-Hyperterminal trennen -> haengt lange, endet mit
+"Kein Prozess ist am anderen Ende der Pipe". `bt_cyspp_monitor()` zeigte danach wieder
+`bit7 = LOW`, RS232 wieder traege - exakt dasselbe Symptombild wie vor dem 5.74-Fix, obwohl
+5.74 das Problem bestaetigt behoben hatte (Test 2 vom Anwender explizit bestaetigt).
+
+**Zeitliche Eingrenzung:** Zwischen dem bestaetigt funktionierenden 5.74 und dem erneuten
+Auftreten liegen nur 5.75 (PPCP-Aufraeumung, inhaltlich unabhaengig von BT-Disconnect) und 5.76
+(Schritt-5-Wachhund: `bt_release()`-Selbstheilung von 1x/Minute auf 1x/5s verkuerzt). Verdacht:
+5.76 interferiert auf noch unbekannte Weise mit dem Disconnect-Ablauf.
+
+**Nebenbefund geklaert (kein Bug):** Die zwischenzeitlich beobachtete zweite "Viasis 3003M..."-
+Banner-Ausgabe auf RS232 war KEIN Geraete-Neustart, sondern die normale Begruessungsnachricht,
+die `communication_change()` bei JEDER neuen BT-Verbindung sendet (`startmessage=1`) - wird auf
+RS232 mitgespiegelt, weil beide Schnittstellen (`connect`-Bits UART0+UART1) gleichzeitig aktiv
+waren. Keine Aenderung noetig.
+
+**Aenderung (measure.c):** Schritt 5 (5.76) komplett zurueckgenommen - `bt_release()`-Selbst-
+heilung wieder wie vor 5.76, nur 1x pro RTC-Minutentick. Reiner Isolationsschritt: noch NICHT
+bewiesen, dass 5.76 tatsaechlich die Ursache ist, nur der naheliegendste Verdaechtige (einzige
+Aenderung im relevanten Zeitraum). Ziel: pruefen, ob das Symptom mit dem alten Takt verschwindet.
+
+**Geaenderte Dateien:** measure.c, sprachen/sictxt.c (-> 5.77).
+
+**Am Geraet zu testen:** Exakt denselben Ablauf wie oben (RS232 + BT verbinden, 40 s warten,
+BT trennen) mehrfach wiederholen.
+- **Haengt es NICHT mehr:** 5.76 war tatsaechlich die Ursache - Schritt 5 muss anders (seltener
+  oder mit einer Schutzbedingung) umgesetzt werden.
+- **Haengt es TROTZDEM noch:** 5.76 war nicht die Ursache - dann liegt es an etwas anderem, das
+  wir noch nicht gefunden haben (ggf. ein rein zeitabhaengiges/RF-Problem, das mit unserem Code
+  gar nichts zu tun hat).
