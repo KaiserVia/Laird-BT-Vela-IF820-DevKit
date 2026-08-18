@@ -2810,3 +2810,34 @@ zukuenftig, dass unsere eigenen Diagnose-Tools das CYSPP-Bild waehrend eines Tes
 **Am Geraet zu verifizieren:** Event-Sniff/Transfer-Test starten, waehrenddessen eine BT-
 Verbindung trennen - `connect&BT_LINK` sollte jetzt prompt (binnen ~100ms) korrekt aktualisiert
 werden, statt erst nach Ablauf der 180s/120s.
+
+## Update 5.79: FIX PIN-Abfrage - Endlosschleife durch Nicht-Ziffer-Bytes als Fehlversuch gezaehlt
+
+**Symptom (Anwenderbeobachtung, RS232-Log ueber COM3, BT-Verbindung ueber COM10):** Waehrend
+einer aktiven BT-Verbindung erscheint am Terminal wiederholt und automatisch, ohne jede
+Tastatureingabe, `PIN = ******` (sechs Sternchen) im Sekundentakt neu - nicht Zeichen fuer
+Zeichen aufgebaut, sondern komplett fertig und sofort wieder neu ausgegeben. Reproduzierbar
+unabhaengig vom urspruenglichen CYSPP-Thema; trat u. a. direkt im Anschluss an einen 180s
+Event-Sniff-Lauf auf, sobald `mainmenu()` nach der Sniff-Pause wieder Bytes verarbeitete.
+
+**Ursache (`sicom.c`, `mainmenu()`, PIN-Zweig `bt_pininit>0`):** Der Fehlversuchszaehler
+`bt_pininit` wurde bisher fuer **jedes** empfangene Byte erhoeht, unabhaengig davon, ob es
+tatsaechlich eine Ziffer war. Waehrend einer bestehenden BT-Verbindung treffen ueber den
+gemeinsam genutzten UART0/UART1-Puffer laufend irgendwelche Nicht-Ziffer-Bytes ein (Modul-/
+Protokoll-Rauschen, Steuerzeichen etc.) - jedes davon zaehlte als Fehlversuch. Nach 6 solcher
+Bytes: `reset_bt_pin()` (PIN-Abfrage-Reset + Neuausgabe der PIN-Aufforderung), sofort erneut
+gefuettert von den naechsten 6 eintreffenden Bytes - eine Endlosschleife, die sich selbst
+staendig neu antreibt, solange die Verbindung aktiv ist und Bytes eintreffen. Voellig
+unabhaengig von CYSPP/Pin-Treiben; ein reiner Zaehl-Bug im PIN-Handler.
+
+**Fix (`sicom.c`):** Die gesamte Verarbeitung (Echo, Aufbau von `menu`, Zaehler-Erhoehung,
+Erfolgs-/Fehlversuchspruefung) ist jetzt komplett hinter `isdigit(c)` gestellt. Nicht-Ziffer-
+Bytes (ausser `'H'` fuer den expliziten Reset) werden still verworfen und zaehlen nicht mehr
+als Fehlversuch.
+
+**Geaenderte Dateien:** sicom.c, sprachen/sictxt.c (-> 5.79).
+
+**Am Geraet zu verifizieren:** BT verbinden, PIN-Abfrage abwarten, PIN wie gewohnt eingeben -
+sollte jetzt sauber funktionieren, auch waehrend im Hintergrund andere BT-Aktivitaet
+(Event-Sniff, normale Verbindungsnutzung) laeuft. Insbesondere: kein automatisches, unaufge-
+fordertes Neu-Anzeigen der PIN-Abfrage mehr ohne eigene Tastatureingabe.

@@ -2152,24 +2152,24 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
  else // bt_pininit > 0 Bluetooth Pinnummerabfrage aktiviert
  {
 	if (c=='H') reset_bt_pin ();
-  else 
-	{	
-	 putc('*');	
-	 if (isdigit(c))
-   {	
-    menu*=10;					// bisherige Ziffern * 10
-    menu+=(c&0x0F);		// neue Ziffer addieren 
-	 }	
-	 bt_pininit++;	
+  else if (isdigit(c))		// FIX (5.79): Nicht-Ziffern (z. B. Modul-/Verbindungsrauschen kurz
+  {												// nach dem Connect, gemeinsamer UART0/UART1-Puffer) durften bisher
+	 putc('*');						// NICHT als Fehlversuch zaehlen - sonst reissen 6 Stoerbytes die PIN-
+	 menu*=10;						// Abfrage sofort in einen Reset+Neuausgabe-Zyklus, der sich bei
+	 menu+=(c&0x0F);			// anhaltendem Rauschen endlos wiederholt, schneller als ein Mensch
+											// tippen kann (beobachtet: "PIN = ******" erscheint im Sekundentakt
+											// neu, ohne jede Eingabe). Jetzt: nur echte Ziffern werden echot
+											// und gezaehlt, alles andere wird still verworfen.
+	 bt_pininit++;
 
 	 if (fp.btpin==menu) // Erfolg?
-	 {	
+	 {
 	  putstr (T_main);					// Hauptmen� senden
-		select ('6',0);						// Men�auswahl senden		
+		select ('6',0);						// Men�auswahl senden
 		bt_pininit=0;							// Reset Pinnabfrage
-		menu=0; 
-	 }	 
-	 else if (bt_pininit>6)	reset_bt_pin ();		// Zuviele (falsche) Eingaben 
-  }		
- }  // end if bt_pininit > 0 
+		menu=0;
+	 }
+	 else if (bt_pininit>6)	reset_bt_pin ();		// Zuviele (falsche) Eingaben
+  }
+ }  // end if bt_pininit > 0
 }	
