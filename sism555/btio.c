@@ -514,6 +514,18 @@ void bt_event_sniff (void)
 {
  uchar cc; int loop; char c; uint t0; bool bol=TRUE;   // bol = Zeilenanfang (fuer Zeitstempel)
  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ if (bt_pininit)                              // FIX (5.80): PIN-Abfrage noch offen? Der Sniffer liest
+ {                                             // ALLE eingehenden UART1-Bytes roh mit und verwirft den Rest
+                                               // am Ende (bxi=rxi) - eine waehrenddessen ueber BT eingegebene
+                                               // echte PIN geht dadurch spurlos verloren (verschluckt statt an
+                                               // mainmenu() weitergereicht), bt_pininit bleibt haengen. Alles was
+                                               // danach eintrifft, landet in einem PIN-Handler ohne vollstaendige
+                                               // Eingabe - das erzeugte die beobachtete Dauerschleife
+                                               // ("PIN = ******" wiederholt ohne Tastatureingabe). Deshalb: Sniff
+                                               // erst starten, wenn die PIN-Abfrage abgeschlossen ist.
+  putln("Event-Sniff: PIN-Abfrage noch offen - erst PIN ueber BT eingeben, dann erneut starten.");
+  return;
+ }
  Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (verdraengt GSM/GPS falls noetig,
                                                // wie bei send_bt_info() - MUX schaltet auf BT)
  cc=connect; connect=concpy & ~UART1;         // Ausgabe nur ans Terminal, nichts zurueck ans Modul
@@ -600,6 +612,12 @@ void bt_transfer_echo (void)
  uchar cc; uint loop; char c;
 
  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ if (bt_pininit)                              // FIX (5.80): siehe bt_event_sniff() - dieselbe Funktion
+ {                                             // verschluckt sonst eine waehrenddessen ueber BT eingegebene
+                                               // echte PIN als Diagnose-Rohdaten.
+  putln("Transfer-Test: PIN-Abfrage noch offen - erst PIN ueber BT eingeben, dann erneut starten.");
+  return;
+ }
  Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (wie bt_event_sniff)
  cc=connect; connect=concpy & ~UART1;
  putln("Transfer-Test: wartet auf CYS1-Frames (CRC/Seq), sendet ACK1 zurueck. Laufzeit 120s.");

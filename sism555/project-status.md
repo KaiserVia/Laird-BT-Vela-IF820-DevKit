@@ -2841,3 +2841,34 @@ als Fehlversuch.
 sollte jetzt sauber funktionieren, auch waehrend im Hintergrund andere BT-Aktivitaet
 (Event-Sniff, normale Verbindungsnutzung) laeuft. Insbesondere: kein automatisches, unaufge-
 fordertes Neu-Anzeigen der PIN-Abfrage mehr ohne eigene Tastatureingabe.
+
+**Nachtrag (2026-08-18) - 5.79 allein war NICHT ausreichend, echte Ursache war woanders:**
+Nach Flashen von 5.79 trat die Endlosschleife ("PIN = ******" wiederholt, ohne Tastatur-
+eingabe) weiterhin auf, reproduziert direkt im Anschluss an einen Event-Sniff-Lauf (Testmenue
+8->1). Direkter Vergleich mit dem normalen, ungestoerten PIN-Ablauf (RS232-Log ohne Sniffer:
+PIN-Prompt erscheint genau einmal, 6 Ziffern werden als `******` echot, danach sofort das
+Hauptmenue - kein Wiederholen) zeigte: das Problem liegt nicht im Ziffern-Zaehler (5.79-Fix war
+zwar sachlich richtig, aber nicht die Hauptursache), sondern in `bt_event_sniff()` selbst.
+
+## Update 5.80: FIX Event-Sniff/Transfer-Test verschlucken eine waehrenddessen ueber BT
+eingegebene PIN
+
+**Ursache:** `bt_event_sniff()` liest waehrend der festen 180s-Laufzeit ALLE eingehenden
+UART1-Bytes roh mit (reine Diagnose-Ausgabe) und verwirft am Ende alles Restliche im Puffer
+(`bxi=rxi;` - "nichts darf ans Menue durchsickern"). Wird waehrend dieser 180s ueber BT die
+echte PIN eingegeben (bt_pininit>0, PIN-Abfrage aktiv), werden genau diese Ziffern-Bytes vom
+Sniffer als Rohdaten verschluckt statt an `mainmenu()`/den PIN-Handler weitergereicht - die
+Eingabe geht spurlos verloren, `bt_pininit` bleibt auf 1 haengen. Alles was danach eintrifft,
+landet in einem PIN-Handler ohne je eine vollstaendige, gueltige Eingabe zu bekommen - das
+erzeugte die beobachtete Dauerschleife. Dieselbe Schwachstelle besteht in `bt_transfer_echo()`.
+
+**Fix (btio.c):** Beide Funktionen pruefen jetzt beim Start `if (bt_pininit)` und brechen mit
+einer Meldung ab ("PIN-Abfrage noch offen - erst PIN ueber BT eingeben, dann erneut starten."),
+statt die laufende PIN-Eingabe zu zerstoeren.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.80).
+
+**Am Geraet zu verifizieren:** BT verbinden, PIN-Abfrage bewusst NICHT sofort beantworten,
+stattdessen ueber RS232 Testmenue -> 8 -> 1 (Event-Sniff) versuchen zu starten - sollte jetzt
+sofort mit der neuen Meldung abbrechen statt 180s zu blockieren. Danach PIN normal eingeben -
+sollte wie im ungestoerten Fall sauber funktionieren (kein Wiederholen mehr).
