@@ -13,7 +13,7 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
 - **Aktueller Branch:** `LTE-Update`
-- **Aktuelle Firmware-Version:** `T_version = "5.64"` (in `sism555/sprachen/sictxt.c`, Z. 27)
+- **Aktuelle Firmware-Version:** `T_version = "5.66"` (in `sism555/sprachen/sictxt.c`, Z. 27)
 - **Firmware-Quellcode:** `sism555/` (Hauptdatei BT: `btio.c` / `btio.h`)
 - **Liefer-/Herstellercode:** `SupplierSourceCode/` (u. a. Vela IF820 Firmware 1.4.18.18, als Submodul)
 - **Hersteller-PDFs:** `Documentation/` (Datenblatt, EZ-Serial-Guide, DVK-Guide, PCNs)
@@ -65,44 +65,36 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 `…ca102` wird mit ATT-Success quittiert — und sofort danach trennt das Modul.
 Classic SPP läuft dagegen einwandfrei.
 
-**Diagnose (Stand 2026-08-05, Details in `HW_Massnahmen_Bewertung_2026-08.md`):**
+**✅ URSACHE GEKLÄRT (2026-08-10, unabhängig auf IF820-DVK nachgewiesen — Details/Quelle:
+`sism555/Doku/ble-Dvk-request.md`, dort auch die konkrete Umsetzungsanforderung):**
 
-Der CYSPP-Pin ist low-aktiv: **LOW = Datenmodus erlaubt, HIGH = Command-Mode /
-Kanal beenden.** `bt_release()` gibt IC54 Bit 7 nur als **Eingang** frei — die Leitung
-wird dabei **nicht** aktiv LOW getrieben. Es gibt im ganzen Code keine Funktion, die das täte.
+Der CYSPP-Pin muss für einen funktionierenden transparenten BLE-Datenkanal **hochohmig/
+Eingang** sein — **nicht aktiv HIGH und nicht aktiv LOW getrieben.** Auf dem DVK wurden alle
+drei Zustände bei identischer Konfiguration reproduzierbar getestet:
 
-Im Schaltplan hat die Leitung drei Bauteile — und der entscheidende fehlt:
+| Zustand der Host-CYSPP-Leitung | Ergebnis |
+|---|---|
+| aktiv LOW | Fehler — kein nutzbarer Datenpfad |
+| aktiv HIGH | Fehler — BLE-Schreiben erscheinen als EZ-Serial-GATT-Events, nicht als UART-Nutzdaten |
+| **Eingang / hochohmig** | **Pass** — CCCD `0100`, UART↔BLE transparent in beide Richtungen |
 
-| Bauteil | Wert | Funktion | Bestückt (Variante „Abwärtskompatibel mit LTE")? |
-|---|---|---|---|
-| **R77** | 10 kΩ | **Pull-down** IC36 IO7 → GND | **NEIN** ← Pad ist frei |
-| C77 | 10 nF | Filter auf IO7 | ja |
-| R78 | 100 Ω | Serie IO7 → IF820 P13 | ja |
+Wichtig: Ein gemessenes HIGH ist **kein Beweis** für den korrekten Zustand — aktiv HIGH und
+hochohmig sind beide als HIGH messbar, verhalten sich am Modul aber nachweislich
+unterschiedlich. Die früher vermutete Ursache "R77 (Pull-down) fehlt, daher liegt die
+Leitung nur über den PCA9554-Pull-up auf HIGH" ist damit **nicht der Kernfehler** — das
+eigentliche Problem ist, dass unsere **Firmware** die Leitung über `bt_cmdmode()`
+(IC54 Bit 7 als Ausgang HIGH) an mehreren Stellen aktiv treibt:
+- `bt_disconnect()` (btio.c) — SPP-Trennung erzwingen
+- `init_bluetooth()` (btio.c) — Reconfig-Command-Mode erzwingen
+- `uart1_request()` (hard.c) — beim Verdrängen von BT durch GSM/GPS (`bt_displaced`)
+- Bluetooth-Deinstallieren-Menüpunkt (sicom.c case -1)
 
-Ohne R77 bleibt nur der **interne ~100-kΩ-Pull-up des PCA9554** im Eingangsmodus → die
-Leitung liegt auf HIGH → das Modul liest „Command-Mode" → Datenkanal wird beendet.
-**Wahrscheinlichkeit, dass das die Ursache ist: 60 %.**
-
-**Kernproblem für jeden Fix — die Doppelrolle von Bit 7:** Dieselbe Leitung wird auch als
-**Eingang** gelesen, um eine BT-Verbindung zu erkennen (`BT_LINK`, low-aktiv, über EINT1 →
-`communication_change()` in `libtool.c`). Wird ein DC-Pegel auf die Leitung gelegt (R77
-oder aktives LOW-Treiben), sind Ruhe- und Verbundzustand nicht mehr unterscheidbar.
-
-**Drei Wege, bewertet:**
-
-| Weg | Hardware | Firmware | Wahrsch. |
-|---|---|---|---|
-| A — Event-Parser auf UART1, IO7 aktiv LOW | keine | **neuer Parser** (existiert heute nicht!) + UART1-Owner-Umstellung | 55 % |
-| B — P27 → IC36 IO5, IO7 aktiv LOW | Draht + GND-Trennung + Pull-up | Bit umbenennen + `bt_datamode()` | 85 % |
-| C — P27 → IC36 IO5, R77 bestücken | wie B, plus 1 Widerstand | nur Bit umbenennen | 85 % |
-
-**IC36 IO5 ist nachweislich frei:** `MQTT_LINK (1<<5)` wird **nie** aus `get_com_status()`
-gelesen; der Bit wird nur softwareseitig gesetzt (`mqtt.c` Z. 1438/1474/1491,
-`libtool.c` Z. 564/607). Im Schaltplan liegt IO5 fest auf GND.
-
-**Nächster Schritt:** Messung nach `Messprotokoll_CYSPP_Diagnose.md`. Sie entscheidet
-zwischen den Wegen und klärt zugleich, ob aktives LOW-Treiben Contention erzeugt
-(R78 dient dabei als Strom-Messwiderstand).
+Alle vier Stellen widersprechen der jetzt bestätigten Anforderung "Leitung nie aktiv treiben,
+auch nicht beim UART1-Muxwechsel oder bei Fehler-/Timeout-Pfaden" und müssen überarbeitet
+werden. **Voraussichtlich ist KEINE Hardware-Änderung nötig** (R77, CONNECTION-Pin-
+Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md` und
+`Messprotokoll_CYSPP_Diagnose.md` (Wege A/B/C, R77/P27-Umverdrahtung) sind als *Lösungsweg*
+überholt, bleiben aber als Herleitungs-/Messhistorie erhalten.
 
 **Zwei Sackgassen — nicht nochmal untersuchen:**
 

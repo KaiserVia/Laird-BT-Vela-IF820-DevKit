@@ -1,5 +1,16 @@
 # HW-Maßnahmen IF820 — Bewertung mit Wahrscheinlichkeiten
 
+> ⚠ **TEILWEISE ÜBERHOLT (2026-08-10):** Ein unabhängiger, reproduzierter DVK-Nachweis
+> (`ble-Dvk-request.md`) zeigt: das Problem ist **keine fehlende Hardware-Beschaltung**
+> (R77-Pull-down), sondern dass die **Firmware** die CYSPP-Leitung (IC54 Bit 7) über
+> `bt_cmdmode()` an mehreren Stellen aktiv HIGH treibt — aktiv HIGH verhält sich auf dem
+> IF820 nachweislich ANDERS als hochohmig/Eingang, obwohl beide Zustände als HIGH gemessen
+> werden. Die Wege A/B/C unten (P27-Umverdrahtung, R77 bestücken) sind damit als
+> Primärlösung hinfällig — voraussichtlich ist **keine Hardware-Änderung** nötig, nur eine
+> Firmware-Korrektur (CYSPP nie mehr aktiv treiben). Details/Quelle: `ble-Dvk-request.md`.
+> Diese Datei bleibt als Herleitungs-/Messhistorie stehen, aber NICHT mehr als aktueller
+> Lösungsweg verwenden.
+
 > Bewertung der Hardware-Maßnahmen aus `HW_Massnahmen_IF820.md` gegen die Primärquellen
 > (Datenblatt `EZ-DS-Vela IF820_v2_2.pdf`, `EZ-GUIDE-EZ-SERIAL-VELA-IF820_v2_2.pdf`) und
 > gegen den Schaltplan `Mainboard-V2-A1_13_07_2026.sch`.

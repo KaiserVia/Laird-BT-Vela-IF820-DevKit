@@ -1,3 +1,8 @@
+> ⚠ **ÜBERHOLT (2026-08-10):** DVK-Nachweis (`ble-Dvk-request.md`) zeigt, dass die Ursache
+> keine fehlende Hardware-Beschaltung ist, sondern dass die Firmware CYSPP an mehreren
+> Stellen aktiv treibt (`bt_cmdmode()`). Dieses Messprotokoll (R77/Contention/P27) ist als
+> Lösungsweg nicht mehr aktuell, bleibt aber als Messhistorie stehen.
+
 # Messprotokoll — CYSPP-Leitung diagnostizieren
 
 > Zum Ausdrucken und Ausfüllen. Zwei Personen, ca. 45 min.
