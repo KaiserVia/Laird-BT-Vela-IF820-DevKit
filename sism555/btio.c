@@ -482,22 +482,22 @@ void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesb
 #endif
 }
 
-// IF820: offene BT/SPP-Verbindung SAUBER trennen.
-// Ablauf: CYSPP HIGH -> PUART in Command-Mode (ab FW 1.4.18.18 zuverlaessig), dann /DIS
-// (gap_disconnect) -> das Modul baut die Verbindung aktiv ab (Peer wird informiert, SPP-Slot frei).
-// Defensiv: quittiert das Modul /DIS nicht (z. B. alte FW 1.4.12.12), wird trotzdem freigegeben -
-// also nie schlechter als der bisherige reine CYSPP-Puls.
+// IF820: offene BT/SPP-Verbindung trennen.
+// DVK-Nachweis (ble-Dvk-request.md, Schritt 1 CYSPP-Plan, 5.65): CYSPP darf NIE aktiv getrieben
+// werden, auch nicht kurz zum Command-Mode-Erzwingen - das verhindert nachweislich den
+// transparenten BLE-Datenkanal. Schritt 2: bt_cmdmode() hier ersatzlos entfernt. /DIS wird
+// weiterhin versucht (harmlos: ist das Modul noch im Datenmodus, geht der Befehl einfach als
+// Nutzdaten durch und bewirkt nichts - kein Fehler, nur kein aktives Trennen). bt_release()
+// bleibt als Sicherheitsnetz (idempotent, stellt sicher, dass CYSPP Eingang ist).
 void bt_disconnect (void)
 {
  if (fp.btmodem!=IF820) return;
  concpy = connect;                          // WICHTIG: bt_command() stellt am Ende connect=concpy her
                                             // -> ohne dies wuerde connect auf einen veralteten Wert gesetzt
                                             //    (Timeout-Kontext) und Terminal/BT-Routing kaputtgehen.
- bt_cmdmode();                              // CYSPP HIGH -> Command-Mode
- osDelay(150);                              // Modul Zeit geben: SPP-Datenmodus -> Command-Mode
  bt_command(T_dis, T_disok, -300);          // /DIS still senden (kein Terminal-Spam), Antwort abwarten
  osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
- bt_release();                              // CYSPP wieder als Eingang
+ bt_release();                              // CYSPP sicherstellen: Eingang (idempotent)
  bxi=rxi;                                   // RX-Reste (/DIS-Antwort) verwerfen -> nichts ins Terminal/Menue
  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
@@ -717,22 +717,23 @@ void bt_cyspp_contention_test (void)
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
- putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
+ putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)   9 = zurueck");
  putstr(" comchange_count: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69, CYSPP-Diagnose)
  for (tries=0; tries<20; tries++)
  {
   if (comchange) clear_comchange();        // stehenden Merker verwerfen, bevor getc() ihn sieht
   c = getc(TERMINAL_CHAR_TIMEOUT);
-  if (c=='1' || c=='2' || c=='3') break;
+  if (c=='1' || c=='2' || c=='3' || c=='9') break;
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
  putstr(" comchange_count danach: "); putnumber(comchange_count,0);           // TEMPORAER (5.69)
  putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(", "); putnumber(tries,0); putstr(" Versuche)"); newline();
- if (c=='1' || c=='2' || c=='3') { putc((char)c); newline(); }
+ if (c=='1' || c=='2' || c=='3' || c=='9') { putc((char)c); newline(); }
  else { newline(); putln(" keine gueltige Eingabe (staendiger Schnittstellenwechsel?) - abgebrochen."); }
  if (c=='1') bt_event_sniff();
  else if (c=='2') bt_cyspp_contention_test();
  else if (c=='3') bt_transfer_echo();
+ // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
 }
 
 //-----------------------------------------------------------------------------

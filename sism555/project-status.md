@@ -2503,3 +2503,57 @@ Timeout ~20 s). Fokus bleibt auf den bereits angegangenen BLE-Verbindungsparamet
 (`/RLH,H=0007` sollte `D=0C00180000005802` zeigen) und beim naechsten Connect-Versuch im
 Event-Sniff den `O=`-Wert im `gap_connected`-Event ablesen (Ziel: 0258 = 6 s statt der
 beobachteten 1 s).
+
+**Ergebnis Init-Log (Anwender, Modul nach langem Power-Cycle wieder online):** Advertising-
+Intervall wurde erfolgreich von `L=12C0` (3 s) auf `L=0140` (200 ms) umgestellt (Update 5.66
+wirkt). Der PPCP-Schreibversuch (`/WLH,H=0007,...`) schlug fehl ("Setzen fehlgeschlagen") -
+Handle 0007 ist auf diesem Geraet offenbar nicht die 0x2A04-Characteristic (war eine Annahme
+aus dem Guide-Beispiel, keine gepruefte Tatsache). **Entscheidung (Anwender):** PPCP/GATT-
+Discovery NICHT weiterverfolgen - Aufwand (echte GATT-Discovery fuer den realen Handle) steht
+in keinem Verhaltnis zum Nutzen, da unser Testaufbau (Windows-PC) PPCP-Hints oft ohnehin
+ignoriert und PPCP erst NACH Verbindungsaufbau wirkt (das eigentliche Problem - Verbindungsaufbau
+selbst dauert 13-47 s oder scheitert komplett - bleibt davon unberuehrt). Der fehlgeschlagene
+Schreibversuch ist harmlos (schlaegt sauber fehl, aendert nichts) und bleibt vorerst im Code.
+
+**Wichtige Zwischen-Erkenntnis (Anwender-Einwand, korrigiert mehrere Annahmen):**
+Bluetooth Classic laeuft auf demselben Board sauber - eine reine Hardware-/RF-Erklaerung
+(Antenne/Entkopplung/GSM-Interferenz) fuer die BLE-Verbindungsprobleme ist damit unwahrscheinlich
+(gleicher Funkteil/Antenne/Versorgung wie BLE). GSM/LTE war waehrend der fehlgeschlagenen BLE-
+Tests durchgehend AUS. Ausserdem: 32-kHz-Quarz Q3 ist bestueckt (frueherer CLAUDE.md-Punkt war
+falsch), und das erfolgreiche Referenz-Eval-Kit (`ble-Dvk-request.md`) lief ebenfalls auf
+Modul-FW 1.4.12.12 (kein FW-Unterschied zum Mainboard). Neue Arbeitshypothese: BLE-spezifische
+Protokoll-/Timing-Eigenschaften (kurzer Supervision-Timeout, zeitkritischerer Verbindungsaufbau
+als Classic), nicht gemeinsam genutzte Hardware. CLAUDE.md entsprechend korrigiert.
+
+**Separat notiert (nicht Teil dieser Untersuchung):** Anwender berichtet gelegentlichen
+kompletten Modul-Ausfall (`/PING` scheitert komplett), nur durch Power-Cycle mit laengerer
+Stromlos-Zeit behebbar - als eigener offener Punkt in CLAUDE.md aufgenommen, moeglicher
+Zusammenhang mit dem fehlenden RST_L-Zugang (R124-Pad), nicht bestaetigt.
+
+---
+
+## Update 5.71 - Schritt 2: kein bt_cmdmode() mehr in bt_disconnect()
+
+**Aenderung (btio.c, `bt_disconnect()`):** Der `bt_cmdmode()`-Aufruf (CYSPP HIGH treiben, um vor
+`/DIS` den Command-Mode zu erzwingen) ist entfernt. `/DIS` wird weiterhin versucht - falls das
+Modul noch im Datenmodus ist, geht der Befehl einfach als Nutzdaten durch und bewirkt nichts
+(kein Fehler, nur kein aktives Trennen in diesem Fall). `bt_release()` bleibt als Sicherheitsnetz
+(idempotent). Genutzt vom BT-Inaktivitaets-Timeout (`measure.c`).
+
+**Bewusste Nebenwirkung:** Ohne erzwungenen Command-Mode kann `/DIS` in einigen Faellen wirkungs-
+los verhallen (Modul noch transparent) - dann bleibt nur die virtuelle Trennung (Flags loeschen),
+wie vor Update 5.47b. Das ist ein Rueckbau auf ein frueher akzeptiertes Verhalten, kein neues
+Risiko.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.71).
+
+**Am Geraet zu testen (Schritt 2 aus dem Plan):**
+1. BT-Verbindung (Classic) aufbauen, `BT_TIMEOUT` abwarten, pruefen dass die Verbindung sauber
+   endet (Terminal zeigt "Bluetooth getrennt", `bt_cyspp_monitor` zeigt Bit7 zurueck auf Eingang,
+   danach ist ein Neuverbinden sofort moeglich).
+2. Gleiches mit BLE: Client verbinden+subscriben (KEIN eigenes Disconnect im Client), Geraet-
+   seitigen Timeout abwarten lassen, pruefen ob der Client sauber getrennt wird und ein erneuter
+   Connect danach klappt.
+3. Falls das eben beobachtete "Verbindung trennen haengt sich auf" (Anwenderbericht vor 5.65)
+   reproduzierbar war: jetzt nochmal genau denselben Ablauf testen - haelt es jetzt, war es
+   dieser Bug.
