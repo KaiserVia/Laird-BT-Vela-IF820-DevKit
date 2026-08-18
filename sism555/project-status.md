@@ -2679,3 +2679,30 @@ jetzt umgesetzt.
 **Naechster Schritt (Schritt 5 aus dem Plan, noch offen):** Wachhund fuer den Fall, dass
 `BT_LINK` trotz allem unplausibel lange aktiv bleibt (z. B. wenn auch der jetzt korrigierte
 `bt_disconnect()` das Modul nicht erreicht) - Design noch abzustimmen.
+
+**Test 1-3 am Geraet bestaetigt (Anwender):** 6-Minuten-Timeout jetzt sauber (kein CTS-Timeout,
+`bit7` geht auf HIGH zurueck, RS232 bleibt schnell). Windows-Trennen weiterhin sofort. "Bluetooth
+deinstallieren" ueber die BT-Verbindung selbst funktioniert; die anschliessend beobachtete
+Fortsetzung des Konfigurations-Wizards (USB/Modem/Turnswitch/viaspeedcam-Abfragen) auf RS232 ist
+erwartetes Verhalten (RS232 spiegelt einfach die laufende Menuefuehrung mit, kein Bug).
+
+---
+
+## Update 5.75 - PPCP-Setzen entfernt (schlug immer fehl, nur Anzeige bleibt)
+
+**Anlass:** Der `/WLH`-Schreibversuch aus 5.66 schlug bei jedem Init fehl ("BT-ConnParams:
+WARNUNG - Setzen fehlgeschlagen") - Handle `0007` war nur eine Annahme aus dem EZ-Serial-Guide-
+Referenzbeispiel, auf unserem Geraet nicht die tatsaechliche 0x2A04-Characteristic. Da (Update
+5.66-Diskussion) ohnehin entschieden wurde, keine echte GATT-Discovery dafuer zu bauen, ist der
+wiederholte Fehlschlag nur noch stoerende Log-Ausgabe ohne Nutzen.
+
+**Aenderung (btio.c/.h):** `bt_get_connparams()`, `bt_set_connparams()`, `bt_ensure_connparams()`
+sowie die zugehoerigen Makros `T_wlh_ppcp`/`T_wlhok`/`IF820_PPCP_VALUE` und der Aufruf in
+`init_bluetooth()` (Schritt 3g) sind entfernt. Die reine Anzeige im BT-Info-Menue
+(`bt_query_show(T_rlh_ppcp)`, liest per `/RLH` nur den aktuellen Wert aus, schreibt nichts)
+bleibt erhalten - harmlos, keine Fehlermeldung moeglich.
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.75).
+
+**Am Geraet zu verifizieren:** Init-Log zeigt keine "BT-ConnParams"-Zeile mehr; BT-Info-Menue
+zeigt weiterhin die `/RLH`-Zeile mit dem aktuellen (unveraenderten) Wert.

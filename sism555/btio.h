@@ -127,24 +127,12 @@
 #define T_sapok    "SAP,0000"
 #define T_gap      "GAP\r"     // gap_get_adv_parameters -> ...,D=..,L=..,O=<low duration>,F=..
 #define T_gap_end  ",F="       // Parse-Anker fuer GAP: O-Feld ist bei ",F=" komplett in cbuf
-// --- 5.6x: Verbindungsparameter-Praeferenz (Robustheit statt Stromsparen) ---
-// Guide Kap. 3.8.1.5: "select a longer supervision timeout, shorter connection interval, and/or
-// lower slave latency value to achieve required connection stability." Diese Praeferenz wird ueber
-// die BLE-Standard-Characteristic "Peripheral Preferred Connection Parameters" (0x2A04, im
-// GAP-Service 0x1800) an den Central kommuniziert - keine Garantie, dass er sie nutzt (Android
-// meist ja, Windows/iOS teils eigene Defaults), aber ein Hebel, der bisher komplett ungenutzt war.
-// Wert = 8 Byte, SIG-Format je Feld little-endian: Min-Interval/Max-Interval/Slave-Latency/
-// Supervision-Timeout-Multiplier. Ziel: 15-30 ms Intervall, Latency 0 (nie aussetzen), 6 s Timeout
-// (deutlich robuster als die beobachteten 1 s in einer BLE-Sitzung). Handle 0x0007 ist im
-// EZ-Serial-Referenzbeispiel (Guide Kap. 3.8) der Value-Handle von 0x2A04 - GAP-Service wird beim
-// Stack-Init IMMER zuerst angelegt (feste, niedrige Handles), unsere CYSPP-/App-Services kommen
-// mit hoeheren Handles danach dazu. Kein /SCFG: reiner RAM-Wert des lokalen GATT-Servers (nicht
-// dokumentiert, ob per /SCFG persistierbar) - wird deshalb bei JEDEM Init neu geschrieben
-// (kostet keinen Flash-Write, daher unkritisch haeufig).
+// --- 5.6x/5.75: Verbindungsparameter-Anzeige (PPCP/0x2A04) - nur Anzeige im BT-Info-Menue.
+// Das aktive Setzen (/WLH) wurde wieder entfernt (5.75): Handle 0x0007 war nur eine Annahme aus
+// dem EZ-Serial-Guide-Referenzbeispiel, auf unserem Geraet nicht die richtige 0x2A04-Characteristic
+// ("Setzen fehlgeschlagen" bei jedem Init) - siehe project-status.md Update 5.75. /RLH zum reinen
+// Auslesen bleibt (harmlos, zeigt nur den aktuellen Wert, egal welche Characteristic dahinter steckt).
 #define IF820_PPCP_HANDLE "0007"
-#define IF820_PPCP_VALUE  "0C00180000005802"   // Min=0x0C(15ms) Max=0x18(30ms) Latency=0 Timeout=0x0258(6000ms)
-#define T_wlh_ppcp "/WLH,H=" IF820_PPCP_HANDLE ",D=" IF820_PPCP_VALUE "\r"
-#define T_wlhok    "/WLH,0000"
 #define T_rlh_ppcp "/RLH,H=" IF820_PPCP_HANDLE "\r"
 // --- 5.57: App-Config aus IF820_Config_Kandidaten.md ---
 // A1: Command-Echo aus. Guide empfiehlt es fuer MCU-Hosts (der LPC muss dann nur Antworten
@@ -187,9 +175,6 @@ extern bool bt_ensure_btcfg (void);       // generisch: pruefen, bei Bedarf setz
 extern int  bt_get_adv (void);            // Adv abfragen: -1=unbek., 0=abweichend, 1=T=04 low-duty + O=0000 + L=Ziel
 extern bool bt_set_adv (void);            // IF820: dauerhaftes Advertising -> RAM + /SCFG
 extern bool bt_ensure_adv (void);         // generisch: pruefen, bei Bedarf setzen, verifizieren
-extern int  bt_get_connparams (void);     // PPCP abfragen: -1=unplausibel (falscher Handle?), 0=abweichend, 1=Zielwert
-extern bool bt_set_connparams (void);     // Verbindungsparameter-Praeferenz -> /WLH (RAM, kein /SCFG)
-extern bool bt_ensure_connparams (void);  // generisch: pruefen, bei plausiblem Handle setzen, verifizieren
 extern int  bt_get_echo (void);           // Echo abfragen: -1=unbek., 0=an, 1=aus (M=0)
 extern bool bt_set_echo (void);           // A1: Command-Echo aus -> RAM + /SCFG
 extern int  bt_get_pkt (void);            // Paketierung abfragen: -1=unbek., 0=anders, 1=W=01
