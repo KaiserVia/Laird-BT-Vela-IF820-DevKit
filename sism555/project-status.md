@@ -2634,3 +2634,48 @@ betroffen: `init_bluetooth()` laeuft in dem Fall unveraendert durch.
 3. Reconfig-Versuch WAEHREND aktiver BT-Verbindung (Menue "Bluetooth?y"): akzeptiertes neues
    Verhalten ist ein sauberer Fehlschlag/Hinweis statt automatischem Kill - pruefen, dass das
    nicht z. B. haengt, sondern sauber abbricht.
+
+---
+
+## Update 5.74 - KORREKTUR Schritt 2: bt_cmdmode() in bt_disconnect() wieder eingebaut
+
+**Anlass:** Am Geraet reproduziert - nach Schritt 2 (5.71, kein bt_cmdmode() mehr) feuerte der
+6-Minuten-Inaktivitaets-Timeout, `/DIS` erreichte das Modul nicht (Modul im Datenmodus, Befehl
+verhallt wirkungslos), das Modul blieb CYSPP LOW haengen ("Bluetooth getrennt" im Log, danach
+`W11015 CTS Timeout`, RS232-Terminal komplett blockiert - jede Ausgabe wartete auf CTS Richtung
+eines nicht mehr antwortenden Moduls).
+
+**Korrigierte Erkenntnis:** Der DVK-Befund ("CYSPP nie aktiv treiben") bezieht sich auf
+UNGEWOLLTES Stoeren laufenden Betriebs (Schritt 1: GSM-Verdraengung; Schritt 3: Reconfig-
+Erzwingen). `bt_disconnect()` ist aber eine BEWUSST GEWOLLTE, sofortige Terminierung - in diesem
+Moment spielt der Transport (Classic/BLE) keine Rolle, weil die Verbindung ohnehin sofort endet.
+Kurzes CYSPP-HIGH-Treiben genau in diesem Moment widerspricht dem DVK-Befund nicht.
+
+**Aenderung (btio.c, `bt_disconnect()`):** `bt_cmdmode()` + `osDelay(150)` vor `/DIS` wieder
+eingebaut (Stand wie vor 5.71). Damit erreicht `/DIS` das Modul wieder zuverlaessig, auch wenn
+es sich gerade im Datenmodus befindet.
+
+**Schritt 4 (sicom.c "Bluetooth deinstallieren") neu bewertet - KEINE Aenderung noetig:** Diese
+Stelle (`bt_cmdmode(); osDelay(300); bt_release();`) ist bereits derselbe Fall wie
+`bt_disconnect()` - eine bewusste, zeitlich begrenzte Trennung durch Anwenderaktion. Der
+urspruengliche Plan haette das faelschlich auch entfernt (derselbe Fehler wie Schritt 2). Bleibt
+unveraendert.
+
+**Backlog-Idee dokumentiert (kein Code):** Classic/BLE-Transport-Erkennung wurde als moegliche
+"sauberere" Alternative diskutiert (transport-spezifisches Verhalten statt einer pauschalen
+"bei bewusstem Trennen ist Treiben ok"-Regel) - Aufwand/Risiko dafuer sind erheblich (siehe
+CLAUDE.md), deckt sich mit der bereits zurueckgestellten BLE-Durchsatz-Option B. Bewusst nicht
+jetzt umgesetzt.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.74).
+
+**Am Geraet zu testen:**
+1. BT-Verbindung aufbauen, `BT_TIMEOUT` abwarten (oder testweise verkuerzen) - Terminal darf
+   danach NICHT blockieren, `bt_cyspp_monitor()` muss `HIGH` zeigen.
+2. Windows-seitiges Trennen (HyperTerminal ueber BT-COM-Port) - muss weiterhin sofort klappen
+   (5.72-Fix bleibt unveraendert wirksam).
+3. "Bluetooth deinstallieren" waehrend aktiver Verbindung - muss weiterhin sauber trennen.
+
+**Naechster Schritt (Schritt 5 aus dem Plan, noch offen):** Wachhund fuer den Fall, dass
+`BT_LINK` trotz allem unplausibel lange aktiv bleibt (z. B. wenn auch der jetzt korrigierte
+`bt_disconnect()` das Modul nicht erreicht) - Design noch abzustimmen.

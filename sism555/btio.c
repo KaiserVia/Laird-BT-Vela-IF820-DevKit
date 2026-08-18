@@ -482,22 +482,29 @@ void bt_release (void)   // CYSPP loslassen -> Bit 7 wieder Eingang (Status lesb
 #endif
 }
 
-// IF820: offene BT/SPP-Verbindung trennen.
-// DVK-Nachweis (ble-Dvk-request.md, Schritt 1 CYSPP-Plan, 5.65): CYSPP darf NIE aktiv getrieben
-// werden, auch nicht kurz zum Command-Mode-Erzwingen - das verhindert nachweislich den
-// transparenten BLE-Datenkanal. Schritt 2: bt_cmdmode() hier ersatzlos entfernt. /DIS wird
-// weiterhin versucht (harmlos: ist das Modul noch im Datenmodus, geht der Befehl einfach als
-// Nutzdaten durch und bewirkt nichts - kein Fehler, nur kein aktives Trennen). bt_release()
-// bleibt als Sicherheitsnetz (idempotent, stellt sicher, dass CYSPP Eingang ist).
+// IF820: offene BT/SPP-Verbindung SAUBER trennen.
+// KORREKTUR (5.74): Schritt 2 (5.71) hatte bt_cmdmode() hier ersatzlos entfernt, weil der
+// DVK-Nachweis aktives CYSPP-Treiben WAEHREND laufendem Betrieb verbietet. Am Geraet bestaetigt
+// falsch fuer DIESEN Fall: ohne erzwungenen Command-Mode erreicht /DIS ein Modul im Datenmodus
+// gar nicht (geht als Nutzdaten unter) - das Modul erfaehrt nie vom gewollten Trennen und haelt
+// CYSPP dauerhaft LOW (Split-Brain, RS232 wird unbenutzbar: jede Ausgabe wartet auf CTS-Timeout
+// Richtung eines Moduls, das nicht mehr antwortet - W11015 im Geraetelog bestaetigt).
+// Unterschied zum DVK-Fall: hier wollen wir die Verbindung IMMER bewusst UND SOFORT beenden -
+// unabhaengig vom Transport (Classic oder BLE) - das widerspricht dem DVK-Befund nicht, der sich
+// auf ungewolltes Stoeren laufender Uebertragung bezieht, nicht auf eine gewollte Terminierung.
+// Ablauf: CYSPP HIGH -> Command-Mode, dann /DIS (gap_disconnect) -> Modul baut Verbindung aktiv
+// ab. Defensiv: quittiert das Modul /DIS nicht, wird trotzdem freigegeben.
 void bt_disconnect (void)
 {
  if (fp.btmodem!=IF820) return;
  concpy = connect;                          // WICHTIG: bt_command() stellt am Ende connect=concpy her
                                             // -> ohne dies wuerde connect auf einen veralteten Wert gesetzt
                                             //    (Timeout-Kontext) und Terminal/BT-Routing kaputtgehen.
+ bt_cmdmode();                              // CYSPP HIGH -> Command-Mode (bewusste, gezielte Trennung)
+ osDelay(150);                              // Modul Zeit geben: Datenmodus -> Command-Mode
  bt_command(T_dis, T_disok, -300);          // /DIS still senden (kein Terminal-Spam), Antwort abwarten
  osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
- bt_release();                              // CYSPP sicherstellen: Eingang (idempotent)
+ bt_release();                              // CYSPP wieder als Eingang
  bxi=rxi;                                   // RX-Reste (/DIS-Antwort) verwerfen -> nichts ins Terminal/Menue
  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
