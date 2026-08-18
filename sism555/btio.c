@@ -710,10 +710,22 @@ void bt_cyspp_contention_test (void)
 // Pegelaenderung, z. B. die floatende CYSPP-Leitung) beim Aufruf bereits gesetzt ist - noch
 // BEVOR ueberhaupt einmal gewartet/yieldet wird. Der 5.68-Fix (bis zu 20 Wiederholungen) half
 // deshalb NICHT: ohne jeden Yield dazwischen bekommt nichts anderes im System die Chance,
-// comchange zu loeschen - alle 20 Versuche schlagen in Mikrosekunden fehl. Etabliertes Muster
-// aus gpsio.c ("Einschaltung von GSM/GPS Versorgung kann scheinbaren Schnittstellenwechsel
-// verursachen"): comchange VOR dem Warten explizit loeschen, ein evtl. stehender Merker gilt
-// als bereits bearbeitet/irrelevant fuer diese Eingabe.
+// comchange zu loeschen - alle 20 Versuche schlagen in Mikrosekunden fehl.
+//
+// SCHWERER FOLGEFEHLER (5.72-Fix): Die 5.70-Fassung rief bei gesetztem comchange blind
+// clear_comchange() auf, um den Merker "wegzuwerfen". Das ist FALSCH, wenn comchange durch
+// eine ECHTE BT_LINK-Statusaenderung (z. B. ein Disconnect) ausgeloest wurde: die einzige
+// Stelle, die comchange tatsaechlich AUSWERTET und `connect`/BT_LINK korrekt nachfuehrt, ist
+// communication_change() (libtool.c), aufgerufen aus measure.c NUR wenn `comchange` (noch)
+// gesetzt ist. clear_comchange() loescht den Merker aber OHNE communication_change()
+// aufzurufen - die Firmware bekommt den echten Disconnect dann NIE mehr mit, `connect&BT_LINK`
+// bleibt für immer auf "verbunden" haengen (Split-Brain: das Modul/Windows haben laengst
+// getrennt, unsere Firmware denkt weiter "verbunden" -> jede Terminalausgabe wird weiter
+// sinnlos Richtung UART1 gespiegelt und wartet dort auf CTS/THRE-Timeouts -> das beobachtete
+// "RS232 wird nach einem BT-Disconnect ploetzlich sehr langsam"). Fix: statt blind zu loeschen,
+// wird bei gesetztem comchange jetzt communication_change() selbst aufgerufen (macht die echte
+// Verarbeitung UND loescht comchange danach) - mit derselben Schutzbedingung wie in measure.c
+// (`!osActiveThread`, GSM/MQTT-Verbindungsthread nicht stoeren).
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
@@ -721,7 +733,8 @@ void bt_diag_menu (void)
  putstr(" comchange_count: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69, CYSPP-Diagnose)
  for (tries=0; tries<20; tries++)
  {
-  if (comchange) clear_comchange();        // stehenden Merker verwerfen, bevor getc() ihn sieht
+  if (comchange)                            // echten Schnittstellenwechsel richtig verarbeiten
+  { if (!osActiveThread) communication_change(); else clear_comchange(); }
   c = getc(TERMINAL_CHAR_TIMEOUT);
   if (c=='1' || c=='2' || c=='3' || c=='9') break;
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)

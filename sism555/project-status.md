@@ -2557,3 +2557,48 @@ Risiko.
 3. Falls das eben beobachtete "Verbindung trennen haengt sich auf" (Anwenderbericht vor 5.65)
    reproduzierbar war: jetzt nochmal genau denselben Ablauf testen - haelt es jetzt, war es
    dieser Bug.
+
+---
+
+## Update 5.72 - FIX: bt_diag_menu() (5.70) verschluckte echte BT-Disconnects dauerhaft
+
+**Symptom (Anwender, nach 5.71):** Windows-seitiger BT-Classic-Disconnect (HyperTerminal ueber
+BT-COM-Port "Trennen") hing sehr lange, endete mit Windows-Fehlern ("Kein Prozess am anderen Ende
+der Pipe", "Zeitlimit fuer die Semaphore erreicht"). Danach lief das Geraet auf RS232 extrem
+langsam (5 s fuer ein paar Menuezeilen). `bt_cyspp_monitor()` zeigte `CYSPP bit7 = LOW` - die
+Firmware dachte weiter, sie sei verbunden, obwohl der Windows-Link laengst tot war.
+
+**Der Anwender hat zurecht widersprochen, dass das Zufall/Ueberlastung sei - es lag tatsaechlich
+an unserem eigenen Code (5.70-Fix), nicht am Modul oder an RF.**
+
+**Ursache - schwerer Folgefehler aus dem 5.70-Fix:** `bt_diag_menu()` rief bei gesetztem
+`comchange` blind `clear_comchange()` auf, um den Merker zu verwerfen (Ziel damals: `getc()`
+nicht durch ein stehendes Stoerbyte sofort abbrechen lassen). Das ist aber grundlegend falsch,
+wenn `comchange` durch eine ECHTE `BT_LINK`-Zustandsaenderung (z. B. einen echten Disconnect)
+ausgeloest wurde: Die EINZIGE Stelle, die `comchange` tatsaechlich AUSWERTET und `connect`/
+`BT_LINK` korrekt nachfuehrt, ist `communication_change()` (libtool.c), normalerweise aus
+`measure.c` aufgerufen, sobald `comchange` gesetzt ist. `clear_comchange()` loescht den Merker
+aber OHNE `communication_change()` je aufzurufen - die Firmware hat den echten Disconnect
+dadurch NIE verarbeitet. `connect&BT_LINK` blieb fuer immer auf "verbunden" haengen (Split-
+Brain-Zustand), und jede Terminalausgabe wurde weiter sinnlos Richtung UART1 gespiegelt und
+wartete dort auf CTS/THRE-Timeouts (bis zu ~1 s pro Byte) - das erklaert exakt die beobachtete
+Verlangsamung auf RS232.
+
+**Fix (btio.c, `bt_diag_menu()`):** Bei gesetztem `comchange` wird jetzt `communication_change()`
+selbst aufgerufen (macht die vollstaendige, korrekte Verarbeitung UND loescht `comchange`
+danach) - mit derselben Schutzbedingung wie in `measure.c` (`!osActiveThread`, um einen
+laufenden GSM/MQTT-Verbindungsthread nicht zu stoeren; ist ein Thread aktiv, wird ausnahmsweise
+weiterhin nur `clear_comchange()` verwendet, wie zuvor).
+
+**Wichtig fuer die laufende CYSPP-Untersuchung:** Dieser Bug war eine Nebenwirkung unserer
+EIGENEN Diagnose-Tooling-Erweiterung (5.70), NICHT des DVK-Umbauplans (Schritte 1+2, 5.65/5.71)
+selbst. Die zuvor vermutete "GSM-Masking"-Erklaerung fuer das fruehere Hang-Symptom war falsch
+und wurde zurueckgenommen (siehe Konversation) - der tatsaechliche Fehler liegt in `bt_diag_menu()`.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.72).
+
+**Am Geraet zu verifizieren:** BT-Classic verbinden, ueber Windows/HyperTerminal trennen -
+`bt_cyspp_monitor()` sollte danach zuverlaessig `HIGH` zeigen (nicht mehr dauerhaft haengend
+LOW), und RS232 sollte nicht mehr traege werden. Falls doch nochmal reproduzierbar: pruefen, ob
+zum Zeitpunkt des Disconnects zufaellig Testmenue -> 8 offen war (das ist die einzige Stelle,
+die je den fehlerhaften Pfad ausgeloest haben kann).
