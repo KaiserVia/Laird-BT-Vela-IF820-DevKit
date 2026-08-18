@@ -2954,3 +2954,25 @@ jetzt ebenfalls `bxi=rxi;` gesetzt - Rest im Puffer wird verworfen, analog zu `b
 **Am Geraet zu verifizieren:** BT verbinden, PIN eingeben, dann ueber den Client (HyperTerminal/
 viagraph) trennen - das RS232-Hauptmenue sollte danach unveraendert stehen bleiben, keine
 selbststaendige Navigation mehr.
+
+**Verifiziert (2026-08-18):** Beide Fixes (5.81 Hintergrund-Sniff, 5.82 Puffer-Flush beim
+Trennen) am Geraet bestaetigt - PIN-Eingabe waehrend laufendem Event-Sniff funktioniert sauber,
+keine Endlosschleife mehr; Trennen vom Client aus navigiert das RS232-Menue nicht mehr von
+selbst.
+
+**Nachtrag (2026-08-18) - der eigentliche 40s-Idle-Haenger ist ein SEPARATES, bereits bekanntes
+Problem, kein Software-Bug von heute:** Reproduziert (BT verbinden, PIN eingeben, 40s nichts
+tun, dann vom Client trennen -> Windows-Fehler "Kein Prozess ist am anderen Ende der Pipe").
+RS232 wird danach extrem langsam (jede Ausgabe wartet auf CTS/THRE-Timeout Richtung UART1, weil
+`connect` noch `UART1|BT_LINK` gesetzt hat - Split-Brain, siehe bereits dokumentierter
+Nachtrag oben unter "Offene/zu beobachtende Punkte"). CYSPP-Monitor (Testmenue 3->7) zeigt
+waehrenddessen `bit7 = LOW` (Modul haelt Datenmodus fest) mit `comchange_count` unveraendert
+(Delta=0) ueber volle 2 Minuten Beobachtung - keine einzige Pegelaenderung, kein Prellen. Das
+Modul reagiert in dieser Zeit also gar nicht auf den laengst toten Host-Link. Deutet auf
+echten Modul-internen Lockup hin (nicht auf einen normalen, laengeren Classic-Supervision-
+Timeout - der waere kuerzer als 2 Minuten). Deckt sich mit dem bereits separat gefuehrten
+CLAUDE.md-Punkt "BT-Modul faellt gelegentlich komplett aus" (`/PING` scheitert komplett, nur
+Power-Cycle mit laengerer Stromlos-Zeit hilft, moeglicher Zusammenhang mit fehlendem RST_L/
+R124-Pad). Keine weitere Live-Diagnose heute fortgesetzt (Diminishing Returns bei manueller
+Menuenavigation waehrend der Traegheit). Fuer eine kuenftige Session sinnvoll: automatisches
+Mitprotokollieren von CYSPP-Zustand+Zeitstempel statt manuellem Nachschauen alle paar Minuten.
