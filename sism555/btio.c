@@ -574,6 +574,104 @@ void bt_event_sniff (void)
  uart1_release(MUX_BT);                       // UART1 wieder freigeben (GSM/GPS koennen zurueck)
 }
 
+//-----------------------------------------------------------------------------
+// BLE-CYSPP-Transfer-Test (Gegenstueck zum PC-Python-Skript, siehe Doku/tools):
+// empfaengt CRC/Sequenz-Frames ueber UART1 (vom PC per BLE-Write transparent durch CYSPP
+// durchgereicht), prueft CRC-32 und sendet je gueltigem Frame ein ACK1-Frame zurueck (geht
+// ebenso transparent per CYSPP/BLE-Notify an den PC). Wire-Format identisch zum Referenztest
+// des Zulieferers (SupplierSourceCode/.../tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py):
+//   Frame: "CYS1" + Sequenz(4B LE) + Groesse(2B LE) + CRC32(4B LE) + Payload
+//   ACK:   "ACK1" + Sequenz(4B LE)
+//-----------------------------------------------------------------------------
+
+// CRC-32 (IEEE 802.3 / identisch zu Python zlib.crc32) - bitweise, keine 256-Byte-Tabelle
+// noetig (Frames sind klein, kein Zeitdruck).
+static uint32_t crc32_calc (const uchar *data, uint len)
+{
+ uint32_t crc = 0xFFFFFFFF; uint i; uchar j;
+ for (i=0; i<len; i++)
+ {
+  crc ^= data[i];
+  for (j=0; j<8; j++)
+   crc = (crc>>1) ^ (0xEDB88320UL & (uint32_t)(-(int32_t)(crc & 1)));
+ }
+ return crc ^ 0xFFFFFFFF;
+}
+
+// ACK-Frame senden. WICHTIG: pchar() direkt statt putc() - putc() wuerde jedes 0x0A-Byte in den
+// Binaerdaten faelschlich in "\r\n" verwandeln (LF->CRLF-Übersetzung, siehe sio.c putc()).
+static void bt_send_ack (uint32_t seq)
+{
+ uchar cc=connect; uchar i;
+ connect=UART1;
+ pchar('A'); pchar('C'); pchar('K'); pchar('1');
+ for (i=0; i<4; i++) pchar((uchar)(seq>>(8*i)));   // little-endian, wie Python struct '<4sI'
+ connect=cc;
+}
+
+// Empfangsschleife: feste Laufzeit, kein frueher Ausstieg (gleicher Grund wie bt_event_sniff,
+// 5.62-Fix - rbuf/bxi/rxi ist der gemeinsame UART0/UART1-Ringpuffer).
+void bt_transfer_echo (void)
+{
+ enum { ST_SYNC, ST_HDR, ST_PAYLOAD } state = ST_SYNC;
+ uchar buf[270];                              // 14 Byte Header + max. 256 Byte Payload
+ uchar sync4[4] = {0,0,0,0};
+ uint n=0;                                    // Bytes des aktuellen Frames bereits im Puffer
+ uint32_t want_seq=0, want_crc=0, want_size=0;
+ uint32_t frames_ok=0, frames_bad=0;
+ uchar cc; uint loop; char c;
+
+ if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (wie bt_event_sniff)
+ cc=connect; connect=concpy & ~UART1;
+ putln("Transfer-Test: wartet auf CYS1-Frames (CRC/Seq), sendet ACK1 zurueck. Laufzeit 120s.");
+ connect=cc;
+ bxi=rxi;
+ for (loop=0; loop<1200; loop++)              // 1200 * 100 ms = 120 s, FEST
+ {
+  while (bxi!=rxi)
+  {
+   c = rbuf[++bxi];
+   if (state==ST_SYNC)
+   {
+    sync4[0]=sync4[1]; sync4[1]=sync4[2]; sync4[2]=sync4[3]; sync4[3]=(uchar)c;
+    if (sync4[0]=='C' && sync4[1]=='Y' && sync4[2]=='S' && sync4[3]=='1')
+    { buf[0]='C'; buf[1]='Y'; buf[2]='S'; buf[3]='1'; n=4; state=ST_HDR; }
+   }
+   else if (state==ST_HDR)
+   {
+    buf[n++]=(uchar)c;
+    if (n==14)                                // 4 Magic + 4 Seq + 2 Size + 4 CRC
+    {
+     want_seq  = (uint32_t)buf[4] | ((uint32_t)buf[5]<<8) | ((uint32_t)buf[6]<<16) | ((uint32_t)buf[7]<<24);
+     want_size = (uint32_t)buf[8] | ((uint32_t)buf[9]<<8);
+     want_crc  = (uint32_t)buf[10] | ((uint32_t)buf[11]<<8) | ((uint32_t)buf[12]<<16) | ((uint32_t)buf[13]<<24);
+     if (want_size==0 || want_size>256) { state=ST_SYNC; n=0; }  // unplausibel -> Resync
+     else state=ST_PAYLOAD;
+    }
+   }
+   else                                       // ST_PAYLOAD
+   {
+    buf[n++]=(uchar)c;
+    if (n==(uint)(14+want_size))
+    {
+     if (crc32_calc(&buf[14],(uint)want_size)==want_crc) { frames_ok++; bt_send_ack(want_seq); }
+     else frames_bad++;
+     state=ST_SYNC; n=0; sync4[0]=sync4[1]=sync4[2]=sync4[3]=0;
+    }
+   }
+  }
+  ResetWDT();
+  osDelay(100);
+ }
+ bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
+ cc=connect; connect=concpy & ~UART1;
+ newline(); putstr(" Transfer-Test beendet: "); putnumber(frames_ok,0); putstr(" ok, ");
+ putnumber(frames_bad,0); putstr(" fehlerhaft."); newline();
+ connect=cc;
+ uart1_release(MUX_BT);
+}
+
 // Contention-Test (Messprotokoll_CYSPP_Diagnose.md, Schritt 6): IC54 Bit7 (CYSPP-Leitung)
 // fuer kurze Zeit aktiv als Ausgang LOW treiben - Gegenstueck zu bt_cmdmode() (das HIGH
 // treibt). Ziel: am R78 (100 Ohm, Serienwiderstand in der CYSPP-Leitung) die Spannungs-
@@ -600,12 +698,13 @@ void bt_cyspp_contention_test (void)
 void bt_diag_menu (void)
 {
  int c;
- putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Messprotokoll Schritt 6)");
+ putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
  c = getc(TERMINAL_CHAR_TIMEOUT);
- if (c=='1' || c=='2') putc((char)c);
+ if (c=='1' || c=='2' || c=='3') putc((char)c);
  newline();
  if (c=='1') bt_event_sniff();
  else if (c=='2') bt_cyspp_contention_test();
+ else if (c=='3') bt_transfer_echo();
 }
 
 //-----------------------------------------------------------------------------

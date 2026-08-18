@@ -2342,3 +2342,53 @@ zeigt D=).
    `O=0258` (6 s) zeigen, falls Windows die Praeferenz uebernimmt - falls nicht, ist das ein Hin-
    weis, dass Windows sie ignoriert (kein Fehler unsererseits, siehe Einschraenkung oben).
 3. Classic-SPP-Regression weiterhin unauffaellig.
+
+---
+
+## Update 5.67 - Eigener BLE-Transfer-Test (Firmware-Gegenstelle + PC-Skript)
+
+**Anlass:** Der Zulieferer-DVK-Test (`SupplierSourceCode/.../tests/Bluetooth-Simulation/ble/
+cyspp_dvk_hil.py`) hat einen robusten 40-kB-CRC/ACK-Integritaetstest, laeuft aber nur gegen das
+IF820-DVK (braucht dessen zweite USB-Debug-Verbindung zum Modul, `If820Board`/`common_lib`).
+Gegen unser Mainboard nicht direkt lauffaehig. Anwenderwunsch: einen eigenen, gleichwertigen
+Test (1. Smoke-Test mit Debug-Infos, 2. 40-kB-Datentransfer) OHNE DVK, direkt gegen das
+Mainboard.
+
+**Firmware-Gegenstelle (btio.c, `bt_transfer_echo()`, neuer Testmenue-Punkt 8->3):**
+Empfaengt Frames ueber UART1 (vom PC per BLE-Write transparent durch CYSPP durchgereicht),
+Wire-Format bewusst IDENTISCH zum Zulieferer-Referenztest, damit Ergebnisse vergleichbar sind:
+- Frame: `"CYS1" + Sequenz(4B LE) + Groesse(2B LE) + CRC32(4B LE) + Payload`
+- ACK: `"ACK1" + Sequenz(4B LE)`, geht transparent per CYSPP/BLE-Notify zurueck an den PC.
+
+Neu implementiert: `crc32_calc()` (bitweise IEEE-802.3/zlib-kompatible CRC-32, gab es im Projekt
+noch nicht) und ein kleiner Byte-Parser mit 3 Zustaenden (Sync/Header/Payload) ueber die
+bekannte `bxi`/`rxi`-Ringpuffer-Schleife. **Wichtig:** ACK-Bytes werden ueber `pchar()` gesendet,
+NICHT `putc()` - `putc()` wuerde jedes 0x0A-Byte in Binaerdaten faelschlich zu `\r\n` machen
+(LF->CRLF-Uebersetzung, `sio.c`). Feste Laufzeit 120 s, kein Fruehausstieg (gleicher Grund wie
+`bt_event_sniff`, 5.62-Fix). `bt_diag_menu()` um Option 3 erweitert (kein neuer Testmenue-Platz
+noetig, war schon der Sammel-Einstieg fuer Diagnosefunktionen).
+
+**PC-Skript (neu, `Doku/tools/ble_mainboard_test.py`):**
+- `--mode smoke`: Verbindungstest mit Phasen-Timings (Scan/Connect/GATT-Discovery/Subscribe je
+  in ms), volle GATT-Tabelle, haelt die Verbindung danach `--hold` Sekunden (Default 8s) und
+  prueft auf Spontan-Disconnect. Braucht KEINE Firmware-Gegenstelle. JSON+Markdown-Report unter
+  `Doku/tools/Testreports/`.
+- `--mode transfer`: sendet `--bytes` (Default 40 kB, wie DVK-Referenz) CRC/Sequenz-Frames per
+  Write-without-Response, Sliding-Window-ACK (Default Fenster 4, 3 Retries, 8000 B/s Zielrate,
+  `--rate 0`/`--window 0` fuer unpaced Burst), automatische Recovery (Fenster->1, Rate halbiert)
+  bei Timeout wie im DVK-Vorbild. Verifikation laeuft rein ueber die vom Mainboard per CRC
+  bestaetigten ACKs - kein zusaetzlicher Kanal noetig (einfacher als beim DVK, der dafuer eine
+  zweite UART-Direktverbindung brauchte).
+- Referenzwert zum Vergleichen: DVK-Referenzlauf 40 kB, Fenster 4, 0 Verlust/Korruption,
+  ~7900 B/s.
+
+**Geaenderte/neue Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.67),
+Doku/tools/ble_mainboard_test.py (neu).
+
+**Am Geraet zu testen:**
+1. `python Doku/tools/ble_mainboard_test.py --mode smoke` - sollte "passed" mit stabilen
+   Phasen-Zeiten liefern (nach 5.66 idealerweise deutlich unter den bisherigen 13-47 s Connect).
+2. Firmware Testmenue -> 8 -> 3 starten, dann `python Doku/tools/ble_mainboard_test.py --mode
+   transfer` - Ziel: 40 kB ohne Retransmissions/Timeouts, Durchsatz in Richtung der DVK-Referenz
+   (~7900 B/s). Fehlende ACKs/viele Retransmits deuten auf denselben Instabilitaets-Kandidaten
+   (RF/Brownout/Supervision-Timeout) wie in den bisherigen Tests.
