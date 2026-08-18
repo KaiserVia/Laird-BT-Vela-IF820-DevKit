@@ -48,6 +48,10 @@ uint iap_data[5]				__noinit;					// Globales Array f�r IAP Kommando/Ergebnis 
 volatile uchar rpi 			__noinit;					// Empfangsindex Empfangsringpuffer MQTT und Plus Kommunikation
 volatile uchar bpi 			__noinit;					// Bearbeitungsindex Empfangsringpuffer MQTT und Plus Kommunikation
 volatile uchar comchange __noinit;				// > 0 bei �nderung Status Datenschnittstellen
+volatile uint comchange_count = 0;    // TEMPORAER (5.69, CYSPP-Diagnose): zaehlt EINT1-Interrupts
+                                       // (I2C-Expander-Pegelwechsel, u. a. CYSPP/BT_LINK) seit Boot -
+                                       // zeigt, ob die floatende CYSPP-Leitung durch Rauschen bouncet.
+                                       // Wieder entfernen, wenn die CYSPP-Diagnose abgeschlossen ist.
 ushort cind							__noinit;					// Index Char Zeichenpuffer
 uint ledton, ledtoff		__noinit;					// Ein-/Ausschaltwerte f�r LED
 uint flashsize					__noinit;					// Flash Speichergr��e KB/MB				
@@ -225,8 +229,9 @@ void UART2_IRQHandler(void) 						// UART2 Sende- und Empfangsinterrupt
 void EINT1_IRQHandler (void)				// Interruptanforderung I2C Expander
 {
  comchange=1;				// Schnittstellenstatus ge�ndert
- EXTINT|=(1<<1);		// Anforderung l�schen								 	
-}	
+ comchange_count++;	// TEMPORAER (5.69, CYSPP-Diagnose) - siehe Deklaration oben
+ EXTINT|=(1<<1);		// Anforderung l�schen
+}
 
 void EINT2_IRQHandler (void)				// Interruptanforderung Detektionsfehler
 {

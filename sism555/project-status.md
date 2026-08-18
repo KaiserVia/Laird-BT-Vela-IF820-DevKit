@@ -2424,6 +2424,47 @@ Timeout/Comchange (kein Zeichen ueberhaupt, `getc()` liefert < 0) beendet die Sc
 **Am Geraet zu verifizieren:** Testmenue -> 8 -> Ziffer eingeben muss jetzt zuverlaessig beim
 ersten Versuch funktionieren, auch wenn GSM im Hintergrund aktiv ist.
 
+---
+
+## Update 5.69/5.70 - FIX comchange blockierte bt_diag_menu() vollstaendig + Diagnose-Zaehler
+
+**Symptom (Anwender, nach 5.68):** Testmenue -> 8 -> Ziffer eingeben sprang WEITERHIN sofort
+zurueck, obwohl der 5.68-Fix (20 Wiederholungen) bereits eingebaut war.
+
+**Ursache (tiefer als 5.68 angenommen):** `getc()`/`getbyte()` (sio.c) brechen SOFORT mit -1 ab,
+wenn das globale `comchange`-Flag (Schnittstellenwechsel, von `EINT1_IRQHandler` bei JEDER
+IC54-Pegelaenderung gesetzt - u. a. die CYSPP/BT_LINK-Leitung) beim Aufruf bereits gesetzt ist -
+NOCH BEVOR ueberhaupt einmal gewartet/yieldet wird. Der 5.68-Fix half deshalb nicht: ohne jeden
+Yield dazwischen bekam nichts anderes im System die Chance, `comchange` zu loeschen - alle 20
+Versuche schlugen in Mikrosekunden fehl. Etabliertes Muster aus `gpsio.c` ("Einschaltung von
+GSM/GPS Versorgung kann scheinbaren Schnittstellenwechsel verursachen"): `comchange` VOR dem
+Warten explizit loeschen.
+
+**Fix (btio.c, `bt_diag_menu()`):** `comchange` wird jetzt vor jedem Versuch per
+`clear_comchange()` verworfen, bevor `getc()` es sehen kann; bei Fehlschlag `osDelay(50)` statt
+Busy-Spin. Nach den 20 Versuchen erscheint jetzt eine klare Meldung statt stillem Abbruch.
+
+**Zusaetzlich (Anwenderwunsch): TEMPORAERER Diagnose-Zaehler `comchange_count`** (hard.c/.h,
+volatile, in `EINT1_IRQHandler` hochgezaehlt) - zeigt, WIE OFT das IC54/CYSPP-Interrupt seit Boot
+gefeuert hat. Sichtbar in `bt_diag_menu()` (Stand vor/nach der Warteschleife + Anzahl Versuche)
+und in `bt_cyspp_monitor()` (Testmenue 7, Start-/Endwert + Delta). Ziel: klaeren, ob die
+floatende CYSPP-Leitung (DVK-Nachweis: muss hochohmig bleiben) durch elektrisches Rauschen
+tatsaechlich bouncet (viele Interrupts ohne echte Verbindungsaenderung) - das waere zugleich eine
+Erklaerung fuer das bt_diag_menu()-Symptom UND ein Hinweis auf einen moeglichen Nebeneffekt von
+Schritt 1 des CYSPP-Plans (5.65: CYSPP wird jetzt oefter/laenger als reiner Eingang belassen als
+vorher, floatet also mehr).
+
+**Geaenderte Dateien:** btio.c, hard.c, hard.h, sprachen/sictxt.c (-> 5.70).
+
+**Am Geraet zu verifizieren:**
+1. Testmenue -> 8 -> Ziffer muss jetzt beim ersten Versuch reagieren.
+2. `comchange_count`-Werte notieren: springt er zwischen zwei Menueaufrufen (Sekunden
+   auseinander) um viele hundert/tausend, ist die CYSPP-Leitung vermutlich elektrisch instabil/
+   bouncet - dann Testmenue 7 (CYSPP monitor) laufen lassen und das Delta ueber ~10-30 s
+   beobachten. Ein Delta nahe 0 bei ruhigem, unverbundenem Geraet waere unauffaellig.
+3. Nach Abschluss der CYSPP-Diagnose: `comchange_count` ist TEMPORAERER Diagnose-Code (wie
+   `bt_transfer_echo()`) und gehoert zum spaeteren Aufraeumen dazu.
+
 **Zum Smoke-Test-Ergebnis des Anwenders (2 von 3 Laeufen "device_not_found", einer mit
 manuellem Abbruch beim Verbinden):** passt weiterhin zum bekannten Bild instabiler/langsamer
 Verbindungsaufbauten (siehe 5.60-5.66) - vermutlich RF/Brownout, nicht durch dieses Menue-Problem

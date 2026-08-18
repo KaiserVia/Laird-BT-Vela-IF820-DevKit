@@ -505,8 +505,10 @@ void bt_disconnect (void)
 void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW-Diagnose (Testmenue)
 {
  int st; uchar now, last=0xFF, sec=0;
+ uint cc0=comchange_count;                  // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
  bt_release();                              // sicherstellen: CYSPP als Eingang -> Modul kann treiben
  putln("CYSPP/BT_LINK monitor (IC54 bit7). Now try to connect via BT. Key = exit (max 30s).");
+ putstr(" comchange_count bei Start: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69)
  for (sec=0; sec<255; sec++)                // laeuft bis Taste/comchange, aber begrenzt
  {
   st = read_i2cdev(IC54, 0, 1);             // IC54 Eingangsregister lesen
@@ -518,6 +520,7 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
    {
     putstr(" CYSPP bit7 = ");
     putstr(now ? "HIGH (idle / not connected)" : "LOW  (connected / data mode)");
+    putstr("  [comchange_count="); putnumber(comchange_count,0); putstr("]");  // TEMPORAER (5.69)
     newline();
     last = now;
    }
@@ -525,7 +528,9 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
   ResetWDT();
   if (getkey(120) >= 0) break;               // ~120 ms warten; Taste (1) oder comchange (0) -> Ende
  }
- newline(); putln(" CYSPP monitor ended");
+ newline(); putstr(" CYSPP monitor ended. comchange_count: "); putnumber(cc0,0);  // TEMPORAER (5.69)
+ putstr(" -> "); putnumber(comchange_count,0);
+ putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(")"); newline();
 }
 
 // Roher EZ-Serial-Event-Mitschnitt auf UART1 (Diagnose, Testmenue): druckt alles, was am
@@ -700,24 +705,31 @@ void bt_cyspp_contention_test (void)
 
 // Sammel-Einstieg Testmenue (ein Ziffernplatz fuer die BT-Diagnosen): waehlt zwischen Event-
 // Mitschnitt, Contention-Test und Transfer-Test.
-// WICHTIG (5.68-Fix): getc() liest vom selben gemeinsamen UART0/UART1-Ringpuffer wie GSM/BT-
-// Traffic (siehe 5.62-Fix bei bt_event_sniff). Ein einzelnes Stoerbyte (z. B. GSM-Chatter waehrend
-// der Anwender noch "1"/"2"/"3" eingeben wollte) wurde bisher als "ungueltige Eingabe" gewertet
-// und die Funktion kehrte KOMMENTARLOS zum Testmenue zurueck, ohne dass der Anwender das Auswahl-
-// Fenster ueberhaupt gesehen hatte. Jetzt: Stoerbytes werden ignoriert und die Eingabe wiederholt
-// (bis zu 20x), statt beim ersten falschen Byte aufzugeben.
+// WICHTIG (5.68/5.69-Fix): getc()/getbyte() brechen SOFORT mit -1 ab, wenn das globale
+// comchange-Flag (Schnittstellenwechsel, gesetzt von EINT1_IRQHandler bei JEDER IC54-
+// Pegelaenderung, z. B. die floatende CYSPP-Leitung) beim Aufruf bereits gesetzt ist - noch
+// BEVOR ueberhaupt einmal gewartet/yieldet wird. Der 5.68-Fix (bis zu 20 Wiederholungen) half
+// deshalb NICHT: ohne jeden Yield dazwischen bekommt nichts anderes im System die Chance,
+// comchange zu loeschen - alle 20 Versuche schlagen in Mikrosekunden fehl. Etabliertes Muster
+// aus gpsio.c ("Einschaltung von GSM/GPS Versorgung kann scheinbaren Schnittstellenwechsel
+// verursachen"): comchange VOR dem Warten explizit loeschen, ein evtl. stehender Merker gilt
+// als bereits bearbeitet/irrelevant fuer diese Eingabe.
 void bt_diag_menu (void)
 {
- int c=-1; uchar tries;
+ int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
  putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
+ putstr(" comchange_count: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69, CYSPP-Diagnose)
  for (tries=0; tries<20; tries++)
  {
+  if (comchange) clear_comchange();        // stehenden Merker verwerfen, bevor getc() ihn sieht
   c = getc(TERMINAL_CHAR_TIMEOUT);
   if (c=='1' || c=='2' || c=='3') break;
-  if (c<0) break;                          // echter Timeout/Comchange -> nicht weiter versuchen
+  if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
- if (c=='1' || c=='2' || c=='3') putc((char)c);
- newline();
+ putstr(" comchange_count danach: "); putnumber(comchange_count,0);           // TEMPORAER (5.69)
+ putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(", "); putnumber(tries,0); putstr(" Versuche)"); newline();
+ if (c=='1' || c=='2' || c=='3') { putc((char)c); newline(); }
+ else { newline(); putln(" keine gueltige Eingabe (staendiger Schnittstellenwechsel?) - abgebrochen."); }
  if (c=='1') bt_event_sniff();
  else if (c=='2') bt_cyspp_contention_test();
  else if (c=='3') bt_transfer_echo();
