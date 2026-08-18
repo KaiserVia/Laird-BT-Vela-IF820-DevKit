@@ -2976,3 +2976,51 @@ Power-Cycle mit laengerer Stromlos-Zeit hilft, moeglicher Zusammenhang mit fehle
 R124-Pad). Keine weitere Live-Diagnose heute fortgesetzt (Diminishing Returns bei manueller
 Menuenavigation waehrend der Traegheit). Fuer eine kuenftige Session sinnvoll: automatisches
 Mitprotokollieren von CYSPP-Zustand+Zeitstempel statt manuellem Nachschauen alle paar Minuten.
+
+## Update 5.83: FIX gemeinsamer UART-Ringpuffer konnte volllaufen und blieb dann DAUERHAFT tot
+
+**Der eigentliche Kernfund der heutigen Session (Anwender-Hartnaeckigkeit hat das aufgedeckt -
+"das liegt am Mikrocontroller, nicht am Modul" war richtig):**
+
+`UART1_IRQHandler()` (hard.c) deaktiviert bei vollem `rbuf` (gemeinsamer 256-Byte-Ringpuffer
+fuer RS232 UND BT/GSM) den kompletten UART1-Empfangsinterrupt (`NVIC_DisableIRQ`) und setzt
+`rbuf_full=1` - das ist grundsaetzlich gewollte Hardware-Flusskontrolle (Auto-RTS haelt das
+Modul dann automatisch an). Codeweite Suche zeigte aber: `rbuf_full` wird nur an ZWEI Stellen
+je wieder zurueckgesetzt und der Interrupt reaktiviert (`NVIC_EnableIRQ`) - `modem_terminal()`
+(libtool.c, unbeteiligtes "Matrix-Controller"-Feature) und `mqtt.c`'s MQTT-Nachrichtenschleife.
+Im NORMALEN BT-Betrieb (measure.c Hauptschleife, mainmenu(), communication_change()) gab es
+KEINE Stelle, die das prueft. Laeuft der Puffer also waehrend einer normalen BT-Sitzung mal
+voll, bleibt UART1 fuer den Rest der laufenden Betriebszeit (bis zum naechsten Power-Cycle)
+komplett taub - das Modul kann nichts mehr senden (kein Event, kein `/PING`, keine Disconnect-
+Meldung). Erklaert vermutlich die ganze Verwirrung der heutigen Session: nach dem ersten
+Ueberlauf (reproduziert beim 40s-Idle-dann-Trennen-Test) wirkten alle nachfolgenden Tests
+in derselben laufenden Sitzung wie sich verschlimmernde/neue Bugs (Datenausgabe stockt "wie
+sau", BT-Menue "geht nach 10s nicht mehr") - waren aber vermutlich alle Folge desselben, seit
+dem ersten Ueberlauf nie wieder reparierten toten UART1-Interrupts.
+
+**Warum der 40kb-Transfertest (`bt_transfer_echo()`) davon nie betroffen war:** Der liest den
+Puffer in einer ENGEN Schleife komplett leer (`while (bxi!=rxi)`, alle 100ms), waehrend die
+normale Menue-/Verbindungsverarbeitung nur 1 Byte pro komplettem Hauptschleifendurchlauf
+konsumiert (measure.c, geteilt mit Messzyklen/GPS/MQTT etc.) - reicht fuer einzelne
+Tastendruecke, aber nicht fuer einen Schwall mehrerer Modul-Event-Zeilen auf einmal (z. B. beim
+Trennen).
+
+**Fix (measure.c):** Zwei Massnahmen kombiniert:
+1. Bis zu 16 Bytes pro Hauptschleifendurchlauf verarbeiten statt nur 1 (senkt die
+   Wahrscheinlichkeit, ueberhaupt in den Vollzustand zu geraten, deutlich).
+2. `if (rbuf_full && bxi==rxi) { rbuf_full=0; NVIC_EnableIRQ(UART1_IRQn); }` nach jedem
+   Durchlauf - falls es doch passiert, wird der Interrupt automatisch wieder freigegeben, sobald
+   der Puffer leergelaufen ist, statt dauerhaft tot zu bleiben.
+
+**Geaenderte Dateien:** measure.c, sprachen/sictxt.c (-> 5.83).
+
+**Am Geraet zu verifizieren:** Nach Flashen + Power-Cycle den 40s-Idle-dann-Trennen-Test
+mehrfach hintereinander wiederholen, OHNE zwischendurch neu zu starten - sollte jetzt auch bei
+wiederholten Tests in derselben Sitzung nicht mehr kumulativ schlechter werden. Datenausgabe
+sollte nach einem BT-Vorfall nicht mehr dauerhaft "stocken".
+
+**Noch offen:** Der genaue Ausloeser (was am Trennen nach 40s Leerlauf konkret einen Byte-
+Schwall verursacht, den 5-10s-Verbindungen nicht zeigen) ist weiterhin nicht mit einem rohen
+Mitschnitt bewiesen - nur die Fix-Wirkung (Wiederfreigabe + schnelleres Draining) ist unabhaengig
+vom genauen Ausloeser wirksam. Bei Interesse: Event-Sniff (jetzt nicht-blockierend, 5.81) waehrend
+eines 40s-Idle-Tests mitlaufen lassen, um den tatsaechlichen Byte-Schwall zu erfassen.

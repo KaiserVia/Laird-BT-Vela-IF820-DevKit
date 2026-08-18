@@ -334,12 +334,24 @@ void runcycle (void)				// Messzyklenbetrieb
 	}	
 	
 	if (!osActiveThread)								// Keine Thread mit Zeichenbearbeitung aktiv?
-	 if (bxi!=rxi) {										// Zeichen von Schnittstelle?
-		mainmenu(rbuf[++bxi]); 						// Aufruf Hauptmen�/Zeichenbearbeitung
-		if (simulation) 									// Simulation?
-		{ cycle=0;												// starte mit Messzyklus
+	{
+	 uchar n;												// FIX (5.83): mehrere Bytes je Hauptschleifendurchlauf statt
+	 for (n=0; n<16 && bxi!=rxi; n++)	// nur eines - bei einer Barrage von Modul-Events (z. B. beim
+	 {									// Trennen) reichte 1 Byte/Durchlauf nicht aus, der gemeinsame
+		mainmenu(rbuf[++bxi]); 						// Ringpuffer konnte volllaufen (siehe project-status.md
+		if (simulation) 									// Update 5.83). Obergrenze 16, damit ein einzelner Durchlauf
+		{ cycle=0;												// nicht zu lange dauert (Watchdog/andere Zyklen).
 		  if (simulation==2) 							// Simulationsende
-			{ acycle=0; simulation=0; } } }	// reset Anzeigezyklus und reset Simulationszustand
+			{ acycle=0; simulation=0; } }		// reset Anzeigezyklus und reset Simulationszustand
+	 }
+	 if (rbuf_full && bxi==rxi)			// FIX (5.83): Puffer war ueberlaufen -> UART1_IRQHandler (hard.c)
+	 {									// hat den Interrupt deaktiviert (Auto-RTS haelt das Modul dann
+		rbuf_full=0;						// dauerhaft an); dafuer gab es im normalen Betrieb bisher KEINE
+		NVIC_EnableIRQ(UART1_IRQn);		// Wiederfreigabe (nur in zwei unbeteiligten Sonderfaellen -
+	 }									// modem_terminal()/mqtt.c) - blieb sonst bis zum naechsten
+										// Power-Cycle abgeschaltet. Jetzt: sobald der Puffer wieder
+										// leer ist, Interrupt reaktivieren.
+	}
 
 	if (menrep)	mainmenu('0');					// Men�wiederholung
 
