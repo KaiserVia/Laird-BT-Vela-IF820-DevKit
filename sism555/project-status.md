@@ -2392,3 +2392,9 @@ Doku/tools/ble_mainboard_test.py (neu).
    transfer` - Ziel: 40 kB ohne Retransmissions/Timeouts, Durchsatz in Richtung der DVK-Referenz
    (~7900 B/s). Fehlende ACKs/viele Retransmits deuten auf denselben Instabilitaets-Kandidaten
    (RF/Brownout/Supervision-Timeout) wie in den bisherigen Tests.
+
+**⚠ Bewusst TEMPORAER (Anwenderentscheidung 2026-08-18):** `bt_transfer_echo()` ist reiner
+Diagnose-Code fuer die BLE-CYSPP-Untersuchung, kein produktives Feature. Wird wieder entfernt,
+sobald die CYSPP-Diagnose abgeschlossen ist (siehe Aufraeum-Punkt weiter unten im Dokument /
+CLAUDE.md-Backlog). Betrifft: `bt_transfer_echo()`, `crc32_calc()`, `bt_send_ack()` (btio.c),
+die zugehoerige `extern`-Deklaration (btio.h) und Menuepunkt 8->3 in `bt_diag_menu()`.

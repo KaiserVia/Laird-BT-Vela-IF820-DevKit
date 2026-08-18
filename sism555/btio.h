@@ -207,6 +207,7 @@ extern void bt_disconnect (void);         // IF820: offene Verbindung sauber tre
 extern void bt_cyspp_monitor (void);      // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) - Testmenue
 extern void bt_event_sniff (void);        // Roher UART1-Event-Mitschnitt (Diagnose) - Testmenue
 extern void bt_transfer_echo (void);      // BLE-CYSPP-Transfer-Test: CRC/Seq-Frames empfangen+ACK - Testmenue
+                                           // TEMPORAER (5.67) - wieder entfernen, wenn CYSPP-Diagnose fertig ist
 extern void bt_cyspp_contention_test (void); // IC54 Bit7 kurz aktiv LOW (Messprotokoll Schritt 6) - Testmenue
 extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Test - Testmenue
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen

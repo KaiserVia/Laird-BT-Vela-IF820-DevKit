@@ -582,6 +582,11 @@ void bt_event_sniff (void)
 // des Zulieferers (SupplierSourceCode/.../tests/Bluetooth-Simulation/ble/cyspp_dvk_hil.py):
 //   Frame: "CYS1" + Sequenz(4B LE) + Groesse(2B LE) + CRC32(4B LE) + Payload
 //   ACK:   "ACK1" + Sequenz(4B LE)
+//
+// TEMPORAERER DIAGNOSE-CODE (bewusste Entscheidung, siehe project-status.md Update 5.67/5.68):
+// Nur ueber das Testmenue erreichbar, kein Teil des produktiven BT-Ablaufs. Wieder entfernen,
+// sobald die BLE-CYSPP-Diagnose abgeschlossen ist (bt_transfer_echo, crc32_calc, bt_send_ack,
+// btio.h-Deklaration, Menuepunkt 8->3 in bt_diag_menu()).
 //-----------------------------------------------------------------------------
 
 // CRC-32 (IEEE 802.3 / identisch zu Python zlib.crc32) - bitweise, keine 256-Byte-Tabelle
