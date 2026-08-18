@@ -2706,3 +2706,32 @@ bleibt erhalten - harmlos, keine Fehlermeldung moeglich.
 
 **Am Geraet zu verifizieren:** Init-Log zeigt keine "BT-ConnParams"-Zeile mehr; BT-Info-Menue
 zeigt weiterhin die `/RLH`-Zeile mit dem aktuellen (unveraenderten) Wert.
+
+---
+
+## Update 5.76 - Schritt 5 CYSPP-Plan: Recovery-Fenster 60s -> 5s
+
+**Aenderung (measure.c):** Die bestehende Selbstheilung (5.51: "CYSPP darf im verbindungslosen
+Ruhezustand NIE als Ausgang haengen" - `if ((fp.btmodem==IF820) && !(connect&BT_LINK) &&
+(uart1_owner!=MUX_BT)) bt_release();`) lief bisher nur einmal pro RTC-Minutentick (`if
+(minute)`). Jetzt laeuft dieselbe Pruefung unabhaengig vom Minutentick alle 5 Sekunden (eigener
+`mstimer`-basierter Zaehler, wie an anderen Stellen im Code ueblich). Bewusst schlank gehalten:
+keine neue Logik, nur ein kuerzeres Intervall fuer die bereits bewaehrte, idempotente Pruefung -
+kein Retry-Mechanismus, keine Eskalation (das haette fuer ein Problem, das mit Bordmitteln
+ohnehin nicht loesbar ist - ein wirklich haengendes Modul braucht Power-Cycle/RST, siehe
+CLAUDE.md-Punkt "Modul faellt gelegentlich komplett aus" - keinen Mehrwert, nur zusaetzliches
+Risiko).
+
+**Warum das jetzt reicht:** Mit dem 5.74-Fix (bt_cmdmode() wieder in bt_disconnect()) sollte der
+6-Minuten-Timeout das Modul jetzt zuverlaessig zum echten Trennen bringen. Dieser Wachhund ist
+das zusaetzliche Sicherheitsnetz fuer den selteneren Fall, dass CYSPP trotzdem als Host-Ausgang
+haengen bleibt (z. B. durch einen noch unbekannten Randfall) - Erholzeit jetzt 5s statt bis zu 60s.
+
+**Damit sind alle 5 Schritte des DVK-Umbauplans umgesetzt** (Schritt 4 brauchte keine Aenderung,
+siehe Update 5.74).
+
+**Geaenderte Dateien:** measure.c, sprachen/sictxt.c (-> 5.76).
+
+**Am Geraet zu verifizieren:** Normalbetrieb unauffaellig (Selbstheilung ist idempotent, laeuft
+jetzt nur oefter). Funktional nicht einfach isoliert testbar (der Fall "Host treibt HIGH und
+haengt" ist selten) - vor allem beobachten, ob Regressionen bei GSM/BT-Umschaltung auftreten.
