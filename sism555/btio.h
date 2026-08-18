@@ -190,7 +190,8 @@ extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-M
 extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
 extern void bt_disconnect (void);         // IF820: offene Verbindung sauber trennen (Command-Mode + /DIS)
 extern void bt_cyspp_monitor (void);      // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) - Testmenue
-extern void bt_event_sniff (void);        // Roher UART1-Event-Mitschnitt (Diagnose) - Testmenue
+extern void bt_event_sniff (void);        // Roher UART1-Event-Mitschnitt (Diagnose) - Testmenue, startet nur
+extern void bt_sniff_poll (void);         // nicht-blockierendes Nachlesen - 1x je Hauptschleifendurchlauf (measure.c)
 extern void bt_transfer_echo (void);      // BLE-CYSPP-Transfer-Test: CRC/Seq-Frames empfangen+ACK - Testmenue
                                            // TEMPORAER (5.67) - wieder entfernen, wenn CYSPP-Diagnose fertig ist
 extern void bt_cyspp_contention_test (void); // IC54 Bit7 kurz aktiv LOW (Messprotokoll Schritt 6) - Testmenue

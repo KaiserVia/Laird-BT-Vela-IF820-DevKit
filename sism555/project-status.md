@@ -2872,3 +2872,60 @@ statt die laufende PIN-Eingabe zu zerstoeren.
 stattdessen ueber RS232 Testmenue -> 8 -> 1 (Event-Sniff) versuchen zu starten - sollte jetzt
 sofort mit der neuen Meldung abbrechen statt 180s zu blockieren. Danach PIN normal eingeben -
 sollte wie im ungestoerten Fall sauber funktionieren (kein Wiederholen mehr).
+
+**Nachtrag (2026-08-18) - 5.80 behob nur den Start-Fall, nicht das eigentliche Problem:**
+Anwendereinwand zurecht: der Start-Guard (`if (bt_pininit) return;`) greift nur, wenn die PIN-
+Abfrage schon VOR dem Sniff-Start offen ist. Im echten Reproduktionsfall war das nie so -
+mainmenu() haette bei offener PIN-Abfrage RS232-Eingaben (Navigation zu Testmenue 8->1) gar
+nicht zugelassen (jedes Byte wird bei bt_pininit>0 als PIN-Ziffer interpretiert, unabhaengig
+von der Schnittstelle). Die PIN-Abfrage entstand immer ERST waehrend des laufenden Sniffs
+(neue BT-Verbindung mitten in den 180s), der Start-Guard lief also nie. Anwendervorschlag:
+Sniff soll parallel/im Hintergrund mitlesen und aufs Terminal schreiben, ohne mainmenu() zu
+stoeren - das ist der richtige Ansatz und behebt die Bugklasse an der Wurzel statt sie nur
+abzufangen.
+
+## Update 5.81: Event-Sniff komplett neu gebaut - nicht-blockierend, eigener Leseindex
+
+**Alter Aufbau (5.62-5.80):** `bt_event_sniff()` blockierte 180s lang die komplette
+Hauptschleife und las dabei ueber `bxi` denselben Index, den auch `mainmenu()`/die PIN-Abfrage
+zum Verarbeiten von Eingaben benutzen. Der Sniffer war damit faktisch der alleinige "Besitzer"
+des gemeinsamen Ringpuffers waehrend seiner Laufzeit - jede echte Eingabe (allen voran eine
+gerade laufende BT-PIN-Abfrage) wurde als Rohdaten mitgelesen und am Ende verworfen (`bxi=rxi`),
+statt bei `mainmenu()` anzukommen. 5.78/5.80/5.81 (verworfen) haben das nur nachtraeglich
+abgefangen (comchange durchreichen, PIN-Start-Guard, Abbruch bei bt_pininit in der Schleife) -
+alles Pflaster auf derselben Architekturschwaeche, keines davon hat den Fall "PIN-Abfrage
+entsteht waehrend des Sniffs" wirklich sauber geloest.
+
+**Neuer Aufbau:** Der Sniffer bekommt einen EIGENEN, von `bxi` unabhaengigen Leseindex
+(`sniff_i`), der `rxi` genauso verfolgt wie `bxi` es tut, aber `bxi` selbst nie anfasst.
+`mainmenu()` bekommt dadurch exakt dieselben Bytes wie ganz ohne Sniffer - der Sniffer ist ein
+reiner Mitleser, kein Verbraucher. `bt_event_sniff()` (Testmenue 8->1) setzt nur noch den
+Startzustand (`sniff_i=rxi`, Zeitstempel-Referenz) und kehrt SOFORT zurueck - das Testmenue
+bleibt normal bedienbar. `bt_sniff_poll()` (neu, `measure.c`'s Hauptschleife, einmal je
+Durchlauf, direkt nach der `mainmenu()`-Verarbeitung) liest non-blocking nach, was seit dem
+letzten Aufruf neu in `rbuf` steht, und gibt es mit Zeitstempel am RS232-Terminal aus - ganz
+ohne `osDelay()` oder Blockieren. Nach 180s (`mstimer`-basiert, kein Schleifenzaehler mehr)
+schaltet sich der Sniffer selbst ab und gibt UART1 wieder frei.
+
+**Vorteil:** Eine BT-PIN-Abfrage, die waehrend des Sniffs neu entsteht (der urspruengliche
+Reproduktionsfall), wird jetzt ganz normal von `mainmenu()` verarbeitet - der Sniffer bekommt
+dieselben Bytes nur zusaetzlich zum Mitlesen, nimmt sie `mainmenu()` aber nie weg. Die
+komchange-Durchreich-Logik (5.78) und der PIN-Start-Guard (5.80) sind damit fuer diese Funktion
+hinfaellig und wurden entfernt (weniger Spezialfaelle statt mehr).
+
+**Geaenderte Dateien:** btio.c (Neubau `bt_event_sniff()`, neue Funktion `bt_sniff_poll()`),
+btio.h (Deklaration `bt_sniff_poll`), measure.c (Aufruf `bt_sniff_poll()` in `runcycle()`),
+sprachen/sictxt.c (-> 5.81).
+
+**Am Geraet zu verifizieren:** Testmenue 8->1 (Event-Sniff) starten - Menue muss SOFORT wieder
+bedienbar sein (kein 180s-Warten). Waehrend der 180s ueber BT verbinden, PIN eingeben - sollte
+wie im ungestoerten Fall einmalig funktionieren, waehrend gleichzeitig am RS232-Terminal die
+rohen `@E,...`-Eventzeilen mit Zeitstempel erscheinen. Nach 180s: "Event-Sniff (Hintergrund)
+beendet" am Terminal, UART1 wieder frei fuer GSM/GPS.
+
+**Noch offen (bewusst zurueckgestellt):** `bt_transfer_echo()` (Transfer-Test, Testmenue 8->3)
+hat dieselbe blockierende Bauweise und denselben PIN-Start-Guard (5.80) wie die alte
+Event-Sniff-Fassung, wurde aber NICHT auf das neue Poll-Modell umgebaut (komplexerer
+Frame-Parser mit Zustandsmaschine, aufwendiger als reines Byte-Durchreichen). Da dieser Test
+ohnehin als temporaerer Diagnose-Code zur Entfernung vorgesehen ist (siehe CLAUDE.md), nur bei
+konkretem Bedarf nachziehen.

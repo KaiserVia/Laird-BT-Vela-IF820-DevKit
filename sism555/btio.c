@@ -503,60 +503,65 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
 // "lokal/Modul-initiiert" (0x0916, passt zur CYSPP-Pin-Theorie) von "Supervision-Timeout"
 // (0x0908, eher RF/Brownout).
 //
-// WICHTIG (5.62-Fix): KEIN getkey()/Traffic-abhaengiger Abbruch. rbuf/bxi/rxi ist EIN
-// gemeinsamer Ringpuffer fuer UART0 (Terminal) UND UART1 (BT/GSM, siehe hard.c ISRs) -
-// getkey() bricht bei JEDEM neuen Byte ab, auch bei BT-Modul-Traffic. Genau der soll hier
-// aber laufend beobachtet werden -> die Funktion brach bisher bei der ersten Modul-Zeile
-// sofort ab, und das dabei ungelesene Byte landete anschliessend im normalen Menue-Zeichen-
-// leser (getc()/getbyte(), dieselben bxi/rxi) und wurde dort faelschlich als Tastatureingabe
-// verarbeitet -> selbststaendige Menuenavigation. Fix: feste Laufzeit, kein Fruehausstieg.
+// WICHTIG (5.81-Neubau): Fruehere Fassungen (5.62-5.80) lasen rbuf ueber denselben Index
+// (bxi), den auch mainmenu()/PIN-Abfrage benutzen, und blockierten dafuer 180s lang die
+// gesamte Hauptschleife. Das machte den Sniffer zum alleinigen "Besitzer" des gemeinsamen
+// Ringpuffers waehrend seiner Laufzeit - jede ECHTE Eingabe (Menue, vor allem eine gerade
+// laufende BT-PIN-Abfrage) wurde dabei als Rohdaten mitgelesen und verworfen, statt bei
+// mainmenu() anzukommen (siehe project-status.md Update 5.79/5.80 fuer die Bug-Historie).
+// Neubau: der Sniffer bekommt einen EIGENEN, unabhaengigen Leseindex (sniff_i), der rxi
+// genau wie bxi verfolgt, aber bxi selbst nie anfasst. mainmenu() bekommt dadurch exakt
+// dieselben Bytes wie ohne Sniffer - der Sniffer ist ein reiner Mitleser, kein Verbraucher.
+// Start/Ende laufen nicht mehr blockierend: bt_event_sniff() setzt nur den Startzustand und
+// kehrt sofort zurueck, bt_sniff_poll() (aus measure.c's Hauptschleife, einmal je Durchlauf)
+// liest non-blocking nach und gibt am RS232-Terminal aus. Kein osDelay(), kein Blockieren -
+// das Hauptmenue bleibt waehrend der gesamten 180s normal bedienbar.
+static bool sniff_active=FALSE;
+static uchar sniff_i;                         // eigener, von bxi unabhaengiger Leseindex in rbuf
+static uint sniff_t0;                         // Startzeitpunkt (mstimer) fuer Dauer und Zeitstempel
+static bool sniff_bol;                        // Zeilenanfang (fuer Zeitstempel je Zeile)
+#define SNIFF_DURATION_MS  180000UL           // 180s, deckt einen kompletten "--runs 3"-Durchlauf
+                                               // von ble_cyspp_probe.py ab (Connect allein dauert
+                                               // bei diesem Setup 13-30s je Versuch)
+
 void bt_event_sniff (void)
 {
- uchar cc; int loop; char c; uint t0; bool bol=TRUE;   // bol = Zeilenanfang (fuer Zeitstempel)
  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
- if (bt_pininit)                              // FIX (5.80): PIN-Abfrage noch offen? Der Sniffer liest
- {                                             // ALLE eingehenden UART1-Bytes roh mit und verwirft den Rest
-                                               // am Ende (bxi=rxi) - eine waehrenddessen ueber BT eingegebene
-                                               // echte PIN geht dadurch spurlos verloren (verschluckt statt an
-                                               // mainmenu() weitergereicht), bt_pininit bleibt haengen. Alles was
-                                               // danach eintrifft, landet in einem PIN-Handler ohne vollstaendige
-                                               // Eingabe - das erzeugte die beobachtete Dauerschleife
-                                               // ("PIN = ******" wiederholt ohne Tastatureingabe). Deshalb: Sniff
-                                               // erst starten, wenn die PIN-Abfrage abgeschlossen ist.
-  putln("Event-Sniff: PIN-Abfrage noch offen - erst PIN ueber BT eingeben, dann erneut starten.");
-  return;
- }
  Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (verdraengt GSM/GPS falls noetig,
                                                // wie bei send_bt_info() - MUX schaltet auf BT)
- cc=connect; connect=concpy & ~UART1;         // Ausgabe nur ans Terminal, nichts zurueck ans Modul
- putln("Event-Sniff: rohe Modul-Ausgabe, feste Laufzeit 180s (laeuft NICHT vorzeitig ab). Jetzt BLE/Classic verbinden.");
- t0=mstimer;                                  // Referenzzeitpunkt fuer relative Zeitstempel (ms seit Start)
- bxi=rxi;                                     // sauberer Start, alte Reste verwerfen
- for (loop=0; loop<1800; loop++)              // 1800 * 100 ms = 180 s (3 min), FEST - deckt einen
-                                               // kompletten "--runs 3"-Durchlauf von ble_cyspp_probe.py ab
-                                               // (Connect allein dauert bei diesem Setup 13-30 s je Versuch)
+ putln("Event-Sniff (Hintergrund): rohe Modul-Ausgabe, laeuft 180s im Hintergrund mit - Hauptmenue");
+ putln("bleibt normal bedienbar. Jetzt BLE/Classic verbinden.");
+ sniff_i=rxi;                                 // sauberer Start, alte Reste ignorieren (nicht bxi!)
+ sniff_t0=mstimer;
+ sniff_bol=TRUE;
+ sniff_active=TRUE;
+}
+
+// Non-blocking nachlesen - einmal je Hauptschleifendurchlauf aus measure.c aufgerufen.
+// Beruehrt bxi/rbuf-Verbrauch NICHT, daher voellig unabhaengig von mainmenu()/PIN-Abfrage.
+void bt_sniff_poll (void)
+{
+ char c; uchar cc;
+ if (!sniff_active) return;
+ if (sniff_i!=rxi)
  {
-  while (bxi!=rxi)
+  cc=connect; connect=concpy & ~UART1;        // Ausgabe nur ans Terminal, nichts zurueck ans Modul
+  while (sniff_i!=rxi)
   {
-   c = rbuf[++bxi];
+   c = rbuf[(uchar)(sniff_i+1)]; sniff_i++;
    if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
-   if (bol) { putc('['); putnumber(mstimer-t0,0); putstr("ms] "); bol=FALSE; }  // Zeitstempel je Zeile
+   if (sniff_bol) { putc('['); putnumber(mstimer-sniff_t0,0); putstr("ms] "); sniff_bol=FALSE; }
    putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
-   if (c=='\n') bol=TRUE;
+   if (c=='\n') sniff_bol=TRUE;
   }
-  ResetWDT();
-  // WICHTIG (5.78-Fix): mainmenu() (sicom.c) wird direkt aus measure.c's Hauptschleife
-  // gerufen - waehrend dieser Funktion blockiert, laeuft KEIN anderer Code, auch nicht die
-  // Pruefung "if (comchange) communication_change();" aus measure.c, die einen ECHTEN
-  // BT-Disconnect verarbeitet. Ohne diesen Aufruf wuerde ein Disconnect waehrend der 180s
-  // Laufzeit komplett verschluckt (dieselbe Bugklasse wie der 5.72-Fix in bt_diag_menu()).
-  if (comchange) { if (!osActiveThread) communication_change(); else clear_comchange(); }
-  osDelay(100);
+  connect=cc;
  }
- bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
- newline(); putln(" Event-Sniff beendet (180s abgelaufen).");
- connect=cc;
- uart1_release(MUX_BT);                       // UART1 wieder freigeben (GSM/GPS koennen zurueck)
+ if ((uint)(mstimer-sniff_t0)>=SNIFF_DURATION_MS)
+ {
+  sniff_active=FALSE;
+  uart1_release(MUX_BT);                      // UART1 wieder freigeben (GSM/GPS koennen zurueck)
+  newline(); putln(" Event-Sniff (Hintergrund) beendet (180s abgelaufen).");
+ }
 }
 
 //-----------------------------------------------------------------------------

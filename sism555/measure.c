@@ -335,13 +335,17 @@ void runcycle (void)				// Messzyklenbetrieb
 	
 	if (!osActiveThread)								// Keine Thread mit Zeichenbearbeitung aktiv?
 	 if (bxi!=rxi) {										// Zeichen von Schnittstelle?
-		mainmenu(rbuf[++bxi]); 						// Aufruf Hauptmen�/Zeichenbearbeitung	
+		mainmenu(rbuf[++bxi]); 						// Aufruf Hauptmen�/Zeichenbearbeitung
 		if (simulation) 									// Simulation?
 		{ cycle=0;												// starte mit Messzyklus
 		  if (simulation==2) 							// Simulationsende
 			{ acycle=0; simulation=0; } } }	// reset Anzeigezyklus und reset Simulationszustand
-	
+
 	if (menrep)	mainmenu('0');					// Men�wiederholung
+
+	// 5.81: BT-Event-Sniff (Testmenue-Diagnose) liest ueber einen eigenen, von bxi
+	// unabhaengigen Index nicht-blockierend nach - beeinflusst mainmenu()/PIN-Abfrage nicht.
+	bt_sniff_poll ();
   		 	
 	if ((fp.i2cdev&IC37_b) || simulation)	// Expander Messsteuerung installiert oder Simulation?
   {
