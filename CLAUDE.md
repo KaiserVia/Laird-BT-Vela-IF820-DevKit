@@ -119,6 +119,20 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   waere der Zugang) - noch nicht bestaetigt, aber ein nahliegender Zusammenhang: mit einem
   funktionierenden RST koennte das Modul per Software-Reset statt per langem Power-Cycle
   wiederbelebt werden. Auf der Liste, noch nicht tiefer untersucht.
+  **Nachtrag (2026-08-18) - vermutlich derselbe Mechanismus, mildere Auspraegung:** Windows-
+  seitiger Bluetooth-Classic-Disconnect (COM-Port "Trennen" in HyperTerminal) hing sehr lange,
+  endete mit Windows-Fehlern ("Kein Prozess am anderen Ende der Pipe", "Zeitlimit fuer die
+  Semaphore erreicht"). Danach lief das Geraet auf RS232 extrem langsam (5 s fuer ein paar
+  Menuezeilen), obwohl im Hauptmenue nichts Blockierendes lief. `bt_cyspp_monitor()` zeigte
+  `CYSPP bit7 = LOW` (das MODUL haelt die Leitung selbst noch aktiv) - das Modul denkt also noch,
+  es sei verbunden, obwohl der Windows-seitige Link laengst tot ist (Split-Brain). **Unser
+  bestehendes Sicherheitsnetz (Minutentick in measure.c) greift hier NICHT**, weil es nur bei
+  `!(connect&BT_LINK)` eingreift - hier liest die Leitung ja "aktiv", weil das MODUL sie treibt,
+  nicht unsere eigene Firmware. Die Langsamkeit auf RS232 erklaert sich dadurch, dass `putb()`
+  bei gesetztem `BT_LINK`/`connect&UART1` jede Terminal-Ausgabe zusaetzlich Richtung UART1
+  spiegelt und dort auf CTS/THRE-Timeouts wartet (bis zu ~1 s pro Byte), solange das Modul nicht
+  mehr sauber reagiert. Noch offen: ob/nach wie langer Zeit sich das von selbst aufloest
+  (Classic-Link-Supervision-Timeout des Moduls) oder ob nur Power-Cycle hilft.
 - **Aufraeumen (bewusst temporaerer Diagnose-Code):** `bt_transfer_echo()`, `crc32_calc()`,
   `bt_send_ack()` (btio.c/.h) und Testmenue-Punkt 8→3 sind reiner Diagnose-Code fuer die
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`
