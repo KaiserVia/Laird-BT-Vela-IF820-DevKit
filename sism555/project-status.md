@@ -2469,3 +2469,37 @@ vorher, floatet also mehr).
 manuellem Abbruch beim Verbinden):** passt weiterhin zum bekannten Bild instabiler/langsamer
 Verbindungsaufbauten (siehe 5.60-5.66) - vermutlich RF/Brownout, nicht durch dieses Menue-Problem
 verursacht. Bitte nach 5.68 nochmal neu testen, jetzt ohne die Menue-Fehlbedienung als Stoerfaktor.
+
+---
+
+## Doku-Korrektur (2026-08-18) - drei Annahmen widerlegt/korrigiert
+
+Nach den `comchange_count`-Messungen (5x Delta=0 im Ruhezustand - CYSPP-Leitung elektrisch
+sauber, kein Bounce) und drei erneut fehlgeschlagenen BLE-Connects hat der Anwender drei
+Denkfehler in meiner Analyse aufgedeckt:
+
+1. **32-kHz-Quarz Q3 ist bestueckt** (Anwender hat es am Board geprueft) - der bisher in
+   CLAUDE.md gelistete Punkt "Modul laeuft auf internem LPO, Timing ungenau" entfaellt.
+2. **Modul-FW-Unterschied entkraeftet:** Das Eval-Kit aus `ble-Dvk-request.md` (erfolgreicher
+   BLE-Test) lief ebenfalls auf 1.4.12.12, nicht 1.4.18.18 - das war ein *anderes* Eval-Kit als
+   das in Update 5.47 verglichene. Referenzboard und Mainboard laufen also auf identischer
+   Modul-Firmware.
+3. **Reine HW/RF-Erklaerung insgesamt unwahrscheinlich:** Classic Bluetooth laeuft auf demselben
+   Board (gleicher Funkteil/Antenne/Stromversorgung) sauber - eine reine Antennen-/Entkopplungs-/
+   Stromversorgungs-Erklaerung muesste Classic genauso treffen. Zusaetzlich war GSM/LTE waehrend
+   der fehlgeschlagenen BLE-Tests durchgehend AUS - GSM-Interferenz scheidet fuer diese
+   Fehlschlaege damit aus.
+
+**Neue Arbeitshypothese:** Der Unterschied liegt vermutlich in BLE-spezifischen Protokoll-/
+Timing-Eigenschaften, nicht in gemeinsam genutzter Hardware. BLE hat einen deutlich kuerzeren,
+beobachteten Supervision-Timeout (teils nur 1 s, siehe Update 5.63) und einen zeitkritischeren
+Verbindungsaufbau als Classic (reifere, fehlertolerantere Baseband-Prozedur mit laengerem
+Timeout ~20 s). Fokus bleibt auf den bereits angegangenen BLE-Verbindungsparametern
+(PPCP/Supervision-Timeout, Update 5.66) statt auf Antenne/Stromversorgung/GSM.
+
+**CLAUDE.md** entsprechend aktualisiert (Abschnitt "Offene / zu beobachtende Punkte").
+
+**Naechster Schritt:** Pruefen, ob der PPCP-Wert aus 5.66 tatsaechlich wirkt - BT-Info-Menue
+(`/RLH,H=0007` sollte `D=0C00180000005802` zeigen) und beim naechsten Connect-Versuch im
+Event-Sniff den `O=`-Wert im `gap_connected`-Event ablesen (Ziel: 0258 = 6 s statt der
+beobachteten 1 s).

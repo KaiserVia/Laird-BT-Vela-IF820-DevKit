@@ -120,12 +120,29 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   Wahrscheinlichkeit 55 % gegen das Symptom, 100 % dass die Maßnahme richtig ist.
 - **Pull-up auf `BLT-RXD` fehlt** → 0xFF-Junk am BT-Terminal, sobald der MUX auf GSM schaltet
   (Modul reicht Leitungsrauschen transparent weiter). 10–100 kΩ nach VDDIO, 90 %.
-- 32-kHz-Quarz `Q3` + C129/C137 nicht bestückt → Modul läuft auf internem LPO. Nachrüsten
-  bringt nur mit passender Modul-FW etwas (15 % ohne FW-Wechsel) → zurückgestellt.
+- **KORREKTUR (2026-08-18):** 32-kHz-Quarz `Q3` ist doch bestückt (Anwender hat es am Board
+  geprüft) — der Punkt „Modul läuft auf internem LPO, Timing ungenau" entfällt damit als
+  Erklärungsansatz.
 - Antennen-Keep-out (Ausfall schon auf 40 cm) — 45 %, erst nach Entkopplung neu bewerten.
-- Modul-FW ist 1.4.12.12; 1.4.18.18 behebt „lockup under heavy UART loading" (60 %).
-  Setzt voraus, dass HCI-UART (Pins 24–27) + RST (Pin 34) erreichbar sind — HCI-UART ungeprüft,
-  RST geklärt (siehe nächster Punkt).
+- **KORREKTUR (2026-08-18):** Modul-FW-Unterschied als Erklärung für die BLE-Verbindungsprobleme
+  ist entkräftet — das Eval-Kit, mit dem der Anwender erfolgreich über BLE kommuniziert hat
+  (Grundlage von `ble-Dvk-request.md`), lief ebenfalls auf **1.4.12.12**, nicht 1.4.18.18 (das
+  war ein *anderes* Eval-Kit als das in Update 5.47 verglichene). Damit läuft sowohl das
+  erfolgreiche Referenzboard als auch unser Mainboard auf derselben Modul-Firmware. Der
+  „lockup under heavy UART loading"-Fix in 1.4.18.18 bleibt trotzdem grundsätzlich sinnvoll,
+  ist aber nicht mehr der Hauptverdächtige für dieses Symptom.
+- **KORREKTUR (2026-08-18) - reine HW/RF-Erklärung insgesamt unwahrscheinlich:** Bluetooth
+  Classic läuft auf demselben Board sauber (gleicher Funkteil, gleiche Antenne, gleiche
+  Stromversorgung) - eine reine Antennen-/Entkopplungs-/Stromversorgungs-Erklärung müsste
+  Classic genauso treffen, tut es aber nicht. Zusätzlich war GSM/LTE waehrend der fehlgeschlagenen
+  BLE-Tests durchgehend AUS - GSM-Funkinterferenz scheidet fuer diese konkreten Fehlschläge damit
+  aus. Der Unterschied liegt vermutlich in BLE-spezifischen Protokoll-/Timing-Eigenschaften, nicht
+  in gemeinsam genutzter Hardware: BLE hat einen deutlich kürzeren, beobachteten Supervision-
+  Timeout (teils nur 1 s, siehe project-status.md Update 5.63) und einen zeitkritischeren
+  Verbindungsaufbau als Classic (reifere, fehlertolerantere Baseband-Prozedur mit längerem
+  Timeout ~20 s). Ein kurzer Aussetzer, den Classic wegsteckt, kann eine BLE-Verbindung mit
+  1-Sekunden-Timeout sofort beenden. Fokus liegt daher auf den bereits angegangenen BLE-
+  Verbindungsparametern (PPCP/Supervision-Timeout, Update 5.66), nicht auf Antenne/Stromversorgung.
 - **`RST_L` (Pin 34) hängt am Mainboard an nichts.** Netz `N$160` enthält nur `IC37.RST` und
   `R124` Pad 1; **R124 (10 kΩ nach VDDIO) ist in beiden Varianten nicht bestückt**. Folgen:
   (a) der LPC kann das Modul **nicht** zurücksetzen — deshalb hilft bei einem hängenden Modul
