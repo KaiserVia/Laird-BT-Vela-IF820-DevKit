@@ -533,6 +533,12 @@ void bt_event_sniff (void)
    if (c=='\n') bol=TRUE;
   }
   ResetWDT();
+  // WICHTIG (5.78-Fix): mainmenu() (sicom.c) wird direkt aus measure.c's Hauptschleife
+  // gerufen - waehrend dieser Funktion blockiert, laeuft KEIN anderer Code, auch nicht die
+  // Pruefung "if (comchange) communication_change();" aus measure.c, die einen ECHTEN
+  // BT-Disconnect verarbeitet. Ohne diesen Aufruf wuerde ein Disconnect waehrend der 180s
+  // Laufzeit komplett verschluckt (dieselbe Bugklasse wie der 5.72-Fix in bt_diag_menu()).
+  if (comchange) { if (!osActiveThread) communication_change(); else clear_comchange(); }
   osDelay(100);
  }
  bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
@@ -634,6 +640,9 @@ void bt_transfer_echo (void)
    }
   }
   ResetWDT();
+  // 5.78-Fix (wie bt_event_sniff): echten Schnittstellenwechsel waehrend der 120s nicht
+  // verschlucken - siehe Kommentar dort.
+  if (comchange) { if (!osActiveThread) communication_change(); else clear_comchange(); }
   osDelay(100);
  }
  bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern

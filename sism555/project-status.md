@@ -2771,3 +2771,42 @@ BT trennen) mehrfach wiederholen.
 - **Haengt es TROTZDEM noch:** 5.76 war nicht die Ursache - dann liegt es an etwas anderem, das
   wir noch nicht gefunden haben (ggf. ein rein zeitabhaengiges/RF-Problem, das mit unserem Code
   gar nichts zu tun hat).
+
+**Ergebnis (Anwender):** 5.76 war NICHT die Ursache - derselbe Fehler trat auf 5.77 (mit
+zurueckgenommenem Schritt 5) erneut auf, in einem minimalen Reproduktionsfall (Boot -> RS232 ->
+BT verbinden -> kurz warten -> trennen), OHNE jede Testmenue-Funktion. Keine unserer Aenderungen
+dieser Woche liegt in diesem Codepfad (weder Schritt 1-5 noch die Diagnose-Tools) - der
+Verdacht verschiebt sich Richtung "schon immer vorhandenes Verhalten in `communication_change()`/
+I2C-Statuslesen" oder echtes Modul-/RF-Problem. Zusaetzlicher Beleg: beim naechsten regulaeren
+6-Minuten-Timeout kam trotz 5.74-Fix (bt_cmdmode() wieder in bt_disconnect()) erneut ein
+`W11015 CTS Timeout` - selbst der erzwungene Command-Mode erreichte das Modul nicht. Spricht
+fuer ein echtes Modul-Haenger-Problem (siehe CLAUDE.md "Modul faellt gelegentlich komplett aus"),
+nicht fuer einen Pin-Logik-Fehler unsererseits.
+
+---
+
+## Update 5.78 - FIX: Diagnose-Tools (Event-Sniff/Transfer-Test) verschluckten comchange
+
+**Bestaetigter, unabhaengiger Fund (bei der Fehlersuche zum obigen Update entdeckt):**
+`mainmenu()` (sicom.c, komplette Menueverarbeitung) wird SYNCHRON aus der Hauptschleife in
+`measure.c` (`runcycle()`, Zeile 338) aufgerufen - im selben Single-Thread-Kontext wie die
+Pruefung `if (comchange) communication_change();`, die einen ECHTEN BT-Disconnect verarbeitet.
+Jede lang blockierende Testmenue-Funktion (`bt_event_sniff()` 180s, `bt_transfer_echo()` 120s)
+friert dadurch die GESAMTE Hauptschleife ein, inklusive der Disconnect-Erkennung - beide
+Funktionen pruefen `comchange` waehrend ihrer Laufzeit bisher gar nicht. Ein echter Disconnect
+waehrend eines laufenden Tests wuerde also komplett verschluckt, bis die Funktion fertig ist -
+dieselbe Bugklasse wie der bereits behobene 5.72-Fix in `bt_diag_menu()`.
+
+**Fix (btio.c):** In beiden Funktionen wird jetzt bei jedem Schleifendurchlauf (alle 100 ms)
+geprueft: `if (comchange) { if (!osActiveThread) communication_change(); else
+clear_comchange(); }` - identisches Muster wie in `measure.c`/`bt_diag_menu()`.
+
+**Wichtig - erklaert NICHT den aktuellen Haenger:** Der oben beschriebene Fehlerfall trat OHNE
+jede Testmenue-Funktion auf, dieser Fix behebt also ein echtes, aber ANDERES Problem (verhindert
+zukuenftig, dass unsere eigenen Diagnose-Tools das CYSPP-Bild waehrend eines Tests verfaelschen).
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.78).
+
+**Am Geraet zu verifizieren:** Event-Sniff/Transfer-Test starten, waehrenddessen eine BT-
+Verbindung trennen - `connect&BT_LINK` sollte jetzt prompt (binnen ~100ms) korrekt aktualisiert
+werden, statt erst nach Ablauf der 180s/120s.
