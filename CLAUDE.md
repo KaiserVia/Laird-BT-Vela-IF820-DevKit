@@ -109,6 +109,12 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
 
 ## Offene / zu beobachtende Punkte
 
+- **⚠ NEU (2026-08-18) - BT-Modul faellt gelegentlich komplett aus** (separates Problem, NICHT
+  Teil der BLE-CYSPP-Untersuchung): Anwenderbeobachtung "manchmal geht das einfach nicht mehr" -
+  Details (genaues Fehlerbild, ob nur Power-Cycle hilft) noch zu klaeren. Moeglicher Zusammenhang
+  mit dem bereits dokumentierten `RST_L`-Punkt weiter unten (LPC kann das IF820 nicht selbst
+  zuruecksetzen, da RST an nichts haengt) - noch nicht bestaetigt. Auf der Liste, noch nicht
+  untersucht.
 - **Aufraeumen (bewusst temporaerer Diagnose-Code):** `bt_transfer_echo()`, `crc32_calc()`,
   `bt_send_ack()` (btio.c/.h) und Testmenue-Punkt 8→3 sind reiner Diagnose-Code fuer die
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`
