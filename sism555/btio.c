@@ -737,8 +737,13 @@ void bt_cyspp_contention_test (void)
 // TEMPORAER (Alt-Firmware-Vergleichstest): setzt das Modul per /RFAC auf Werkszustand zurueck,
 // damit eine alte MCU-Firmware (z. B. 5.50) das Modul wieder frisch/passend erkennen und
 // konfigurieren kann - das Modul behaelt seine EZ-Serial-Konfiguration sonst dauerhaft im
-// eigenen Speicher, unabhaengig davon, welche MCU-Firmware geflasht ist. Danach Power-Cycle
-// und gewuenschte Firmware flashen - deren eigene Werksmodul-Erkennung (F=00) uebernimmt den Rest.
+// eigenen Speicher, unabhaengig davon, welche MCU-Firmware geflasht ist.
+// WICHTIG (5.86-Korrektur): KEIN Power-Cycle zwischen Factory-Reset und Flashen der Zielfirmware!
+// Ein Zwischen-Reboot wuerde von der noch installierten AKTUELLEN Firmware (deren eigene
+// Werksmodul-Erkennung, siehe init_bluetooth()) sofort wieder erkannt und automatisch mit den
+// AKTUELLEN Einstellungen neu konfiguriert - der Factory-Reset waere fuer die Katz, bevor die
+// gewuenschte (alte) Firmware ueberhaupt zum Zug kommt. Direkt nach /RFAC die Zielfirmware
+// flashen (der Flash-Vorgang bootet direkt in die neue Firmware, kein Zwischenlauf der alten).
 void bt_factory_reset (void)
 {
  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
@@ -747,7 +752,8 @@ void bt_factory_reset (void)
  if (bt_command(T_rfac,T_rfacok,1000)) putln(" /RFAC bestaetigt (@R,...,/RFAC,0000).");
  else putln(" keine /RFAC-Bestaetigung erhalten (evtl. andere Baud/Zustand?).");
  uart1_release(MUX_BT);
- putln("Bitte jetzt Power-Cycle machen (langes Stromlos) und danach die gewuenschte Firmware flashen.");
+ putln("WICHTIG: JETZT SOFORT die Zielfirmware flashen - KEIN Power-Cycle vorher (die aktuelle");
+ putln("Firmware wuerde das Werksmodul sonst beim naechsten Boot automatisch neu konfigurieren)!");
 }
 
 void bt_diag_menu (void)

@@ -3081,3 +3081,18 @@ verworfen statt angezeigt) wie an mehreren anderen Stellen dieser Session.
 Reboot-Verify-Fehlschlag erneut auftritt (falls reproduzierbar) - diesmal sollte am Terminal
 sichtbar sein, was das Modul nach `/RBT` tatsaechlich sendet (Boot-Banner? nichts? Fehler-Event?),
 und im Protokoll sollte F11018 mit Zeitstempel auftauchen.
+
+## Update 5.86: KORREKTUR - kein Power-Cycle zwischen Factory-Reset und Alt-FW-Flash
+
+**Anwender-Einwand (berechtigt):** Die 5.84/5.85-Anleitung riet nach `/RFAC` zu einem Power-Cycle
+VOR dem Flashen der Zielfirmware. Das ist falsch: solange danach noch die AKTUELLE Firmware
+laeuft, wuerde deren eigene Werksmodul-Erkennung (`init_bluetooth()`) das frisch zurueckgesetzte
+Modul beim naechsten Boot sofort wieder erkennen und automatisch mit den AKTUELLEN Einstellungen
+neu konfigurieren - der Factory-Reset waere hinfaellig, bevor die gewuenschte alte Firmware
+ueberhaupt zum Einsatz kommt.
+
+**Fix (btio.c, `bt_factory_reset()`):** Meldung korrigiert - direkt nach `/RFAC` soll OHNE
+Zwischen-Power-Cycle sofort die Zielfirmware geflasht werden (der Flash-Vorgang bootet direkt in
+die neue Firmware, kein Zwischenlauf der aktuellen).
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.86).
