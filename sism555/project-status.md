@@ -3096,3 +3096,16 @@ Zwischen-Power-Cycle sofort die Zielfirmware geflasht werden (der Flash-Vorgang 
 die neue Firmware, kein Zwischenlauf der aktuellen).
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.86).
+
+**Nachtrag (2026-08-18) - Ursache des Reboot-Verify-Fehlschlags (F11009 bei 5.84/5.50) GEKLAERT,
+5.85-Fix bestaetigt:** Mit der neuen Rohausgabe (5.85) zeigt sich am Geraet:
+`/RBT` wird vom Modul bei ~1s bestaetigt (`@R,...,/RBT,0000`), der eigentliche `BOOT`-Event
+(`@E,...,BOOT,...,F=EZ-Serial-VELA_IF820_INT V1.4.12.12...`) kommt aber erst bei ~3s, gefolgt
+von einem `ASC`-Event kurz danach. Die ALTE `bt_reboot()`-Schleife brach ihre Wartezeit ab,
+sobald IRGENDEIN Byte ankam - und das war nur die `/RBT`-Bestaetigung selbst (~1s), nicht der
+echte Boot. Nach nur ~2,5s (1s Fruehausstieg + pauschale 1,5s) ging es weiter zur Verify-
+Schleife, obwohl der Boot erst bei ~3s abgeschlossen ist - je nach genauem Timing reichte das
+Restbudget (~2,8s) mal knapp, mal nicht (genau das beobachtete unzuverlaessige Verhalten bei
+5.84 und 5.50). **Kein Modul-Hardware-Problem, sondern ein Timing-/Abbruchbedingungs-Bug in
+unserer eigenen Wartelogik** - durch den 5.85-Fix (kein Fruehausstieg mehr, durchgehend ~8s)
+behoben. Am Geraet bestaetigt: Verifikation lief danach zuverlaessig durch (`I11019`, 1 Retry).
