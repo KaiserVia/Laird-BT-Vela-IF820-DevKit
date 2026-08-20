@@ -3145,3 +3145,48 @@ Events/Advertising-Nachlauf nach dem Trennen, kein Beweis per Rohmitschnitt). An
 Mitigationsvorschlag (kurzes "Settle-Fenster" nach Trennung, eingehende Bytes kurz ignorieren)
 ABGELEHNT (Menue soll nicht kurzzeitig unresponsive werden). Bleibt vorerst unbehoben, geringe
 Prioritaet (rein kosmetisch).
+
+## Rueckkehr zur urspruenglichen BLE-Frage: PC-Test (ble_mainboard_test.py) gegen 5.86/5.87
+
+**Smoke-Test (Board 123456, 5.86):** Subscribe (CCCD-Write) in 24-28ms quittiert, Verbindung
+hielt die vollen 8s inkl. Datenempfang (Boot-Banner+PIN-Prompt kommt transparent ueber CYSPP
+an) - **der urspruengliche BLE-CYSPP-Bug (Subscribe -> sofortiger Disconnect) ist damit als
+behoben bestaetigt.** Gefundener Nebeneffekt: das Test-Skript rief bisher vor dem Trennen
+`client.stop_notify()` auf (CCCD explizit auf 0x0000 zurueckschreiben) - das loeste zuverlaessig
+einen Disconnect aus (~5s Verzoegerung). Kein Firmware-Bug, sondern ein Test-Skript-Artefakt -
+`stop_notify()`-Aufruf entfernt (ein echter Client wuerde beim gewollten Trennen ohnehin nicht
+extra abbestellen wollen).
+
+**PIN-Handhabung:** `ble_mainboard_test.py` um `--pin`/automatische Ableitung aus dem
+Geraetenamen (`VIASIS_<serno>` -> erste 2 + letzte 4 Ziffern) erweitert - sendet die BT-PIN nach
+dem Subscribe ueber den CYSPP-Kanal, damit `bt_pininit` nicht offen bleibt (das blockierte sonst
+auch RS232-Navigation zum Testmenue).
+
+## Update 5.87: FIX derselbe Puffer-Ueberlauf-Bug (5.83) jetzt auch in bt_transfer_echo()
+
+**Symptom (Transfer-Test, PIN korrekt gesendet):** Erste 1-2 Frames wurden bestaetigt, danach
+~20s komplette Stille, dann scheiterten auch alle 3 Recovery-Versuche (Fenster/Rate reduziert)
+vollstaendig - "Frame 5 ueberschritt 3 Retries nach 3 Recoveries", Disconnect.
+
+**Ursache:** `bt_transfer_echo()` (btio.c) hat exakt dieselbe Schwachstelle, die in 5.83 fuer
+`measure.c`'s Hauptschleife behoben wurde, aber NICHT fuer diese Funktion: Bei vollem `rbuf`
+deaktiviert `UART1_IRQHandler()` (hard.c) den Empfangsinterrupt (`rbuf_full=1`) und nirgends in
+dieser Funktion wird das zurueckgesetzt. Bei der Test-Zielrate 8000 B/s (= 800 B pro 100ms-
+Polling-Intervall, weit ueber den ~255 nutzbaren Bytes von `rbuf`) lief das zuverlaessig hinein -
+erklaert, warum nach den ersten 1-2 ACKs GAR NICHTS mehr ankam, auch nicht bei per Recovery
+reduzierter Rate (der Empfang war schon dauerhaft abgeschaltet, nicht nur langsam).
+
+**Fix (btio.c):** Gleiche Wiederfreigabe wie in 5.83 ergaenzt:
+`if (rbuf_full && bxi==rxi) { rbuf_full=0; NVIC_EnableIRQ(UART1_IRQn); }` nach jedem
+Schleifendurchlauf. Die innere Drain-Schleife von `bt_transfer_echo()` liest ohnehin schon ALLES
+Verfuegbare pro Durchlauf (kein "1 Byte/Durchlauf"-Problem wie bei `mainmenu()`), es fehlte nur
+die Wiederfreigabe selbst.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.87).
+
+**Am Geraet zu verifizieren:** Transfer-Test mit PIN-Vorabsendung wiederholen - sollte jetzt auch
+nach einem kurzzeitigen Puffer-Ueberlauf weiterlaufen statt komplett stehenzubleiben. Falls der
+Durchsatz bei voller Zielrate (8000 B/s) weiterhin instabil ist (Puffer laeuft schneller voll als
+100ms-Polling ihn leeren kann), waere eine niedrigere `--rate` oder ein kuerzeres Polling-
+Intervall der naechste Schritt - das ist aber ein Performance-/Tuning-Thema, kein Korrektheits-Bug
+mehr.

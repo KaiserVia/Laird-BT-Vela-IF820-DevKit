@@ -677,6 +677,13 @@ void bt_transfer_echo (void)
    }
   }
   ResetWDT();
+  // FIX (5.87): derselbe Puffer-Ueberlauf-Bug wie in measure.c (5.83) - bei hoher Transferrate
+  // (Ziel 8000 B/s = 800 B pro 100ms-Poll, weit ueber den ~255 nutzbaren Bytes von rbuf) lief
+  // der Empfangsinterrupt hier bisher ins Leere: rbuf_full deaktiviert UART1_IRQn (hard.c), und
+  // ohne diese Wiederfreigabe blieb der Empfang fuer den Rest der 120s tot - erklärt, warum nach
+  // den ersten 1-2 ACKs alles stehenblieb, auch bei per Recovery reduzierter Rate (der Empfang
+  // war ja schon abgeschaltet, nicht nur langsam).
+  if (rbuf_full && bxi==rxi) { rbuf_full=0; NVIC_EnableIRQ(UART1_IRQn); }
   // 5.78-Fix (wie bt_event_sniff): echten Schnittstellenwechsel waehrend der 120s nicht
   // verschlucken - siehe Kommentar dort.
   if (comchange) { if (!osActiveThread) communication_change(); else clear_comchange(); }
