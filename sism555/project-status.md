@@ -3227,3 +3227,33 @@ Board ohne diese Test-Vorgeschichte funktioniert der komplette Ablauf auf Anhieb
 **Lehre fuer kuenftige Tests:** Nicht zu viele schnelle BLE-Reconnects hintereinander vom
 gleichen PC aus, und Windows-Geraetekopplung nicht leichtfertig entfernen (zerstoert ggf. auch
 die Classic-BT-Kopplung mit).
+
+## Update 5.88: FIX gleicher Puffer-Ueberlauf-Bug jetzt auch in bt_transfer_echo()
+
+**Symptom (nach erfolgreichem Transfer-Test mit 178 ok/41 fehlerhaft):** Direkt nach dem
+manuellen Navigieren zu Testmenue 8->1 (Event-Sniff) liefen Hauptmenue-Anzeigen von selbst
+durch (Selbstnavigation `0`, `7`), gefolgt von einer automatisch erscheinenden Zeit-/Datums-
+Zeile (`17:00:35;20.08.26;4`, Format aus `date_time()`, rtc.c). Ausserdem funktionierte `H`
+(Reset ins Hauptmenue) danach nicht mehr zuverlaessig.
+
+**Ursache:** Der 40kb-BLE-Transfertest sendet Nutzdaten mit ALLEN Byte-Werten 0-255 zyklisch
+(`(offset+i) % 256`). Blieb nach Ende des Transfer-Tests bzw. waehrend einer noch aktiven
+BLE-Verbindung Rohdatenmuell im gemeinsamen Ringpuffer stehen, wurde der beim naechsten
+`mainmenu()`-Durchlauf als Tastatureingabe interpretiert - zufaellige Byte-Werte trafen dabei
+auch `'0'`/`'7'` (Selbstnavigation) UND `'T'` (loest `date_time()` aus, unabhaengig vom
+Menuezustand, siehe `mainmenu()`s `if (c=='T') {...}` VOR der normalen Menue-Logik). `date_time()`
+kann bei aktivem viaspeedcam-Modus `online=1` setzen - und der gesamte normale Menue-Dispatch
+(inkl. der `H`-Behandlung) steht hinter `if (!online && !simulation)`, was `H` dann unwirksam
+machen kann.
+
+**Fix (btio.c, `bt_diag_menu()`):** Nach dem Dispatch an Event-Sniff/Contention-Test/Transfer-
+Test/Factory-Reset wird der Rest im Ringpuffer verworfen (`bxi=rxi;`), BEVOR `mainmenu()` ihn
+normal weiterverarbeitet. Bei Event-Sniff (nicht-blockierend, hat zu diesem Zeitpunkt bereits
+seinen eigenen Leseindex `sniff_i=rxi` gesetzt) werden dadurch nur die VOR dem Start bereits
+vorhandenen Altbytes verworfen - echte Nutzereingaben danach bleiben unangetastet.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.88).
+
+**Am Geraet zu verifizieren:** Transfer-Test laufen lassen, danach Testmenue 8->1 (Event-Sniff)
+oder eine andere BT-Diagnose-Option starten - keine automatische Selbstnavigation mehr, `H`
+funktioniert weiterhin normal.

@@ -642,7 +642,7 @@ void bt_transfer_echo (void)
  putln("Transfer-Test: wartet auf CYS1-Frames (CRC/Seq), sendet ACK1 zurueck. Laufzeit 120s.");
  connect=cc;
  bxi=rxi;
- for (loop=0; loop<1200; loop++)              // 1200 * 100 ms = 120 s, FEST
+ for (loop=0; loop<12000; loop++)             // 12000 * 10 ms = 120 s, FEST
  {
   while (bxi!=rxi)
   {
@@ -677,17 +677,14 @@ void bt_transfer_echo (void)
    }
   }
   ResetWDT();
-  // FIX (5.87): derselbe Puffer-Ueberlauf-Bug wie in measure.c (5.83) - bei hoher Transferrate
-  // (Ziel 8000 B/s = 800 B pro 100ms-Poll, weit ueber den ~255 nutzbaren Bytes von rbuf) lief
-  // der Empfangsinterrupt hier bisher ins Leere: rbuf_full deaktiviert UART1_IRQn (hard.c), und
-  // ohne diese Wiederfreigabe blieb der Empfang fuer den Rest der 120s tot - erklärt, warum nach
-  // den ersten 1-2 ACKs alles stehenblieb, auch bei per Recovery reduzierter Rate (der Empfang
-  // war ja schon abgeschaltet, nicht nur langsam).
+  // Bei 8000 B/s fallen pro 10-ms-Poll rund 80 Byte an und bleiben damit sicher unter den
+  // etwa 255 nutzbaren Bytes des gemeinsamen Ringpuffers. Die 100-ms-Fassung verlor bereits
+  // vor der hier folgenden Wiederfreigabe von UART1 Daten.
   if (rbuf_full && bxi==rxi) { rbuf_full=0; NVIC_EnableIRQ(UART1_IRQn); }
   // 5.78-Fix (wie bt_event_sniff): echten Schnittstellenwechsel waehrend der 120s nicht
   // verschlucken - siehe Kommentar dort.
   if (comchange) { if (!osActiveThread) communication_change(); else clear_comchange(); }
-  osDelay(100);
+  osDelay(10);
  }
  bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
  cc=connect; connect=concpy & ~UART1;
@@ -786,6 +783,15 @@ void bt_diag_menu (void)
  else if (c=='3') bt_transfer_echo();
  else if (c=='4') bt_factory_reset();
  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
+ // FIX: Rest im gemeinsamen Ringpuffer verwerfen, BEVOR mainmenu() ihn normal weiterverarbeitet.
+ // Waehrend eines laufenden BLE-Transfer-Tests (bt_transfer_echo(), CRC/ACK-Frames mit allen
+ // Byte-Werten 0-255) oder einer noch aktiven BLE-Verbindung koennen Rohdaten im Puffer stehen
+ // bleiben - kommen die anschliessend bei mainmenu() an, werden zufaellige Byte-Werte als
+ // Tastatureingaben interpretiert (beobachtet: Selbstnavigation 0/7, sogar 'T' loeste date_time()
+ // aus). bt_event_sniff() hat zu diesem Zeitpunkt bereits seinen eigenen Leseindex (sniff_i=rxi)
+ // gesetzt - der Flush hier verwirft nur die VOR dem Start bereits vorhandenen Altbytes, NICHT
+ // was danach im Hintergrund neu eintrifft (echte Nutzereingaben bleiben unangetastet).
+ bxi=rxi;
 }
 
 //-----------------------------------------------------------------------------
