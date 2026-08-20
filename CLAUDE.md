@@ -148,6 +148,17 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   spiegelt und dort auf CTS/THRE-Timeouts wartet (bis zu ~1 s pro Byte), solange das Modul nicht
   mehr sauber reagiert. Noch offen: ob/nach wie langer Zeit sich das von selbst aufloest
   (Classic-Link-Supervision-Timeout des Moduls) oder ob nur Power-Cycle hilft.
+  **AUFGELOEST (2026-08-18) - Ursache gefunden: Board 269996 ist defekt.** Systematischer
+  Vergleichstest (Konfig-vs-Code, siehe project-status.md Update "5.86/5.50-Vergleich"): auf
+  Board 123456 tritt der 40s-Idle-Haenger unter keiner Firmware/Konfig-Kombination auf (5.50 alt,
+  5.50+aktuelle Konfig, 5.86 aktuell - alles stabil, mehrfach getestet). Nur Board 269996 zeigte
+  den Haenger, unabhaengig von Firmware-Version. **Board 269996 ist defekt und nicht reparabel
+  ohne Bauteil-Nacharbeit** (Anwenderbefund) - der 40s-Haenger war also die ganze Zeit ein
+  **Hardware-Defekt auf diesem einen Board**, kein allgemeiner Firmware-Bug. Die im Rahmen dieser
+  Untersuchung gefundenen und behobenen Firmware-Bugs (PIN-Endlosschleife 5.79, Sniffer-Redesign
+  5.81, Selbstnavigation beim Trennen 5.82, UART-Puffer-Recovery 5.83, Reboot-Verify-Timing 5.85)
+  bleiben trotzdem gueltige, eigenstaendige Verbesserungen - sie haben nur nicht den 40s-Haenger
+  selbst verursacht/behoben, da der auf einem defekten Board sitzt.
 - **Aufraeumen (bewusst temporaerer Diagnose-Code):** `bt_transfer_echo()`, `crc32_calc()`,
   `bt_send_ack()` (btio.c/.h) und Testmenue-Punkt 8→3 sind reiner Diagnose-Code fuer die
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`

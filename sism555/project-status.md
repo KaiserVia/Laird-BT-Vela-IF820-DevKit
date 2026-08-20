@@ -3109,3 +3109,39 @@ Restbudget (~2,8s) mal knapp, mal nicht (genau das beobachtete unzuverlaessige V
 5.84 und 5.50). **Kein Modul-Hardware-Problem, sondern ein Timing-/Abbruchbedingungs-Bug in
 unserer eigenen Wartelogik** - durch den 5.85-Fix (kein Fruehausstieg mehr, durchgehend ~8s)
 behoben. Am Geraet bestaetigt: Verifikation lief danach zuverlaessig durch (`I11019`, 1 Retry).
+
+## Update: 40s-Idle-Haenger AUFGELOEST - Board 269996 ist defekt (Hardware, kein Firmware-Bug)
+
+**Test-Historie:** Der 40s-Idle-dann-Trennen-Haenger wurde ausschliesslich auf **Board 269996**
+reproduziert. Systematischer Vergleich auf **Board 123456**:
+- 5.50 (Alt-Firmware) + 5.50-eigene Konfiguration (nach Factory-Reset): 5x sauber, kein Haenger.
+- 5.50 (Alt-Firmware) + AKTUELLE Modul-Konfiguration (5.86 konfiguriert, dann 5.50 direkt
+  zurueckgeflasht, ohne Zwischen-Reboot): 3x sauber, kein Haenger.
+- 5.86 (aktuelle Firmware) + aktuelle Konfiguration: 3x sauber, kein Haenger.
+
+Auf Board 123456 also unter KEINER Firmware/Konfig-Kombination reproduzierbar. Damit war die
+geplante Versions-Bisektion (5.51-5.86) hinfaellig, bevor sie begonnen wurde.
+
+**Aufloesung (Anwenderbefund):** Board 269996 ist **hardwaredefekt und nicht reparabel ohne
+Bauteil-Nacharbeit** (Neuloeten erforderlich). Der 40s-Idle-Haenger war also die ganze Zeit ein
+**Hardware-Defekt auf diesem einen Board** - kein allgemeiner, reproduzierbarer Firmware-Bug.
+Das erklaert rueckblickend auch die widerspruechlich wirkenden Beobachtungen der letzten Stunden
+(scheinbar wechselnde Reproduzierbarkeit, CYSPP bit7 dauerhaft LOW ueber 2 Minuten ohne jede
+Pegelaenderung, Windows-Pipe-Fehler) - passt zu einem echten Hardware-Defekt, nicht zu einem
+Timing-/Software-Problem.
+
+**Die im Rahmen dieser Untersuchung gefundenen und behobenen Firmware-Bugs bleiben trotzdem
+gueltig und wertvoll** (unabhaengig vom 269996-Defekt gefunden, auf Board 123456 nachvollzogen):
+PIN-Endlosschleife (5.79), Event-Sniff verschluckte PIN (5.80, ueberholt), nicht-blockierender
+Sniffer-Umbau (5.81), Selbstnavigation beim Trennen (5.82), UART-Puffer-Recovery nach Ueberlauf
+(5.83), Reboot-Verify-Timing-Bug (5.85). Diese haben nur nicht den 40s-Haenger selbst verursacht
+oder behoben - der sitzt auf defekter Hardware.
+
+**Noch offen (auf Board 123456, unabhaengig vom 269996-Defekt):** Beim Trennen kommen weiterhin
+vereinzelt echte Bytes (Wert '0'/0x30) ueber UART1 an, die als Menue-Zifferneingabe interpretiert
+werden und kurzzeitig eine Selbstnavigation/Neuanzeige des Hauptmenues verursachen (kein Schaden,
+nur optisch stoerend). Herkunft nicht abschliessend geklaert (vermutlich fortlaufende Modul-
+Events/Advertising-Nachlauf nach dem Trennen, kein Beweis per Rohmitschnitt). Anwender hat einen
+Mitigationsvorschlag (kurzes "Settle-Fenster" nach Trennung, eingehende Bytes kurz ignorieren)
+ABGELEHNT (Menue soll nicht kurzzeitig unresponsive werden). Bleibt vorerst unbehoben, geringe
+Prioritaet (rein kosmetisch).
