@@ -167,7 +167,10 @@ def derive_pin_from_name(name: str) -> str | None:
 # Menuetext-Marker fuer die automatische Navigation (mainmenu()/sicom.c spiegelt Menueausgaben
 # auch ueber den CYSPP-Kanal an BLE, siehe Boot-Banner+PIN-Ausgabe im Smoke-Test-Log). Jeder
 # Schritt: warte auf den Marker der aktuellen Menueebene, dann sende die Ziffer fuer die naechste.
-MENU_NAV_STEPS = [("Hauptmen", "3"), ("Testmen", "8"), ("BT-Diagnose", "3")]
+# Erster Schritt (marker=None): 'H' - springt aus JEDEM Menuezustand definiert zurueck ins
+# Hauptmenue (sicom.c mainmenu(): "if (c=='H') { menu=0; ... }") - so ist der Startzustand
+# unabhaengig davon, wo das Geraet-Menue gerade steht.
+MENU_NAV_STEPS = [(None, "H"), ("Hauptmen", "3"), ("Testmen", "8"), ("BT-Diagnose", "3")]
 MENU_NAV_CONFIRM = "Transfer-Test"
 
 
@@ -195,11 +198,14 @@ async def navigate_to_transfer_test(client: BleakClient, char, nav_buf: bytearra
                 return needle in nav_buf
 
     for marker, digit in MENU_NAV_STEPS:
-        if not await wait_for(marker):
+        if marker is not None and not await wait_for(marker):
             log(f"Navigation: Marker '{marker}' nicht gesehen (Timeout {timeout:.0f}s) - Abbruch.")
             return False
         del nav_buf[:]
-        log(f"Navigation: '{marker}' gesehen -> sende '{digit}'.")
+        if marker is None:
+            log(f"Navigation: sende '{digit}' (Reset ins Hauptmenue).")
+        else:
+            log(f"Navigation: '{marker}' gesehen -> sende '{digit}'.")
         await client.write_gatt_char(char, digit.encode("ascii"), response=False)
         await asyncio.sleep(0.3)
 
