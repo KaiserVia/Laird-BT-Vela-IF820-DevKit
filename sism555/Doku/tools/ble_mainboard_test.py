@@ -19,7 +19,9 @@ Zwei Modi
   --mode transfer  Datentransfer-Test (Default 40 kB): sendet CRC-32/Sequenz-Frames per
                     BLE-Write-without-Response an ...ca102, wartet auf ACK1-Notifications
                     vom Mainboard (Sliding-Window-Flusskontrolle, automatischer Retry).
-                    VORHER auf dem Geraet Testmenue -> 8 -> 3 starten (120 s Laufzeit)!
+                    Navigiert VOLLAUTOMATISCH per BLE zu Testmenue -> 8 -> 3 (liest den ueber
+                    CYSPP gespiegelten Menuetext mit, sendet PIN + Ziffern selbst) - keine
+                    manuelle Bedienung am Geraet mehr noetig.
 
 Aufruf
 ------
@@ -160,6 +162,52 @@ def derive_pin_from_name(name: str) -> str | None:
         return None
     pin = serno[0:2] + serno[-4:]
     return pin if pin.isdigit() else None
+
+
+# Menuetext-Marker fuer die automatische Navigation (mainmenu()/sicom.c spiegelt Menueausgaben
+# auch ueber den CYSPP-Kanal an BLE, siehe Boot-Banner+PIN-Ausgabe im Smoke-Test-Log). Jeder
+# Schritt: warte auf den Marker der aktuellen Menueebene, dann sende die Ziffer fuer die naechste.
+MENU_NAV_STEPS = [("Hauptmen", "3"), ("Testmen", "8"), ("BT-Diagnose", "3")]
+MENU_NAV_CONFIRM = "Transfer-Test"
+
+
+async def navigate_to_transfer_test(client: BleakClient, char, nav_buf: bytearray,
+                                     nav_event: asyncio.Event, timeout: float = 5.0) -> bool:
+    """Navigiert autark Hauptmenue -> 3 (Testfunktionen) -> 8 (BT-Diagnose) -> 3 (Transfer-Test),
+    indem der ueber BLE-Notify gespiegelte Menuetext gelesen wird - kein manuelles Navigieren
+    am Geraet mehr noetig. nav_buf/nav_event werden vom (bereits abonnierten) on_notify-Handler
+    gefuellt, der auch fuer die spaetere ACK-Auswertung zustaendig ist (ein einziges Subscribe
+    fuer die ganze Sitzung - kein stop_notify()/re-subscribe, das hat sich als Disconnect-Ausloeser
+    erwiesen, siehe run_smoke_test)."""
+    async def wait_for(marker: str) -> bool:
+        deadline = time.monotonic() + timeout
+        needle = marker.encode("ascii")
+        while True:
+            if needle in nav_buf:
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            nav_event.clear()
+            try:
+                await asyncio.wait_for(nav_event.wait(), timeout=remaining)
+            except asyncio.TimeoutError:
+                return needle in nav_buf
+
+    for marker, digit in MENU_NAV_STEPS:
+        if not await wait_for(marker):
+            log(f"Navigation: Marker '{marker}' nicht gesehen (Timeout {timeout:.0f}s) - Abbruch.")
+            return False
+        del nav_buf[:]
+        log(f"Navigation: '{marker}' gesehen -> sende '{digit}'.")
+        await client.write_gatt_char(char, digit.encode("ascii"), response=False)
+        await asyncio.sleep(0.3)
+
+    if not await wait_for(MENU_NAV_CONFIRM):
+        log(f"Navigation: '{MENU_NAV_CONFIRM}'-Bestaetigung nicht gesehen - evtl. trotzdem ok.")
+        return False
+    log("Navigation abgeschlossen: Transfer-Test auf dem Geraet aktiv.")
+    return True
 
 
 def write_report(kind: str, data: dict) -> tuple[Path, Path]:
@@ -371,11 +419,15 @@ async def run_transfer_test(args) -> int:
 
     acknowledgements: asyncio.Queue = asyncio.Queue()
     ack_buffer = bytearray()
+    nav_buffer = bytearray()
+    nav_event = asyncio.Event()
 
     def on_disconnect(_client):
         log("*** DISCONNECT ***")
 
     def on_notify(_sender, data: bytearray):
+        nav_buffer.extend(bytes(data))   # fuer navigate_to_transfer_test() - Marker-Suche
+        nav_event.set()
         ack_buffer.extend(bytes(data))
         while len(ack_buffer) >= TRANSFER_ACK.size:
             idx = ack_buffer.find(TRANSFER_ACK_MAGIC)
@@ -410,8 +462,12 @@ async def run_transfer_test(args) -> int:
             log("Kein --pin angegeben/ableitbar - PIN-Abfrage der Firmware bleibt offen "
                 "(RS232-Menue kann dann u.U. nicht bis Testmenue 8->3 navigiert werden).")
 
-        log("Jetzt Testmenue -> 8 -> 3 auf dem Geraet starten, falls noch nicht aktiv.")
-        await asyncio.sleep(1.5)
+        del nav_buffer[:]
+        if not await navigate_to_transfer_test(client, char, nav_buffer, nav_event):
+            log("Automatische Navigation fehlgeschlagen - bitte Testmenue -> 8 -> 3 manuell "
+                "pruefen/starten.")
+            result["result"] = "navigation_failed"
+            return 2
 
         write_limit = min(244, int(char.max_write_without_response_size))
         frames = build_frames(args.bytes, write_limit)
