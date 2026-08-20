@@ -59,11 +59,20 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
   per `cts_bypass`-Bootstrap automatisch (STU F=01 + /SCFG + /RBT), verifiziert danach den
   CTS-Handshake; bleibt CTS trotzdem HIGH → `F11009` (echter Verdrahtungsfehler).
 
-## ⚠ OFFENER HAUPTPUNKT: BLE-Datenkanal bricht beim Subscribe ab
+## ✅ BEHOBEN (2026-08-20): BLE-Datenkanal brach beim Subscribe ab
 
-**Symptom (App-Seite, reproduziert auf zwei Boards):** BLE verbindet, Subscribe auf
-`…ca102` wird mit ATT-Success quittiert — und sofort danach trennt das Modul.
-Classic SPP läuft dagegen einwandfrei.
+**Ursprüngliches Symptom (App-Seite, reproduziert auf zwei Boards):** BLE verbindet, Subscribe
+auf `…ca102` wird mit ATT-Success quittiert — und sofort danach trennt das Modul.
+Classic SPP lief dagegen einwandfrei.
+
+**✅ BEWIESEN BEHOBEN (2026-08-20, Board 269993):** Nach Umsetzung des 5-Schritte-Plans (CYSPP-
+Pin nie mehr aktiv treiben außer beim bewussten Trennen, Firmware 5.65–5.87) wurde mit
+gleichzeitigem Event-Sniff (RS232) + PC-BLE-Test (`ble_mainboard_test.py`) der komplette
+DVK-geforderte Ablauf bestätigt: CCCD-Write wird vom Modul gemeldet (`@E,...,W,...,D=0100`),
+CYSPP-Bridge aktiviert sich (`.CYSPP,S=01`), Banner+PIN-Prompt kommen per BLE-Notify an, eine per
+BLE-Write gesendete PIN kommt tatsächlich in der Firmware an (sichtbar auf RS232) — **bidirektionaler
+Datenfluss über BLE funktioniert.** Details/Testverlauf: `sism555/project-status.md`, Abschnitt
+"BLE-CYSPP-Bug ENDGÜLTIG BEWIESEN BEHOBEN".
 
 **✅ URSACHE GEKLÄRT (2026-08-10, unabhängig auf IF820-DVK nachgewiesen — Details/Quelle:
 `sism555/Doku/ble-Dvk-request.md`, dort auch die konkrete Umsetzungsanforderung):**

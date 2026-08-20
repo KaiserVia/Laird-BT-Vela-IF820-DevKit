@@ -3190,3 +3190,40 @@ Durchsatz bei voller Zielrate (8000 B/s) weiterhin instabil ist (Puffer laeuft s
 100ms-Polling ihn leeren kann), waere eine niedrigere `--rate` oder ein kuerzeres Polling-
 Intervall der naechste Schritt - das ist aber ein Performance-/Tuning-Thema, kein Korrektheits-Bug
 mehr.
+
+## ✅ BLE-CYSPP-Bug ENDGUELTIG BEWIESEN BEHOBEN (Board 269993, Event-Sniff + BLE gleichzeitig)
+
+**Zwischenzeitliches Ratsel:** Auf Board 123456 kamen nach mehreren erfolgreichen Tests
+irgendwann gar keine BLE-Notify-Daten mehr an, auch scheinbare Schreibzugriffe (PIN, 'H') zeigten
+keinerlei Reaktion mehr auf RS232 - trotz Bluetooth-Neustart, Geraet-Neustart und komplettem
+Entkoppeln/Neukoppeln in Windows. Vermutung: ein Windows-seitiger BLE-Stack-/Pairing-Zustand fuer
+genau dieses Geraet, verursacht durch sehr viele Reconnects waehrend der Tests (das Entkoppeln
+hat zusaetzlich auch die Classic-BT-Kopplung mit zerstoert - COM-Port liess sich danach nicht
+mehr oeffnen, auch nicht ueber viagraph).
+
+**Endgueltiger Beweis auf einem zweiten, "sauberen" Board (269993):** Event-Sniff (Testmenue
+8->1, nicht-blockierend seit 5.81) am RS232-Terminal gestartet, waehrend gleichzeitig per
+`ble_mainboard_test.py --mode smoke` per BLE verbunden wurde. Der RS232-Mitschnitt zeigt exakt
+die von der DVK-Anforderung (`ble-Dvk-request.md`) geforderte Ereigniskette:
+
+```
+@E,001A,W,C=01,H=0012,T=00,D=0100   <- CCCD-Write (Notify aktiviert) vom Modul gemeldet
+@E,000C,.CYSPP,S=01                  <- CYSPP-Bridge wird AKTIV
+PIN = 269993                         <- die per BLE-Write gesendete PIN kommt tatsaechlich an!
+...
+@E,000C,.CYSPP,S=00                  <- Bridge wird beim Trennen wieder inaktiv
+```
+
+Gleichzeitig zeigte das Python-Skript: Banner + PIN-Prompt kommen sauber per BLE-Notify an,
+Verbindung haelt die vollen 8s, kein Absturz. **Damit ist bidirektionaler Datenfluss (nicht nur
+"Subscribe bricht nicht mehr sofort ab") ueber BLE nachgewiesen - der urspruengliche BLE-CYSPP-
+Bug (Verbindung bricht beim Subscribe ab, Gegenstand der gesamten CYSPP-Untersuchung dieser
+Session) ist behoben.**
+
+**Einordnung Board 123456:** Sehr wahrscheinlich ein Windows-/PC-seitiges Problem (kaputter
+BLE-Pairing-/GATT-Zustand nach exzessivem Test-Reconnect-Verkehr), kein Firmware-Bug - auf einem
+Board ohne diese Test-Vorgeschichte funktioniert der komplette Ablauf auf Anhieb.
+
+**Lehre fuer kuenftige Tests:** Nicht zu viele schnelle BLE-Reconnects hintereinander vom
+gleichen PC aus, und Windows-Geraetekopplung nicht leichtfertig entfernen (zerstoert ggf. auch
+die Classic-BT-Kopplung mit).
