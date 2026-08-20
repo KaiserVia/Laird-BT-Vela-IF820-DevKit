@@ -29,6 +29,12 @@ Aufruf
   python ble_mainboard_test.py --mode transfer --bytes 40960 --window 4 --retries 3
   python ble_mainboard_test.py --mode transfer --bytes 40960 --rate 0   # unpaced burst
   python ble_mainboard_test.py --name VIASIS_26SC9996 --mode smoke
+  python ble_mainboard_test.py --mode smoke --pin 269996        # BT-PIN explizit senden
+  python ble_mainboard_test.py --mode transfer                  # PIN wird aus dem Namen abgeleitet
+
+Ohne --pin bzw. ableitbaren PIN bleibt die BT-Pinabfrage der Firmware offen - das kann dazu
+fuehren, dass die Verbindung nach einer Weile ohne Aktivitaet getrennt wird bzw. das RS232-Menue
+nicht bis Testmenue 8->3 navigiert werden kann (siehe project-status.md).
 """
 
 import argparse
@@ -133,6 +139,29 @@ def dump_gatt_table(client: BleakClient) -> list:
     return table
 
 
+async def send_pin(client: BleakClient, char, pin: str) -> None:
+    """Sendet die BT-PIN (mainmenu()'s Pinabfrage, sicom.c) ueber den CYSPP-Datenkanal -
+    ohne das nimmt die Firmware KEINE weiteren Menuebefehle an (bt_pininit bleibt >0 und
+    blockiert dann auch RS232, siehe project-status.md) und trennt manche Verbindungen
+    (z.B. BLE ohne Pin-Antwort) nach einer Weile von selbst."""
+    log(f"Sende PIN '{pin}' ...")
+    await client.write_gatt_char(char, pin.encode("ascii"), response=False)
+    await asyncio.sleep(0.3)   # Firmware Zeit geben, die Ziffern zu verarbeiten (echot '*' je Ziffer)
+
+
+def derive_pin_from_name(name: str) -> str | None:
+    """PIN = die ersten 2 + letzten 4 Ziffern der Seriennummer im Geraetenamen
+    (z.B. VIASIS_12SC3456 -> Seriennummer 12SC3456 -> PIN 123456, siehe btio.c bt_set_pin()).
+    Best-effort - liefert None, wenn das Namensschema nicht passt (dann --pin explizit angeben)."""
+    if not name or not name.upper().startswith("VIASIS_"):
+        return None
+    serno = name.split("_", 1)[1].split("_")[0]   # ...VIASIS_<serno> oder ...VIASIS_<serno>_BLE
+    if len(serno) < 8:
+        return None
+    pin = serno[0:2] + serno[-4:]
+    return pin if pin.isdigit() else None
+
+
 def write_report(kind: str, data: dict) -> tuple[Path, Path]:
     REPORT_DIR.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -172,6 +201,7 @@ async def run_smoke_test(args) -> int:
             _finish_smoke(result, args)
             return 2
         address = device.address
+    device_name = device.name if device else None
     result["phases_ms"]["scan"] = round(scan_ms, 1)
 
     disconnected = asyncio.Event()
@@ -222,6 +252,13 @@ async def run_smoke_test(args) -> int:
         result["subscribe_ok"] = True
         log(f"Subscribe (CCCD-Write) quittiert nach {sub_ms:.0f} ms.")
 
+        pin = args.pin or derive_pin_from_name(device_name)
+        if pin:
+            await send_pin(client, char, pin)
+        else:
+            log("Kein --pin angegeben/ableitbar - PIN-Abfrage der Firmware bleibt offen "
+                "(Verbindung koennte deshalb ohne Aktivitaet getrennt werden).")
+
         log(f"Halte Verbindung {args.hold:.0f} s, um einen spontanen Disconnect zu beobachten ...")
         try:
             await asyncio.wait_for(disconnected.wait(), timeout=args.hold)
@@ -230,7 +267,10 @@ async def run_smoke_test(args) -> int:
             result["disconnect_reason"] = "hold_time_elapsed_still_connected"
             log(f"Verbindung hielt die vollen {args.hold:.0f} s.")
 
-        await client.stop_notify(char)
+        # KEIN explizites stop_notify() mehr vor dem Trennen: das loeste bisher zuverlaessig
+        # einen Disconnect aus (CCCD-Rueckschreiben auf 0x0000 haengt/scheitert, ~5s spaeter
+        # trennt das Geraet) - ein echter Client wuerde beim gewollten Trennen ohnehin nicht
+        # extra abbestellen. Verbindung/Subscribe/Datenempfang selbst liefen bis hierher sauber.
         result["result"] = ("passed" if result["subscribe_ok"]
                             and not result["unexpected_disconnect"] else "unstable")
     finally:
@@ -320,14 +360,14 @@ async def run_transfer_test(args) -> int:
     }
 
     if args.address:
-        address = args.address
+        address, device_name = args.address, None
     else:
         device, _ = await scan_for_device(args.name)
         if device is None:
             result["result"] = "device_not_found"
             _finish_transfer(result)
             return 2
-        address = device.address
+        address, device_name = device.address, device.name
 
     acknowledgements: asyncio.Queue = asyncio.Queue()
     ack_buffer = bytearray()
@@ -361,7 +401,16 @@ async def run_transfer_test(args) -> int:
             result["result"] = "char_missing"
             return 2
         await client.start_notify(char, on_notify)
-        log("Subscribed. Jetzt Testmenue -> 8 -> 3 auf dem Geraet starten, falls noch nicht aktiv.")
+        log("Subscribed.")
+
+        pin = args.pin or derive_pin_from_name(device_name)
+        if pin:
+            await send_pin(client, char, pin)
+        else:
+            log("Kein --pin angegeben/ableitbar - PIN-Abfrage der Firmware bleibt offen "
+                "(RS232-Menue kann dann u.U. nicht bis Testmenue 8->3 navigiert werden).")
+
+        log("Jetzt Testmenue -> 8 -> 3 auf dem Geraet starten, falls noch nicht aktiv.")
         await asyncio.sleep(1.5)
 
         write_limit = min(244, int(char.max_write_without_response_size))
@@ -516,6 +565,10 @@ def main() -> int:
     p.add_argument("--name", default=DEFAULT_NAME_PREFIX,
                    help=f"Namensprefix beim Scannen (Default: {DEFAULT_NAME_PREFIX})")
     p.add_argument("--address", default=None, help="BT-Adresse direkt angeben, ueberspringt Scan")
+    p.add_argument("--pin", default=None,
+                   help="BT-PIN (6 Ziffern) nach dem Subscribe senden - ohne das bleibt die "
+                        "Firmware-Pinabfrage offen. Ohne Angabe wird versucht, sie aus dem "
+                        "Geraetenamen abzuleiten (VIASIS_<serno> -> erste 2 + letzte 4 Ziffern).")
     p.add_argument("--connect-timeout", type=float, default=30.0)
     p.add_argument("--hold", type=float, default=8.0,
                    help="[smoke] Sekunden verbunden bleiben, um Spontan-Disconnect zu pruefen")
