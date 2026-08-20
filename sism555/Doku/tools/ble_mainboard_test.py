@@ -200,6 +200,7 @@ async def navigate_to_transfer_test(client: BleakClient, char, nav_buf: bytearra
     for marker, digit in MENU_NAV_STEPS:
         if marker is not None and not await wait_for(marker):
             log(f"Navigation: Marker '{marker}' nicht gesehen (Timeout {timeout:.0f}s) - Abbruch.")
+            log(f"Navigation: tatsaechlich empfangen: {bytes(nav_buf)!r}")
             return False
         del nav_buf[:]
         if marker is None:
@@ -211,6 +212,7 @@ async def navigate_to_transfer_test(client: BleakClient, char, nav_buf: bytearra
 
     if not await wait_for(MENU_NAV_CONFIRM):
         log(f"Navigation: '{MENU_NAV_CONFIRM}'-Bestaetigung nicht gesehen - evtl. trotzdem ok.")
+        log(f"Navigation: tatsaechlich empfangen: {bytes(nav_buf)!r}")
         return False
     log("Navigation abgeschlossen: Transfer-Test auf dem Geraet aktiv.")
     return True
