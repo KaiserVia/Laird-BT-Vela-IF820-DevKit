@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+﻿//-----------------------------------------------------------------------------
 //  FILE: btio.c			PROJECT: sis3000M
 //-----------------------------------------------------------------------------
 //  COMMENTS:  Routinen f�r Bluetooth Modem Erweiterung
@@ -49,8 +49,12 @@ bool bt_command (text * command, text * answer, int pause) // Bluetooth Kommando
  connect=UART1;                            // Kommando NUR ans Modul senden (kein roher Mix am Terminal)
  putstr (command);
 
- bxi1=rxi1;                                 // FIX (5.89): rbuf1 (Command-Mode-Puffer), nicht rbuf
- result = wait_message1 (answer,timeout);  // auf Antwort warten (liest aus rbuf1)
+ // FIX (5.93): Puffer-Wahl muss der ISR-Weiche (hard.c) exakt folgen - die routet nur beim IF820
+ // nach rbuf1; bei Laird/RN4678 (kein CYSPP-Bypass moeglich) landet UART1 unveraendert in rbuf.
+ if ((fp.btmodem==Laird) || (fp.btmodem==Roving))
+ { bxi=rxi; result = wait_message (answer,timeout); }
+ else
+ { bxi1=rxi1; result = wait_message1 (answer,timeout); }
 
  osDelay (2);
  connect=concpy;                           // urspruengliche Verbindung wiederherstellen
@@ -475,6 +479,14 @@ void bt_disconnect (void)
  osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
  bt_release();                              // CYSPP wieder als Eingang
  bxi1=rxi1;                                 // FIX (5.89): RX-Reste (/DIS-Antwort) liegen jetzt in rbuf1
+ // FIX (5.93): Rennen bt_release() (bt_cyspp_out=0) <-> Aufrufer loescht BT_LINK erst NACH
+ // dieser Funktion (measure.c) - in diesem Fenster liest die ISR-Weiche "Bruecke aktiv" (BT_LINK
+ // noch gesetzt, bt_cyspp_out schon 0) und haette Nachlauf-Bytes (Rest der /DIS-Antwort, spaete
+ // @E,...-Disconnect-Events) faelschlich nach rbuf statt rbuf1 geroutet - dort wuerden sie von
+ // mainmenu() als Eingabe fehlinterpretiert (die urspruengliche Selbstnavigations-Bugklasse).
+ // Da diese Trennung ohnehin immer bewusst und sofort ist, kann rbuf hier gefahrlos verworfen
+ // werden - echte Tastatureingaben sind in diesem Moment ebenfalls hinfaellig.
+ bxi=rxi;
  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
 
@@ -1044,9 +1056,9 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 	 putstr(T_AT);															// Sende AT\r um Modul AT Parser zurueckzusetzen
 	 connect=concpy;														// Verbindung wiederherstellen
 	 osDelay(150);															// Warte kurz auf Modul-Antwort (OK oder ERROR)
-	 bxi=rxi;																		// Empfangspuffer leeren
-  }	
-	
+	 bxi1=rxi1;										// FIX (5.93): fp.btmodem noch 0 -> ISR routet nach rbuf1, nicht rbuf
+  }
+
   if (result) 												// Antwort erhalten? Ja --> Laird BT
   { 	
    Init_UART1 (9600);									// mit niedriger Baudrate weiter
@@ -1056,7 +1068,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 	 putstr (T_S521);												// Sende ATS521=460800 neue Baudrate
 	 osDelay(3);																// Warte 3 ms bis letztes Bit gesendet	
 	 Init_UART1 (460800);												// Initialisiert UART1 auf neue Baudrate
-	  result = wait_ok_time (300);			// OK Antwort erhalten?
+	  result = wait_message1 (T_OKNZ,300);			// FIX (5.93): fp.btmodem noch 0 -> rbuf1, nicht wait_ok_time/rbuf
 	  connect&=~UART1;									// nicht an BT Modem senden
     putstr(cbuf);		  								// Ergebnis an Terminal
    } // end if Echo aus ok		
@@ -1071,9 +1083,9 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 			 putstr(T_BTK);											// AT+BTK="
 			 putnumber(fp.btpin,0xC4);					// 4 stellige Pinnummer
 			 putc('"');													// Abschluss-Quote
-			 bxi=rxi;
+			 bxi1=rxi1;											// FIX (5.93): rbuf1, fp.btmodem noch 0
 			 putc(CR);													// Kommandoabschluss
-			 if (wait_ok_time(300)>0)						// OK erhalten? Setze PIN
+			 if (wait_message1(T_OKNZ,300)>0)						// OK erhalten? Setze PIN
 		   {	
 			  connect=concpy;
 			  putstr(cbuf);											// Ergebnis an Terminal
@@ -1083,9 +1095,9 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 			  putc ('_');													// Understrich
 			  putstr (fp.serno);									// Serienummer
 			  putc ('"');
-			  bxi=rxi;													// Empfangspuffer leeren vor CR
+			  bxi1=rxi1;													// Empfangspuffer leeren vor CR
 			  putc(CR);		
-			  result = wait_ok_time (300);				// OK Antwort erhalten?
+			  result = wait_message1 (T_OKNZ,300);				// OK Antwort erhalten?
 			  osDelay(100); 
 			  connect=concpy;
 			  putstr(cbuf); 
@@ -1121,7 +1133,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 		 else if (retry==2) { Init_UART1 (307200); putnumber(307200,0); newline(); }	// teste 307200 Baud
 		 else if (retry==1) { Init_UART1 (460800); putnumber(460800,0); newline(); }	// teste 460800 Baud
 		 osDelay(250);															// Silence gap fuer $$$ Kommandomodus Erkennung
-		 bxi=rxi;																		// Empfangspuffer leeren
+		 bxi1=rxi1;												// FIX (5.93): fp.btmodem noch 0 -> ISR routet nach rbuf1, nicht rbuf
 		}
 		
 		if (result>0) result=bt_command(T_sf1,T_AOK,12000); // Reset to Factory default
@@ -1129,7 +1141,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 		{		
 		 result=bt_command(T_sr1,T_reb,10500);							// Reboot Command
 		 Init_BT_ch(115200);																// Factory default Baudrate nach SF,1
-		 if (wait_message(T_boot,13000)<0) result=0;				// Warte 3s auf "Reboot" Nachricht 											
+		 if (wait_message1(T_boot,13000)<0) result=0;				// Warte 3s auf "Reboot" Nachricht 											
 		 ResetWDT();
 		 if (result>0)																			// Rebooting erhalten?
      { 			 		  																
@@ -1161,7 +1173,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 			 putc('.'); osDelay(1000); ResetWDT();							// Wait for module reboot with feedback
 			 putc('.'); osDelay(1000); ResetWDT();
 			 newline();
-			 bxi=rxi;																					// Flush RX buffer before $$$
+			 bxi1=rxi1;																					// Flush RX buffer before $$$
 		   result=bt_command(T_$,T_cmdp,10300);									// Sende $$$, warte auf CMD> prompt 				
 			 if (result) result = bt_command(T_min,T_end,10300);	// --- END erhalten?
 			 if (result>0) // end erhalten? 

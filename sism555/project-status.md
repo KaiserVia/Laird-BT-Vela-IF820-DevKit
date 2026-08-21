@@ -3413,3 +3413,67 @@ bestehen, ist damit aber nicht abschliessend geklaert.
 **Am Geraet zu verifizieren:** Mehrfach (5-10x) hintereinander BT verbinden/trennen (Classic UND
 BLE) - kein Ausfall/keine "Modul tot"-Situation mehr, unabhaengig davon ob Event-Sniff dabei
 aktiv war oder nicht.
+
+## Update 5.93: Code-Review der 5.89-5.92-Umstellung - vier weitere Puffer-Weichen-Luecken behoben
+
+Nach Abschluss von 5.92 wurde der gesamte 5.89-5.92-Diff mit dem `code-review`-Skill geprueft
+(mehrere unabhaengige Review-Agenten + Verifikationspass). Ergebnis: 2 bestaetigte, 1
+plausibler und 1 architektureller (zurueckgestellter) Befund. Die ersten drei sind hier behoben,
+konsequent nach der in [[feedback_shared_state_review]] festgehaltenen Lehre aus 5.89-5.92:
+vor dem Bauen JEDEN Verbraucher der betroffenen Variable durchgehen, nicht nur die eine gerade
+bearbeitete Stelle.
+
+**Befund 1 (bestaetigt) - Rennen in `bt_disconnect()` (btio.c):** `bt_release()` setzt
+`bt_cyspp_out` zurueck auf 0, aber `connect&BT_LINK` bleibt bis zum Aufrufer (measure.c, NACH
+`bt_disconnect()`) gesetzt. In diesem Fenster liest die ISR-Weiche (`UART1_IRQHandler()`,
+hard.c) "Bruecke aktiv" (`connect&BT_LINK` gesetzt, `bt_cyspp_out` schon 0) und haette
+Nachlauf-Bytes (Rest der `/DIS`-Antwort, spaete `@E,...`-Disconnect-Events) faelschlich nach
+`rbuf` statt `rbuf1` geroutet - dort haette `mainmenu()` sie wieder als Eingabe
+fehlinterpretiert (dieselbe Selbstnavigations-Bugklasse wie vor 5.89, nur ueber einen neuen Weg).
+**Fix:** `bt_disconnect()` verwirft jetzt zusaetzlich `rbuf` (`bxi=rxi`, analog zum bereits
+vorhandenen `bxi1=rxi1`), bevor `connect` wiederhergestellt wird - gerechtfertigt, weil eine
+bewusste, sofortige Trennung ohnehin macht, dass in diesem Moment weder echte Tastatureingaben
+noch echte Protokollantworten relevant sind.
+
+**Befund 2/3 (bestaetigt) - Laird/RN4678-Erkennungspfad nicht konsistent mit der ISR-Weiche:**
+`bt_command()` benutzte seit 5.89 unbedingt `rbuf1`/`bxi1`/`wait_message1()` - die ISR routet
+UART1 aber nur dann nach `rbuf1`, wenn `fp.btmodem!=Laird && fp.btmodem!=Roving`. Solange
+`fp.btmodem` noch 0 ist (gesamte Erkennungsphase, auch fuer Laird/RN4678) passt das noch
+zusammen - sobald ein Laird- oder RN4678-Modul aber erkannt UND `fp.btmodem` dauerhaft gesetzt
+ist, haetten alle spaeteren `bt_command()`-Aufrufe (z. B. `set_bt_name()`) am falschen, nie
+befuellten Puffer gewartet und waeren immer per Timeout gescheitert. Zusaetzlich benutzte die
+RN4678-Boot-Wartschleife in `init_bluetooth()` sowie mehrere manuelle Flush-Stellen im
+Laird/RN4678-Erkennungsblock weiterhin das alte `wait_message()`/`bxi=rxi` (rbuf), obwohl
+`fp.btmodem` dort noch 0 ist und die ISR bereits nach `rbuf1` routet - ein Rest der 5.89-
+Migration, der in diesem (bisher nie am echten Laird/RN4678-Modul getesteten) Codepfad
+uebersehen wurde. **Fix:** `bt_command()` waehlt den Puffer jetzt anhand von `fp.btmodem` -
+`rbuf`/`wait_message()` nur noch fuer bereits bestaetigtes Laird/Roving, sonst (inkl. `0`/
+unbekannt, also waehrend der gesamten Erkennung) `rbuf1`/`wait_message1()`, exakt wie die ISR.
+Alle manuellen Flushes (`bxi=rxi`) und der direkte `wait_message()`-Aufruf im Laird/RN4678-
+Erkennungsblock (btio.c, `init_bluetooth()`) wurden auf `bxi1`/`rxi1`/`wait_message1()`
+umgestellt, da `fp.btmodem` dort durchgehend `0` ist, bis die Erkennung erfolgreich abschliesst.
+
+**Befund 4 (plausibel) - Wiederfreigabe fuer `rbuf1` haette bei aktivem GSM/MQTT-Thread
+blockiert bleiben koennen (measure.c):** Die `rbuf1_full`/`NVIC_EnableIRQ`-Wiederfreigabe (5.91)
+stand innerhalb von `if (!osActiveThread) {...}` - das Draining von `rbuf1` ueber `bt_sniff_poll()`
+(seit 5.91/5.92 unbedingt, siehe Update 5.91) laeuft aber ausserhalb dieser Bedingung. Waere
+`rbuf1` waehrend eines aktiven GSM-/MQTT-Verbindungsthreads (`osActiveThread` gesetzt)
+uebergelaufen, haette `bxi1` durch `bt_sniff_poll()` trotzdem `rxi1` erreicht - aber die
+Wiederfreigabe-Pruefung waere nie gelaufen, der UART1-Interrupt waere dauerhaft aus geblieben
+(derselbe Fehlerklasse wie 5.92, nur unter einer anderen Randbedingung ausgeloest). **Fix:** die
+`rbuf1_full`-Wiederfreigabe steht jetzt direkt nach dem unbedingten `bt_sniff_poll()`-Aufruf,
+also ebenfalls unbedingt - konsistent mit dem Draining, das sie ueberhaupt erst noetig macht.
+
+**Bewusst NICHT behoben (zurueckgestellt, kein Teil dieses Updates):** der architektonische
+Befund, dass die gesamte Weiche letztlich von `connect&BT_LINK` abhaengt - einem Flag, das
+andernorts bereits als potenziell veraltet dokumentiert ist ("Split-Brain", siehe CLAUDE.md).
+Befund 1 behebt einen konkreten, bekannten Fall dieser Klasse (bewusstes Trennen), aendert aber
+nichts an der grundsaetzlichen Abhaengigkeit. Als bekanntes Risiko dokumentiert, keine akute
+Aenderung noetig.
+
+**Geaenderte Dateien:** btio.c, measure.c, sprachen/sictxt.c (-> 5.93).
+
+**Am Geraet zu verifizieren:** normales Verbinden/Trennen (Classic + BLE) weiterhin ohne
+Selbstnavigation; Laird/RN4678-Pfad ist auf diesem Board nicht real testbar (kein solches Modul
+verbaut) - Aenderung ist eine reine Konsistenzkorrektur anhand der ISR-Logik, kein Verhaltens-
+wechsel fuer den aktuell verwendeten IF820.

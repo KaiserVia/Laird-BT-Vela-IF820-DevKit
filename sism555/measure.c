@@ -351,11 +351,6 @@ void runcycle (void)				// Messzyklenbetrieb
 	 }									// modem_terminal()/mqtt.c) - blieb sonst bis zum naechsten
 										// Power-Cycle abgeschaltet. Jetzt: sobald der Puffer wieder
 										// leer ist, Interrupt reaktivieren.
-	 if (rbuf1_full && bxi1==rxi1)		// FIX (5.89): dieselbe Wiederfreigabe fuer rbuf1 (UART1
-	 {									// Command-Mode-Puffer, siehe hard.c UART1_IRQHandler) - kann
-		rbuf1_full=0;						// theoretisch genauso ueberlaufen wie frueher rbuf, bevor der
-		NVIC_EnableIRQ(UART1_IRQn);		// eigentliche Interrupt wieder freigegeben wird.
-	 }
 	}
 
 	if (menrep)	mainmenu('0');					// Men�wiederholung
@@ -363,6 +358,18 @@ void runcycle (void)				// Messzyklenbetrieb
 	// 5.81: BT-Event-Sniff (Testmenue-Diagnose) liest ueber einen eigenen, von bxi
 	// unabhaengigen Index nicht-blockierend nach - beeinflusst mainmenu()/PIN-Abfrage nicht.
 	bt_sniff_poll ();
+
+	// FIX (5.93): Wiederfreigabe fuer rbuf1 an dieselbe Bedingung gekoppelt wie das Draining,
+	// das bxi1 vorantreibt (bt_sniff_poll(), s.o.) - die laeuft UNABHAENGIG von osActiveThread.
+	// Die alte Platzierung dieser Pruefung innerhalb von "if (!osActiveThread)" (siehe rbuf_full
+	// oben, dort korrekt, weil dort auch bxi ausschliesslich in diesem Zweig avanciert) blockierte
+	// hier die Wiederfreigabe, wenn rbuf1 waehrend eines aktiven GSM-/MQTT-Threads ueberlief -
+	// bxi1 erreichte rxi1 trotzdem (via bt_sniff_poll()), der Interrupt blieb aber dauerhaft aus.
+	if (rbuf1_full && bxi1==rxi1)
+	{
+	 rbuf1_full=0;
+	 NVIC_EnableIRQ(UART1_IRQn);
+	}
   		 	
 	if ((fp.i2cdev&IC37_b) || simulation)	// Expander Messsteuerung installiert oder Simulation?
   {
