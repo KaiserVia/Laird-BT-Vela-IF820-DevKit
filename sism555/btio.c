@@ -556,23 +556,34 @@ void bt_event_sniff (void)
 
 // Non-blocking nachlesen - einmal je Hauptschleifendurchlauf aus measure.c aufgerufen.
 // Beruehrt bxi/rbuf-Verbrauch NICHT, daher voellig unabhaengig von mainmenu()/PIN-Abfrage.
+// FIX (5.89-Ergaenzung): rbuf1 (UART1-Command-Mode-Puffer) wird sonst NUR bei aktivem
+// Event-Sniff bzw. waehrend eines bt_command()-Aufrufs geleert - im normalen Betrieb (kein
+// Sniff aktiv, kein Kommando gerade unterwegs) liest NIEMAND rbuf1, er kann volllaufen und
+// den UART1-Interrupt dauerhaft abschalten (bxi1==rxi1 wird ja nie erreicht, da nichts mehr
+// aus bxi1 liest - die bestehende Wiederfreigabe in measure.c greift dann nie). Deshalb wird
+// rbuf1 jetzt IMMER geleert (sniff_i folgt rxi1 auch ohne aktiven Sniff) - nur die Anzeige mit
+// Zeitstempel ist an sniff_active gebunden, das Leeren selbst nicht mehr.
 void bt_sniff_poll (void)
 {
  char c; uchar cc;
- if (!sniff_active) return;
  if (sniff_i!=rxi1)
  {
-  cc=connect; connect=concpy & ~UART1;        // Ausgabe nur ans Terminal, nichts zurueck ans Modul
-  while (sniff_i!=rxi1)
+  if (sniff_active)
   {
-   c = rbuf1[(uchar)(sniff_i+1)]; sniff_i++;
-   if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
-   if (sniff_bol) { putc('['); putnumber(mstimer-sniff_t0,0); putstr("ms] "); sniff_bol=FALSE; }
-   putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
-   if (c=='\n') sniff_bol=TRUE;
+   cc=connect; connect=concpy & ~UART1;        // Ausgabe nur ans Terminal, nichts zurueck ans Modul
+   while (sniff_i!=rxi1)
+   {
+    c = rbuf1[(uchar)(sniff_i+1)]; sniff_i++;
+    if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
+    if (sniff_bol) { putc('['); putnumber(mstimer-sniff_t0,0); putstr("ms] "); sniff_bol=FALSE; }
+    putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
+    if (c=='\n') sniff_bol=TRUE;
+   }
+   connect=cc;
   }
-  connect=cc;
+  else sniff_i=rxi1;                            // kein Sniff aktiv -> nur leeren, nichts anzeigen
  }
+ if (!sniff_active) return;
  if ((uint)(mstimer-sniff_t0)>=SNIFF_DURATION_MS)
  {
   sniff_active=FALSE;

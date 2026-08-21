@@ -3348,3 +3348,28 @@ Hardware-Beschaedigung des Moduls - vergleichbar mit den bereits mehrfach beobac
 "Modul reagiert nicht mehr"-Faellen dieser Session, die durchgehend per Power-Cycle behoben
 werden konnten. Am Geraet zu verifizieren: 5.90 flashen, Power-Cycle, Werksinit/Bluetooth-Setup
 erneut durchlaufen - sollte jetzt sauber ablaufen wie vor 5.89.
+
+## Update 5.91: FIX Puffer-Reste aus Transfer-Test/BLE-Verkehr loesten Selbstnavigation aus
+
+**Symptom (Anwender-Log, nach 5.90):** Beim Auslesen von Messdaten ueber Bluetooth
+(Hauptmenue -> 1 Datenausgabe -> XMODEM) wurde das RS232-Menue mit Datenmuell "vollgeballert"
+und stuerzte ab - trat vor der 5.89/5.90-Umstellung nicht auf.
+
+**Ursache (Luecke im 5.89-Umbau, nicht der 5.90-Bug selbst):** Der neue Command-Mode-Puffer
+`rbuf1` (fuer UART1-Protokolltext, siehe 5.89) wird nur dann geleert, wenn entweder
+`bt_command()` gerade eine Antwort erwartet ODER Event-Sniff aktiv laeuft. Im normalen
+Betrieb (laengerer BT-Datentransfer, kein Sniff aktiv) liest **niemand** `rbuf1` - er kann
+volllaufen und ueber `rbuf1_full`/`NVIC_DisableIRQ` den UART1-Empfangsinterrupt dauerhaft
+abschalten (die vorhandene Wiederfreigabe in `measure.c` wartet auf vollstaendiges Leerlesen,
+das aber ohne aktiven Verbraucher nie eintritt) - das killt dann auch den eigentlich ueber
+`rbuf` laufenden XMODEM-Datenaustausch, weil derselbe physische UART1-Interrupt betroffen ist.
+
+**Fix (btio.c, `bt_sniff_poll()`):** `rbuf1` wird jetzt IMMER geleert (jeder Hauptschleifen-
+durchlauf, unabhaengig davon ob Event-Sniff aktiv ist) - nur die Anzeige mit Zeitstempel bleibt
+an `sniff_active` gebunden. Damit kann `rbuf1` im Normalbetrieb praktisch nie mehr ueberlaufen.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.91).
+
+**Am Geraet zu verifizieren:** Laengeren Datentransfer ueber BT (Datenausgabe/XMODEM oder der
+40kb-BLE-Transfer-Test) durchlaufen lassen - RS232 bleibt danach normal bedienbar, kein
+Datenmuell/Absturz mehr.
