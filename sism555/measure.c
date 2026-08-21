@@ -351,6 +351,11 @@ void runcycle (void)				// Messzyklenbetrieb
 	 }									// modem_terminal()/mqtt.c) - blieb sonst bis zum naechsten
 										// Power-Cycle abgeschaltet. Jetzt: sobald der Puffer wieder
 										// leer ist, Interrupt reaktivieren.
+	 if (rbuf1_full && bxi1==rxi1)		// FIX (5.89): dieselbe Wiederfreigabe fuer rbuf1 (UART1
+	 {									// Command-Mode-Puffer, siehe hard.c UART1_IRQHandler) - kann
+		rbuf1_full=0;						// theoretisch genauso ueberlaufen wie frueher rbuf, bevor der
+		NVIC_EnableIRQ(UART1_IRQn);		// eigentliche Interrupt wieder freigegeben wird.
+	 }
 	}
 
 	if (menrep)	mainmenu('0');					// Men�wiederholung

@@ -912,6 +912,44 @@ int wait_message (text *Pt, uint timeout)		// Warte auf Nachricht
  return (-1);										// kein Erfolg
 }
 
+// FIX (5.89): identisch zu wait_message(), liest aber aus rbuf1/bxi1/rxi1 (UART1 Command-Mode-
+// Puffer) statt rbuf/bxi/rxi. Wird von bt_command() (btio.c) benutzt, damit BT-Kommando-
+// Antworten (/PING, GDN, GAP usw.) nie mehr im menue-lesenden rbuf landen koennen. wait_message()
+// selbst bleibt unveraendert - wird auch von GSM/MQTT/Matrix-Controller-Code (gsmio.c, mqtt.c,
+// libtool.c) genutzt, die weiterhin rbuf lesen sollen.
+int wait_message1 (text *Pt, uint timeout)		// Warte auf Nachricht in rbuf1 (UART1 Command-Mode)
+{
+ ushort anzahl=0, start=0;
+ uint ltime=mstimer+timeout;
+
+ if (ltime<mstimer) { mstimer=0; ltime=timeout; }
+
+ cind=0;
+ while (*(Pt+anzahl)!=0) anzahl++;
+
+ do
+ {
+  if (bxi1!=rxi1)
+  {
+   ltime=mstimer+timeout/2;
+   cbuf[cind++]=rbuf1[++bxi1];
+   if (cind>=start+anzahl)
+   {
+    cbuf[cind]=0;
+    if (compare((char *)Pt,cbuf,start, start+anzahl)>0)
+	  return (cind);
+	  else start++;
+   }
+  }
+	else
+	{
+	 ResetWDT();
+	 osThreadYield();
+	}
+ } while (ltime>mstimer);
+ return (-1);
+}
+
 int wait_message_2 (text *Pt, uint timeout, uchar uart)		// Warte auf Nachricht in UART Puffern
 {																													// �bergaben 	*Pt 	- Zeiger auf erwarteten Text
 																													// 				timeout	- Timeout bis erstes Zeichen empfangen

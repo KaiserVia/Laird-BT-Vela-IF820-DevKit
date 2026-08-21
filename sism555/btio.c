@@ -49,8 +49,8 @@ bool bt_command (text * command, text * answer, int pause) // Bluetooth Kommando
  connect=UART1;                            // Kommando NUR ans Modul senden (kein roher Mix am Terminal)
  putstr (command);
 
- bxi=rxi;                                  // Empfangspuffer-Indizes gleichsetzen
- result = wait_message (answer,timeout);   // auf Antwort warten
+ bxi1=rxi1;                                 // FIX (5.89): rbuf1 (Command-Mode-Puffer), nicht rbuf
+ result = wait_message1 (answer,timeout);  // auf Antwort warten (liest aus rbuf1)
 
  osDelay (2);
  connect=concpy;                           // urspruengliche Verbindung wiederherstellen
@@ -92,7 +92,7 @@ int bt_get_flowcontrol (void)        // Abfrage: -1=unbekannt, 0=aus, 1=an
    uchar tries;
    for (tries=0; tries<3; tries++)                    // GTU direkt nach /PING liefert manchmal keine Antwort -> Retry
    {
-    bxi=rxi;                                           // RX-Reste (z. B. /PING-Nachlauf) verwerfen
+    bxi1=rxi1;                                          // RX-Reste (z. B. /PING-Nachlauf) verwerfen
     if (bt_command(T_gtu,T_gtu_d,400))                 // GTU senden, Antwort bis ",D=" in cbuf
     {
      p = strstr(cbuf,",F=");                           // Flow-Control-Feld suchen
@@ -163,10 +163,10 @@ int bt_get_cod (void)                // -1 = keine Antwort, 0 = abweichend, 1 = 
  char buf[64]; uchar n=0, i; char *p; uchar dconn=connect;
  if (fp.btmodem!=IF820) return (-1);
  connect=UART1; putstr(T_gbtdc);                       // "GBTDC\r" an das Modul
- bxi=rxi;                                              // RX-Marke
+ bxi1=rxi1;                                            // RX-Marke (rbuf1, 5.89)
  connect=dconn & ~UART1;                               // nichts zurueck ans Modul spiegeln
  osDelay(200);                                         // Antwort abwarten (kurze, feste Antwort)
- while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+ while (bxi1!=rxi1 && n<sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
  buf[n]=0; connect=dconn;
  p=strstr(buf,"C=");                                   // CoD-Feld der GBTDC-Antwort
  if (!p) return (-1);                                  // keine/keine verwertbare Antwort
@@ -256,9 +256,9 @@ int bt_get_echo (void)               // -1 = keine Antwort, 0 = Echo an, 1 = Ech
  if (fp.btmodem!=IF820) return (-1);
  for (t=0; t<3; t++)                                   // Retry: erster Read kann leer sein (vermeidet
  {                                                     //         sonst einen unnoetigen Reflash+Reboot)
-  n=0; connect=UART1; putstr(T_gpem); bxi=rxi;         // GPEM ans Modul, RX-Marke
+  n=0; connect=UART1; putstr(T_gpem); bxi1=rxi1;       // GPEM ans Modul, RX-Marke (rbuf1, 5.89)
   connect=dconn & ~UART1; osDelay(200);               // nichts spiegeln, Antwort abwarten
-  while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+  while (bxi1!=rxi1 && n<sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
   buf[n]=0; connect=dconn;
   p=strstr(buf,"M=");                                  // Echo-Feld (im Header/GPEM kein "M=")
   if (p) return ((p[2]=='0'&&p[3]=='0') ? 1 : 0);      // M=00 -> Echo aus
@@ -349,21 +349,21 @@ void bt_reboot (void)   // IF820: /RBT senden + auf Boot warten (Classic-Name wi
                           // (F11018) live nachvollziehen.
  uchar cc, w; char c; uint t0=mstimer; bool bol=TRUE;
  cc=connect; connect|=UART1; putstr(T_rbt); connect=cc;   // /RBT senden
- bxi=rxi;
+ bxi1=rxi1;                                // FIX (5.89): rbuf1 (Command-Mode-Puffer)
  cc=connect; connect=concpy & ~UART1;      // Rohausgabe nur ans Terminal, nichts zurueck ans Modul
  for (w=0; w<8; w++)                       // ~8s Gesamtwartezeit (vorher 6s+1.5s, hier durchgehend
  {                                          // mitgelesen statt nur teilweise verworfen)
   osDelay(1000); ResetWDT();
-  while (bxi!=rxi)
+  while (bxi1!=rxi1)
   {
-   c = rbuf[++bxi];
+   c = rbuf1[++bxi1];
    if (c=='\r') continue;                  // CR ueberspringen, LF traegt den Zeilenumbruch
    if (bol) { putc('['); putnumber(mstimer-t0,0); putstr("ms] "); bol=FALSE; }
    putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
    if (c=='\n') bol=TRUE;
   }
  }
- newline(); connect=cc; bxi=rxi;
+ newline(); connect=cc; bxi1=rxi1;
 }
 
 bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ -> RAM+Flash)
@@ -400,10 +400,10 @@ void bt_show_name (void)             // aktuellen BT-Namen vom Modul lesen und a
  char buf[80]; uchar n=0, i; char *p; uchar dconn=connect;
  if (fp.btmodem!=IF820) return;      // derzeit nur IF820 (RN4678/Laird: GN bzw. AT+BTN? -> TODO)
  connect=UART1; putstr(T_gdn);       // "GDN\r" an das Modul
- bxi=rxi;                            // RX-Marke
+ bxi1=rxi1;                          // RX-Marke (rbuf1, 5.89)
  connect=dconn & ~UART1;             // Ausgabe nur ans Terminal, nicht zurueck ans Modul
  osDelay(200);                       // Antwort abwarten
- while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+ while (bxi1!=rxi1 && n<sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
  buf[n]=0;
  newline();                          // eigene Zeile (nicht an vorherige Meldung kleben)
  put2str(T_btname,T_ist);            // Label "Device name ..."
@@ -474,7 +474,7 @@ void bt_disconnect (void)
  bt_command(T_dis, T_disok, -300);          // /DIS still senden (kein Terminal-Spam), Antwort abwarten
  osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
  bt_release();                              // CYSPP wieder als Eingang
- bxi=rxi;                                   // RX-Reste (/DIS-Antwort) verwerfen -> nichts ins Terminal/Menue
+ bxi1=rxi1;                                 // FIX (5.89): RX-Reste (/DIS-Antwort) liegen jetzt in rbuf1
  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
 
@@ -530,8 +530,11 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
 // kehrt sofort zurueck, bt_sniff_poll() (aus measure.c's Hauptschleife, einmal je Durchlauf)
 // liest non-blocking nach und gibt am RS232-Terminal aus. Kein osDelay(), kein Blockieren -
 // das Hauptmenue bleibt waehrend der gesamten 180s normal bedienbar.
+// FIX (5.89): sniff_i verfolgt jetzt rxi1 (rbuf1, UART1-Command-Mode-Puffer) statt rxi -
+// das ist ohnehin genau der Puffer, in dem die interessanten @E,.../@R,...-Ereignisse landen
+// (die treten per Definition nur auf, waehrend die CYSPP-Bruecke NICHT aktiv ist).
 static bool sniff_active=FALSE;
-static uchar sniff_i;                         // eigener, von bxi unabhaengiger Leseindex in rbuf
+static uchar sniff_i;                         // eigener Leseindex in rbuf1 (Command-Mode-Puffer)
 static uint sniff_t0;                         // Startzeitpunkt (mstimer) fuer Dauer und Zeitstempel
 static bool sniff_bol;                        // Zeilenanfang (fuer Zeitstempel je Zeile)
 #define SNIFF_DURATION_MS  180000UL           // 180s, deckt einen kompletten "--runs 3"-Durchlauf
@@ -545,7 +548,7 @@ void bt_event_sniff (void)
                                                // wie bei send_bt_info() - MUX schaltet auf BT)
  putln("Event-Sniff (Hintergrund): rohe Modul-Ausgabe, laeuft 180s im Hintergrund mit - Hauptmenue");
  putln("bleibt normal bedienbar. Jetzt BLE/Classic verbinden.");
- sniff_i=rxi;                                 // sauberer Start, alte Reste ignorieren (nicht bxi!)
+ sniff_i=rxi1;                                // sauberer Start, alte Reste ignorieren (rbuf1)
  sniff_t0=mstimer;
  sniff_bol=TRUE;
  sniff_active=TRUE;
@@ -557,12 +560,12 @@ void bt_sniff_poll (void)
 {
  char c; uchar cc;
  if (!sniff_active) return;
- if (sniff_i!=rxi)
+ if (sniff_i!=rxi1)
  {
   cc=connect; connect=concpy & ~UART1;        // Ausgabe nur ans Terminal, nichts zurueck ans Modul
-  while (sniff_i!=rxi)
+  while (sniff_i!=rxi1)
   {
-   c = rbuf[(uchar)(sniff_i+1)]; sniff_i++;
+   c = rbuf1[(uchar)(sniff_i+1)]; sniff_i++;
    if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
    if (sniff_bol) { putc('['); putnumber(mstimer-sniff_t0,0); putstr("ms] "); sniff_bol=FALSE; }
    putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
@@ -783,15 +786,11 @@ void bt_diag_menu (void)
  else if (c=='3') bt_transfer_echo();
  else if (c=='4') bt_factory_reset();
  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
- // FIX: Rest im gemeinsamen Ringpuffer verwerfen, BEVOR mainmenu() ihn normal weiterverarbeitet.
- // Waehrend eines laufenden BLE-Transfer-Tests (bt_transfer_echo(), CRC/ACK-Frames mit allen
- // Byte-Werten 0-255) oder einer noch aktiven BLE-Verbindung koennen Rohdaten im Puffer stehen
- // bleiben - kommen die anschliessend bei mainmenu() an, werden zufaellige Byte-Werte als
- // Tastatureingaben interpretiert (beobachtet: Selbstnavigation 0/7, sogar 'T' loeste date_time()
- // aus). bt_event_sniff() hat zu diesem Zeitpunkt bereits seinen eigenen Leseindex (sniff_i=rxi)
- // gesetzt - der Flush hier verwirft nur die VOR dem Start bereits vorhandenen Altbytes, NICHT
- // was danach im Hintergrund neu eintrifft (echte Nutzereingaben bleiben unangetastet).
- bxi=rxi;
+ // HINWEIS (5.89): Der fruehere Flush hier (5.88, "bxi=rxi vor mainmenu()") ist nicht mehr
+ // noetig - Command-Mode-/Protokollbytes (Event-Sniff, Factory-Reset, Contention-Test) landen
+ // jetzt an der Quelle (UART1_IRQHandler, hard.c) in rbuf1 statt in rbuf und koennen mainmenu()
+ // gar nicht mehr erreichen. bt_transfer_echo() (echte Transparent-Daten, bleibt auf rbuf) macht
+ // seinen eigenen Flush bereits selbst am Ende.
 }
 
 //-----------------------------------------------------------------------------
@@ -815,7 +814,7 @@ static int bt_scan_ping (uint32_t baud)   // 1 = "/PING,0000" gesehen, sonst 0
  Init_BT_ch(baud);
  bt_msg("  [ch] send CR");
  cc=connect; connect=UART1; putstr(T_CR); connect=cc;   // Modul-Parser: (Muell-)Zeile abschliessen (5.98)
- osDelay(20); bxi=rxi;                                  // kurz setteln, dann RX-Puffer leeren
+ osDelay(20); bxi1=rxi1;                                // kurz setteln, dann RX-Puffer leeren (rbuf1, 5.89)
  bt_msg("  [CR] send /PING");
  cc=connect; connect=UART1; putstr(T_ping); connect=cc; // /PING senden (cts_bypass aktiv -> ohne CTS-Gate)
  bt_msg("  [PING] wait 250ms for reply");
@@ -823,7 +822,7 @@ static int bt_scan_ping (uint32_t baud)   // 1 = "/PING,0000" gesehen, sonst 0
  while ((int)(deadline-mstimer)>0)
  {
   ResetWDT();
-  while (bxi!=rxi && n<(int)sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+  while (bxi1!=rxi1 && n<(int)sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
   osThreadYield();
  }
  buf[n]=0;
@@ -1203,12 +1202,12 @@ static void bt_query_show (char *cmd)
  newline(); putstr("  > ");
  for (i=0; cmd[i] && cmd[i]!='\r' && cmd[i]!='\n'; i++) putc(cmd[i]);
  connect=cc;
- osDelay(2); bxi=rxi;                                     // alten Pufferinhalt verwerfen
+ osDelay(2); bxi1=rxi1;                                   // alten Pufferinhalt verwerfen (rbuf1, 5.89)
  cc=connect; connect=UART1; putstr(cmd); connect=cc;      // Kommando NUR ans Modul
  deadline=mstimer+400;                                    // feste Antwortzeit (keine Echo-Abhaengigkeit)
  while ((int)(deadline-mstimer)>0)
  { ResetWDT();
-   while (bxi!=rxi && n<(int)sizeof(buf)-1) buf[n++]=rbuf[++bxi];
+   while (bxi1!=rxi1 && n<(int)sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
    osThreadYield();
  }
  buf[n]=0;
@@ -1217,7 +1216,7 @@ static void bt_query_show (char *cmd)
  if (!n) putstr("(no response)");
  else for (i=0; i<n; i++) if (buf[i]>=32 && buf[i]<127) putc(buf[i]);
  newline(); connect=cc;
- bxi=rxi;                                                 // Rest sicher verwerfen -> keine Bytes ins Menue
+ bxi1=rxi1;                                               // Rest sicher verwerfen -> keine Bytes ins Menue
 }
 
 // Durchsatz-Diagnose (5.53): Zaehler aus putb() anzeigen. Nur Anzeige, kein Eingriff.
@@ -1270,7 +1269,7 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
    bt_query_show(T_rlh_ppcp);                                     // Verbindungsparameter-Praeferenz (5.6x): D=0C00180000005802
    bt_show_counters();                                            // Durchsatz-Diagnose der laufenden BT-Sitzung
   }
-  osDelay(50); bxi=rxi;                                           // finaler Flush: keine Modulbytes ins Menue
+  osDelay(50); bxi1=rxi1;                                         // finaler Flush (rbuf1, 5.89)
   uart1_release(MUX_BT);
   if (!result) puterror(DTC_BT_PING,-1);
   return;

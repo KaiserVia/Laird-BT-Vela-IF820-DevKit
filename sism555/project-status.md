@@ -3257,3 +3257,64 @@ vorhandenen Altbytes verworfen - echte Nutzereingaben danach bleiben unangetaste
 **Am Geraet zu verifizieren:** Transfer-Test laufen lassen, danach Testmenue 8->1 (Event-Sniff)
 oder eine andere BT-Diagnose-Option starten - keine automatische Selbstnavigation mehr, `H`
 funktioniert weiterhin normal.
+
+## Update 5.89: WURZEL-FIX - UART1-Protokoll/Status strukturell von Menue-Eingabe getrennt
+
+**Anlass:** 5.88 (und davor 5.79/5.82) haben die Selbstnavigations-Bugklasse jeweils nur an
+EINEM festen Zeitpunkt geflickt (Puffer leeren beim Trennen bzw. beim Verlassen von
+BT-Diagnose). Direkt danach zeigte sich erneut ein Fall, bei dem ein einfaches Trennen (ganz
+ohne Testmenue-Bezug) wieder Selbstnavigation + einen `H`-Ausfall ausloeste - das Modul schickt
+Protokoll-/Statusereignisse (`@E,...DIS...`, `@E,...ASC...`, `@E,...CYSPP,S=00`) teils ueber
+mehrere Sekunden verteilt, ein einmaliges Leeren zu einem festen Zeitpunkt kann das grundsaetzlich
+nicht zuverlaessig abfangen. Anwender hat zurecht auf einer strukturellen Loesung bestanden statt
+weiterer Einzelfall-Flicken.
+
+**Design:** Der IC54/CYSPP-Pin-Status (`connect&BT_LINK`, bereits ueber `communication_change()`
+gepflegt) sagt bereits zuverlaessig, ob die transparente Datenbruecke gerade aktiv ist oder
+nicht - eine einzelne Protokollzeile muss dafuer nicht inhaltlich verstanden werden. Der
+UART1-Interrupt (`UART1_IRQHandler()`, hard.c) route jetzt an der Quelle in zwei getrennte
+Puffer, nur fuer IF820 (`fp.btmodem==IF820`; Laird/RN4678 unveraendert, da dort BT_LINK ein
+reiner Status-Ausgang ist, kein bidirektionaler CYSPP-Pin):
+
+- **`rbuf`/`bxi`/`rxi`** (bestehend, unveraendert): RS232 (UART0) **plus** UART1, wenn die
+  CYSPP-Bruecke aktiv ist (`(connect&BT_LINK) && !bt_cyspp_out`) - also echte Transparent-Daten
+  (Tastatureingabe ueber Classic/BLE, oder die CRC/ACK-Frames des Transfer-Tests). Genau das
+  liest `mainmenu()` weiterhin unveraendert.
+- **`rbuf1`/`bxi1`/`rxi1`** (neu, gleiches Muster wie `rbuf`): UART1, wenn die Bruecke NICHT
+  aktiv ist - Command-Mode: Boot-Meldungen, `/PING`-Antworten, Connect-/Disconnect-Events. Landet
+  NIE mehr bei `mainmenu()`, unabhaengig vom Timing.
+
+`bt_cyspp_out` (bereits vorhandenes Flag) deckt den Sonderfall ab, dass `bt_disconnect()` bewusst
+Command-Mode erzwingt (`bt_cmdmode()`), obwohl `connect&BT_LINK` zu dem Zeitpunkt noch nicht
+zurueckgesetzt ist - die `/DIS`-Antwort landet dank dieser Bedingung trotzdem in `rbuf1`.
+
+**Wer liest was:**
+- Bleiben auf `rbuf`/`bxi`/`rxi` (unveraendert): `mainmenu()`; `bt_transfer_echo()` (echte
+  Transparent-Nutzdaten); `bt_diag_menu()`s eigene Ziffernabfrage per `getc()`.
+- Umgezogen auf `rbuf1`/`bxi1`/`rxi1`: `bt_command()` (dafuer neue Variante `wait_message1()` in
+  sio.c - `wait_message()` selbst bleibt unveraendert, wird auch von GSM/MQTT/Matrix-Controller-
+  Code genutzt), `bt_get_flowcontrol()`/`bt_get_cod()`/`bt_get_echo()`, `bt_show_name()`,
+  `bt_reboot()`s Boot-Wartschleife, `bt_scan_ping()`, `bt_query_show()`, sowie `bt_event_sniff()`s
+  Leseindex `sniff_i` (verfolgt jetzt `rxi1` - die `@E,...`-Ereignisse, die Event-Sniff zeigen
+  soll, treten per Definition nur im Command-Mode auf). Der Laird-BT730-Fallback-Pfad in
+  `init_bluetooth()` bleibt komplett unangetastet (nicht IF820, siehe oben).
+- `bt_diag_menu()`s bisheriger 5.88-Flush (`bxi=rxi` vor Rueckkehr) ist jetzt ueberfluessig und
+  wurde entfernt - der Wurzel-Fix wirkt an der Quelle, unabhaengig davon, wie lange ein
+  Diagnose-Ausflug dauert.
+- Ueberlauf-Recovery fuer `rbuf1` (eigenes `rbuf1_full`-Flag) analog zum 5.83/5.87-Fix ergaenzt
+  (measure.c, neben der bestehenden `rbuf_full`-Pruefung).
+
+**Geaenderte Dateien:** hard.c, hard.h (neue Puffer/Indizes, ISR-Weiche), sio.c, sio.h (neue
+`wait_message1()`), btio.c (Konsumenten umgezogen, siehe oben), measure.c (rbuf1-Ueberlauf-
+Recovery), sprachen/sictxt.c (-> 5.89).
+
+**Am Geraet zu verifizieren (beide Boards, 123456 und 269993):**
+- Boot/Init unveraendert: normaler Start, `init_bluetooth()` erkennt/konfiguriert wie bisher.
+- Der eigentliche Bug weg: BT verbinden (Classic und BLE), PIN eingeben, trennen - RS232 bleibt
+  danach unveraendert stehen, keine Selbstnavigation mehr, `H` funktioniert weiterhin.
+- Event-Sniff unveraendert nuetzlich: zeigt weiterhin die rohen `@E,...`-Events wie bisher.
+- Transfer-Test unveraendert funktionsfaehig: CRC/ACK-Frames werden weiterhin korrekt
+  empfangen/bestaetigt.
+- Nach einem Transfer-Test direkt zu Testmenue 8->1 oder normale Navigation - keine automatische
+  Selbstnavigation/`date_time()`-Ausloesung mehr.
+- GSM/MQTT unbeeinflusst (MUX_GSM-Pfad in der ISR wurde nicht angefasst).

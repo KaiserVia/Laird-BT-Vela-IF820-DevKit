@@ -39,6 +39,7 @@ int (*pchar) (int c)		__noinit;					// Funktionszeiger Zeichenausgabe
 __align(4) flashparameter fp 	__noinit;		// Parameter, die im Flash gesichert werden
 tcap tm									__noinit;					// Messpuffer mit Capture Z�hlerst�nden
 char rbuf[PAGE]					__noinit;					// Allgemeiner Empfangsringpuffer eine Seite
+char rbuf1[PAGE]				__noinit;					// UART1-Command-Mode-Puffer (Protokoll/Status, siehe unten)
 char pbuf[PAGE]					__noinit;					// Empfangsringpuffer f�r Plus Matrix eine Seite
 __align(4) char cbuf[CBUFSIZE] __noinit;	// char Arbeitspuffer (1056+256=1312 Byte)
 uchar probuf[FLASHKGV]	__noinit;					// Puffer Protokolldaten
@@ -124,6 +125,15 @@ uchar btmode						__noinit;					// BLE=48 oder SPP=47 Profil aktiv?
 volatile uchar rxi=0;						// Empfangsindex UART Empfangspuffer
 volatile uchar bxi=0;						// Bearbeitungsindex UART Empfangspuffer
 volatile uchar rbuf_full=0;			// 0 wenn UART Empfangspuffer leer
+// FIX (5.89): UART1-Protokoll-/Statusbytes (Command-Mode: Boot-Meldungen, /PING-Antworten,
+// Connect-/Disconnect-Events) sollen nie mehr im menue-lesenden rbuf landen, unabhaengig vom
+// Timing (bisherige Flush-Fixes an einzelnen Zeitpunkten - 5.79/5.82/5.88 - fingen das nicht
+// zuverlaessig ab, wenn das Modul ueber mehrere Sekunden verteilt nachtraegt). rbuf1 ist das
+// Gegenstueck zu rbuf, ausschliesslich fuer UART1 waehrend NICHT aktiver CYSPP-Datenbruecke -
+// siehe UART1_IRQHandler() (Weiche) und die auf rbuf1 umgezogenen Command-Mode-Helfer in btio.c.
+volatile uchar rxi1=0;						// Empfangsindex rbuf1
+volatile uchar bxi1=0;						// Bearbeitungsindex rbuf1
+volatile uchar rbuf1_full=0;			// 0 wenn rbuf1 leer (analog rbuf_full)
 volatile uchar tmi=0;						// Messindex Messpuffer IF und Phase
 volatile uchar minute=0;				// Minutenwechsel der Echtzeituhr (RTC Interrupt)
 volatile uint msdelay=0;				// Millisekunden Abw�rtsz�hler feeded by Timer 0
@@ -195,19 +205,35 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
  switch (U1->IIR&0x000E)								// Verteile je nach Interruptquelle
  {	
   case 0x0002:	break;												// Kein Puffer leer Sendeinterrupt
-  case 0x0004: 	if ((connect&MQTT_LINK)&&(bpi!=(rpi+1))) 	// MQTTS Verbindung besteht und Platz in Puffer? 								
-								 pbuf[++rpi]=U1->RBR; 										// Zeichen in Empfangspuffer, pr�inkrement	
-								else if (!(connect&MQTT_LINK) && (bxi!=(rxi+1))) // Keine MQTTS Verbindung und Platz in Puffer?
-								{	
+  case 0x0004: 	if ((connect&MQTT_LINK)&&(bpi!=(rpi+1))) 	// MQTTS Verbindung besteht und Platz in Puffer?
+								 pbuf[++rpi]=U1->RBR; 										// Zeichen in Empfangspuffer, pr�inkrement
+								// FIX (5.89): IF820, aber CYSPP-Datenbruecke NICHT aktiv (Command-Mode: Boot-
+								// Meldungen, /PING-Antworten, Connect-/Disconnect-Events) -> eigener Puffer
+								// rbuf1, damit diese Bytes NIE bei mainmenu() als Tastatureingabe ankommen -
+								// unabhaengig davon, wie lange das Modul nach einer Trennung noch nachtraegt
+								// (bisherige Flush-Fixes zu festen Zeitpunkten fingen das nicht zuverlaessig
+								// ab). bt_cyspp_out deckt den Sonderfall ab, dass bt_disconnect() bewusst
+								// Command-Mode erzwingt, obwohl connect&BT_LINK noch nicht zurueckgesetzt ist.
+								// Nur fuer IF820 (fp.btmodem==IF820): bei Laird/RN4678 ist die BT_LINK-Leitung
+								// ein reiner Status-Ausgang des Moduls, kein bidirektionaler CYSPP-Datenpin -
+								// dort bleibt alles beim bisherigen Verhalten (rbuf), unveraendert.
+								else if ((uart1_owner==MUX_BT) && (fp.btmodem==IF820) &&
+								         !((connect&BT_LINK) && !bt_cyspp_out))
+								{
+								 if (bxi1!=(rxi1+1)) { rbuf1[++rxi1]=U1->RBR; bt_time=BT_TIMEOUT; }
+								 else { rbuf1_full=1; NVIC_DisableIRQ(UART1_IRQn); }
+								}
+								else if (!(connect&MQTT_LINK) && (bxi!=(rxi+1))) // BT gebrueckt, oder GSM (nicht MQTT)
+								{
 								 rbuf[++rxi]=U1->RBR; 		// Sonst Zeichen in Empfangspuffer, pr�inkrement
-								 bt_time=BT_TIMEOUT;			// Reset Bluetooth Verbindungstimeout	
-								}	
-								else											// Ringpufferindizes vor �berlauf? 
+								 bt_time=BT_TIMEOUT;			// Reset Bluetooth Verbindungstimeout
+								}
+								else											// Ringpufferindizes vor �berlauf?
 								{													// I. d. F. solange U1->RBR ungelesen RTS=High -> Empfangsstop
 								 rbuf_full=1;										// Puffer voll Flag setzen
 								 NVIC_DisableIRQ(UART1_IRQn);		// Disable UART1 Interrupt
-								} 
-								break;		
+								}
+								break;
   default: 		c=U1->LSR;	 							// Dummy read Rx Fehlerstatus  
  }
 }

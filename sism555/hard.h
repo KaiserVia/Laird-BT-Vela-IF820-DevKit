@@ -477,9 +477,12 @@ extern uchar comstate;								// Status Datenschnittstellen an IC54 Expander
 extern bool plustrans;								// 1 wenn transparenter Datentransfer Plus Matrix controller
 // *** Uart-Ein/Ausgabe/Pufferindizes ***
 extern int (*pchar)(int c); 					// Funktionszeiger auf Routine Zeichenausgabe			
-extern volatile uchar rxi;						// Empfangsindex UART Empfangspuffer			
+extern volatile uchar rxi;						// Empfangsindex UART Empfangspuffer
 extern volatile uchar bxi;						// Bearbeitungsindex UART Empfangspuffer
 extern volatile uchar rbuf_full;			// 0 wenn UART Empfangspuffer leer
+extern volatile uchar rxi1;					// Empfangsindex rbuf1 (UART1 Command-Mode, siehe 5.89)
+extern volatile uchar bxi1;					// Bearbeitungsindex rbuf1
+extern volatile uchar rbuf1_full;		// 0 wenn rbuf1 leer
 extern volatile uchar rpi;						// Empfangsindex Empfangsringpuffer MQTT und Plus Kommunikation
 extern volatile uchar bpi;						// Bearbeitungsindex Empfangsringpuffer MQTT und Plus Kommunikation
 extern ushort cind;										// Index Char Zeichenpuffer
@@ -576,6 +579,7 @@ extern uchar btmode;									// BLE=48 oder SPP=47 Profil aktiv?
 extern char cbuf[CBUFSIZE];					// Char Arbeitspuffer (1056+256=1312 Byte)
 extern char wcbuf[16];							// Char Arbeitspuffer
 extern char rbuf[PAGE];							// Allgemeiner UART Zeichen Empfangsringpuffer, eine Seite lang
+extern char rbuf1[PAGE];							// UART1 Command-Mode-Puffer (Protokoll/Status, siehe 5.89)
 extern char pbuf[PAGE];							// Empfangsringpuffer f�r Plus Matrix eine Seite
 extern uchar flbuf[FBUFSIZE];				// uchar Arbeitspuffer u. a. f�r flash und i2c transfers
 extern uchar probuf[FLASHKGV];			// Puffer Protokolldaten
