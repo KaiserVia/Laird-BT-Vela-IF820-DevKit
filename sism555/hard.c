@@ -214,10 +214,13 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
 								// (bisherige Flush-Fixes zu festen Zeitpunkten fingen das nicht zuverlaessig
 								// ab). bt_cyspp_out deckt den Sonderfall ab, dass bt_disconnect() bewusst
 								// Command-Mode erzwingt, obwohl connect&BT_LINK noch nicht zurueckgesetzt ist.
-								// Nur fuer IF820 (fp.btmodem==IF820): bei Laird/RN4678 ist die BT_LINK-Leitung
-								// ein reiner Status-Ausgang des Moduls, kein bidirektionaler CYSPP-Datenpin -
-								// dort bleibt alles beim bisherigen Verhalten (rbuf), unveraendert.
-								else if ((uart1_owner==MUX_BT) && (fp.btmodem==IF820) &&
+								// FIX: nicht auf fp.btmodem==IF820 pruefen - waehrend der allerersten
+								// Erkennung (bt_scan_ping() etc.) ist fp.btmodem noch 0 (unbekannt), nicht
+								// IF820 (wird erst NACH erfolgreicher Erkennung gesetzt) - sonst wuerde die
+								// Erkennungsphase selbst am neuen Puffer vorbeilesen. Bei Laird/RN4678 ist
+								// die BT_LINK-Leitung ein reiner Status-Ausgang, kein bidirektionaler
+								// CYSPP-Datenpin - dort (und nur dort) bleibt alles unveraendert bei rbuf.
+								else if ((uart1_owner==MUX_BT) && (fp.btmodem!=Laird) && (fp.btmodem!=Roving) &&
 								         !((connect&BT_LINK) && !bt_cyspp_out))
 								{
 								 if (bxi1!=(rxi1+1)) { rbuf1[++rxi1]=U1->RBR; bt_time=BT_TIMEOUT; }

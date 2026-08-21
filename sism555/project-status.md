@@ -3318,3 +3318,33 @@ Recovery), sprachen/sictxt.c (-> 5.89).
 - Nach einem Transfer-Test direkt zu Testmenue 8->1 oder normale Navigation - keine automatische
   Selbstnavigation/`date_time()`-Ausloesung mehr.
 - GSM/MQTT unbeeinflusst (MUX_GSM-Pfad in der ISR wurde nicht angefasst).
+
+## Update 5.90: FIX Bedingung in 5.89 - fp.btmodem==IF820 erst NACH Erkennung gesetzt
+
+**Symptom (Anwender-Log direkt nach 5.89):** Waehrend der Werksinit-Assistent ("Bluetooth
+(j/n)?y") das Modul konfigurierte, erschien wirres Bild aus erkennbaren Text-Fragmenten
+("/PING", "Bluetooth Laird: 460800", "AT&F1", "$$$") und rohen Binaerbytes untereinander
+gemischt - sah nach kaputtem/inkonsistentem Zustand aus.
+
+**Ursache (eigener Bug in 5.89):** Die ISR-Weiche (hard.c) hat auf `fp.btmodem==IF820` geprueft,
+um Laird/RN4678 unangetastet zu lassen. Problem: `fp.btmodem` ist waehrend der ALLERERSTEN
+Erkennung (bt_scan_ping() usw., ganz am Anfang von init_bluetooth()) noch `0` (unbekannt) - IF820
+wird als Wert erst NACH erfolgreicher Erkennung gesetzt. Die migrierten Konsumenten
+(bt_scan_ping(), bt_query_show(), bt_command() waehrend der Erkennung) lasen also bereits aus
+rbuf1, waehrend die ISR die eingehenden Bytes zu diesem Zeitpunkt (fp.btmodem noch 0, nicht
+IF820) weiterhin nach rbuf schrieb - Erkennung/Konfiguration lief dadurch komplett an den
+tatsaechlichen Modul-Antworten vorbei, mit den beobachteten Folgeerscheinungen.
+
+**Fix (hard.c):** Bedingung von `fp.btmodem==IF820` auf `fp.btmodem!=Laird &&
+fp.btmodem!=Roving` geaendert - deckt sowohl den Erkennungszustand (0, unbekannt) als auch
+bestaetigtes IF820 (82) korrekt ab. Nur bei bestaetigtem Laird/RN4678 bleibt alles beim alten
+Verhalten (rbuf), wie eigentlich beabsichtigt.
+
+**Geaenderte Dateien:** hard.c, sprachen/sictxt.c (-> 5.90).
+
+**Wichtig fuer den Anwender:** Die im Log sichtbare wirre Ausgabe war hoechstwahrscheinlich
+dieser Software-Bug (Erkennung/Konfiguration lesen am falschen Puffer vorbei), keine dauerhafte
+Hardware-Beschaedigung des Moduls - vergleichbar mit den bereits mehrfach beobachteten
+"Modul reagiert nicht mehr"-Faellen dieser Session, die durchgehend per Power-Cycle behoben
+werden konnten. Am Geraet zu verifizieren: 5.90 flashen, Power-Cycle, Werksinit/Bluetooth-Setup
+erneut durchlaufen - sollte jetzt sauber ablaufen wie vor 5.89.
