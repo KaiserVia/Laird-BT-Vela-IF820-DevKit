@@ -530,11 +530,19 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
 // kehrt sofort zurueck, bt_sniff_poll() (aus measure.c's Hauptschleife, einmal je Durchlauf)
 // liest non-blocking nach und gibt am RS232-Terminal aus. Kein osDelay(), kein Blockieren -
 // das Hauptmenue bleibt waehrend der gesamten 180s normal bedienbar.
-// FIX (5.89): sniff_i verfolgt jetzt rxi1 (rbuf1, UART1-Command-Mode-Puffer) statt rxi -
-// das ist ohnehin genau der Puffer, in dem die interessanten @E,.../@R,...-Ereignisse landen
-// (die treten per Definition nur auf, waehrend die CYSPP-Bruecke NICHT aktiv ist).
+// FIX (5.89): Sniff liest aus rbuf1 (UART1-Command-Mode-Puffer) - das ist ohnehin genau der
+// Puffer, in dem die interessanten @E,.../@R,...-Ereignisse landen (die treten per Definition
+// nur auf, waehrend die CYSPP-Bruecke NICHT aktiv ist).
+// FIX (5.92): KEIN eigener Leseindex mehr (fruehere sniff_i) - der war vom eigentlichen
+// Ueberlauf-/Wiederfreigabe-Mechanismus (bxi1, siehe UART1_IRQHandler/measure.c) komplett
+// entkoppelt. Die 5.91-Ergaenzung ("rbuf1 immer leeren") hielt dadurch nur sniff_i aktuell,
+// NICHT bxi1 - der Puffer konnte aus bxi1s Sicht trotzdem volllaufen und den UART1-Interrupt
+// dauerhaft abschalten (genau das vom Anwender wiederholt beobachtete "Modul antwortet auf
+// KEINER Baudrate mehr" - kein Hardware-Defekt, sondern unser eigener abgeschalteter
+// Empfangsinterrupt). Fix: bt_sniff_poll() liest jetzt ueber bxi1 - denselben Index, den auch
+// bt_command() und die Ueberlauf-Wiederfreigabe in measure.c benutzen. Nur EIN Verbraucher-
+// Index fuer rbuf1, konsistent mit der Ueberlauflogik.
 static bool sniff_active=FALSE;
-static uchar sniff_i;                         // eigener Leseindex in rbuf1 (Command-Mode-Puffer)
 static uint sniff_t0;                         // Startzeitpunkt (mstimer) fuer Dauer und Zeitstempel
 static bool sniff_bol;                        // Zeilenanfang (fuer Zeitstempel je Zeile)
 #define SNIFF_DURATION_MS  180000UL           // 180s, deckt einen kompletten "--runs 3"-Durchlauf
@@ -548,7 +556,7 @@ void bt_event_sniff (void)
                                                // wie bei send_bt_info() - MUX schaltet auf BT)
  putln("Event-Sniff (Hintergrund): rohe Modul-Ausgabe, laeuft 180s im Hintergrund mit - Hauptmenue");
  putln("bleibt normal bedienbar. Jetzt BLE/Classic verbinden.");
- sniff_i=rxi1;                                // sauberer Start, alte Reste ignorieren (rbuf1)
+ bxi1=rxi1;                                   // sauberer Start, alte Reste ignorieren (rbuf1)
  sniff_t0=mstimer;
  sniff_bol=TRUE;
  sniff_active=TRUE;
@@ -556,24 +564,26 @@ void bt_event_sniff (void)
 
 // Non-blocking nachlesen - einmal je Hauptschleifendurchlauf aus measure.c aufgerufen.
 // Beruehrt bxi/rbuf-Verbrauch NICHT, daher voellig unabhaengig von mainmenu()/PIN-Abfrage.
-// FIX (5.89-Ergaenzung): rbuf1 (UART1-Command-Mode-Puffer) wird sonst NUR bei aktivem
-// Event-Sniff bzw. waehrend eines bt_command()-Aufrufs geleert - im normalen Betrieb (kein
-// Sniff aktiv, kein Kommando gerade unterwegs) liest NIEMAND rbuf1, er kann volllaufen und
-// den UART1-Interrupt dauerhaft abschalten (bxi1==rxi1 wird ja nie erreicht, da nichts mehr
-// aus bxi1 liest - die bestehende Wiederfreigabe in measure.c greift dann nie). Deshalb wird
-// rbuf1 jetzt IMMER geleert (sniff_i folgt rxi1 auch ohne aktiven Sniff) - nur die Anzeige mit
+// FIX (5.89-Ergaenzung, 5.92-Korrektur): rbuf1 (UART1-Command-Mode-Puffer) wird sonst NUR bei
+// aktivem Event-Sniff bzw. waehrend eines bt_command()-Aufrufs geleert - im normalen Betrieb
+// (kein Sniff aktiv, kein Kommando gerade unterwegs) liest NIEMAND rbuf1, er kann volllaufen und
+// den UART1-Interrupt dauerhaft abschalten. Deshalb wird rbuf1 jetzt IMMER geleert - und zwar
+// ueber bxi1, denselben Index, den auch bt_command() und die Ueberlauf-Wiederfreigabe in
+// measure.c benutzen (5.91 hatte faelschlich einen SEPARATEN Index sniff_i aktuell gehalten,
+// der mit der eigentlichen Ueberlauflogik gar nichts zu tun hatte - rbuf1 konnte aus bxi1s Sicht
+// trotzdem volllaufen und den UART1-Empfang dauerhaft lahmlegen). Nur die Anzeige mit
 // Zeitstempel ist an sniff_active gebunden, das Leeren selbst nicht mehr.
 void bt_sniff_poll (void)
 {
  char c; uchar cc;
- if (sniff_i!=rxi1)
+ if (bxi1!=rxi1)
  {
   if (sniff_active)
   {
    cc=connect; connect=concpy & ~UART1;        // Ausgabe nur ans Terminal, nichts zurueck ans Modul
-   while (sniff_i!=rxi1)
+   while (bxi1!=rxi1)
    {
-    c = rbuf1[(uchar)(sniff_i+1)]; sniff_i++;
+    c = rbuf1[++bxi1];
     if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
     if (sniff_bol) { putc('['); putnumber(mstimer-sniff_t0,0); putstr("ms] "); sniff_bol=FALSE; }
     putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
@@ -581,7 +591,7 @@ void bt_sniff_poll (void)
    }
    connect=cc;
   }
-  else sniff_i=rxi1;                            // kein Sniff aktiv -> nur leeren, nichts anzeigen
+  else bxi1=rxi1;                               // kein Sniff aktiv -> nur leeren, nichts anzeigen
  }
  if (!sniff_active) return;
  if ((uint)(mstimer-sniff_t0)>=SNIFF_DURATION_MS)

@@ -168,6 +168,26 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   5.81, Selbstnavigation beim Trennen 5.82, UART-Puffer-Recovery 5.83, Reboot-Verify-Timing 5.85)
   bleiben trotzdem gueltige, eigenstaendige Verbesserungen - sie haben nur nicht den 40s-Haenger
   selbst verursacht/behoben, da der auf einem defekten Board sitzt.
+  **Nachtrag (2026-08-20) - derselbe "Modul antwortet gar nicht mehr"-Ausfall auch auf Board
+  269993 beobachtet** (bisher als gesund geltendes Board, nicht 269996): nach mehreren
+  BT-Classic-Verbindungszyklen hintereinander (5. Versuch) reagierte das Modul auf `/PING` auf
+  KEINER Baudrate mehr (voller Scan durchprobiert). CYSPP-Monitor zeigte dabei `bit7 = HIGH`
+  (Modul selbst meldet "nicht verbunden" - anderes Bild als der LOW-Split-Brain bei 269996, aber
+  gleiches Endergebnis: Modul stumm). Nur langer Stromlos-Power-Cycle hat geholfen, danach lief
+  alles wieder normal (volle Erkennung + Konfiguration erfolgreich, PIN-Eingabe sauber auf
+  RS232 UND BT-Terminal sichtbar).
+  **KORREKTUR (2026-08-20, noch am selben Tag):** Die obige Einschaetzung "kein Zusammenhang mit
+  den 5.89-5.91-Puffer-Aenderungen" war falsch und zu voreilig. Ursache gefunden und in 5.92
+  behoben (siehe project-status.md, Update 5.92): die 5.91-Ergaenzung hielt einen Diagnose-Index
+  (`sniff_i`) aktuell, der mit der eigentlichen Ueberlauf-/Interrupt-Wiederfreigabe-Logik (haengt
+  an `bxi1`) nichts zu tun hatte - der neue Command-Mode-Puffer `rbuf1` konnte aus `bxi1`s Sicht
+  nach ein paar BT-Verbindungszyklen trotzdem volllaufen und den UART1-Empfangsinterrupt
+  dauerhaft abschalten. **Das Modul war nicht wirklich tot - unsere eigene Firmware hatte sich
+  selbst taub gemacht.** Mit 5.92 (ein gemeinsamer Index `bxi1` fuer `rbuf1`) behoben. Der
+  AELTERE, vor der CYSPP-Investigation dokumentierte "Modul faellt gelegentlich aus"-Punkt
+  (RST_L/Power-Cycle) bleibt als eigenstaendiges, ungeklaertes Thema bestehen - aber zumindest
+  die heute wiederholt reproduzierten Faelle waren dieser eigene 5.89-5.91-Bug, kein Hardware-
+  Defekt.
 - **Aufraeumen (bewusst temporaerer Diagnose-Code):** `bt_transfer_echo()`, `crc32_calc()`,
   `bt_send_ack()` (btio.c/.h) und Testmenue-Punkt 8→3 sind reiner Diagnose-Code fuer die
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`

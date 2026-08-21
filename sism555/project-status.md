@@ -3373,3 +3373,43 @@ an `sniff_active` gebunden. Damit kann `rbuf1` im Normalbetrieb praktisch nie me
 **Am Geraet zu verifizieren:** Laengeren Datentransfer ueber BT (Datenausgabe/XMODEM oder der
 40kb-BLE-Transfer-Test) durchlaufen lassen - RS232 bleibt danach normal bedienbar, kein
 Datenmuell/Absturz mehr.
+
+## Update 5.92: FIX 5.91-Ergaenzung leerte den FALSCHEN Index - Modul wirkte "komplett tot"
+
+**Symptom (Anwender-Log, nach 5.91):** Nach 3-5 aufeinanderfolgenden BT-Classic-Verbindungs-
+zyklen (verbinden, PIN eingeben, trennen, wiederholen) blieb irgendwann die PIN-Abfrage leer
+(keine Sterne mehr), und ein anschliessender Werksinit-Bluetooth-Schritt fand das Modul auf
+KEINER Baudrate mehr (`/PING` scheiterte komplett, alle 6 getesteten Baudraten). Sah aus wie
+der bereits dokumentierte "Modul faellt komplett aus"-Hardwarefall - trat aber jetzt mehrfach
+reproduzierbar nach wenigen Verbindungszyklen auf, nicht mehr zufaellig.
+
+**Ursache (eigener Bug, Fortsetzung von 5.89/5.91):** Die 5.91-Ergaenzung liess `bt_sniff_poll()`
+zwar staendig einen Index (`sniff_i`) auf dem Laufenden halten - aber das ist NICHT derselbe
+Index, an dem die Ueberlauf-/Wiederfreigabe-Logik (`rbuf1_full`/`NVIC_DisableIRQ`, siehe
+`UART1_IRQHandler()` und die Wiederfreigabe in `measure.c`) haengt. Diese haengt an `bxi1` - dem
+Index, den `bt_command()` benutzt. `sniff_i` und `bxi1` liefen also komplett unabhaengig
+nebeneinander her: `sniff_i` wurde brav aktuell gehalten, `bxi1` aber nur, wenn gerade explizit
+ein `bt_command()`-Aufruf lief. Zwischen zwei BT-Verbindungszyklen (kein Kommando unterwegs,
+Event-Sniff meist auch nicht aktiv) blieb `bxi1` also liegen, waehrend `rxi1` weiter durch
+Boot-/Connect-/Disconnect-Ereignisse anwuchs - der Puffer lief aus `bxi1`s Sicht nach ein paar
+Zyklen voll, schaltete den UART1-Empfangsinterrupt dauerhaft ab: **das Modul war nicht wirklich
+tot, unsere eigene Firmware hatte sich selbst taub gemacht.**
+
+**Fix (btio.c):** `sniff_i` als eigenstaendiger Index komplett entfernt. Event-Sniff/
+`bt_sniff_poll()` benutzt jetzt denselben Index (`bxi1`) wie `bt_command()` - nur EIN
+Verbraucher-Index fuer `rbuf1`, konsistent mit der Ueberlauflogik. Kein Konflikt zwischen beiden
+Nutzern, da sie nie gleichzeitig laufen (einzelner Ausfuehrungsthread).
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.92).
+
+**Wichtig fuer die Einordnung:** Die vorherige Einschaetzung, das beobachtete "Modul-Aussetzen"
+sei ein allgemeines, nicht mit den heutigen Puffer-Aenderungen zusammenhaengendes Hardware-/
+Modul-Thema (siehe CLAUDE.md-Nachtrag vom 20.08.), war zu voreilig - zumindest ein erheblicher
+Teil der reproduzierten Faelle heute war tatsaechlich dieser eigene Bug, nicht das Modul selbst.
+Der aeltere, seit laengerem dokumentierte "Modul faellt gelegentlich aus"-Punkt (vor dem
+CYSPP-Investigations-Zeitraum) bleibt als eigenstaendiges, moeglicherweise verwandtes Thema
+bestehen, ist damit aber nicht abschliessend geklaert.
+
+**Am Geraet zu verifizieren:** Mehrfach (5-10x) hintereinander BT verbinden/trennen (Classic UND
+BLE) - kein Ausfall/keine "Modul tot"-Situation mehr, unabhaengig davon ob Event-Sniff dabei
+aktiv war oder nicht.
