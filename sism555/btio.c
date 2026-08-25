@@ -1002,7 +1002,11 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
     bt_reboot();                        // Reboot: F=01 aus Flash, Classic-Name live (wartet auf Boot)
     cts_bypass=0;
     { uchar v; result=0;               // Modul braucht nach Reboot Anlaufzeit -> mehrere Versuche
-      for (v=0; v<4 && !result; v++)
+      for (v=0; v<8 && !result; v++)    // FIX (5.94): 4->8 Versuche (verdoppelt), da ein frisches
+                                        // Werksmodul beim ALLERERSTEN Reboot (Name+CoD+Advertising+
+                                        // Paketierung+Security in einem Zug neu ins Modulflash
+                                        // geschrieben) laenger braucht als ein Reboot mit weniger
+                                        // Aenderungen (siehe F11018 auf einem brandneuen Board)
       { Init_BT_ch(IF820_BAUD); bt_command(T_CR,T_pingok,-60);
         result=bt_command(T_ping,T_pingok,300);
         if (!result) { bt_msg("   waiting for module after reboot..."); osDelay(400); } }

@@ -3477,3 +3477,37 @@ Aenderung noetig.
 Selbstnavigation; Laird/RN4678-Pfad ist auf diesem Board nicht real testbar (kein solches Modul
 verbaut) - Aenderung ist eine reine Konsistenzkorrektur anhand der ISR-Logik, kein Verhaltens-
 wechsel fuer den aktuell verwendeten IF820.
+
+## Update 5.94: FIX F11018 auf brandneuem Board - Reboot-Verify-Budget nach Werksinit verdoppelt
+
+**Symptom (Anwenderlog, erstes Flashen von 5.93 auf ein NEUES, unkonfiguriertes Board):**
+`init_bluetooth()` erkannte das IF820 korrekt als Werksmodul ("Detection: baud scan without CTS
+(factory module)"), konfigurierte es vollstaendig neu (Name, Class-of-Device, Advertising,
+CYSPP-Paketierung, Just-Works-Security - ALLE Schritte 3/3b/3c/3d/3e/3f liefen, da beim
+allerersten Init naturgemaess nichts schon passt), sendete `/RBT` - und danach antwortete
+`/PING` trotz 4 Versuchen (mit 400 ms Wartezeit dazwischen, siehe unten) nicht mehr:
+`F11018 Reboot-Verifikation fehlgeschlagen`.
+
+**Ursache:** kein Software-Fehler in 5.93 (die dortigen Aenderungen betreffen ausschliesslich
+Puffer-Routing, nicht diese Stelle) - vermutlich schlicht ein zu knappes Zeitbudget fuer DIESEN
+Sonderfall. Die Retry-Schleife in `init_bluetooth()` (btio.c, Schritt 4 nach `/RBT`) ist fuer den
+Normalfall ausgelegt (nur wenige Einstellungen geaendert, kurzer Reboot) - bei einem
+brandneuen Modul, das beim allerersten Reboot ALLE genannten Einstellungen zum ersten Mal
+dauerhaft ins Modul-Flash schreibt/uebernimmt, kann der eigentliche Neustart laenger dauern als
+die bisherigen ca. 4 x (300 ms Ping-Timeout + 400 ms Pause) ≈ 2,8 s Gesamtbudget.
+
+**Fix (btio.c):** Retry-Anzahl in der Post-`/RBT`-Verifikationsschleife von 4 auf 8 verdoppelt
+(Zeilenkommentar bei der Schleife) - verdoppelt das Gesamtzeitbudget auf ca. 5,6 s, ohne die
+Abfragefrequenz (400 ms) selbst zu aendern. Reine Wartezeit-Anpassung, keine Logikaenderung.
+
+**Noch offen:** ob ein einziges Mal (dieses eine neue Board) reicht, um die Ursache sicher als
+"knappes Zeitbudget" statt eines anderen, selteneren Problems zu bestaetigen, ist mit einer
+einzigen Beobachtung nicht endgueltig zu sagen - falls `F11018` auf einem NEUEN Board mit dieser
+Aenderung erneut auftritt, ist das ein Hinweis auf eine andere/zusaetzliche Ursache statt reiner
+Zeitknappheit.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.94).
+
+**Am Geraet zu verifizieren:** ein weiteres neues/werksfrisches Board erstmalig flashen und
+booten lassen - Werksinit sollte jetzt auch bei einem besonders langen ersten Reboot ohne
+`F11018` durchlaufen.
