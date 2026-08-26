@@ -51,6 +51,12 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 - Phase 0 (Bring-up / `/PING`-Lebenszeichen) **erreicht**.
 - SPP-Datenmodus + Menü über Bluetooth Classic **funktioniert** (Meilenstein 5.92).
+- **2026-08-26: Umfassend end-to-end bestätigt** (`sism555/project-status.md`, Update
+  "Umfassender End-to-End-Testlauf"): 24 Connect/Disconnect-Zyklen (Classic+BLE, Haltezeiten
+  0–300 s) ohne Aussetzer, plus 3× echter Ymodem-Produktionsdownload (4,2 MB) je Transport
+  fehlerfrei (bis auf einen einmaligen, nicht reproduzierten Classic-Ausreißer). Ein zuvor auf
+  einem neuen Board aufgetretenes "nicht sichtbar beim Pairing"-Problem wurde vom Anwender per
+  Hardware-Maßnahme behoben (Details noch nicht dokumentiert).
 - Gerätename BLE + Classic einheitlich `VIASIS_<serno>`.
 - Zugangsschutz über bestehende **App-Layer-PIN** (kein BT-Passkey).
 - BT-Baud fix über `#define IF820_BAUD 460800` in `btio.h` (921600 verworfen — HW-Limit LPC1766).

@@ -3511,3 +3511,85 @@ Zeitknappheit.
 **Am Geraet zu verifizieren:** ein weiteres neues/werksfrisches Board erstmalig flashen und
 booten lassen - Werksinit sollte jetzt auch bei einem besonders langen ersten Reboot ohne
 `F11018` durchlaufen.
+
+## Update: Modul nicht beim Pairing sichtbar - per Hardware-Massnahme behoben (2026-08-26)
+
+**Symptom (dasselbe neue Board wie oben, nach erfolgreichem 5.94-Boot ohne F11018):** Modul
+liess sich weiterhin ganz normal per RS232/UART konfigurieren und ansprechen (Werksinit,
+`/PING`, `/QFV` usw. liefen einwandfrei) - erschien aber beim Bluetooth-Pairing (Classic wie
+BLE) auf keinem Endgeraet. Da UART-Kommandobetrieb komplett unabhaengig vom HF-/Antennenpfad
+ist, deutete das von Anfang an auf ein Problem NACH der digitalen Konfiguration (Advertising-
+Ebene, Rollen-Pin oder HF-Pfad), nicht auf einen Software-/Konfigurationsfehler.
+
+**Untersuchte Kandidaten (Diagnose per Schaltplan, ohne Platinenzugriff von hier aus):**
+- `CP_ROLE` (LOW=Central, HIGH=Peripheral, laut `IF820_EZSerial_Konzept_Mapping.md` am Mainboard
+  *"nicht verdrahtet"*, kein bestaetigter interner Pull-up wie bei `LP_MODE`) - potenziell
+  board-abhaengig schwankender Logikpegel, der das Modul faelschlich in die Central-Rolle
+  (Scannen statt Advertising) haette kippen lassen koennen. Ueber einen vom Anwender geteilten
+  Schaltplanausschnitt geprueft; die zunaechst vermutete Pin-Zuordnung (`P32`) stellte sich als
+  reine manuelle Markierung des Anwenders heraus, nicht als tatsaechliche Schaltungsbesonderheit
+  - die Pin-Zuordnung von `CP_ROLE` auf dieser Modulvariante (`453-00171R`) bleibt offen, da die
+  entsprechende Datenblatt-Pin-Funktionstabelle hier nicht renderbar war (kein PDF-Tooling in
+  dieser Session).
+- `VDDIO`/`3P0V`-Entkopplung (`C128`/`C58`, siehe HW_Massnahmen_Bewertung_2026-08.md) - als
+  moeglicher Kandidat besprochen, aber nicht der schnellste/naheliegendste erste Check (RF-Pfad-
+  Instabilitaet unter TX-Bursten waere die Wirkkette).
+
+**Fix:** vom Anwender eigenstaendig durch eine Hardware-Massnahme direkt am Board behoben - die
+genaue Massnahme wurde in dieser Session nicht im Detail mitgeteilt (nur "mit Hardware-
+Aenderungen geloest, Modul laeuft jetzt"). Sollte spaeter dokumentiert werden, welche
+Aenderung es konkret war (Pull-up auf `CP_ROLE`? Entkopplung ergaenzt? Antennen-/Loetstelle
+korrigiert?), damit diese Board-Serie kuenftig direkt richtig bestueckt werden kann.
+
+## Update: Umfassender End-to-End-Testlauf nach dem HW-Fix (2026-08-26) - Modul vollstaendig bestaetigt funktionsfaehig
+
+Nach der Hardware-Korrektur (siehe oben) hat der Anwender einen erweiterten, automatisierten
+Testlauf (`Doku/tools/ble_mainboard_test.py`, Modus `module-suite` - die Skriptdatei wurde
+zwischen den Sessions erheblich ausgebaut: native Windows-Classic-BT-Inquiry per `ctypes`/
+`BluetoothAPIs.dll`, PIN-Prompt-bewusster Smoke-Test, HTML/JSON-Suite-Report - Erweiterung liegt
+noch uncommitted im Arbeitsverzeichnis) auf dem reparierten Board gefahren:
+
+| Phase | Transport | Ergebnis | Dauer | Details |
+| --- | --- | --- | ---: | --- |
+| Classic Smoke | Classic | passed | 51.9 s | |
+| Classic Verbindung (12 Zyklen, Haltezeiten 0-300 s) | Classic | passed | 1016.1 s | 12/12 Zyklen, PIN/Menue jedes Mal ok |
+| BLE Smoke | BLE | passed | 11.7 s | |
+| BLE Verbindung (12 Zyklen, Haltezeiten 0-300 s) | BLE | passed | 1063.6 s | 12/12 Zyklen, PIN/Menue jedes Mal ok |
+| Flash schreiben (419430 Test-Messwerte) | - | passed | 163.1 s | |
+| Classic Download 1/3 | Classic | passed | 603.6 s | 4.199.424 Byte / 4101 Bloecke, 7024 B/s, 17 Retries |
+| Classic Download 2/3 | Classic | **failed** | 8.3 s | "PIN-Prompt nicht gesehen" - einmaliger Ausreisser, siehe unten |
+| Classic Download 3/3 | Classic | passed | 578.4 s | 4.199.424 Byte / 4101 Bloecke, 7289 B/s, 8 Retries |
+| BLE Download 1/3 | BLE | passed | 638.1 s | 4.199.424 Byte / 4101 Bloecke, 6639 B/s, 0 Retries |
+| BLE Download 2/3 | BLE | passed | 687.2 s | 4.199.424 Byte / 4101 Bloecke, 6184 B/s, 0 Retries |
+| BLE Download 3/3 | BLE | passed | 649.2 s | 4.199.424 Byte / 4101 Bloecke, 6537 B/s, 0 Retries |
+
+**Gesamtergebnis der Suite:** `failed` (wegen des einen Ausreissers Classic Download 2/3), aber
+10 von 11 Phasen liefen einwandfrei durch - inklusive drei vollstaendiger, echter Ymodem-
+Downloads von je 4,2 MB je Transport (nicht nur der kleine 40-kB-Diagnose-Transfer-Test).
+
+**Einordnung des einen Fehlschlags:** "Classic Download 2/3" brach nach nur 8,3 s mit "PIN-Prompt
+nicht gesehen" ab - direkt zwischen zwei erfolgreichen Classic-Downloads (1/3 und 3/3 liefen
+beide einwandfrei durch). Sieht nach einem einmaligen COM-Port-/Windows-SPP-Reconnect-Timing-
+Problem aus (aehnlich den bereits dokumentierten Windows-Classic-Eigenheiten, siehe "Split-Brain"-
+Absatz weiter oben), nicht nach einem reproduzierbaren Firmware- oder Navigationsfehler - wird
+aber nicht ohne Wiederholung als endgueltig geklaert betrachtet.
+
+**Bedeutung fuer 5.89-5.94:**
+- Bestaetigt die gesamte dual-Puffer-UART1-Architektur (5.89-5.93) und das verdoppelte Reboot-
+  Verify-Budget (5.94) als stabil unter echtem, wiederholtem Dauerbetrieb: 24 Connect/Disconnect-
+  Zyklen (12x Classic + 12x BLE) mit Haltezeiten bis 5 Minuten, ohne einen einzigen Fall von
+  Selbstnavigation, PIN-Endlosschleife oder haengengebliebenem UART1-Interrupt.
+- Bestaetigt erstmals den ECHTEN Produktions-Downloadpfad (`send_vtf_file()`/Ymodem, nicht nur
+  den Diagnose-Transfer-Test) Ende-zu-Ende ueber beide Transporte, inklusive einer sehr grossen
+  Datenmenge (419.430 Messwerte, 4,2 MB) - die im ersten Entwurf des Download-Testmodus (siehe
+  vorheriger Eintrag "ble_mainboard_test.py um BT-Classic + Cycle/Download-Modi erweitert")
+  ausdrueckliche Unsicherheit ("nicht an echter Hardware verifiziert") ist damit ausgeraeumt.
+- Durchsatz-Größenordnung: Classic ~7000-7300 B/s (mit vereinzelten Retries, wie unter realem
+  Bluetooth-Verkehr zu erwarten), BLE ~6200-6640 B/s (durchgehend 0 Retries) - beide deutlich
+  hoeher als der fruehere kleine 40-kB-Referenztransfer, da hier eine echte, große Datei
+  uebertragen wurde.
+
+**Noch offen:** die genaue Hardware-Massnahme, die das Pairing-Problem behoben hat, ist noch
+nicht dokumentiert (siehe Update direkt oberhalb); der eine Classic-Download-Ausreisser sollte
+bei Gelegenheit wiederholt werden, um "einmaliger Reconnect-Glitch" von "seltener aber echter
+Bug" zu unterscheiden.
