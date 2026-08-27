@@ -3593,3 +3593,146 @@ aber nicht ohne Wiederholung als endgueltig geklaert betrachtet.
 nicht dokumentiert (siehe Update direkt oberhalb); der eine Classic-Download-Ausreisser sollte
 bei Gelegenheit wiederholt werden, um "einmaliger Reconnect-Glitch" von "seltener aber echter
 Bug" zu unterscheiden.
+
+## Offener Firmwarefehler: Messdatenexport kann leere Flashseiten bis zum Ringpufferende senden (2026-08-27)
+
+**Reproduktion:** Nach dem Loeschen der Messdaten und dem anschliessenden Erzeugen von 100
+Test-Messwerten wird beim Export ein langer Strom von 1-KiB-Ymodem-Bloecken mit `0xFF` gelesen.
+Der Effekt tritt nicht nur im Python-Testtool auf, sondern auch beim Export mit Viagraph ueber
+RS232. Damit ist er unabhaengig von BLE, Windows-SPP und dem Empfaengerprogramm reproduziert.
+
+**Soll:** 100 Messwerte mit je 10 Byte ergeben zuzuerglich VTF-, Parameter- und
+Protokollbloecken nur wenige Ymodem-Bloecke. Der Export muss danach `EOT` senden.
+
+**Ist:** Die Firmware sendet weitere Flashseiten, obwohl diese geloescht sind. `0xFF` ist dabei
+der Inhalt einer geloeschten Flashzelle; das regulare VTF/Ymodem-Auffuellen verwendet dagegen
+`CPMEOF` (`0x20`). Der Sender wartet vor jedem weiteren Block auf das `ACK` des Empfaengers;
+die grosse Datenmenge entsteht daher auf der Firmwareseite und nicht durch eine Endlosschleife
+des Empfaengers.
+
+**Codeursache:** `messdaten()` berechnet die Anzahl `anzmw` und uebergibt sie an
+`send_vtf_file(anzmw, 1)`. `send_vtf_file()` verwendet `anzwerte` fuer die im Ymodem-Header
+angekuendigte Dateilaenge, begrenzt den eigentlichen Messdatenexport jedoch ausschliesslich
+ueber `fp.md_start_page`, `fp.md_page` und `fp.md_adr`. Stimmen diese Zeiger nicht zum zuvor
+berechneten Zaehlwert, kann der Header eine kleine Datei ankundigen, waehrend die Seiten-Schleife
+einen grossen Bereich geloeschter Seiten uebertraegt.
+
+**Erforderliche Korrektur:** Vor dem Aufbau des Ymodem-Headers einen konsistenten Snapshot von
+Messdatenstart, aktuellem Schreibzeiger und Byteanzahl bilden. Die Exportschleife muss zusaetzlich
+eine feste Restlaenge von `10 * anzwerte` fuehren und nach genau dieser Nutzdatenmenge enden;
+nur der letzte 1-KiB-Block darf mit `CPMEOF` aufgefuellt werden. Headerlaenge und tatsaechlich
+gesendete Nutzdaten verwenden dann dieselbe Momentaufnahme. Danach den Fall
+"loeschen -> 100 schreiben -> Export" sowohl per RS232/Viagraph als auch per Classic und BLE
+gegenpruefen.
+
+## Testlauf 2026-08-26: BLE-Datenkanal per Testsuite belegt + Antwort an die App-Seite
+
+**Kein Versionssprung** - reiner Test-/Doku-Eintrag.
+
+**Testlauf:** `ble_mainboard_test.py --mode module-suite`, Board `26SC9993`, Firmware 5.93.
+Report: `Doku/tools/Testreports/mainboard-module-suite-2026-08-26_11-57-14.json` (+ `.html`).
+
+| Phase | Transport | Ergebnis | Messwerte |
+|---|---|---|---|
+| Classic Smoke | classic | passed | Connect 47,2 s (COM-Port-Aufbau), Banner + PIN + Menue ok |
+| Classic Verbindung | classic | passed | 12/12 Zyklen, Haltezeiten 0...300 s, Connect 45-117 ms |
+| BLE Smoke | ble | passed | Connect 1383 ms, GATT 2 ms, **Subscribe 39 ms**, PIN-Prompt + Menue ok, 8 s gehalten ohne Disconnect |
+| BLE Verbindung | ble | passed | **12/12 Zyklen**, Haltezeiten 0...**300 s**, Connect 3,1-6,1 s, Disconnect 126-133 ms |
+| Flash schreiben | ble | passed | 419430 Messwerte, 163 s |
+| Classic Download 1/3 | classic | passed | 4 199 424 B, 598 s, **7024 B/s**, 17 Retries |
+| Classic Download 2/3 | classic | **failed** | Abbruch nach 8,3 s: "PIN-Prompt nicht gesehen" - siehe unten |
+| Classic Download 3/3 | classic | passed | 4 199 424 B, 576 s, **7289 B/s**, 8 Retries |
+| BLE Download 1-3 | ble | passed | je 4 199 424 B, 632/679/642 s, **6639/6184/6537 B/s**, **Retries 0/0/0** |
+
+**Kernaussage:** Der BLE-CYSPP-Datenkanal ist damit nicht nur "einmal beobachtet funktionierend"
+(Update 5.87 ff.), sondern ueber 12 Verbindungszyklen und 3 x 4,2 MB Nutzdaten belegt - ueber BLE
+sogar fehlerfreier als ueber Classic SPP (0 statt 8-17 Ymodem-Retries). Der von der App-Seite in
+`ble-retest-1-negative.md` gemeldete Fehler ("subscribe ...ca102 ok -> sofort Disconnect") ist
+damit abschliessend widerlegt.
+
+**Der einzige Fehlschlag (`Classic Download 2/3`) ist Classic-only und noch offen:** der Versuch
+startete 9 s nach dem Ende eines 10-minuetigen 4,2-MB-Downloads und sah keinen PIN-Prompt; der
+Wiederholungsversuch 9 s spaeter lief vollstaendig durch. Verdacht: Wiederverbinden zu kurz nach
+einer langen Session (auf Classic-Seite zusaetzlich der Windows-COM-Port-Neuaufbau). Nicht
+weiter untersucht - als Punkt notiert, nicht als Firmware-Bug bestaetigt.
+
+**Nebenbefund im Testskript (kein Firmware-Problem):** In der BLE-Smoke-Phase steht
+`unexpected_disconnect: true`, obwohl `disconnect_reason: hold_time_elapsed_still_connected` und
+`result: passed` gemeldet werden. Ursache: der Bleak-`disconnected_callback` feuert auch bei
+unserem eigenen, gewollten `client.disconnect()` im `finally`-Block, also NACH dem Setzen von
+`result`. Reines Reporting-Artefakt in `ble_mainboard_test.py`; das Feld ist in dieser Phase
+nicht aussagekraeftig. Sollte irgendwann bereinigt werden (Flag erst nach dem gewollten Trennen
+ignorieren), aendert aber nichts am Ergebnis.
+
+**Neues Dokument: `Doku/ble-app-integration-freigabe.md`** - Antwort/Freigabe an die App-Seite.
+Enthaelt: (a) den Nachweis anhand der Zahlen oben, (b) die Richtigstellung zu deren Frage 4
+(der CYSPP-Pin muss hochohmig sein, nicht aktiv LOW - ein gemessenes HIGH beweist nichts),
+(c) eine vollstaendige Integrationsliste mit acht Punkten, die die App einhalten muss:
+nur `...ca102` (notify + writeWithoutResponse), erst nach `PIN = ` senden (Puffer-Flush),
+PIN = 2 erste + 4 letzte Ziffern der Seriennummer, nur Ziffern ohne CR/LF, Textkodierung
+ISO-8859-1 statt UTF-8, Notify-Reassemblierung (20-Byte-Paketierung), Bursts unter 250 B und
+Fluss ueber Geraeteantworten takten, keine Binaerdaten (globale Hotkeys), Connect-Timeout >= 15 s,
+Supervision-Timeout >= 5 s selbst anfordern (Firmware setzt PPCP nicht), kein `stop_notify()`
+vor dem Trennen, Reconnect-Pause, 6-Minuten-Inaktivitaets-Trennung, stille Antwortpausen bei
+GSM/GPS-UART-Uebernahme. Zusaetzlich die Ymodem-Parameter fuer den Datenexport.
+
+## Update 5.95: Diagnose + Sicherheitsnetz fuer "leere Flashseiten"-Export (Root Cause weiter offen)
+
+**Ausgangspunkt:** siehe "Offener Firmwarefehler: Messdatenexport kann leere Flashseiten bis zum
+Ringpufferende senden (2026-08-27)" weiter oben. Board 269992 reproduzierte den Fehler mehrfach
+(3x Loeschen+Schreiben+Export, davon 1x mit Power-Cycle), Board 269990 nicht.
+
+**Root-Cause-Jagd (chronologisch, alle Theorien am Ende WIDERLEGT bzw. nicht abschliessend
+bestaetigt):**
+1. *Fehlende Batterie auf 269992* (269990 hat eine, 269992 hatte urspruenglich keine) - passt
+   zur `md_pg_adr`/GPREG4-Mechanik aus dem `vario245`-Incident (`flash.c` Zeile ~423: bei
+   fehlgeschlagenem Kennung-Read wird `fp.md_start_page` aus der battery-backed GPREG-Kopie
+   rekonstruiert - ohne Batterie ueberlebt das keinen Stromausfall). **Widerlegt:** Batterie
+   nachgeruestet, Fehler blieb identisch reproduzierbar (3x Loeschen+Schreiben+Export, 1x mit
+   Power-Cycle).
+2. *Reiner Code-Bug unabhaengig vom Zustand* (Header-Laenge `anzwerte` vs. tatsaechliche
+   Schleifenbegrenzung `fp.md_start_page`/`fp.md_page` laufen auseinander) - passte zur
+   deterministischen Reproduktion aus (1). **Nicht bestaetigt:** `sicom.c`/`xmodem.c`/`flash.c`/
+   `libtool.c` (inkl. `send_vtf_file()`, `messdaten()`, `md_simulation()`, CRC-Routinen) sind seit
+   Firmware 5.55 (Commit `caab3d2`) funktional UNVERAENDERT - der grosse `libtool.c`-Diff bestand
+   nachweislich nur aus Umlaut-Encoding-Rauschen in Kommentaren, keine Logikaenderung. Ein reiner
+   Code-Bug haette dann auch auf 5.55 auftreten muessen.
+3. **Tatsaechlicher Befund:** Zurueckflashen auf 5.55 behob den Fehler auf 269992 - ABER erneutes
+   Zurueckflashen auf 5.94 behob ihn ebenfalls. Der Fehler ist also weder an eine Firmware-Version
+   noch an eine deterministische Code-Logik gebunden, sondern an einen **persistenten Zustand**
+   (vermutlich `fp.md_start_page`/`md_pg_adr` bzw. der Parameterblock-Kennung-Abgleich in
+   `InitParameter()`), der durch den Flash-Vorgang selbst (Neustart mit vermutlicher Kennung-/
+   Versions-Neuinitialisierung) zuruckgesetzt wird - unabhaengig davon, welche Firmware-Version
+   geflasht wird. **Die eigentliche Ursache, WARUM `fp.md_start_page` waehrend des normalen
+   Betriebs (ohne Neuflashen) von `fp.md_page` abweichen kann, ist damit weiterhin nicht
+   gefunden** - jeder bisherige Reproduktionsversuch wurde durch das anschliessende Neuflashen
+   (zum Testen einer Theorie) versehentlich "repariert", bevor die Zeigerwerte abgelesen werden
+   konnten.
+
+**Was diese Version aendert (zwei unabhaengige, bewusst kleine Aenderungen in `send_vtf_file()`/
+`messdaten()`, `sicom.c`):**
+
+1. **Diagnose-Ausgabe vor jedem Export:** `md_start_page`, `md_page`, `md_adr` und `anzmw` werden
+   jetzt direkt vor dem Start eines Ymodem-Exports auf das Terminal geschrieben. Reine Anzeige,
+   keine Verhaltensaenderung. Zweck: sollte der Fehler erneut auftreten, OHNE dass zwischendurch
+   neu geflasht wird, zeigt diese Zeile die tatsaechlichen (mutmasslich auseinanderlaufenden)
+   Zeigerwerte - die bisher fehlende Evidenz fuer die eigentliche Root Cause.
+2. **Sicherheits-Obergrenze in der Export-Schleife:** Die Seitenschleife in `send_vtf_file()` lief
+   bisher ausschliesslich, bis `seite==fp.md_page` erreicht wird - bei einem falschen/veralteten
+   `fp.md_start_page` konnte das den gesamten Ringpuffer umlaufen und dabei geloeschte (`0xFF`)
+   Flashseiten senden. Jetzt bricht die Schleife zusaetzlich hart ab, sobald mehr als
+   `anzwerte/MD_PER_PG + 2` Seiten durchlaufen wurden (Sicherheitsmarge fuer Rundungseffekte),
+   unabhaengig davon, ob `seite` jemals `fp.md_page` erreicht. Der Export schliesst dann trotzdem
+   sauber mit `ymodem_close()` ab, statt bis zu einem Empfaenger-Timeout/-Abbruch (`F13010`)
+   weiterzulaufen.
+
+**Bewusst NICHT geaendert:** die eigentliche Ursache der Zeiger-Divergenz wird mit dieser Version
+nicht behoben, weil sie noch nicht bekannt ist - beide Aenderungen sind Diagnose- bzw.
+Schutzmassnahmen, kein Fix der Wurzelursache.
+
+**Geaenderte Dateien:** sicom.c, sprachen/sictxt.c (-> 5.95).
+
+**Naechster Schritt, sobald der Fehler wieder auftritt:** VOR jedem weiteren Neuflashen die
+Diagnosezeile (`md_start_page=... md_page=... md_adr=... anzmw=...`) direkt vor dem fehlerhaften
+Export ablesen und hier dokumentieren - das ist die fehlende Evidenz, um die eigentliche
+Root Cause endlich einzugrenzen.

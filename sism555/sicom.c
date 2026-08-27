@@ -1032,7 +1032,9 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
  uchar blno=0;					// Blocknummer 8 Bit
  uint seite;						// Laufvariable Seiten
  uint pglen;						// Hilfsvariable Seitenl�nge
- uint ind=0;						// Bytez�hler Datenausgabe			
+ uint ind=0;						// Bytez�hler Datenausgabe
+ uint seiten_max;				// FIX (5.95): Sicherheits-Obergrenze Seitenschleife (siehe unten)
+ uint seiten_gesendet;	// FIX (5.95): Zaehler bereits durchlaufener Seiten
  
  ResetWDT();						// Watchdog reset
  
@@ -1091,10 +1093,18 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
     {
 		 blno=result;													// Blocknummer aktualisieren
      seite=fp.md_start_page;							// Messdaten senden
-     pglen=MD_PER_PG*VSATZLEN;						// Anzahl Datens�tze pro Seite     
+     pglen=MD_PER_PG*VSATZLEN;						// Anzahl Datens�tze pro Seite
      cind=0; ind=0;												// Reset Pufferzeiger und Flash Seite Byteindex
+     // FIX (5.95): harte Obergrenze aus der bereits im Ymodem-Header angekuendigten Messwerte-
+     // anzahl (anzwerte) - unabhaengig davon, WARUM fp.md_start_page/fp.md_page auseinanderlaufen
+     // koennen (siehe project-status.md, "Offener Firmwarefehler..."), darf die Schleife niemals
+     // mehr als diese Seitenanzahl (+Sicherheitsmarge) durchlaufen. Verhindert, dass ein falscher/
+     // veralteter fp.md_start_page den Export bis zum Ringpufferende durch geloeschte (0xFF)
+     // Flashseiten laufen laesst, statt sauber mit EOT zu enden.
+     seiten_max=anzwerte/MD_PER_PG+2;
+     seiten_gesendet=0;
      while (1)
-     { 
+     {
       if (seite==fp.md_page)							// Seite ist aktuelle Seite? 
       {	   	   
        if ((cind+fp.md_adr)<=BLOCKSIZE)		// Pufferindex + aktuelle Messdaten <= 1k
@@ -1145,10 +1155,10 @@ bool send_vtf_file (uint anzwerte, uchar ziel)	// VTF Datei senden
         cind=pglen-ind;										// neuer Pufferindex 	
        } // end if Seitenrest
       } // end if 1k Blockgr��e erreicht
-      if (seite==fp.md_page) 							// bis aktuelle Messdatenseite gesendet?
-      {
-			 if (ziel==0) putstr_b64 (cbuf, -1);		// Base64 Pufferausgabe beenden	
-       else if (ziel==1) ymodem_close ();			// ymodem �bertragung beenden			 
+      if ((seite==fp.md_page) || (++seiten_gesendet>=seiten_max))	// bis aktuelle Messdatenseite
+      {																						// gesendet ODER Sicherheits-Obergrenze erreicht (FIX 5.95)
+			 if (ziel==0) putstr_b64 (cbuf, -1);		// Base64 Pufferausgabe beenden
+       else if (ziel==1) ymodem_close ();			// ymodem �bertragung beenden
        return (true);													// R�ckgabe alles ok
       }
       if ((seite+1)==PROTOCOLPAGE) seite=MEASUREPAGE;	// �berlauf
@@ -1188,11 +1198,19 @@ uint messdaten (uchar ausgabe)		// Anzahl Messdaten berechnen und ggf. ausgeben
  {  
   c=ja(T_daus);																// Abfrage Datenausgabe
   if (c==1) put_ascii_data ();								// ASCII Messdaten ausgeben	
-  else if (c=='C') 
-	{	
-	 send_vtf_file (anzmw, 1);				// VTF Datei per ymodem senden 
+  else if (c=='C')
+	{
+	 // FIX (5.95, Diagnose): md_start_page/md_page/md_adr sichtbar machen - Grundlage fuer den
+	 // Verdacht "Exportschleife laeuft an fp.md_start_page vorbei durch geloeschte Flashseiten"
+	 // (project-status.md, "Offener Firmwarefehler: Messdatenexport..."). Kostet nur eine Zeile
+	 // vor jedem Export, hilft aber massiv beim naechsten Reproduzieren.
+	 putstr(" md_start_page="); putnumber(fp.md_start_page,0);
+	 putstr(" md_page=");       putnumber(fp.md_page,0);
+	 putstr(" md_adr=");        putnumber(fp.md_adr,0);
+	 putstr(" anzmw=");         putnumber(anzmw,0); newline();
+	 send_vtf_file (anzmw, 1);				// VTF Datei per ymodem senden
 	 osDelay(100);										// warte 100 ms Ymodem Ende
-	}	
+	}
   if (ja(T_delete)>0) delete_data();					// Abfrage Daten l�schen? Ja -> Messdaten im Speicher l�schen
  } // end ausgabe
  else 															// keine Ausgabe an Terminal
