@@ -440,8 +440,16 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
   if ((fp.md_page>=PROTOCOLPAGE) || (fp.md_start_page>=PROTOCOLPAGE) || (fp.md_adr>=2*BLOCKSIZE))
   {
    puterror (DTC_FL_MD_PTR_INVALID, fp.md_page);		// F16003: ungueltiger Messdatenzeiger erkannt
-   fp.md_start_page=MEASUREPAGE; fp.md_page=MEASUREPAGE; fp.md_adr=0;	// auf sicheren Startwert
-   MQTT_send=fp.md_page<<16; MQTT_index=0; md_pg_adr=fp.md_page<<16;	// GPREG-Kopien mit reset
+	   fp.md_page=MEASUREPAGE;										// auf sicheren Startwert
+	   delete_data();												// Setzt md_start_page/md_adr/MQTT_send/md_pg_adr konsistent
+	                                                    // zurueck (gleiches Muster wie vor einem Firmware-Update,
+	                                                    // siehe mqtt.c) - MQTT_index bleibt bewusst UNVERAENDERT:
+	                                                    // das ist ein monoton steigender Sendezaehler fuer die
+	                                                    // Cloud-Deduplizierung, kein Ringpuffer-Zeiger.
+	   flash_erase (fp.md_page,1);									// Physische Seite tatsaechlich leeren - der folgende
+	                                                    // flash_pcom()-Lesevorgang (unten) wuerde sonst noch
+	                                                    // alten Seiteninhalt von der VORHERIGEN Nutzung dieser
+	                                                    // Seitennummer nach vbuf laden.
   }
  }
 

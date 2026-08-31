@@ -3791,3 +3791,66 @@ Bounds-Checks braucht ein Board, auf dem die Korruption NACH dem Flashen von 5.9
 auftritt (ohne zwischenzeitliches Neuflashen) - dann sollte F16003 im Protokoll erscheinen
 und `MD_start`/`Anzahl Messwerte` nach dem naechsten Boot wieder einen sauberen, kleinen
 Wert zeigen, statt die Korruption unveraendert durchzureichen.
+
+## Update 5.97: Fix ueberarbeitet (delete_data() statt Handarbeit) + Root-Cause-Hypothese
+
+**Ueberarbeitung des 5.96-Fixes:** Auf Nachfrage geprueft, ob noch andere Zaehler/Zeiger beim
+Reset mit beruecksichtigt werden muessen. Ergebnis:
+- `MQTT_index` darf NICHT mit zurueckgesetzt werden - das bestehende Reset-Muster im Code
+  (`fp.md_page=MEASUREPAGE; delete_data();`, siehe mqtt.c vor einer Firmware-Programmierung)
+  laesst `MQTT_index` bewusst unangetastet, da es ein monoton steigender Cloud-Sendezaehler
+  zur Deduplizierung ist, kein Ringpuffer-Zeiger. Der 5.96-Fix hatte ihn faelschlich auf 0
+  gesetzt - jetzt entfernt, stattdessen `delete_data()` direkt aufgerufen (gleiches, bereits
+  etabliertes Reset-Muster wie im Rest des Codes).
+- Physische Flash-Seite wird jetzt zusaetzlich explizit geleert (`flash_erase(fp.md_page,1)`)
+  direkt im Fix - `InitParameter()` liest unmittelbar danach ungefragt den Seiteninhalt nach
+  `vbuf` (Zeile ~464); ohne expliziten Erase haette dort sonst alter Seiteninhalt (von der
+  vorherigen Nutzung dieser Seitennummer) geladen werden koennen. Der bestehende Boot-Erase in
+  main.c (Zeile ~121) deckt den Normalfall zwar meistens ab, wird aber bei SLEEP_RES/FIRM_UP_RES
+  uebersprungen - der Fix ist jetzt eigenstaendig korrekt, unabhaengig vom Reset-Grund.
+
+**Root-Cause-Hypothese (NEU, noch nicht verifiziert):** `flash_wbuf1()` (flash.c) schreibt den
+kompletten `fp`-Parameterblock beim Notfall-Speichern (Power-Loss-ISR, `EINT0_IRQHandler`) NICHT
+atomar, sondern seitenweise in einer Schleife (`maxbyte`=528 Byte je Seite, `sizeof(fp)` ist
+deutlich groesser -> mehrere Erase+Programm-Zyklen von je mehreren ms). Verliert das Geraet
+waehrend dieser laufenden Mehrfach-Schreibsequenz tatsaechlich die Spannung (das Notfall-Save
+laeuft ja bereits als Reaktion auf einen erkannten Spannungsausfall - ein Wettlauf gegen die
+Restenergie), kann das genau die Seite treffen, in der `md_start_page`/`md_page`/`md_adr` liegen -
+mit undefiniertem Ergebnis (bei einem unterbrochenen Flash-Erase/Programm-Zyklus sind die
+betroffenen Zellen typischerweise weder zuverlaessig alt noch neu, sondern effektiv zufaellig -
+passt zu einem Wert wie `30913`, der weder ein sinnvoller alter noch neuer Zeigerstand ist).
+Selbe Fehlerklasse wie der vario245-Incident (Zustand haengt davon ab, WIE das Geraet abgeschaltet
+wird), aber ein anderer konkreter Mechanismus (Torn Write waehrend Notfall-Save, nicht die
+GPREG-Fallback-Divergenz).
+
+**Analyseplan fuer diese Hypothese:** siehe `Doku/Analyseplan_Messdatenzeiger-Korruption.md`.
+
+**Geaenderte Dateien:** flash.c, sprachen/sictxt.c (-> 5.97).
+
+## Update 5.98: FIX Diagnose-Zeile (5.95) stoerte den echten Ymodem-Export - entfernt
+
+**Verifikation am Geraet (Board 269990, 5.97):** Die 5.96/5.97-Zeigerkorrektur wurde live bestaetigt
+- nach Boot erschien `F16003 ... 30913` im Protokoll, und `Anzahl Messwerte`/`MD_start` zeigten
+danach sauber `0`. Ein anschliessender ECHTER Exportversuch mit sinnvollen Werten
+(`md_start_page=0 md_page=23 md_adr=380 anzmw=1234`, Ymodem-Header korrekt `VTF17460` =
+`1024+2048+2048+10*1234`) zeigte aber ein NEUES Problem: Viagraph (das echte Produktionswerkzeug,
+per RS232/COM3) blieb beim Datenexport dauerhaft bei "0 kB" haengen - keinerlei Fortschritt,
+obwohl dieselbe Aktion frueher zuverlaessig funktioniert hat.
+
+**Ursache gefunden (Anwender-Beobachtung):** Die in 5.95 eingebaute Diagnose-Zeile
+(`md_start_page=... md_page=... md_adr=... anzmw=...`) wurde bisher IMMER unmittelbar VOR dem
+Start des echten Ymodem-Transfers auf die Schnittstelle geschrieben - also genau an der Stelle,
+an der ein strenger Ymodem-Client (wie Viagraph) das erste Byte bereits als `SOH` (Blockstart)
+erwartet. Die eingestreute Klartextzeile hat den Protokollparser vermutlich verwirrt/blockiert -
+ein einfaches Terminal oder das tolerante Python-Testtool haben das ueberlebt bzw. teilweise
+kompensiert, ein strikter Produktionsclient offenbar nicht. Damit war die 5.95-Diagnosehilfe
+selbst die Ursache des in dieser Sitzung neu beobachteten Viagraph-Haengers - kein weiterer
+Firmware-Bug im eigentlichen Exportpfad.
+
+**Fix (sicom.c):** Diagnose-Zeile aus dem `c=='C'`-Zweig in `messdaten()` wieder entfernt.
+`send_vtf_file()` startet jetzt wieder unmittelbar, ohne vorgeschalteten Klartext.
+
+**Geaenderte Dateien:** sicom.c, sprachen/sictxt.c (-> 5.98).
+
+**Am Geraet zu verifizieren:** Viagraph-Download auf Board 269990 erneut versuchen - sollte jetzt
+wieder normal Fortschritt zeigen statt bei 0 kB zu haengen.

@@ -1200,14 +1200,6 @@ uint messdaten (uchar ausgabe)		// Anzahl Messdaten berechnen und ggf. ausgeben
   if (c==1) put_ascii_data ();								// ASCII Messdaten ausgeben	
   else if (c=='C')
 	{
-	 // FIX (5.95, Diagnose): md_start_page/md_page/md_adr sichtbar machen - Grundlage fuer den
-	 // Verdacht "Exportschleife laeuft an fp.md_start_page vorbei durch geloeschte Flashseiten"
-	 // (project-status.md, "Offener Firmwarefehler: Messdatenexport..."). Kostet nur eine Zeile
-	 // vor jedem Export, hilft aber massiv beim naechsten Reproduzieren.
-	 putstr(" md_start_page="); putnumber(fp.md_start_page,0);
-	 putstr(" md_page=");       putnumber(fp.md_page,0);
-	 putstr(" md_adr=");        putnumber(fp.md_adr,0);
-	 putstr(" anzmw=");         putnumber(anzmw,0); newline();
 	 send_vtf_file (anzmw, 1);				// VTF Datei per ymodem senden
 	 osDelay(100);										// warte 100 ms Ymodem Ende
 	}
