@@ -40,6 +40,7 @@ Code;Typ;Subsystem;Kurztext;Ursache;Abhilfe;SeitVersion;Status
 15003;F;GPS;GPS Kommando fehlgeschlagen;GPS-Befehl ohne Antwort;GPS-Verbindung und Baudrate pruefen;5.09;aktiv
 15004;F;GPS;GPS Fehler;GPS-Fehler waehrend Betrieb;GPS-Modul und Antenne pruefen;5.09;aktiv
 16002;F;Flash/Speicher;Parameter-Initialisierung fehlgeschlagen;Flash-Write fuer Parametersatz nicht bestaetigt;Geraet neu starten, bei Wiederholung Flash pruefen;5.09;aktiv
+16003;F;Flash/Speicher;Messdatenzeiger ausserhalb des installierten Flash-Bereichs;md_page/md_start_page/md_adr aus dem Parameterblock lagen ausserhalb des tatsaechlichen Flash-Umfangs (Ursache noch offen) - Zeiger auf sicheren Startwert zurueckgesetzt;Beobachten ob Code wiederholt auftritt - Ursache der Zeigerkorruption noch nicht gefunden;5.96;aktiv
 17001;F;System;I2C-Bus Fehler beim Start;I2C-Bus-Scan fehlgeschlagen;I2C-Verkabelung und Versorgung pruefen;5.09;aktiv
 17002;F;System;I2C Geraet fehlt;Erwartetes I2C-Geraet nicht erkannt;I2C-Geraete und Adressen pruefen;5.09;aktiv
 17003;F;System;I2C DPP fehlt;DPP-Modul nicht am I2C-Bus erkannt;DPP-Modul und Verbindung pruefen;5.09;aktiv

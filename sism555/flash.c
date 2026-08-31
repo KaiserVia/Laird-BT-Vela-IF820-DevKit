@@ -1,7 +1,7 @@
-//-----------------------------------------------------------------------------
+ï»¿//-----------------------------------------------------------------------------
 //  FILE: flash.c			PROJECT: sis3000M
 //-----------------------------------------------------------------------------
-//  COMMENTS:  Routinen für externen Flash Speicher 
+//  COMMENTS:  Routinen fï¿½r externen Flash Speicher 
 //-----------------------------------------------------------------------------
 //  HARDWARE:   sis3003-MB, version H2
 //-----------------------------------------------------------------------------
@@ -34,9 +34,9 @@ void EINT0_IRQHandler (void)		// Interruptanforderung Power Down
 {
  PINSEL4 &= ~(PWM6);											// Disable Anzeige	
  PCONP|=PCI2C0|PCSSP1;										// I2C0 und SSP1 Bus einschalten
- FIO1CLR = GSMPWR|USB_RPWR|PWRKEY|EN_ANA;	// GSM, USB und Analogversorgung (Transceiver,Verstärker) aus
+ FIO1CLR = GSMPWR|USB_RPWR|PWRKEY|EN_ANA;	// GSM, USB und Analogversorgung (Transceiver,Verstï¿½rker) aus
  ResetWDT();															// watchdog timer reset	
- flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=0;							// Puffer mit Output Register 2, Port 0 und 1 null füllen
+ flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=0;							// Puffer mit Output Register 2, Port 0 und 1 null fï¿½llen
  I2Cdrv->MasterTransmit(IC37>>1,flbuf,3,false);			// Puffer an IC37 senden -> 5V/3V3 Analogversorgung komplett aus	
  flash_wbuf1 ((uchar *)&fp.Kennung, PARAMETERPAGE, sizeof(fp));	// Parameter sichern
  flash_wbuf1 (vbuf, fp.md_page, fp.md_adr);					// aktuelle Seite mit Messdaten sichern  
@@ -54,14 +54,14 @@ int InitSPIFlash (void)			// Initialisiere SPI und Flash
 #endif
 
 	
- flashsize=0;					// Speichergröße in MB
+ flashsize=0;					// Speichergrï¿½ï¿½e in MB
  Init_SPI ();					// SPI (SSP1) Interface einschalten und initialisieren		
  P_fpar=&flbuf[0];		// Pointer auf unsigned char Arbeitspuffer
  flbuf[0]=0;					// reset Puffer	
  do
  {
   flash_command(FLASH_R_ID,1,2);		// Manufacturer and Device ID read
-  if (flbuf[0]==0x1F) switch (flbuf[1]) // nach Device ID auswählen
+  if (flbuf[0]==0x1F) switch (flbuf[1]) // nach Device ID auswï¿½hlen
   {
    case 0x24: flashsize=512;	// 512 Kilobyte, 2048 pages x 264 Byte
    			maxpage=2047;						
@@ -107,13 +107,13 @@ int InitSPIFlash (void)			// Initialisiere SPI und Flash
  } 
  
  pagepk=1;								// kein Speicher, aber pagepk setzen wg. Nulldivision
- maxpage=0; 							// reset Anzahl Seiten und -größe
+ maxpage=0; 							// reset Anzahl Seiten und -grï¿½ï¿½e
  maxbyte=0; 
  return(FLASH_ERROR);			// Fehler kein (bekannter) Flash
 }	
 
-uint flash_pcom (uchar * Pdata, uint page, uint opcode, int size)	// Adaptiert Seitenzugriff für unterschiedliche Flash Seitengrößen
-{													// Übergaben 	Pdata	- Zeiger auf Sende-/Empfangsdaten
+uint flash_pcom (uchar * Pdata, uint page, uint opcode, int size)	// Adaptiert Seitenzugriff fï¿½r unterschiedliche Flash Seitengrï¿½ï¿½en
+{													// ï¿½bergaben 	Pdata	- Zeiger auf Sende-/Empfangsdaten
 													//				page 	- Flash Seitenadresse
 													//				opcode 	- Flash Kommandocode
 													// 				size	- Anzahl Schreib/-Lesebytes												
@@ -124,39 +124,39 @@ uint flash_pcom (uchar * Pdata, uint page, uint opcode, int size)	// Adaptiert S
 
  if (maxbyte>0)				// Flash vorhanden?
  {
-  if ((opcode==FLASH_ERASE_WRITE_1) && (size>maxbyte)) bytes=maxbyte;	// Bytes zu schreiben maximal Puffergröße
+  if ((opcode==FLASH_ERASE_WRITE_1) && (size>maxbyte)) bytes=maxbyte;	// Bytes zu schreiben maximal Puffergrï¿½ï¿½e
    else bytes=size; 
-  P_fpar=Pdata;							// Übergabe Datenzeiger
+  P_fpar=Pdata;							// ï¿½bergabe Datenzeiger
   flash_adress (0, page++);				// Seite im Atmel Flash adressieren
   flash_command (opcode,adrbytes,bytes);		// Kommando senden
 
   if (opcode==FLASH_ERASE_WRITE_1)		// Schreiben durch Atmel SRAM Puffer 1
   {
-   size-=maxbyte;						// Seitengröße abziehen
+   size-=maxbyte;						// Seitengrï¿½ï¿½e abziehen
   
    while (size>0)						// noch Bytes zu schreiben
    {
-    P_fpar+=maxbyte;					// Seitengröße zu Datenzeiger addieren
-    if (size>maxbyte) bytes=maxbyte;	// Anzahl Bytes > Seitengröße
+    P_fpar+=maxbyte;					// Seitengrï¿½ï¿½e zu Datenzeiger addieren
+    if (size>maxbyte) bytes=maxbyte;	// Anzahl Bytes > Seitengrï¿½ï¿½e
     else bytes=size;   						
     flash_adress (0, page++);				// Seite im Atmel Flash adressieren
     flash_command (opcode,adrbytes,bytes);	// Seite schreiben oder lesen
-    size-=maxbyte;							// Seitengröße	
+    size-=maxbyte;							// Seitengrï¿½ï¿½e	
    } 
   }
  }
- return (page);			// Rückgabe letzte geschriebene/gelesene Seite + 1
+ return (page);			// Rï¿½ckgabe letzte geschriebene/gelesene Seite + 1
 }
 
 void protocol (short event)		// Protokolleintrag ins Flash sichern
-{								// Übergabe event - Ereignisnummer
+{								// ï¿½bergabe event - Ereignisnummer
  
  probuf[fp.pro_adr]=event>>8;			// Ereignis in Puffer kopieren
  probuf[fp.pro_adr+1]=event;
  read_date_time (DATE_HEX, (char *)&probuf[fp.pro_adr+2]);	// Datum in Puffer schreiben
  read_date_time (TIME_HEX, (char *)&probuf[fp.pro_adr+5]);	// Zeit in Puffer schreiben  
 
- fp.pro_adr+=PSATZLEN;												// Byteadresse um Protokollsatzlänge erhöhen
+ fp.pro_adr+=PSATZLEN;												// Byteadresse um Protokollsatzlï¿½nge erhï¿½hen
  if (fp.pro_adr>=BLOCKSIZE/pagepk)						// Seite bzw. pagepk*256 Bytes voll?
  { 
   fp.pro_adr=0;																// Reset Byteadresse
@@ -165,19 +165,19 @@ void protocol (short event)		// Protokolleintrag ins Flash sichern
   if (fp.pro_page>=PROTOCOLENDPG) 						// Protokoll Seitenzeiger am Pufferende?
    fp.pro_page=PROTOCOLPAGE;									// Protokoll Seitenzeiger auf Pufferanfang setzen
   else fp.pro_page++;  												// sonst inkrementieren
-  if ((fp.pro_page)==fp.pro_start_page) 			// Protokollzeiger überschreibt Protokollanfang?
+  if ((fp.pro_page)==fp.pro_start_page) 			// Protokollzeiger ï¿½berschreibt Protokollanfang?
   {
    if (fp.pro_start_page>=PROTOCOLENDPG)			// Protokollstartseite	am Pufferende?
     fp.pro_start_page=PROTOCOLPAGE;						// Protokollstartseite auf Pufferanfang
    else fp.pro_start_page++;									// Protokollstartseite inkrementieren
   }
-  flash_erase (fp.pro_page, 1);	// neue aktuelle Protokollseite löschen
+  flash_erase (fp.pro_page, 1);	// neue aktuelle Protokollseite lï¿½schen
  }	 // end Seite voll
  
  if (event!=LastErrorEvent)										// Fehler ungleich letztem Fehlerereignis?
  {
 	if (((event >=220)&&(event<=540))|| (event==WATCHDOG_RESET))	// Systemfehler?
-  {																							// Letzte Systemfehler haben Priorität und überschreiben evtl. vorhandene Alarme
+  {																							// Letzte Systemfehler haben Prioritï¿½t und ï¿½berschreiben evtl. vorhandene Alarme
 	 mailtosend|=(ALARMMAIL | SYSERROR);					// Fehlerstatus und Email Versand sichern
 	 if (fp.smsalarm) smstosend|=SYSERROR;				// SMS Fehlermeldung zu senden	
   }		
@@ -190,8 +190,8 @@ void protocol (short event)		// Protokolleintrag ins Flash sichern
 	 }	 
 	 else if (event==FULMEM)
 	 {	 
-	  mailtosend|=(ALARMMAIL | FULMEM);						// Speicher voll Flag für Alarm Mail setzen
-		if (fp.smsalarm) smstosend|=FULMEM;					// Speicher voll Flag für Alarm SMS setzen
+	  mailtosend|=(ALARMMAIL | FULMEM);						// Speicher voll Flag fï¿½r Alarm Mail setzen
+		if (fp.smsalarm) smstosend|=FULMEM;					// Speicher voll Flag fï¿½r Alarm SMS setzen
 	 }	 
   }		
 	LastErrorEvent=event;												
@@ -200,13 +200,13 @@ void protocol (short event)		// Protokolleintrag ins Flash sichern
  if ((connect&MQTT_LINK)&&(mqtt_state==STATUSSEND))
 	if (event!=FULMEM)													// Speicher voll nicht melden
   {		
-	 LastEvent=event;														// Ereignis übergeben
+	 LastEvent=event;														// Ereignis ï¿½bergeben
    mqtt_state=EVENT;	 												// MQTT Status setzen
 	}		 
 }
 
 void flash_fill_buffer (uint fbyte)	// Beschreibt Atmel Flash Buffer mit fbyte
-{                                   // Übergabe: 	fbyte = Füllbyte
+{                                   // ï¿½bergabe: 	fbyte = Fï¿½llbyte
  ushort anz;						// Laufvariable und Anzahl zu sendender Bytes													
  
  flash_ready (0);  					// Warte auf Flash bereit
@@ -220,7 +220,7 @@ void flash_fill_buffer (uint fbyte)	// Beschreibt Atmel Flash Buffer mit fbyte
  {  
   while (SSP1->SR&!TNF);				// warte bis nicht voll	
   if (anz<3) SSP1->DR=0;				// Pufferbyteadresse=0 (3 Bytes) und				 
-  else SSP1->DR=fbyte;					// danach Füllbytes schicken
+  else SSP1->DR=fbyte;					// danach Fï¿½llbytes schicken
   while (SSP1->SR&BSY);					// warte bis bereit
  } // end for anz 
 
@@ -228,58 +228,58 @@ void flash_fill_buffer (uint fbyte)	// Beschreibt Atmel Flash Buffer mit fbyte
  Clear_SPI ();								// Disable SPI
 }
 
-void flash_erase (uint page, uint anzahl)	// Eine oder mehrere Flash Seiten im Hauptspeicher löschen
-{											// Übergaben 	page 	- Flash Seitenadresse											
-											// 				anzahl	- Anzahl Seiten	zu löschen
+void flash_erase (uint page, uint anzahl)	// Eine oder mehrere Flash Seiten im Hauptspeicher lï¿½schen
+{											// ï¿½bergaben 	page 	- Flash Seitenadresse											
+											// 				anzahl	- Anzahl Seiten	zu lï¿½schen
  P_fpar=&flbuf[0];						// Pointer auf Arbeitspuffer
- while (anzahl--)	// Anzahl Seiten löschen
+ while (anzahl--)	// Anzahl Seiten lï¿½schen
  {
   flash_adress (0, page++);				// Seite im Atmel Flash adressieren
-  flash_command (FLASH_ERASE_MAIN,4,0);	// Puffer 1 nach gelöschter Seite schreiben  
+  flash_command (FLASH_ERASE_MAIN,4,0);	// Puffer 1 nach gelï¿½schter Seite schreiben  
  }
 }
 
-uint flash_wbuf1 (uchar * Pdata, uint page, int size)	// Atmel Flash schreiben durch Puffer 1 auf gelöschte Seiten
-{														// Übergaben 	Pdata	- Zeiger auf Sendedaten
+uint flash_wbuf1 (uchar * Pdata, uint page, int size)	// Atmel Flash schreiben durch Puffer 1 auf gelï¿½schte Seiten
+{														// ï¿½bergaben 	Pdata	- Zeiger auf Sendedaten
   													//				page 	- Flash Seitenadresse											
 														// 				size	- Anzahl Schreibbytes
  uint bytes;				// Anzahl Schreibbytes
 	
  if (flashsize)							// Flash vorhanden?
  {
-  P_fpar=Pdata;							// Übergabe Datenzeiger
+  P_fpar=Pdata;							// ï¿½bergabe Datenzeiger
   while (size>0)
   {
-   if (size>maxbyte) bytes=maxbyte;				// Bytes zu schreiben maximal Puffergröße
+   if (size>maxbyte) bytes=maxbyte;				// Bytes zu schreiben maximal Puffergrï¿½ï¿½e
    else bytes=size;
    flash_adress (0, 0);										// Byteadress Atmel Flash Puffer adressieren
    flash_command (FLASH_W_BUF1,4,bytes);	// Nach Puffer 1 schreiben
    flash_adress (0, page++);							// Seite im Atmel Flash adressieren
-   flash_command (FLASH_W_BUF1_MAIN,4,0);	// Puffer 1 nach gelöschter Seite schreiben 
-   P_fpar+=maxbyte;												// Seitengröße zu Datenzeiger addieren
-   size-=maxbyte;													// Seitengröße
+   flash_command (FLASH_W_BUF1_MAIN,4,0);	// Puffer 1 nach gelï¿½schter Seite schreiben 
+   P_fpar+=maxbyte;												// Seitengrï¿½ï¿½e zu Datenzeiger addieren
+   size-=maxbyte;													// Seitengrï¿½ï¿½e
   }	// end while (size>0)
  } // end Flash vorhanden
- return(page); 	// Rückgabe letzte geschriebene Seite + 1
+ return(page); 	// Rï¿½ckgabe letzte geschriebene Seite + 1
 }
 
 uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
 {
  uchar i;							// Laufvariable
- char *wp;						// Hilfszeiger zur Blocklöschung	
+ char *wp;						// Hilfszeiger zur Blocklï¿½schung	
 
  fp.Kennung=FLASHKENNUNG;					// Kennung Werkinitialisierung
  if (fp.pKennung!=PARAKENNUNG) 		// Erstmalige Werkinitialisierung
-	 fp.hcount=0;		 								// Betriebsstundenzähler auf Null
+	 fp.hcount=0;		 								// Betriebsstundenzï¿½hler auf Null
  fp.pKennung=PARAKENNUNG;					// Kennung Parameterblock
  clean_cpy (T_version, fp.pVersion, sizeof(fp.pVersion));				// Neue Programmversion nach Parameterblock 
  clean_cpy (T_def_hw_rev,fp.hwVersion,sizeof(fp.hwVersion));		// Default Hardware Revision setzen
  fp.i2cdev=0;											// Reset installierte I2C Baugruppen   
  fp.sprache=Def_sprache;					// Programmsprache 
- fp.psets=Def_paraset;						// Default Anzahl Parametersätze
- for (i=0;i<MAXTAST;i++) 					// Für alle definierbaren Tastverhältnisse
-  fp.hell[i]=Def_hell;						// Helligkeit = Tastverhältniss einstellen
- fp.pwmex=Def_hell;								// Externes PWM Signal Tastverhältniss einstellen		
+ fp.psets=Def_paraset;						// Default Anzahl Parametersï¿½tze
+ for (i=0;i<MAXTAST;i++) 					// Fï¿½r alle definierbaren Tastverhï¿½ltnisse
+  fp.hell[i]=Def_hell;						// Helligkeit = Tastverhï¿½ltniss einstellen
+ fp.pwmex=Def_hell;								// Externes PWM Signal Tastverhï¿½ltniss einstellen		
  fp.hoff=1;												// Helligkeitseinstellung Kunde  
  fp.farben= Def_farben;						// Anzahl LED Farben
  fp.mph=Def_mph;									// Einheit Geschwindigkeiten
@@ -300,10 +300,10 @@ uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
  fp.defic68=0;										// Porteinstellung alter IC68 Expander, zur Zeit ungenutzt
  for (i=0;i<NOSWGR;i++) fp.nosw[i]=0;		// Reset Anzahl Schalter in Schaltgruppe
  wp=&fp.swgrname[0][0];
- do *wp++=0; while (wp < (char*)&fp.swgrp);				// Lösche Textfelder Schaltergruppen	 
- for (i=0;i<NOSW;i++) fp.swexp[i]=0;							// Reset alle Schalter Expander Einträge
+ do *wp++=0; while (wp < (char*)&fp.swgrp);				// Lï¿½sche Textfelder Schaltergruppen	 
+ for (i=0;i<NOSW;i++) fp.swexp[i]=0;							// Reset alle Schalter Expander Eintrï¿½ge
  wp=&fp.symgrname[0][0];
- do *wp++=0; while (wp < (char*)&fp.symfont[0]);	// Lösche Textfelder Symbole
+ do *wp++=0; while (wp < (char*)&fp.symfont[0]);	// Lï¿½sche Textfelder Symbole
  for (i=0;i<3;i++) strcopy (&T_symgr1[i][0],&fp.symgrname[i][0]);	// Setze Led Anzeigesymbol Bezeichner Gruppe 1 und 2
  fp.nosym[0]=3;										// Drei Symbole in Gruppe 1	
  fp.nosym[1]=3;										// Drei Symbole in Gruppe 2
@@ -311,7 +311,7 @@ uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
  for (i=0;i<fp.symbol;i++)				// definiere Symbole
  {
   strcopy (&T_defsym[i][0],&fp.symname[i][0]); 	//  Definiere Default Symbol(-namen)
-  fp.symfont[i]=Def_sym_font[i];								// zugehörige Fonts eintragen
+  fp.symfont[i]=Def_sym_font[i];								// zugehï¿½rige Fonts eintragen
  }
  fp.fileno=0;											// Reset fortlaufende Dateinummer
  fp.btmodem=0;										// Reset installiertes Bluetooth Modem
@@ -320,19 +320,19 @@ uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
  fp.usb=0;												// Reset installierte USB Schnittstelle(n)
  fp.ledspot=0;										// Reset installierte LED Blinklampe
  fp.sense=4;											// Sensitivity auf 100%
- fp.txrcon=Def_txrcon;						// Verstärker und Transceiver - Schaltregler auf 3V3 und ein   
+ fp.txrcon=Def_txrcon;						// Verstï¿½rker und Transceiver - Schaltregler auf 3V3 und ein   
  fp.turnsw=0;											// kein externer Drehschalter Parametersatzauswahl
  fp.gpsintv=Def_gpsintv;					// Setze default GPS Positionsfix Zeitinterval
  fp.gpsanz=0;											// Null GPS Positionsbestimmungen
  fp.gi=0;													// Index Positionsbestimmungen auf Null
  fp.radnet=2;											// Funknetz default automatische Auswahl
- fp.ledcode=0;										// Bestückte LED Farben
+ fp.ledcode=0;										// Bestï¿½ckte LED Farben
  fp.utc=1;												// Default UTC Zeitzone utc+1 (D,F,IT,...) 
- fp.mqtt_pdbq=0;									// Erweiterte Protokollierung insbesondere der MQTT Aktivität
+ fp.mqtt_pdbq=0;									// Erweiterte Protokollierung insbesondere der MQTT Aktivitï¿½t
  return (1);
 }
 
-void default_parameter (void)		// Setze überschreibbare Parameter auf Voreinstellung
+void default_parameter (void)		// Setze ï¿½berschreibbare Parameter auf Voreinstellung
 {
   uchar i,l;										// Laufvariable
 
@@ -344,19 +344,19 @@ void default_parameter (void)		// Setze überschreibbare Parameter auf Voreinstel
   fp.vcor=Def_vcor;								// Default Geschwindigkeitskorrekturfaktor laden  
   fp.pro_start_page=PROTOCOLPAGE;	// Protokollstartseite im Flash  
   fp.pro_page=PROTOCOLPAGE;				// Zeiger auf aktuelle Protokollseite im Flash
-  fp.pro_adr=0;										// Reset Adresszeiger auf nächsten Protokolleintrag im Flash
+  fp.pro_adr=0;										// Reset Adresszeiger auf nï¿½chsten Protokolleintrag im Flash
   fp.md_start_page=MEASUREPAGE;		// Messdaten Startzeiger auf Messdatenstartseite im Flash
   fp.md_page=MEASUREPAGE;					// Messdaten Zeiger auf Messdatenstartseite im Flash
   fp.md_adr=0;										// Reset Messdaten Adresszeiger  
   fp.comment[0]=0;								// Kommentare reset  
-  for (i=0;i<MAX_PARSET;i++)			// für jeden Parametersatz
+  for (i=0;i<MAX_PARSET;i++)			// fï¿½r jeden Parametersatz
   {
    fp.led[i]=1;										// LED Anzeige aktiviert
    fp.eintage[i]=0;								// Einschalttage
    fp.tein[i]=0;									// Einschaltzeit
    fp.taus[i]=0;									// Ausschaltzeit
    fp.vmin[i]=fp.vmm;							// kleinste angezeigte Geschwindigkeit
-   fp.vmax[i]=Defmaxspeed;				// größte angezeigte Geschwindigkeit
+   fp.vmax[i]=Defmaxspeed;				// grï¿½ï¿½te angezeigte Geschwindigkeit
    fp.vblk[i]=Defmaxspeed+1;			// Schwelle blinkende Anzeige aus
    fp.vcol[i]=Defmaxspeed+1;			// Schwelle Farbumschaltung aus
    fp.vmix[i]=Defmaxspeed+1;			// Schwelle Mischfarbe aus  
@@ -372,7 +372,7 @@ void default_parameter (void)		// Setze überschreibbare Parameter auf Voreinstel
 
 int parameter_to_progmem (void)	// Schreibt Sicherungskopie des Parameterblocks in LPC1766 Programmspeicher
 {
- uchar const command[5] = {50, 52, 53, 50, 51}; // Liste auszuführender IAP Kommandos
+ uchar const command[5] = {50, 52, 53, 50, 51}; // Liste auszufï¿½hrender IAP Kommandos
  uchar i=0;																			// Laufvariable 
  IAP iap_entry;																	//  Zeiger auf IAP Funktionsaufruf
 	
@@ -381,7 +381,7 @@ int parameter_to_progmem (void)	// Schreibt Sicherungskopie des Parameterblocks 
  __disable_irq();										// Interrupts sperren
  do
  {
-  iap_data[0]=command[i++];					// Kommando und Parameterübergabe in Array
+  iap_data[0]=command[i++];					// Kommando und Parameterï¿½bergabe in Array
   if (i>=5) break;									// Ende wenn 5. Kommando 51 geladen
   iap_data[1]=7;										// Startsector
   iap_data[2]=7;										// Endsector
@@ -405,10 +405,10 @@ int parameter_to_progmem (void)	// Schreibt Sicherungskopie des Parameterblocks 
 }
 
 int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
-{									// Übergabe werkinit=0 Einschaltinitialisierung, Werkinitialisierung nur bei falscher Kennung
+{									// ï¿½bergabe werkinit=0 Einschaltinitialisierung, Werkinitialisierung nur bei falscher Kennung
 									//					werkinit=1 Werkinitialisierung 			
-									//					werkinit=2 Reset auf Standardparameter (Schaltschwellen, Zeitpläne, etc.)
- uint init=0;								// Rückgabe 1 bei Werkinitialisierung
+									//					werkinit=2 Reset auf Standardparameter (Schaltschwellen, Zeitplï¿½ne, etc.)
+ uint init=0;								// Rï¿½ckgabe 1 bei Werkinitialisierung
  uchar retry=4;							// 3+1 Versuche 
 
  if ((!werkinit) && flashsize)	    // Einschaltinitialisierung und Flash vorhanden?
@@ -422,17 +422,33 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
 																																// Messdatenzeiger der LPC Parameterkopie sind eventuell veraltet, daher
 		fp.md_page=md_pg_adr>>16;																		// NV GPREG Kopie des Messdatenzeigers verwenden 
 		fp.md_adr=md_pg_adr;																				// Adressteil kopieren
-		fp.md_start_page=fp.md_page;																// Sichtbare Messdaten löschen  
+		fp.md_start_page=fp.md_page;																// Sichtbare Messdaten lï¿½schen  
 	 }	 
    if ((fp.Kennung==FLASHKENNUNG)&&(fp.pKennung==PARAKENNUNG)) break;		// Parameter Kennungen in Ordnung?
 	 osDelay(100);
   } while (--retry);	// Bis zu 3 Versuche	
  } 
  
+ // FIX (5.96): fp.md_page/fp.md_start_page/fp.md_adr aus dem geladenen Parameterblock koennen
+ // ausserhalb des tatsaechlich installierten Flash-Bereichs liegen (beobachtet auf Board 269990:
+ // md_start_page=30913 bei nur maxpage=8191 gueltigen Seiten auf einem 4MB-Chip - Ursache dafuer
+ // noch nicht gefunden). Ohne diese Pruefung liest z. B. put_ascii_data()/send_vtf_file() ueber
+ // Zehntausende ungueltiger Seiten hinweg, bevor der einfache ==PROTOCOLPAGE-Ueberlaufcheck je
+ // greift (der nur bei EXAKTEM Treffer umschlaegt, nicht bei bereits ueberschrittenem Start).
+ if ((!werkinit) && flashsize && retry)
+ {
+  if ((fp.md_page>=PROTOCOLPAGE) || (fp.md_start_page>=PROTOCOLPAGE) || (fp.md_adr>=2*BLOCKSIZE))
+  {
+   puterror (DTC_FL_MD_PTR_INVALID, fp.md_page);		// F16003: ungueltiger Messdatenzeiger erkannt
+   fp.md_start_page=MEASUREPAGE; fp.md_page=MEASUREPAGE; fp.md_adr=0;	// auf sicheren Startwert
+   MQTT_send=fp.md_page<<16; MQTT_index=0; md_pg_adr=fp.md_page<<16;	// GPREG-Kopien mit reset
+  }
+ }
+
  if (!retry || (werkinit>0))	// Werkinitialisierung, Parameter reset oder falsche Kennung?
  {											
   if (!retry || (werkinit==1)) init=werkparameter ();	// Bei Kennung falsch oder Werkinitialiserung setze Werte der Werkinitialisierung   
-	default_parameter ();																// Setze überschreibbare Parameter auf Voreinstellung 	
+	default_parameter ();																// Setze ï¿½berschreibbare Parameter auf Voreinstellung 	
 	if (werkinit==2) protocol(DEF_PARAMETER);	// Reset auf Default Parameter protokollieren 	
  } // end if Werkinitialisierung, Parameter reset oder falsche Kennung
  
@@ -447,16 +463,16 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
    flash_pcom (probuf,fp.pro_page,FLASH_R_ARRAY,FLASHKGV);				// Protokollseite lesen      
    flash_pcom (vbuf,fp.md_page,FLASH_R_ARRAY,FLASHKGV);						// Aktuelle Messdatenseite lesen
   }
-  if (sizeof(fp)>(PARA_LEN)) puterror(PARAMETER_INIT_ERROR, -1); 	// Initialisierungsfehler Parameterarray zu groß 
+  if (sizeof(fp)>(PARA_LEN)) puterror(PARAMETER_INIT_ERROR, -1); 	// Initialisierungsfehler Parameterarray zu groï¿½ 
  } 
  else puterror (DTC_FL_WRITE_FAIL, -1);	// Flash Fehler ausgeben und protokollieren
 	
- fp.flash=flashsize;									// Inst. Speichergröße für Parameterblockausgabe bereit stellen  
+ fp.flash=flashsize;									// Inst. Speichergrï¿½ï¿½e fï¿½r Parameterblockausgabe bereit stellen  
  
  return (init);
 }
 
-void delete_data(void)			// Messdatenzeiger im Speicher löschen
+void delete_data(void)			// Messdatenzeiger im Speicher lï¿½schen
 { 
  fp.md_start_page=fp.md_page;	// Aktuellen Messdatenseite reset auf Startseite
  fp.md_adr=0; 								// Reset Messdatenzeiger Adressteil
@@ -466,7 +482,7 @@ void delete_data(void)			// Messdatenzeiger im Speicher löschen
  smstosend&=~(FULMEM|MEM95);	// reset Speicher voll Flags SMS Versand
 }
 
-void delete_protocol(void)			// Protokollzeiger im Speicher löschen
+void delete_protocol(void)			// Protokollzeiger im Speicher lï¿½schen
 { fp.pro_start_page=fp.pro_page; fp.pro_adr=0; }	// Reset Zeiger
 
 void read_flash (void)		// Terminalausgabe Flash Seite im Hexformat
@@ -513,7 +529,7 @@ uint anzahl_protokoll_ereignisse(void)		// Berechnet Anzahl der Protokollereigni
  anzpro=fp.pro_page-fp.pro_start_page;	// Anzahl Protokollseiten
  if (anzpro<0) anzpro+=(1+PROTOCOLENDPG-PROTOCOLPAGE);
  anzpro*=BLOCKSIZE/pagepk/PSATZLEN;		
- anzpro+=fp.pro_adr/PSATZLEN;		    // Anzahl Protokollsätze
+ anzpro+=fp.pro_adr/PSATZLEN;		    // Anzahl Protokollsï¿½tze
  return (anzpro);
 }
 
@@ -523,13 +539,13 @@ uchar mdata_to_flash (void)						// Schreibt Messdaten in Flash, wenn Puffer vol
 	
  if (!(fp.md_page-fp.md_start_page)&&!fp.md_adr) protocol(MESSBEGINN);	
 	
- fp.md_adr+=VSATZLEN;												// Byteadresse um Messdatensatzlänge erhöhen
+ fp.md_adr+=VSATZLEN;												// Byteadresse um Messdatensatzlï¿½nge erhï¿½hen
  if (fp.md_adr>=BLOCKSIZE/pagepk)						// Flashseite bzw. pagepk*256 Bytes voll?
  {   																				// Gespeichert werden 260,520,1030 Bytes/page
   flash_wbuf1 (vbuf,fp.md_page,maxbyte);		// Messdatenseite speichern   
   if ((fp.md_page+1)>=PROTOCOLPAGE) fp.md_page=MEASUREPAGE;	// Messdaten Seitenzeiger am Pufferende?
   else fp.md_page++;												// Messdatenseite inkrementieren
-  if (fp.md_page==fp.md_start_page) 				// Seitenzeiger Messdaten überschreibt Messdatenanfang?
+  if (fp.md_page==fp.md_start_page) 				// Seitenzeiger Messdaten ï¿½berschreibt Messdatenanfang?
   {
 	 memfull=1;																// Speicher voll	
    if ((fp.md_start_page+1)>=PROTOCOLPAGE)	// Messdatenstartseite am Pufferende?
@@ -537,10 +553,10 @@ uchar mdata_to_flash (void)						// Schreibt Messdaten in Flash, wenn Puffer vol
    else fp.md_start_page++;									// Messdatenstartseite inkrementieren
   }   
   fp.md_adr=0;									// Reset Byteadresse
-  flash_erase (fp.md_page, 1);	// aktuelle Messdatenseite löschen
+  flash_erase (fp.md_page, 1);	// aktuelle Messdatenseite lï¿½schen
  }	 // end Seite voll	
  md_pg_adr=(fp.md_page<<16)+fp.md_adr;			// Kopie Messdatenzeiger in GPREG4 sichern
- return (memfull);						// 1 wenn Daten im Messdaten Ringspeicher überschreiben 
+ return (memfull);						// 1 wenn Daten im Messdaten Ringspeicher ï¿½berschreiben 
 }	
 
 void store (uint speed, uint distance)	// Speicherung Geschwindigkeitsdaten im Flash
@@ -556,7 +572,7 @@ void store (uint speed, uint distance)	// Speicherung Geschwindigkeitsdaten im F
  {
 	if (mdata_to_flash ())								// Schreibe Messdaten in Flash
 	 if (!((interfaces&GSM_LINK)&&(fp.servertyp==MQTT)))	// Im MQTT Serverbetrieb nicht protokollieren
-	  protocol(MEMFULL);																	// Protokollmeldung Speicher voll, alte Messdaten werden überschrieben	 	
+	  protocol(MEMFULL);																	// Protokollmeldung Speicher voll, alte Messdaten werden ï¿½berschrieben	 	
  } // end if Flash vorhanden 	 
 }
 

@@ -69,6 +69,7 @@
 /* --- Subsystem 16: Flash/Speicher (flash.c) ------------------------ */
 #define DTC_FL_WRITE_FAIL       16001   /* Schreiben fehlgeschlagen */
 #define DTC_FL_PARAM_INIT       16002   /* Parameter-Initialisierung fehlgeschlagen */
+#define DTC_FL_MD_PTR_INVALID   16003   /* Messdatenzeiger ausserhalb des installierten Flash-Bereichs */
 
 /* --- Subsystem 17: System (main.c) --------------------------------- */
 #define DTC_MA_I2C_BUS          17001   /* I2C-Bus Fehler beim Start */

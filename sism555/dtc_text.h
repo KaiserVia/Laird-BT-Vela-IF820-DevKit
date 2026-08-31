@@ -94,6 +94,7 @@ static const dtc_entry_t dtc_table[] = {
   {15004,'F',"GPS Fehler"},
   {16001,'F',"Schreiben fehlgeschlagen"},
   {16002,'F',"Parameter-Initialisierung fehlgeschlagen"},
+  {16003,'F',"Messdatenzeiger ausserhalb des installierten Flash-Bereichs"},
   {17001,'F',"I2C-Bus Fehler beim Start"},
   {17002,'F',"I2C Geraet fehlt"},
   {17003,'F',"I2C DPP fehlt"},

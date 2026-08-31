@@ -3594,36 +3594,29 @@ nicht dokumentiert (siehe Update direkt oberhalb); der eine Classic-Download-Aus
 bei Gelegenheit wiederholt werden, um "einmaliger Reconnect-Glitch" von "seltener aber echter
 Bug" zu unterscheiden.
 
-## Offener Firmwarefehler: Messdatenexport kann leere Flashseiten bis zum Ringpufferende senden (2026-08-27)
+## Untersuchung YMODEM-Abbruch: kein Flashzeigerfehler belegt (2026-08-27)
 
-**Reproduktion:** Nach dem Loeschen der Messdaten und dem anschliessenden Erzeugen von 100
-Test-Messwerten wird beim Export ein langer Strom von 1-KiB-Ymodem-Bloecken mit `0xFF` gelesen.
-Der Effekt tritt nicht nur im Python-Testtool auf, sondern auch beim Export mit Viagraph ueber
-RS232. Damit ist er unabhaengig von BLE, Windows-SPP und dem Empfaengerprogramm reproduziert.
+**Korrektur eines frueheren Verdachts:** Der lange Download ist im aktuellen Modul-Suite-Lauf
+erwartet. Die vor dem YMODEM-Header ausgegebene Firmwarediagnose lautet
+`md_start_page=5137 md_page=5028 md_adr=500 anzmw=419430`; der Zaehlwert entspricht damit exakt
+den 419430 erzeugten Test-Messwerten. Die vom Python-Empfaenger verworfenen Bytes sind dieser
+Diagnosetext, nicht Flashdaten und kein YMODEM-Protokollfehler.
 
-**Soll:** 100 Messwerte mit je 10 Byte ergeben zuzuerglich VTF-, Parameter- und
-Protokollbloecken nur wenige Ymodem-Bloecke. Der Export muss danach `EOT` senden.
+**Tatsaechlicher Abbruch:** Der BLE-Download lief anschliessend mit stabilen rund 6750 B/s bis
+zu 2620 Bloecken beziehungsweise 2 682 880 Byte. Danach kam ein unvollstaendiger Block und die
+BLE-Verbindung war bereits geschlossen (`Not connected`), sodass weder NAK noch CAN an das
+Geraet gesendet werden konnten. Die folgenden BLE-Verbindungsversuche fanden die Adresse nicht
+mehr. Das belegt einen Verbindungsabbruch waehrend des Transfers, aber keinen Fehler in der
+Flashbereichsberechnung oder der YMODEM-Exportschleife.
 
-**Ist:** Die Firmware sendet weitere Flashseiten, obwohl diese geloescht sind. `0xFF` ist dabei
-der Inhalt einer geloeschten Flashzelle; das regulare VTF/Ymodem-Auffuellen verwendet dagegen
-`CPMEOF` (`0x20`). Der Sender wartet vor jedem weiteren Block auf das `ACK` des Empfaengers;
-die grosse Datenmenge entsteht daher auf der Firmwareseite und nicht durch eine Endlosschleife
-des Empfaengers.
+**Empfaengerkorrektur:** Fuehrende Nicht-YMODEM-Bytes werden im Python-Testtool seitdem bis zum
+naechsten `SOH`/`STX` ohne NAK und ohne Verbrauch des Block-Retrybudgets verworfen. Echte
+Blockfehler behalten das bisherige NAK-/Retryverhalten; bei einem lokalen Abbruch sendet das Tool
+`CAN CAN CAN`, sofern die Verbindung noch besteht.
 
-**Codeursache:** `messdaten()` berechnet die Anzahl `anzmw` und uebergibt sie an
-`send_vtf_file(anzmw, 1)`. `send_vtf_file()` verwendet `anzwerte` fuer die im Ymodem-Header
-angekuendigte Dateilaenge, begrenzt den eigentlichen Messdatenexport jedoch ausschliesslich
-ueber `fp.md_start_page`, `fp.md_page` und `fp.md_adr`. Stimmen diese Zeiger nicht zum zuvor
-berechneten Zaehlwert, kann der Header eine kleine Datei ankundigen, waehrend die Seiten-Schleife
-einen grossen Bereich geloeschter Seiten uebertraegt.
-
-**Erforderliche Korrektur:** Vor dem Aufbau des Ymodem-Headers einen konsistenten Snapshot von
-Messdatenstart, aktuellem Schreibzeiger und Byteanzahl bilden. Die Exportschleife muss zusaetzlich
-eine feste Restlaenge von `10 * anzwerte` fuehren und nach genau dieser Nutzdatenmenge enden;
-nur der letzte 1-KiB-Block darf mit `CPMEOF` aufgefuellt werden. Headerlaenge und tatsaechlich
-gesendete Nutzdaten verwenden dann dieselbe Momentaufnahme. Danach den Fall
-"loeschen -> 100 schreiben -> Export" sowohl per RS232/Viagraph als auch per Classic und BLE
-gegenpruefen.
+**Noch zu untersuchen:** Ursache des BLE-Disconnects nach etwa sieben Minuten unter laufendem
+Transfer. Die Firmware empfängt pro Block ein ACK; `UART1_IRQHandler()` setzt dabei `bt_time`
+zurueck. Der 6-Minuten-Inaktivitaetstimeout erklaert den Abbruch daher nicht unmittelbar.
 
 ## Testlauf 2026-08-26: BLE-Datenkanal per Testsuite belegt + Antwort an die App-Seite
 
@@ -3736,3 +3729,65 @@ Schutzmassnahmen, kein Fix der Wurzelursache.
 Diagnosezeile (`md_start_page=... md_page=... md_adr=... anzmw=...`) direkt vor dem fehlerhaften
 Export ablesen und hier dokumentieren - das ist die fehlende Evidenz, um die eigentliche
 Root Cause endlich einzugrenzen.
+
+## Update 5.96: BEWEIS gefunden (Board 269990) - md_start_page ausserhalb des Flash-Bereichs + Bounds-Check
+
+**Board 269990 (Serial 26SC9992), Firmware 5.94** zeigte dasselbe Symptom ("Scheisse beim
+Messdaten ausgeben"). Diesmal gelang der Beweis OHNE Neuflashen, ueber bereits vorhandene,
+rein lesende Diagnosewege in 5.94 (kein Risiko, den Fehler durch die Pruefung selbst zu
+verdecken):
+
+- Hauptmenue -> 1: `Anzahl Messwerte = 3507` - unauffaellig, plausibel.
+- Funkmodems -> 2 -> Ctrl-G -> 5 (`get_mqtt_ind()`, alle Felder nur mit Enter durchgeklickt,
+  NICHTS veraendert): `MD_start: 30913` - reproduzierbar identisch bei zweimaliger Abfrage.
+- Testmenue -> 2 (Flash Speicher, Abfrage NICHT bestaetigt - waere Datenloeschung!): Ausgabe
+  "4 MB Flash Speicher installiert".
+
+**Der Beweis:** Fuer einen 4-MB-Flash-Chip gilt laut `flash.c` (`InitSPIFlash()`, Case `0x27`):
+`maxpage=8191` - also sind NUR die Seiten 0...8191 real vorhanden. `fp.md_start_page=30913`
+liegt fast 4x ausserhalb dieses Bereichs. Das ist keine leichte Abweichung, sondern eindeutig
+und beweisbar eine ungueltige, korrupte Zeigerposition.
+
+**Warum das nicht sofort als Absturz auffaellt:** Der vorhandene Ringpuffer-Ueberlauf-Schutz
+(`if (seite==PROTOCOLPAGE) seite=MEASUREPAGE;` in `send_vtf_file()`/`put_ascii_data()`) prueft
+nur auf EXAKTEN Treffer beim Hochzaehlen - ein Zeiger, der bereits weit VOR dem ersten Zaehl-
+schritt ausserhalb liegt, trifft diese Grenze nie exakt und laeuft stattdessen sehr lange durch
+ungueltige Seitennummern (in `put_ascii_data()` beobachtet als scheinbares "Einfrieren" - tatsaech-
+lich vermutlich kein Hardware-Hang, siehe unten, sondern ein sehr langer, aber endlicher Marsch
+durch ungueltige Adressen).
+
+**Nachtrag zum vermuteten "Einfrieren":** Ein Reconnect des RS232-Terminals (ohne Reflash, ohne
+Neustart - kein Boot-Banner beim Reconnect sichtbar) stellte die Verbindung wieder her, und
+`MD_start` las sich danach identisch (`30913`) aus. Das Geraet lief also vermutlich die ganze
+Zeit weiter - das "Einfrieren" war wahrscheinlich ein Terminal-/COM-Port-seitiges Problem
+(bereits an anderer Stelle in diesem Dokument als bekannte Windows-COM-Eigenart vermerkt),
+kein echter Firmware-Hang. Bleibt als Nebenbefund, nicht abschliessend geklaert.
+
+**Root Cause der Korruption selbst: weiterhin NICHT gefunden.** Wir wissen jetzt zweifelsfrei
+DASS der Zeiger korrupt wird und WIE das sich auswirkt - aber nicht WARUM/WODURCH `md_start_page`
+(und wahrscheinlich `md_page`) auf einen Wert jenseits des gueltigen Flash-Bereichs gelangt.
+
+**Fix (flash.c, `InitParameter()`):** Nach dem Laden des Parameterblocks (egal ob aus externem
+Flash oder aus der LPC-internen Kopie via GPREG-Fallback) wird jetzt geprueft, ob `fp.md_page`,
+`fp.md_start_page` oder `fp.md_adr` ausserhalb des durch `maxpage`/`PROTOCOLPAGE` tatsaechlich
+gueltigen Bereichs liegen. Falls ja: neuer Diagnose-Code **F16003** ("Messdatenzeiger ausserhalb
+des installierten Flash-Bereichs") wird protokolliert, und die Zeiger werden auf einen sicheren
+Startwert (`MEASUREPAGE`, leerer Puffer) zurueckgesetzt - inklusive der GPREG-Kopien
+(`MQTT_send`, `MQTT_index`, `md_pg_adr`), damit der Reset konsistent bleibt und nicht durch den
+naechsten Kennung-Lesefehler wieder rueckgaengig gemacht wird.
+
+Das ist eine Absicherung GEGEN die Auswirkung der Korruption (verhindert, dass ein bereits
+kaputter Zeiger je wieder benutzt wird), aber noch nicht der Fix FUER die Korruption selbst -
+die Ursache dafuer bleibt offen. Ergaenzt (nicht ersetzt) den in 5.95 eingebauten Sicherheitsnetz
+in der Export-Schleife.
+
+**Geaenderte Dateien:** flash.c, dtc_codes.h, dtc_text.h, Doku/Diagnose-Codes.csv,
+sprachen/sictxt.c (-> 5.96).
+
+**Am Geraet zu verifizieren:** 5.96 auf Board 269990 flashen (Achtung: der Reflash selbst
+setzt den kaputten Zustand vermutlich zurueck, siehe fruehere Beobachtung auf Board 269992 -
+das ist also KEIN Beweis, dass der Bounds-Check gegriffen hat). Der eigentliche Test des
+Bounds-Checks braucht ein Board, auf dem die Korruption NACH dem Flashen von 5.96 erneut
+auftritt (ohne zwischenzeitliches Neuflashen) - dann sollte F16003 im Protokoll erscheinen
+und `MD_start`/`Anzahl Messwerte` nach dem naechsten Boot wieder einen sauberen, kleinen
+Wert zeigen, statt die Korruption unveraendert durchzureichen.
