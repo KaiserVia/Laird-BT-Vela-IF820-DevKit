@@ -3901,3 +3901,49 @@ Loesung (CRC/Bereichspruefung ueber den gesamten Parameterblock).
 "Einstellungen:"-Liste zeigen; danach `D` druecken und einen Parameterblock-Download
 per XMODEM-1K/CRC versuchen (siehe Analyseplan), um die Korruption erstmals direkt als
 Hex-Dump zu untersuchen.
+
+## Update (kein Versionssprung): Rohen Parameterblock analysiert - Korruption per Hex-Dump bewiesen
+
+**Board 269990:** Nach dem 5.99-Fix war das Einstellungen-Menue wieder benutzbar. Ueber
+`Parameter_transfer()` (Hauptmenue -> 4 -> `D`, XMODEM-1K/CRC-Empfang am PC) wurde der rohe
+Parameterblock zweimal heruntergeladen: einmal VOR und einmal NACH einer vollstaendigen
+Werksinitialisierung (Testmenue -> Ctrl-W -> 5 -> `y`, `InitParameter(1)`).
+
+**Vorher (Hex-Dump, Byte-Offsets manuell aus `FlashSavedParameter` in `hard.h` berechnet):**
+- `md_start_page`/`md_page`/`md_adr` (Offset ~710-715): `49/49/0` - zu diesem Zeitpunkt bereits
+  saniert durch den 5.96/5.97-Bounds-Check, also nicht mehr korrupt.
+- `dmode` (Offset ~720): `0x10` (16) - unplausibel, Feld ist dokumentiert als 0/1.
+- **`fp.sprache` (Offset 721): `0x64` (100)** - eindeutig korrupt (gueltiger Bereich nur 0-2).
+  Erster direkter Byte-Beweis, nicht nur aus Symptomen abgeleitet.
+- Ab Offset ~1740 ein langer Lauf `0xFF` (unbeschriebener/geloeschter Flash-Zustand) genau im
+  Bereich der E-Mail/APN/Server-Konfigurationsfelder.
+
+**Nachher (nach `InitParameter(1)`/`werkparameter()`), an denselben Byte-Offsets:**
+- `dmode` = `0x00` - passt exakt zu `fp.dmode=0;` in `werkparameter()`.
+- `fp.sprache` = `0x00` - passt exakt zu `fp.sprache=Def_sprache;` (=0, Deutsch).
+- `fp.hoff` (Offset ~1738, aus der Struct-Reihenfolge hergeleitet) = `0x01` - passt EXAKT zu
+  `fp.hoff=1;` in `werkparameter()` - bestaetigt zugleich, dass die manuell berechnete
+  Offset-Kette bis dorthin korrekt war.
+- `hell[0..3]` = `100,100,100,100` (einheitlich, passt zu `Def_hell`), `farben`=2 (`Def_farben`).
+
+**Schlussfolgerung:** Die volle Werksinitialisierung hat die Korruption in allen bisher
+gefundenen Feldern (`md_page`-Familie, `dmode`, `sprache`, `hoff`) nachweislich beseitigt.
+Das stuetzt (ohne es endgueltig zu beweisen, da ein Werksinit jede der bisherigen Hypothesen
+gleichermassen "uebertuenchen" wuerde) die neue, in der Diskussion aufgekommene dritte
+Hypothese: das `FlashSavedParameter`-Struct ist ueber viele Firmwareversionen gewachsen
+(BT/GSM/MQTT/GPS/viaspeedcam-Felder kamen sukzessive dazu) - ein Parameterblock, der von
+einer AELTEREN Firmware-Version mit kleinerem/anders sortiertem Struct zuletzt vollstaendig
+initialisiert wurde und seither nur per Firmware-Update (nie per vollem Werksinit) weiter-
+gepflegt wurde, wuerde genau so ein Bild ergeben: manche Felder korrekt, manche korrupt/
+zufaellig, manche schlicht nie beschrieben (`0xFF`).
+
+**Naechster sinnvoller Schritt (Konsens aus der Diskussion):** kein weiteres Einzelfeld-Patchen
+mehr, sondern eine generelle Parameterblock-Integritaetspruefung (CRC-16 ueber den gesamten
+`fp`-Block, gespeichert und bei jedem Laden verifiziert, Fehlerfall gleichrangig zum
+bestehenden `Kennung`/`pKennung`-Mismatch behandelt -> loest automatisch denselben
+`werkparameter()`/`default_parameter()`-Neuaufbau aus). Neuer Diagnose-Code vorgeschlagen:
+`F16004 Parameterblock-Pruefsummenfehler` (breiter als das bestehende `F16003`, das nur den
+Einzelfall "Messdatenzeiger ausserhalb des Bereichs" abdeckt). Noch NICHT umgesetzt - siehe
+`Doku/Analyseplan_Messdatenzeiger-Korruption.md` (ueberarbeitet) fuer Umfang und geplantes
+Vorgehen; bewusst als groesserer, sorgfaeltig zu planender Schritt zurueckgestellt, nicht als
+schnelle Einzelaenderung.
