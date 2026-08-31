@@ -564,9 +564,10 @@ int ja (text *s)				// Pr�ft Eingabe ob Ja oder Nein
  c=getc(TERMINAL_CHAR_TIMEOUT);		// Warte 30s auf Antwort
 
  if (c!='C') c|=0x20; 				// -> Kleinschreibung
- else return (c);					// Einleitung Modemdialog     
+ else return (c);					// Einleitung Modemdialog
 
- if ((c == T_ja[fp.sprache]) | (c == 'y')) result=1;  	// 'Yes' 
+ if (fp.sprache>ANZSPRACHEN-1) fp.sprache=0;	// FIX: ungueltiger/korrupter Wert wuerde T_ja[]/T_nein[] ausserhalb lesen
+ if ((c == T_ja[fp.sprache]) | (c == 'y')) result=1;  	// 'Yes'
  else if (c == T_nein[fp.sprache]) result=-1;			// 'Nein'
  else result=0; 
  if (result) putc (c);              					// echo     

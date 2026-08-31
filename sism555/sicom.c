@@ -128,7 +128,8 @@ void parametermenue	(void)	// Parametermen�
  put_menuitem (T_tmen, '2');																			// Men�punkt "2. Zeitplanung .. ausgeben
  putparameter (T_bdir,0,(3<<16)|('3'<<8),&T_offon[fp.bdir][0]); 	// Ausgabe Status bidirektionale Erfassung
  put_menuitem (T_vopt, '4');																			// Optionen Geschwindigkeitsanzeige
- putparameter (T_brght,0,(3<<16)|('5'<<8),&T_brsel[fp.hoff][0]);	// Anzeigeoptimierung ausgeben	
+ if (fp.hoff>2) fp.hoff=0;		// FIX: ungueltiger/korrupter Wert wuerde T_brsel[] weit ausserhalb lesen (endlose Garbage-Ausgabe)
+ putparameter (T_brght,0,(3<<16)|('5'<<8),&T_brsel[fp.hoff][0]);	// Anzeigeoptimierung ausgeben
  put_menuitem (T_ext, '6');																				// Men�punkt "Schaltschwellen Erweiterungen.. ausgeben	
  putparameter (T_rsens,20*(fp.sense+1),(1<<16)|('7'<<8), T_perc);	// Parameter Radar sensitivity 0...4 f�r 20% - 100%	
 
@@ -256,6 +257,7 @@ void werkeinstellung (uchar gesamt)		// Ausgabe der Werksparameter
  else newline();	
  if (gesamt) putparameter(T_hwrev, 0, (7<<16),fp.hwVersion); 		// Harware Revision ausgeben		
  putstr(T_sprache+1);									// Text "Language: ...
+ if (fp.sprache>ANZSPRACHEN-1) fp.sprache=0;	// FIX: ungueltiger/korrupter Wert wuerde T_spritm[] weit ausserhalb lesen
  putln(&T_spritm[fp.sprache][0]);			// Gew�hlte Programmsprache
  if (gesamt) putparameter(T_sende,fp.TxF,(1<<16),T_MHz); 	// Parameter Sendefrequenz
  putstr(T_dimm);											// Dimm/PWM Modus f�r LED

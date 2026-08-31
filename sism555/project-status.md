@@ -3854,3 +3854,50 @@ Firmware-Bug im eigentlichen Exportpfad.
 
 **Am Geraet zu verifizieren:** Viagraph-Download auf Board 269990 erneut versuchen - sollte jetzt
 wieder normal Fortschritt zeigen statt bei 0 kB zu haengen.
+
+## Update 5.99: FIX zwei weitere ungeschuetzte Feldzugriffe - Korruption ist NICHT auf md_page begrenzt
+
+**Neuer Befund (Board 269990):** Hauptmenue -> 4 (Einstellungen) fuehrte zu endloser Garbage-
+Ausgabe (Flut von `ÿ`/0xFF-Zeichen ohne Ende). Ursache: die Menueanzeige selbst liest
+`T_brsel[fp.hoff][0]` ([sicom.c:131](sicom.c)) OHNE jede Bereichspruefung - ein korrupter,
+zu grosser `fp.hoff`-Wert (Array hat nur 3 Eintraege) liest weit ausserhalb des Arrays und
+gibt den dort gefundenen Speicherinhalt so lange aus, bis zufaellig eine Null-Byte gefunden
+wird (kann sehr lange dauern -> "endlose" Ausgabe).
+
+**Damit ist bewiesen:** die Korruption auf diesem Board betrifft NICHT nur `md_page`/
+`md_start_page`/`md_adr` - mindestens auch `fp.hoff` (Anzeigeoptimierung) und vermutlich
+`fp.sprache` (siehe vorheriger Verdacht, noch nicht mit dem defekten Board direkt bestaetigt,
+da der unklammerte Lesezugriff selbst schon dieses Menue unbenutzbar machte). Alle drei Felder
+liegen im selben Bereich des `FlashSavedParameter`-Structs, nahe beieinander (`md_start_page`/
+`md_page`/`md_adr` bei Byte-Offset ~kurz vor `sprache`, `hoff` etwas weiter dahinter) - staerkt
+die Hypothese einer REGIONALEN Korruption (torn write ODER Pufferueberlauf aus den davor
+liegenden Schaltergruppen-Arrays `swno`/`swexp`/`swport`/`nosw`, noch nicht abschliessend
+untersucht) statt eines auf `md_page` beschraenkten Einzelfalls.
+
+**Praktisches Problem:** Der unklammerte `fp.hoff`-Zugriff blockierte den Zugang zum
+"Parameter Xmodem up-/download" (`Parameter_transfer()`, erreichbar nur ueber genau dieses
+Einstellungen-Menue) - ohne Fix war also nicht einmal mehr moeglich, den rohen Parameterblock
+zwecks weiterer Analyse herunterzuladen.
+
+**Fix (sicom.c, sio.c):** dieselbe Klammerung wie bereits in `sprachauswahl()` (sio.c) jetzt
+auch an den beiden anderen bekannten ungeschuetzten Stellen ergaenzt:
+- `sicom.c` Zeile ~131 (`parametermenue()`): `fp.hoff` auf `0` geklammert, wenn `>2`
+  (T_brsel hat 3 Eintraege), bevor `T_brsel[fp.hoff]` gelesen wird.
+- `sicom.c` Zeile ~259 (`werkeinstellung()`): `fp.sprache` auf `0` geklammert, wenn
+  `>ANZSPRACHEN-1`, bevor `T_spritm[fp.sprache]` gelesen wird.
+- `sio.c` `ja()`: dieselbe Klammerung fuer `fp.sprache` vor dem Vergleich mit
+  `T_ja[fp.sprache]`/`T_nein[fp.sprache]` ergaenzt (erklaert das fruehere "j funktioniert
+  nicht"-Symptom).
+
+**Bewusst NICHT geaendert:** dies sind weiterhin gezielte Einzel-Patches an bekannt
+unsicheren Lesestellen, kein systematischer Schutz. Es koennen noch weitere, bisher nicht
+gefundene ungeschuetzte Zugriffe auf andere Felder in diesem Struct-Bereich existieren - siehe
+Analyseplan (`Doku/Analyseplan_Messdatenzeiger-Korruption.md`) fuer die geplante umfassendere
+Loesung (CRC/Bereichspruefung ueber den gesamten Parameterblock).
+
+**Geaenderte Dateien:** sicom.c, sio.c, sprachen/sictxt.c (-> 5.99).
+
+**Am Geraet zu verifizieren:** Hauptmenue -> 4 sollte jetzt ohne Garbage-Flut die
+"Einstellungen:"-Liste zeigen; danach `D` druecken und einen Parameterblock-Download
+per XMODEM-1K/CRC versuchen (siehe Analyseplan), um die Korruption erstmals direkt als
+Hex-Dump zu untersuchen.
