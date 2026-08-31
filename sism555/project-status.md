@@ -3947,3 +3947,37 @@ Einzelfall "Messdatenzeiger ausserhalb des Bereichs" abdeckt). Noch NICHT umgese
 `Doku/Analyseplan_Messdatenzeiger-Korruption.md` (ueberarbeitet) fuer Umfang und geplantes
 Vorgehen; bewusst als groesserer, sorgfaeltig zu planender Schritt zurueckgestellt, nicht als
 schnelle Einzelaenderung.
+
+## Update (kein Versionssprung): Speicherplatz-Pruefung fuer A/B-Doppelpufferung des Parameterblocks
+
+**Frage:** Reicht der verfuegbare Flash-Speicherplatz fuer eine A/B-Doppelpufferung (Ping-Pong
+mit Sequenznummer) des Parameterblocks, als robusteste Loesung gegen Torn Writes (siehe
+Analyseplan, Abschnitt 3)? Ressourcen sind begrenzt, daher vor einer Design-Entscheidung
+gegengeprueft.
+
+**Ergebnis: Ja, ohne jede Einschraenkung der Messdaten-Kapazitaet.** Das bestehende Speicher-
+layout (`hard.h`) reserviert bereits einen ungenutzten 5-kB-Puffer explizit fuer genau diesen
+Zweck:
+
+```c
+#define PARAMBLOCKS   2   // Parameterblock = 2x1k = 2048 Byte (entspricht dem gezogenen Hex-Dump)
+#define FREEBLOCKS    5   // "5k zwischen Protokoll und Parametern frei ... z. B. fuer Parameter Upload"
+#define PROTBLOCKS    2   // Protokoll = 2x1k
+```
+
+Speicherlayout (von niedriger zu hoher Adresse): `[Messdaten: 0..PROTOCOLPAGE] [Protokoll: 2k]
+[frei/reserviert: 5k] [Parameter: 2k] [Chip-Ende]`. Eine zweite Parameterblock-Kopie braucht nur
+2 weitere 1k-Bloecke - passt bequem in die bereits reservierten 5k (3 Bloecke blieben noch frei),
+OHNE `PROTOCOLPAGE` zu verschieben - die Messdaten-Ringpuffer-Kapazitaet ist davon vollstaendig
+unberuehrt.
+
+**Groessenordnung gegenueber der Gesamtkapazitaet:** selbst auf dem kleinsten unterstuetzten
+Flash-Chip (512 kB, `maxpage=2047`) macht Protokoll+frei+Parameter zusammen nur ca. 9 kB aus
+(<2 % der Gesamtkapazitaet) - auf dem in den aktuellen Boards verbauten 4-MB-Chip ist es
+verschwindend gering. Eine Verdopplung des Parameterblocks ist auf JEDER unterstuetzten
+Chip-Variante ohne spuerbaren Kapazitaetsverlust moeglich.
+
+**Konsequenz fuer den Analyseplan:** die A/B-Doppelpufferung (bisher als "aufwendigste Option"
+eingestuft) ist ressourcenseitig uneingeschraenkt machbar - der Aufwand liegt ausschliesslich
+im Software-Design (Sequenznummer, atomarer "welcher Slot ist aktuell"-Marker, Anpassung aller
+drei Schreibstellen), nicht im verfuegbaren Speicherplatz.
