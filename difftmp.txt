@@ -1,0 +1,581 @@
+diff --git a/sism555/btio.c b/sism555/btio.c
+index 388e8a7..3c2992e 100644
+--- a/sism555/btio.c
++++ b/sism555/btio.c
+@@ -49,8 +49,8 @@ bool bt_command (text * command, text * answer, int pause) // Bluetooth Kommando
+  connect=UART1;                            // Kommando NUR ans Modul senden (kein roher Mix am Terminal)
+  putstr (command);
+ 
+- bxi=rxi;                                  // Empfangspuffer-Indizes gleichsetzen
+- result = wait_message (answer,timeout);   // auf Antwort warten
++ bxi1=rxi1;                                 // FIX (5.89): rbuf1 (Command-Mode-Puffer), nicht rbuf
++ result = wait_message1 (answer,timeout);  // auf Antwort warten (liest aus rbuf1)
+ 
+  osDelay (2);
+  connect=concpy;                           // urspruengliche Verbindung wiederherstellen
+@@ -92,7 +92,7 @@ int bt_get_flowcontrol (void)        // Abfrage: -1=unbekannt, 0=aus, 1=an
+    uchar tries;
+    for (tries=0; tries<3; tries++)                    // GTU direkt nach /PING liefert manchmal keine Antwort -> Retry
+    {
+-    bxi=rxi;                                           // RX-Reste (z. B. /PING-Nachlauf) verwerfen
++    bxi1=rxi1;                                          // RX-Reste (z. B. /PING-Nachlauf) verwerfen
+     if (bt_command(T_gtu,T_gtu_d,400))                 // GTU senden, Antwort bis ",D=" in cbuf
+     {
+      p = strstr(cbuf,",F=");                           // Flow-Control-Feld suchen
+@@ -163,10 +163,10 @@ int bt_get_cod (void)                // -1 = keine Antwort, 0 = abweichend, 1 =
+  char buf[64]; uchar n=0, i; char *p; uchar dconn=connect;
+  if (fp.btmodem!=IF820) return (-1);
+  connect=UART1; putstr(T_gbtdc);                       // "GBTDC\r" an das Modul
+- bxi=rxi;                                              // RX-Marke
++ bxi1=rxi1;                                            // RX-Marke (rbuf1, 5.89)
+  connect=dconn & ~UART1;                               // nichts zurueck ans Modul spiegeln
+  osDelay(200);                                         // Antwort abwarten (kurze, feste Antwort)
+- while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
++ while (bxi1!=rxi1 && n<sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
+  buf[n]=0; connect=dconn;
+  p=strstr(buf,"C=");                                   // CoD-Feld der GBTDC-Antwort
+  if (!p) return (-1);                                  // keine/keine verwertbare Antwort
+@@ -256,9 +256,9 @@ int bt_get_echo (void)               // -1 = keine Antwort, 0 = Echo an, 1 = Ech
+  if (fp.btmodem!=IF820) return (-1);
+  for (t=0; t<3; t++)                                   // Retry: erster Read kann leer sein (vermeidet
+  {                                                     //         sonst einen unnoetigen Reflash+Reboot)
+-  n=0; connect=UART1; putstr(T_gpem); bxi=rxi;         // GPEM ans Modul, RX-Marke
++  n=0; connect=UART1; putstr(T_gpem); bxi1=rxi1;       // GPEM ans Modul, RX-Marke (rbuf1, 5.89)
+   connect=dconn & ~UART1; osDelay(200);               // nichts spiegeln, Antwort abwarten
+-  while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
++  while (bxi1!=rxi1 && n<sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
+   buf[n]=0; connect=dconn;
+   p=strstr(buf,"M=");                                  // Echo-Feld (im Header/GPEM kein "M=")
+   if (p) return ((p[2]=='0'&&p[3]=='0') ? 1 : 0);      // M=00 -> Echo aus
+@@ -343,13 +343,27 @@ int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders,
+ }
+ 
+ void bt_reboot (void)   // IF820: /RBT senden + auf Boot warten (Classic-Name wird dann live)
+-{
+- uchar cc=connect, w;
+- connect|=UART1; putstr(T_rbt); connect=cc;          // /RBT senden
+- bxi=rxi;
+- for (w=0; w<6; w++) { osDelay(1000); ResetWDT(); putc('.'); if (bxi!=rxi) break; }  // auf Boot-Ausgabe warten
+- osDelay(1500); ResetWDT();                          // Modul fertig booten lassen (UART/RTS erst dann bereit)
+- newline(); bxi=rxi;                                 // RX leeren
++{                        // TEMPORAER (5.85): Boot-Ausgabe jetzt sichtbar statt verworfen (vorher
++                          // bxi=rxi direkt nach dem Warten - was das Modul in dieser Zeit sagt,
++                          // war nie zu sehen). Damit laesst sich ein Reboot-Verify-Fehlschlag
++                          // (F11018) live nachvollziehen.
++ uchar cc, w; char c; uint t0=mstimer; bool bol=TRUE;
++ cc=connect; connect|=UART1; putstr(T_rbt); connect=cc;   // /RBT senden
++ bxi1=rxi1;                                // FIX (5.89): rbuf1 (Command-Mode-Puffer)
++ cc=connect; connect=concpy & ~UART1;      // Rohausgabe nur ans Terminal, nichts zurueck ans Modul
++ for (w=0; w<8; w++)                       // ~8s Gesamtwartezeit (vorher 6s+1.5s, hier durchgehend
++ {                                          // mitgelesen statt nur teilweise verworfen)
++  osDelay(1000); ResetWDT();
++  while (bxi1!=rxi1)
++  {
++   c = rbuf1[++bxi1];
++   if (c=='\r') continue;                  // CR ueberspringen, LF traegt den Zeilenumbruch
++   if (bol) { putc('['); putnumber(mstimer-t0,0); putstr("ms] "); bol=FALSE; }
++   putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
++   if (c=='\n') bol=TRUE;
++  }
++ }
++ newline(); connect=cc; bxi1=rxi1;
+ }
+ 
+ bool bt_set_name (void)              // Name = VIASIS_<serno> schreiben (SDN$ -> RAM+Flash)
+@@ -386,10 +400,10 @@ void bt_show_name (void)             // aktuellen BT-Namen vom Modul lesen und a
+  char buf[80]; uchar n=0, i; char *p; uchar dconn=connect;
+  if (fp.btmodem!=IF820) return;      // derzeit nur IF820 (RN4678/Laird: GN bzw. AT+BTN? -> TODO)
+  connect=UART1; putstr(T_gdn);       // "GDN\r" an das Modul
+- bxi=rxi;                            // RX-Marke
++ bxi1=rxi1;                          // RX-Marke (rbuf1, 5.89)
+  connect=dconn & ~UART1;             // Ausgabe nur ans Terminal, nicht zurueck ans Modul
+  osDelay(200);                       // Antwort abwarten
+- while (bxi!=rxi && n<sizeof(buf)-1) buf[n++]=rbuf[++bxi];
++ while (bxi1!=rxi1 && n<sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
+  buf[n]=0;
+  newline();                          // eigene Zeile (nicht an vorherige Meldung kleben)
+  put2str(T_btname,T_ist);            // Label "Device name ..."
+@@ -460,7 +474,7 @@ void bt_disconnect (void)
+  bt_command(T_dis, T_disok, -300);          // /DIS still senden (kein Terminal-Spam), Antwort abwarten
+  osDelay(50);                               // kurze Nachlaufzeit fuer die Modul-Antwort
+  bt_release();                              // CYSPP wieder als Eingang
+- bxi=rxi;                                   // RX-Reste (/DIS-Antwort) verwerfen -> nichts ins Terminal/Menue
++ bxi1=rxi1;                                 // FIX (5.89): RX-Reste (/DIS-Antwort) liegen jetzt in rbuf1
+  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
+ }
+ 
+@@ -503,48 +517,89 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
+ // "lokal/Modul-initiiert" (0x0916, passt zur CYSPP-Pin-Theorie) von "Supervision-Timeout"
+ // (0x0908, eher RF/Brownout).
+ //
+-// WICHTIG (5.62-Fix): KEIN getkey()/Traffic-abhaengiger Abbruch. rbuf/bxi/rxi ist EIN
+-// gemeinsamer Ringpuffer fuer UART0 (Terminal) UND UART1 (BT/GSM, siehe hard.c ISRs) -
+-// getkey() bricht bei JEDEM neuen Byte ab, auch bei BT-Modul-Traffic. Genau der soll hier
+-// aber laufend beobachtet werden -> die Funktion brach bisher bei der ersten Modul-Zeile
+-// sofort ab, und das dabei ungelesene Byte landete anschliessend im normalen Menue-Zeichen-
+-// leser (getc()/getbyte(), dieselben bxi/rxi) und wurde dort faelschlich als Tastatureingabe
+-// verarbeitet -> selbststaendige Menuenavigation. Fix: feste Laufzeit, kein Fruehausstieg.
++// WICHTIG (5.81-Neubau): Fruehere Fassungen (5.62-5.80) lasen rbuf ueber denselben Index
++// (bxi), den auch mainmenu()/PIN-Abfrage benutzen, und blockierten dafuer 180s lang die
++// gesamte Hauptschleife. Das machte den Sniffer zum alleinigen "Besitzer" des gemeinsamen
++// Ringpuffers waehrend seiner Laufzeit - jede ECHTE Eingabe (Menue, vor allem eine gerade
++// laufende BT-PIN-Abfrage) wurde dabei als Rohdaten mitgelesen und verworfen, statt bei
++// mainmenu() anzukommen (siehe project-status.md Update 5.79/5.80 fuer die Bug-Historie).
++// Neubau: der Sniffer bekommt einen EIGENEN, unabhaengigen Leseindex (sniff_i), der rxi
++// genau wie bxi verfolgt, aber bxi selbst nie anfasst. mainmenu() bekommt dadurch exakt
++// dieselben Bytes wie ohne Sniffer - der Sniffer ist ein reiner Mitleser, kein Verbraucher.
++// Start/Ende laufen nicht mehr blockierend: bt_event_sniff() setzt nur den Startzustand und
++// kehrt sofort zurueck, bt_sniff_poll() (aus measure.c's Hauptschleife, einmal je Durchlauf)
++// liest non-blocking nach und gibt am RS232-Terminal aus. Kein osDelay(), kein Blockieren -
++// das Hauptmenue bleibt waehrend der gesamten 180s normal bedienbar.
++// FIX (5.89): Sniff liest aus rbuf1 (UART1-Command-Mode-Puffer) - das ist ohnehin genau der
++// Puffer, in dem die interessanten @E,.../@R,...-Ereignisse landen (die treten per Definition
++// nur auf, waehrend die CYSPP-Bruecke NICHT aktiv ist).
++// FIX (5.92): KEIN eigener Leseindex mehr (fruehere sniff_i) - der war vom eigentlichen
++// Ueberlauf-/Wiederfreigabe-Mechanismus (bxi1, siehe UART1_IRQHandler/measure.c) komplett
++// entkoppelt. Die 5.91-Ergaenzung ("rbuf1 immer leeren") hielt dadurch nur sniff_i aktuell,
++// NICHT bxi1 - der Puffer konnte aus bxi1s Sicht trotzdem volllaufen und den UART1-Interrupt
++// dauerhaft abschalten (genau das vom Anwender wiederholt beobachtete "Modul antwortet auf
++// KEINER Baudrate mehr" - kein Hardware-Defekt, sondern unser eigener abgeschalteter
++// Empfangsinterrupt). Fix: bt_sniff_poll() liest jetzt ueber bxi1 - denselben Index, den auch
++// bt_command() und die Ueberlauf-Wiederfreigabe in measure.c benutzen. Nur EIN Verbraucher-
++// Index fuer rbuf1, konsistent mit der Ueberlauflogik.
++static bool sniff_active=FALSE;
++static uint sniff_t0;                         // Startzeitpunkt (mstimer) fuer Dauer und Zeitstempel
++static bool sniff_bol;                        // Zeilenanfang (fuer Zeitstempel je Zeile)
++#define SNIFF_DURATION_MS  180000UL           // 180s, deckt einen kompletten "--runs 3"-Durchlauf
++                                               // von ble_cyspp_probe.py ab (Connect allein dauert
++                                               // bei diesem Setup 13-30s je Versuch)
++
+ void bt_event_sniff (void)
+ {
+- uchar cc; int loop; char c; uint t0; bool bol=TRUE;   // bol = Zeilenanfang (fuer Zeitstempel)
+  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+  Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (verdraengt GSM/GPS falls noetig,
+                                                // wie bei send_bt_info() - MUX schaltet auf BT)
+- cc=connect; connect=concpy & ~UART1;         // Ausgabe nur ans Terminal, nichts zurueck ans Modul
+- putln("Event-Sniff: rohe Modul-Ausgabe, feste Laufzeit 180s (laeuft NICHT vorzeitig ab). Jetzt BLE/Classic verbinden.");
+- t0=mstimer;                                  // Referenzzeitpunkt fuer relative Zeitstempel (ms seit Start)
+- bxi=rxi;                                     // sauberer Start, alte Reste verwerfen
+- for (loop=0; loop<1800; loop++)              // 1800 * 100 ms = 180 s (3 min), FEST - deckt einen
+-                                               // kompletten "--runs 3"-Durchlauf von ble_cyspp_probe.py ab
+-                                               // (Connect allein dauert bei diesem Setup 13-30 s je Versuch)
++ putln("Event-Sniff (Hintergrund): rohe Modul-Ausgabe, laeuft 180s im Hintergrund mit - Hauptmenue");
++ putln("bleibt normal bedienbar. Jetzt BLE/Classic verbinden.");
++ bxi1=rxi1;                                   // sauberer Start, alte Reste ignorieren (rbuf1)
++ sniff_t0=mstimer;
++ sniff_bol=TRUE;
++ sniff_active=TRUE;
++}
++
++// Non-blocking nachlesen - einmal je Hauptschleifendurchlauf aus measure.c aufgerufen.
++// Beruehrt bxi/rbuf-Verbrauch NICHT, daher voellig unabhaengig von mainmenu()/PIN-Abfrage.
++// FIX (5.89-Ergaenzung, 5.92-Korrektur): rbuf1 (UART1-Command-Mode-Puffer) wird sonst NUR bei
++// aktivem Event-Sniff bzw. waehrend eines bt_command()-Aufrufs geleert - im normalen Betrieb
++// (kein Sniff aktiv, kein Kommando gerade unterwegs) liest NIEMAND rbuf1, er kann volllaufen und
++// den UART1-Interrupt dauerhaft abschalten. Deshalb wird rbuf1 jetzt IMMER geleert - und zwar
++// ueber bxi1, denselben Index, den auch bt_command() und die Ueberlauf-Wiederfreigabe in
++// measure.c benutzen (5.91 hatte faelschlich einen SEPARATEN Index sniff_i aktuell gehalten,
++// der mit der eigentlichen Ueberlauflogik gar nichts zu tun hatte - rbuf1 konnte aus bxi1s Sicht
++// trotzdem volllaufen und den UART1-Empfang dauerhaft lahmlegen). Nur die Anzeige mit
++// Zeitstempel ist an sniff_active gebunden, das Leeren selbst nicht mehr.
++void bt_sniff_poll (void)
++{
++ char c; uchar cc;
++ if (bxi1!=rxi1)
+  {
+-  while (bxi!=rxi)
++  if (sniff_active)
+   {
+-   c = rbuf[++bxi];
+-   if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
+-   if (bol) { putc('['); putnumber(mstimer-t0,0); putstr("ms] "); bol=FALSE; }  // Zeitstempel je Zeile
+-   putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
+-   if (c=='\n') bol=TRUE;
++   cc=connect; connect=concpy & ~UART1;        // Ausgabe nur ans Terminal, nichts zurueck ans Modul
++   while (bxi1!=rxi1)
++   {
++    c = rbuf1[++bxi1];
++    if (c=='\r') continue;                     // CR ueberspringen, LF traegt den Zeilenumbruch
++    if (sniff_bol) { putc('['); putnumber(mstimer-sniff_t0,0); putstr("ms] "); sniff_bol=FALSE; }
++    putc((c=='\n' || (c>=32 && c<127)) ? c : '.');
++    if (c=='\n') sniff_bol=TRUE;
++   }
++   connect=cc;
+   }
+-  ResetWDT();
+-  // WICHTIG (5.78-Fix): mainmenu() (sicom.c) wird direkt aus measure.c's Hauptschleife
+-  // gerufen - waehrend dieser Funktion blockiert, laeuft KEIN anderer Code, auch nicht die
+-  // Pruefung "if (comchange) communication_change();" aus measure.c, die einen ECHTEN
+-  // BT-Disconnect verarbeitet. Ohne diesen Aufruf wuerde ein Disconnect waehrend der 180s
+-  // Laufzeit komplett verschluckt (dieselbe Bugklasse wie der 5.72-Fix in bt_diag_menu()).
+-  if (comchange) { if (!osActiveThread) communication_change(); else clear_comchange(); }
+-  osDelay(100);
++  else bxi1=rxi1;                               // kein Sniff aktiv -> nur leeren, nichts anzeigen
++ }
++ if (!sniff_active) return;
++ if ((uint)(mstimer-sniff_t0)>=SNIFF_DURATION_MS)
++ {
++  sniff_active=FALSE;
++  uart1_release(MUX_BT);                      // UART1 wieder freigeben (GSM/GPS koennen zurueck)
++  newline(); putln(" Event-Sniff (Hintergrund) beendet (180s abgelaufen).");
+  }
+- bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
+- newline(); putln(" Event-Sniff beendet (180s abgelaufen).");
+- connect=cc;
+- uart1_release(MUX_BT);                       // UART1 wieder freigeben (GSM/GPS koennen zurueck)
+ }
+ 
+ //-----------------------------------------------------------------------------
+@@ -600,12 +655,18 @@ void bt_transfer_echo (void)
+  uchar cc; uint loop; char c;
+ 
+  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
++ if (bt_pininit)                              // FIX (5.80): siehe bt_event_sniff() - dieselbe Funktion
++ {                                             // verschluckt sonst eine waehrenddessen ueber BT eingegebene
++                                               // echte PIN als Diagnose-Rohdaten.
++  putln("Transfer-Test: PIN-Abfrage noch offen - erst PIN ueber BT eingeben, dann erneut starten.");
++  return;
++ }
+  Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (wie bt_event_sniff)
+  cc=connect; connect=concpy & ~UART1;
+  putln("Transfer-Test: wartet auf CYS1-Frames (CRC/Seq), sendet ACK1 zurueck. Laufzeit 120s.");
+  connect=cc;
+  bxi=rxi;
+- for (loop=0; loop<1200; loop++)              // 1200 * 100 ms = 120 s, FEST
++ for (loop=0; loop<12000; loop++)             // 12000 * 10 ms = 120 s, FEST
+  {
+   while (bxi!=rxi)
+   {
+@@ -640,10 +701,14 @@ void bt_transfer_echo (void)
+    }
+   }
+   ResetWDT();
++  // Bei 8000 B/s fallen pro 10-ms-Poll rund 80 Byte an und bleiben damit sicher unter den
++  // etwa 255 nutzbaren Bytes des gemeinsamen Ringpuffers. Die 100-ms-Fassung verlor bereits
++  // vor der hier folgenden Wiederfreigabe von UART1 Daten.
++  if (rbuf_full && bxi==rxi) { rbuf_full=0; NVIC_EnableIRQ(UART1_IRQn); }
+   // 5.78-Fix (wie bt_event_sniff): echten Schnittstellenwechsel waehrend der 120s nicht
+   // verschlucken - siehe Kommentar dort.
+   if (comchange) { if (!osActiveThread) communication_change(); else clear_comchange(); }
+-  osDelay(100);
++  osDelay(10);
+  }
+  bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
+  cc=connect; connect=concpy & ~UART1;
+@@ -697,27 +762,56 @@ void bt_cyspp_contention_test (void)
+ // wird bei gesetztem comchange jetzt communication_change() selbst aufgerufen (macht die echte
+ // Verarbeitung UND loescht comchange danach) - mit derselben Schutzbedingung wie in measure.c
+ // (`!osActiveThread`, GSM/MQTT-Verbindungsthread nicht stoeren).
++// TEMPORAER (Alt-Firmware-Vergleichstest): setzt das Modul per /RFAC auf Werkszustand zurueck,
++// damit eine alte MCU-Firmware (z. B. 5.50) das Modul wieder frisch/passend erkennen und
++// konfigurieren kann - das Modul behaelt seine EZ-Serial-Konfiguration sonst dauerhaft im
++// eigenen Speicher, unabhaengig davon, welche MCU-Firmware geflasht ist.
++// WICHTIG (5.86-Korrektur): KEIN Power-Cycle zwischen Factory-Reset und Flashen der Zielfirmware!
++// Ein Zwischen-Reboot wuerde von der noch installierten AKTUELLEN Firmware (deren eigene
++// Werksmodul-Erkennung, siehe init_bluetooth()) sofort wieder erkannt und automatisch mit den
++// AKTUELLEN Einstellungen neu konfiguriert - der Factory-Reset waere fuer die Katz, bevor die
++// gewuenschte (alte) Firmware ueberhaupt zum Zug kommt. Direkt nach /RFAC die Zielfirmware
++// flashen (der Flash-Vorgang bootet direkt in die neue Firmware, kein Zwischenlauf der alten).
++void bt_factory_reset (void)
++{
++ if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
++ Init_BT_ch(BT_BAUD);
++ putln("Factory-Reset (/RFAC) - Modul wird auf Werkszustand zurueckgesetzt, Baud -> 115200.");
++ if (bt_command(T_rfac,T_rfacok,1000)) putln(" /RFAC bestaetigt (@R,...,/RFAC,0000).");
++ else putln(" keine /RFAC-Bestaetigung erhalten (evtl. andere Baud/Zustand?).");
++ uart1_release(MUX_BT);
++ putln("WICHTIG: JETZT SOFORT die Zielfirmware flashen - KEIN Power-Cycle vorher (die aktuelle");
++ putln("Firmware wuerde das Werksmodul sonst beim naechsten Boot automatisch neu konfigurieren)!");
++}
++
+ void bt_diag_menu (void)
+ {
+  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
+- putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)   9 = zurueck");
++ putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
++ putln("              4 = Factory-Reset (/RFAC, Alt-FW-Vergleich!)   9 = zurueck");
+  putstr(" comchange_count: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69, CYSPP-Diagnose)
+  for (tries=0; tries<20; tries++)
+  {
+   if (comchange)                            // echten Schnittstellenwechsel richtig verarbeiten
+   { if (!osActiveThread) communication_change(); else clear_comchange(); }
+   c = getc(TERMINAL_CHAR_TIMEOUT);
+-  if (c=='1' || c=='2' || c=='3' || c=='9') break;
++  if (c=='1' || c=='2' || c=='3' || c=='4' || c=='9') break;
+   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
+  }
+  putstr(" comchange_count danach: "); putnumber(comchange_count,0);           // TEMPORAER (5.69)
+  putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(", "); putnumber(tries,0); putstr(" Versuche)"); newline();
+- if (c=='1' || c=='2' || c=='3' || c=='9') { putc((char)c); newline(); }
++ if (c=='1' || c=='2' || c=='3' || c=='4' || c=='9') { putc((char)c); newline(); }
+  else { newline(); putln(" keine gueltige Eingabe (staendiger Schnittstellenwechsel?) - abgebrochen."); }
+  if (c=='1') bt_event_sniff();
+  else if (c=='2') bt_cyspp_contention_test();
+  else if (c=='3') bt_transfer_echo();
++ else if (c=='4') bt_factory_reset();
+  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
++ // HINWEIS (5.89): Der fruehere Flush hier (5.88, "bxi=rxi vor mainmenu()") ist nicht mehr
++ // noetig - Command-Mode-/Protokollbytes (Event-Sniff, Factory-Reset, Contention-Test) landen
++ // jetzt an der Quelle (UART1_IRQHandler, hard.c) in rbuf1 statt in rbuf und koennen mainmenu()
++ // gar nicht mehr erreichen. bt_transfer_echo() (echte Transparent-Daten, bleibt auf rbuf) macht
++ // seinen eigenen Flush bereits selbst am Ende.
+ }
+ 
+ //-----------------------------------------------------------------------------
+@@ -741,7 +835,7 @@ static int bt_scan_ping (uint32_t baud)   // 1 = "/PING,0000" gesehen, sonst 0
+  Init_BT_ch(baud);
+  bt_msg("  [ch] send CR");
+  cc=connect; connect=UART1; putstr(T_CR); connect=cc;   // Modul-Parser: (Muell-)Zeile abschliessen (5.98)
+- osDelay(20); bxi=rxi;                                  // kurz setteln, dann RX-Puffer leeren
++ osDelay(20); bxi1=rxi1;                                // kurz setteln, dann RX-Puffer leeren (rbuf1, 5.89)
+  bt_msg("  [CR] send /PING");
+  cc=connect; connect=UART1; putstr(T_ping); connect=cc; // /PING senden (cts_bypass aktiv -> ohne CTS-Gate)
+  bt_msg("  [PING] wait 250ms for reply");
+@@ -749,7 +843,7 @@ static int bt_scan_ping (uint32_t baud)   // 1 = "/PING,0000" gesehen, sonst 0
+  while ((int)(deadline-mstimer)>0)
+  {
+   ResetWDT();
+-  while (bxi!=rxi && n<(int)sizeof(buf)-1) buf[n++]=rbuf[++bxi];
++  while (bxi1!=rxi1 && n<(int)sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
+   osThreadYield();
+  }
+  buf[n]=0;
+@@ -899,14 +993,19 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
+       for (v=0; v<4 && !result; v++)
+       { Init_BT_ch(IF820_BAUD); bt_command(T_CR,T_pingok,-60);
+         result=bt_command(T_ping,T_pingok,300);
+-        if (!result) { bt_msg("   waiting for module after reboot..."); osDelay(400); } } }
+-    if (!result)                        // nach mehreren Versuchen keine Antwort -> echter Fehler
+-    {
+-     newline(); dtcerr(DTC_BT_UART_INIT); newline();   // F11009 CTS/RTS pruefen
+-     fp.btmodem=0; connect&=~(UART1|BT_LINK);
+-     bt_release(); uart1_release(MUX_BT); connect=concpy; clear_comchange(); return;
++        if (!result) { bt_msg("   waiting for module after reboot..."); osDelay(400); } }
++      if (!result)                      // nach mehreren Versuchen keine Antwort -> echter Fehler
++      {
++       // FIX (5.85): eigener, spezifischerer Fehlercode statt des generischen DTC_BT_UART_INIT -
++       // damit dieser konkrete Fall (Modul antwortet nach /RBT nicht) im Protokoll von anderen
++       // BT-UART-Init-Fehlern unterscheidbar ist.
++       newline(); dtcerr(DTC_BT_REBOOT_VERIFY); newline();   // F11018
++       fp.btmodem=0; connect&=~(UART1|BT_LINK);
++       bt_release(); uart1_release(MUX_BT); connect=concpy; clear_comchange(); return;
++      }
++      bt_msg("   verify after reboot OK");
++      puterror_dtc(DTC_BT_REBOOT_VERIFY_OK, v);   // I11019 - nur geloggt, wenn Retries noetig waren (v>0)
+     }
+-    bt_msg("   verify after reboot OK");
+    }
+    else bt_msg(" Step 4: nothing changed -> done (no save/reboot)");
+ 
+@@ -1124,12 +1223,12 @@ static void bt_query_show (char *cmd)
+  newline(); putstr("  > ");
+  for (i=0; cmd[i] && cmd[i]!='\r' && cmd[i]!='\n'; i++) putc(cmd[i]);
+  connect=cc;
+- osDelay(2); bxi=rxi;                                     // alten Pufferinhalt verwerfen
++ osDelay(2); bxi1=rxi1;                                   // alten Pufferinhalt verwerfen (rbuf1, 5.89)
+  cc=connect; connect=UART1; putstr(cmd); connect=cc;      // Kommando NUR ans Modul
+  deadline=mstimer+400;                                    // feste Antwortzeit (keine Echo-Abhaengigkeit)
+  while ((int)(deadline-mstimer)>0)
+  { ResetWDT();
+-   while (bxi!=rxi && n<(int)sizeof(buf)-1) buf[n++]=rbuf[++bxi];
++   while (bxi1!=rxi1 && n<(int)sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
+    osThreadYield();
+  }
+  buf[n]=0;
+@@ -1138,7 +1237,7 @@ static void bt_query_show (char *cmd)
+  if (!n) putstr("(no response)");
+  else for (i=0; i<n; i++) if (buf[i]>=32 && buf[i]<127) putc(buf[i]);
+  newline(); connect=cc;
+- bxi=rxi;                                                 // Rest sicher verwerfen -> keine Bytes ins Menue
++ bxi1=rxi1;                                               // Rest sicher verwerfen -> keine Bytes ins Menue
+ }
+ 
+ // Durchsatz-Diagnose (5.53): Zaehler aus putb() anzeigen. Nur Anzeige, kein Eingriff.
+@@ -1191,7 +1290,7 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
+    bt_query_show(T_rlh_ppcp);                                     // Verbindungsparameter-Praeferenz (5.6x): D=0C00180000005802
+    bt_show_counters();                                            // Durchsatz-Diagnose der laufenden BT-Sitzung
+   }
+-  osDelay(50); bxi=rxi;                                           // finaler Flush: keine Modulbytes ins Menue
++  osDelay(50); bxi1=rxi1;                                         // finaler Flush (rbuf1, 5.89)
+   uart1_release(MUX_BT);
+   if (!result) puterror(DTC_BT_PING,-1);
+   return;
+diff --git a/sism555/btio.h b/sism555/btio.h
+index 83a6668..a14fac7 100644
+--- a/sism555/btio.h
++++ b/sism555/btio.h
+@@ -80,6 +80,9 @@
+ // Ezurio Vela IF820 (EZ-Serial) Texte
+ #define T_ping		"/PING\r"		// system_ping Kommando
+ #define T_pingok	"/PING,0000"	// Erfolgsantwort @R,...,/PING,0000
++#define T_rfac		"/RFAC\r"		// system_factory_reset - TEMPORAER (nur Testmenue 8->4, Alt-FW-Vergleich):
++									// setzt Modul komplett auf Werkszustand zurueck (auch Baud -> 115200!)
++#define T_rfacok	"/RFAC,0000"	// Erfolgsantwort @R,...,/RFAC,0000
+ #define T_qfv      "/QFV\r"       // system_query_firmware_version -> @R,...,/QFV,0000,E=..,S=..,P=..,H=..
+ #define T_qfvok    "/QFV"         // Antwort-Kennung (enthaelt Version E=/S=/P=/H=)
+ #define T_gba      "GBA\r"        // system_get_bluetooth_address -> @R,...,GBA,0000,A=<MAC>
+@@ -190,11 +193,13 @@ extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-M
+ extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
+ extern void bt_disconnect (void);         // IF820: offene Verbindung sauber trennen (Command-Mode + /DIS)
+ extern void bt_cyspp_monitor (void);      // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) - Testmenue
+-extern void bt_event_sniff (void);        // Roher UART1-Event-Mitschnitt (Diagnose) - Testmenue
++extern void bt_event_sniff (void);        // Roher UART1-Event-Mitschnitt (Diagnose) - Testmenue, startet nur
++extern void bt_sniff_poll (void);         // nicht-blockierendes Nachlesen - 1x je Hauptschleifendurchlauf (measure.c)
+ extern void bt_transfer_echo (void);      // BLE-CYSPP-Transfer-Test: CRC/Seq-Frames empfangen+ACK - Testmenue
+                                            // TEMPORAER (5.67) - wieder entfernen, wenn CYSPP-Diagnose fertig ist
+ extern void bt_cyspp_contention_test (void); // IC54 Bit7 kurz aktiv LOW (Messprotokoll Schritt 6) - Testmenue
+-extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Test - Testmenue
++extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Test / Factory-Reset - Testmenue
++extern void bt_factory_reset (void);      // TEMPORAER: /RFAC - Modul-Werksreset fuer Alt-FW-Vergleichstest
+ extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
+ extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
+ 
+diff --git a/sism555/hard.c b/sism555/hard.c
+index 755430a..ecfe44b 100644
+--- a/sism555/hard.c
++++ b/sism555/hard.c
+@@ -39,6 +39,7 @@ int (*pchar) (int c)		__noinit;					// Funktionszeiger Zeichenausgabe
+ __align(4) flashparameter fp 	__noinit;		// Parameter, die im Flash gesichert werden
+ tcap tm									__noinit;					// Messpuffer mit Capture Z�hlerst�nden
+ char rbuf[PAGE]					__noinit;					// Allgemeiner Empfangsringpuffer eine Seite
++char rbuf1[PAGE]				__noinit;					// UART1-Command-Mode-Puffer (Protokoll/Status, siehe unten)
+ char pbuf[PAGE]					__noinit;					// Empfangsringpuffer f�r Plus Matrix eine Seite
+ __align(4) char cbuf[CBUFSIZE] __noinit;	// char Arbeitspuffer (1056+256=1312 Byte)
+ uchar probuf[FLASHKGV]	__noinit;					// Puffer Protokolldaten
+@@ -124,6 +125,15 @@ uchar btmode						__noinit;					// BLE=48 oder SPP=47 Profil aktiv?
+ volatile uchar rxi=0;						// Empfangsindex UART Empfangspuffer
+ volatile uchar bxi=0;						// Bearbeitungsindex UART Empfangspuffer
+ volatile uchar rbuf_full=0;			// 0 wenn UART Empfangspuffer leer
++// FIX (5.89): UART1-Protokoll-/Statusbytes (Command-Mode: Boot-Meldungen, /PING-Antworten,
++// Connect-/Disconnect-Events) sollen nie mehr im menue-lesenden rbuf landen, unabhaengig vom
++// Timing (bisherige Flush-Fixes an einzelnen Zeitpunkten - 5.79/5.82/5.88 - fingen das nicht
++// zuverlaessig ab, wenn das Modul ueber mehrere Sekunden verteilt nachtraegt). rbuf1 ist das
++// Gegenstueck zu rbuf, ausschliesslich fuer UART1 waehrend NICHT aktiver CYSPP-Datenbruecke -
++// siehe UART1_IRQHandler() (Weiche) und die auf rbuf1 umgezogenen Command-Mode-Helfer in btio.c.
++volatile uchar rxi1=0;						// Empfangsindex rbuf1
++volatile uchar bxi1=0;						// Bearbeitungsindex rbuf1
++volatile uchar rbuf1_full=0;			// 0 wenn rbuf1 leer (analog rbuf_full)
+ volatile uchar tmi=0;						// Messindex Messpuffer IF und Phase
+ volatile uchar minute=0;				// Minutenwechsel der Echtzeituhr (RTC Interrupt)
+ volatile uint msdelay=0;				// Millisekunden Abw�rtsz�hler feeded by Timer 0
+@@ -195,19 +205,38 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
+  switch (U1->IIR&0x000E)								// Verteile je nach Interruptquelle
+  {	
+   case 0x0002:	break;												// Kein Puffer leer Sendeinterrupt
+-  case 0x0004: 	if ((connect&MQTT_LINK)&&(bpi!=(rpi+1))) 	// MQTTS Verbindung besteht und Platz in Puffer? 								
+-								 pbuf[++rpi]=U1->RBR; 										// Zeichen in Empfangspuffer, pr�inkrement	
+-								else if (!(connect&MQTT_LINK) && (bxi!=(rxi+1))) // Keine MQTTS Verbindung und Platz in Puffer?
+-								{	
++  case 0x0004: 	if ((connect&MQTT_LINK)&&(bpi!=(rpi+1))) 	// MQTTS Verbindung besteht und Platz in Puffer?
++								 pbuf[++rpi]=U1->RBR; 										// Zeichen in Empfangspuffer, pr�inkrement
++								// FIX (5.89): IF820, aber CYSPP-Datenbruecke NICHT aktiv (Command-Mode: Boot-
++								// Meldungen, /PING-Antworten, Connect-/Disconnect-Events) -> eigener Puffer
++								// rbuf1, damit diese Bytes NIE bei mainmenu() als Tastatureingabe ankommen -
++								// unabhaengig davon, wie lange das Modul nach einer Trennung noch nachtraegt
++								// (bisherige Flush-Fixes zu festen Zeitpunkten fingen das nicht zuverlaessig
++								// ab). bt_cyspp_out deckt den Sonderfall ab, dass bt_disconnect() bewusst
++								// Command-Mode erzwingt, obwohl connect&BT_LINK noch nicht zurueckgesetzt ist.
++								// FIX: nicht auf fp.btmodem==IF820 pruefen - waehrend der allerersten
++								// Erkennung (bt_scan_ping() etc.) ist fp.btmodem noch 0 (unbekannt), nicht
++								// IF820 (wird erst NACH erfolgreicher Erkennung gesetzt) - sonst wuerde die
++								// Erkennungsphase selbst am neuen Puffer vorbeilesen. Bei Laird/RN4678 ist
++								// die BT_LINK-Leitung ein reiner Status-Ausgang, kein bidirektionaler
++								// CYSPP-Datenpin - dort (und nur dort) bleibt alles unveraendert bei rbuf.
++								else if ((uart1_owner==MUX_BT) && (fp.btmodem!=Laird) && (fp.btmodem!=Roving) &&
++								         !((connect&BT_LINK) && !bt_cyspp_out))
++								{
++								 if (bxi1!=(rxi1+1)) { rbuf1[++rxi1]=U1->RBR; bt_time=BT_TIMEOUT; }
++								 else { rbuf1_full=1; NVIC_DisableIRQ(UART1_IRQn); }
++								}
++								else if (!(connect&MQTT_LINK) && (bxi!=(rxi+1))) // BT gebrueckt, oder GSM (nicht MQTT)
++								{
+ 								 rbuf[++rxi]=U1->RBR; 		// Sonst Zeichen in Empfangspuffer, pr�inkrement
+-								 bt_time=BT_TIMEOUT;			// Reset Bluetooth Verbindungstimeout	
+-								}	
+-								else											// Ringpufferindizes vor �berlauf? 
++								 bt_time=BT_TIMEOUT;			// Reset Bluetooth Verbindungstimeout
++								}
++								else											// Ringpufferindizes vor �berlauf?
+ 								{													// I. d. F. solange U1->RBR ungelesen RTS=High -> Empfangsstop
+ 								 rbuf_full=1;										// Puffer voll Flag setzen
+ 								 NVIC_DisableIRQ(UART1_IRQn);		// Disable UART1 Interrupt
+-								} 
+-								break;		
++								}
++								break;
+   default: 		c=U1->LSR;	 							// Dummy read Rx Fehlerstatus  
+  }
+ }
+diff --git a/sism555/hard.h b/sism555/hard.h
+index c6e88dc..4ed3cf4 100644
+--- a/sism555/hard.h
++++ b/sism555/hard.h
+@@ -477,9 +477,12 @@ extern uchar comstate;								// Status Datenschnittstellen an IC54 Expander
+ extern bool plustrans;								// 1 wenn transparenter Datentransfer Plus Matrix controller
+ // *** Uart-Ein/Ausgabe/Pufferindizes ***
+ extern int (*pchar)(int c); 					// Funktionszeiger auf Routine Zeichenausgabe			
+-extern volatile uchar rxi;						// Empfangsindex UART Empfangspuffer			
++extern volatile uchar rxi;						// Empfangsindex UART Empfangspuffer
+ extern volatile uchar bxi;						// Bearbeitungsindex UART Empfangspuffer
+ extern volatile uchar rbuf_full;			// 0 wenn UART Empfangspuffer leer
++extern volatile uchar rxi1;					// Empfangsindex rbuf1 (UART1 Command-Mode, siehe 5.89)
++extern volatile uchar bxi1;					// Bearbeitungsindex rbuf1
++extern volatile uchar rbuf1_full;		// 0 wenn rbuf1 leer
+ extern volatile uchar rpi;						// Empfangsindex Empfangsringpuffer MQTT und Plus Kommunikation
+ extern volatile uchar bpi;						// Bearbeitungsindex Empfangsringpuffer MQTT und Plus Kommunikation
+ extern ushort cind;										// Index Char Zeichenpuffer
+@@ -576,6 +579,7 @@ extern uchar btmode;									// BLE=48 oder SPP=47 Profil aktiv?
+ extern char cbuf[CBUFSIZE];					// Char Arbeitspuffer (1056+256=1312 Byte)
+ extern char wcbuf[16];							// Char Arbeitspuffer
+ extern char rbuf[PAGE];							// Allgemeiner UART Zeichen Empfangsringpuffer, eine Seite lang
++extern char rbuf1[PAGE];							// UART1 Command-Mode-Puffer (Protokoll/Status, siehe 5.89)
+ extern char pbuf[PAGE];							// Empfangsringpuffer f�r Plus Matrix eine Seite
+ extern uchar flbuf[FBUFSIZE];				// uchar Arbeitspuffer u. a. f�r flash und i2c transfers
+ extern uchar probuf[FLASHKGV];			// Puffer Protokolldaten
+diff --git a/sism555/measure.c b/sism555/measure.c
+index 76bbc08..e0ad9bb 100644
+--- a/sism555/measure.c
++++ b/sism555/measure.c
+@@ -334,14 +334,35 @@ void runcycle (void)				// Messzyklenbetrieb
+ 	}	
+ 	
+ 	if (!osActiveThread)								// Keine Thread mit Zeichenbearbeitung aktiv?
+-	 if (bxi!=rxi) {										// Zeichen von Schnittstelle?
+-		mainmenu(rbuf[++bxi]); 						// Aufruf Hauptmen�/Zeichenbearbeitung	
+-		if (simulation) 									// Simulation?
+-		{ cycle=0;												// starte mit Messzyklus
++	{
++	 uchar n;												// FIX (5.83): mehrere Bytes je Hauptschleifendurchlauf statt
++	 for (n=0; n<16 && bxi!=rxi; n++)	// nur eines - bei einer Barrage von Modul-Events (z. B. beim
++	 {									// Trennen) reichte 1 Byte/Durchlauf nicht aus, der gemeinsame
++		mainmenu(rbuf[++bxi]); 						// Ringpuffer konnte volllaufen (siehe project-status.md
++		if (simulation) 									// Update 5.83). Obergrenze 16, damit ein einzelner Durchlauf
++		{ cycle=0;												// nicht zu lange dauert (Watchdog/andere Zyklen).
+ 		  if (simulation==2) 							// Simulationsende
+-			{ acycle=0; simulation=0; } } }	// reset Anzeigezyklus und reset Simulationszustand
+-	
++			{ acycle=0; simulation=0; } }		// reset Anzeigezyklus und reset Simulationszustand
++	 }
++	 if (rbuf_full && bxi==rxi)			// FIX (5.83): Puffer war ueberlaufen -> UART1_IRQHandler (hard.c)
++	 {									// hat den Interrupt deaktiviert (Auto-RTS haelt das Modul dann
++		rbuf_full=0;						// dauerhaft an); dafuer gab es im normalen Betrieb bisher KEINE
++		NVIC_EnableIRQ(UART1_IRQn);		// Wiederfreigabe (nur in zwei unbeteiligten Sonderfaellen -
++	 }									// modem_terminal()/mqtt.c) - blieb sonst bis zum naechsten
++										// Power-Cycle abgeschaltet. Jetzt: sobald der Puffer wieder
++										// leer ist, Interrupt reaktivieren.
++	 if (rbuf1_full && bxi1==rxi1)		// FIX (5.89): dieselbe Wiederfreigabe fuer rbuf1 (UART1
++	 {									// Command-Mode-Puffer, siehe hard.c UART1_IRQHandler) - kann
++		rbuf1_full=0;						// theoretisch genauso ueberlaufen wie frueher rbuf, bevor der
++		NVIC_EnableIRQ(UART1_IRQn);		// eigentliche Interrupt wieder freigegeben wird.
++	 }
++	}
++
+ 	if (menrep)	mainmenu('0');					// Men�wiederholung
++
++	// 5.81: BT-Event-Sniff (Testmenue-Diagnose) liest ueber einen eigenen, von bxi
++	// unabhaengigen Index nicht-blockierend nach - beeinflusst mainmenu()/PIN-Abfrage nicht.
++	bt_sniff_poll ();
+   		 	
+ 	if ((fp.i2cdev&IC37_b) || simulation)	// Expander Messsteuerung installiert oder Simulation?
+   {

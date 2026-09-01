@@ -356,6 +356,39 @@ GATT structure."
 
 ---
 
+## 9b. BT_DEV_WAKE / BT_HOST_WAKE — hängen am selben Netz wie CYSPP
+
+**Neuer Befund (2026-08-25), per Schaltplan verifiziert (nicht nur Bild-Lesart):**
+
+| Pin | Bauteil | Wert | Netz | Sonst noch dran |
+|---|---|---|---|---|
+| BT_DEV_WAKE (Pin 28) | R139 | **0 Ω** | `N$165` | nur R139.1 + IC37.BT_DEV_WAKE — sonst nichts |
+| BT_HOST_WAKE (Pin 29) | R138 | **10 kΩ** | `N$166` | nur R138.1 + IC37.BT_HOST_WAKE — sonst nichts |
+
+R139.2 und R138.2 liegen beide auf dem Netz **`BLT-LINK`** — demselben Netz wie **P13/CYSPP**
+und `IC26.P1_5_` (RN4678-Statuspin, Mehrfachbestückungs-Layout). Das heißt:
+
+- **BT_DEV_WAKE ist über einen Draht (0 Ω) mit der CYSPP-Leitung desselben Moduls
+  kurzgeschlossen.** Jede Bewegung auf CYSPP (ob vom Modul selbst getrieben oder vom Host
+  über `bt_cmdmode()`/R78) erscheint 1:1 auch auf BT_DEV_WAKE.
+- **BT_HOST_WAKE hängt über 10 kΩ am selben Netz** — schwächer gekoppelt, aber nicht
+  unabhängig.
+- Beide Pins sind **keine freien/unbeschalteten Pins** — sie lassen sich nicht isoliert von
+  außen ansteuern, ohne gegen die CYSPP-Leitung zu arbeiten.
+
+**Einordnung zur Frage „auf 3,3 V ziehen":** elektrisch zulässig (VDDIO-Bereich, 3,3 V ist
+innerhalb der Spezifikation), aber ein externer fester Pull auf diesen Pins wirkt über R139
+praktisch direkt auf die CYSPP-Leitung selbst — genau das aktive Treiben, das laut
+`ble-Dvk-request.md` vermieden werden muss. **Empfehlung: nichts an BT_DEV_WAKE/BT_HOST_WAKE
+ändern, keinen zusätzlichen Pull anbringen.**
+
+**Bisher kein bekanntes Symptom durch diese Kopplung** — Classic SPP und der 5.87-Fix
+liefen bereits mit dieser Verdrahtung. Vermutlich stammt sie aus dem Mehrfachmodul-Layout
+(gleiche Netzposition wie beim RN4678). Als Nebenbefund vermerkt, falls künftig
+Sleep/Wake-Verhalten des IF820 auffällig wird — nicht Teil des aktuellen CYSPP-Fixes.
+
+---
+
 ## 10. Was die Doku als Option nennt, was aber nachweislich NICHT geht
 
 Damit kein Aufwand in Sackgassen läuft:
