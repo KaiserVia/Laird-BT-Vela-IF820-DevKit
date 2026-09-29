@@ -4035,3 +4035,112 @@ Classic-Connect/Disconnect-Zyklus beobachten - zeigt `CONNECTION bit5` in beiden
 LOW waehrend der Datenkanal steht und HIGH sonst? Insbesondere interessant: Verhaelt es sich
 identisch zu Bit 7, oder gibt es Faelle, in denen sie auseinanderlaufen (genau das waere die
 Erklaerung fuer die "manchmal fehlerhaften" automatisierten Tests).
+
+## Update 5.102 (Branch `connection-pin`): Stufe A ausgewertet (negativ fuer Split-Brain) + Stufe B umgesetzt (Lese-/Schreibrolle entkoppelt)
+
+**Stufe A - Messergebnis (elektrisches Rauschen zuerst behoben):** Die neu verdrahtete
+`CONNECTION`-Leitung brauchte zunaechst noch einen Pull-up (Pad war zuvor fest auf GND, jetzt
+hochohmig) - ohne Pull-up floatete sie und loeste pro Sekunde hunderte `EINT1`-Interrupts aus
+(`comchange_count`-Deltas von 800-1300 in wenigen Sekunden), was ueber `communication_change()`s
+I2C-Read bei jedem Interrupt das gesamte Geraet spuerbar verlangsamte. Anwender hat einen 18 kOhm
+Pull-up nach VDDIO ergaenzt (nicht die urspruenglich vorgeschlagenen 10 kOhm, elektrisch aber
+unproblematisch) - danach durchgehend `Delta=0` im Ruhezustand, Rauschen vollstaendig behoben.
+
+**Mit sauberen (rauschfreien) Daten wurde die eigentliche Kernfrage getestet:** verhaelt sich
+`CONNECTION` (Bit5) beim unsauberen/nicht quittierten Trennen anders als `CYSPP` (Bit7)? Dreimal
+reproduziert, immer dasselbe Ergebnis:
+- Normaler Connect (Classic SPP, PC-HyperTerminal): beide Bits gemeinsam LOW, korrekt.
+- Sauberes Trennen (HyperTerminal-Fenster regulaer geschlossen): beide Bits gemeinsam wieder HIGH,
+  korrekt.
+- **Unsauberes Trennen (Windows-seitiges COM-Port-"Trennen" in HyperTerminal, informiert die
+  Bluetooth-Verbindung selbst nicht zuverlaessig - bereits laenger bekannter Effekt, siehe
+  Abschnitt "Offene Punkte" in `CLAUDE.md`):** beide Bits bleiben gemeinsam auf LOW haengen,
+  `comchange_count` bewegt sich danach gar nicht mehr (Modul bekommt vom Abbruch nichts mit).
+  Reproduziert ueber die eigentliche Windows/HyperTerminal-Bluetooth-Verbindung selbst (nicht nur
+  ueber RS232-Beobachtung) - **CONNECTION haengt exakt zusammen mit CYSPP fest, keine Divergenz.**
+
+**Ergebnis/Schlussfolgerung:** `CONNECTION` ist **kein unabhaengigeres Signal** als `CYSPP` fuer
+den Split-Brain-Fall - das IF820-Modul selbst merkt in diesem Fehlerfall nicht, dass der Link weg
+ist, und haelt beide abgeleiteten Statusausgaenge gemeinsam aktiv. Eine Umstellung der
+Erkennungslogik auf `CONNECTION` loest das urspruenglich vermutete Robustheitsproblem
+("automatisierte Tests manchmal fehlerhaft ohne bekannten Grund") **nicht** - dafuer braeuchte es
+einen host-seitigen Watchdog (periodisches `/PING` o.ae.), unabhaengig vom Modul-eigenen Status.
+Divergenztest mit absichtlich verzoegerter BLE-GATT-Subscription (laut Datenblatt der einzige
+dokumentierte Unterschied zwischen den beiden Pins) steht noch aus - bisher nur Classic SPP
+getestet, wo beide Ereignisse ohnehin zeitgleich ausgeloest werden.
+
+**Stufe B - trotzdem umgesetzt, aber mit anderer Begruendung:** Unabhaengig vom Split-Brain-
+Ergebnis bleibt ein eigenstaendiger Vorteil: `CYSPP` (Bit7) ist beim IF820 gleichzeitig
+Schreibleitung (`bt_cmdmode()`/`bt_release()` schalten sie zur Laufzeit auf Ausgang) UND wurde
+bisher als Statusquelle gelesen (`communication_change()`) - diese Doppelrolle war die Grundursache
+des urspruenglichen BLE-CYSPP-Bugs und traegt noch das im 5.93-Fix dokumentierte Race-Potenzial
+(`bt_release()` vs. Aufrufer). `CONNECTION` (Bit5) wird vom Host nie getrieben, ist also als
+alleinige Statusquelle strukturell race-frei. Umgesetzt in `get_com_status()` (i2cm.c):
+```c
+if (fp.btmodem==IF820)
+ state = (state & ~BT_LINK) | (((state>>5)&1)<<7);
+```
+Nur fuer `fp.btmodem==IF820` (Laird/RN4678 unveraendert, kein CONNECTION-Pin/keine
+Umverdrahtung bei diesen Modulen). `bt_cyspp_monitor()` selbst liest weiterhin per
+`read_i2cdev()` direkt (unveraendert, umgeht `get_com_status()` bewusst) - liefert also immer die
+rohen Hardware-Pegel, unabhaengig von dieser Umstellung.
+
+**⚠ Wichtige Korrektur des 5.101-Hinweises:** Ab 5.102 ist dieser Branch NICHT mehr "auf einem
+unveraenderten Board funktional identisch zur Hauptlinie" - `BT_LINK` haengt jetzt fuer den IF820
+produktiv von der Umverdrahtung ab. Auf einem unveraenderten Board (Pad IO5 noch auf GND fest)
+wuerde `get_com_status()` dauerhaft Bit5=0 lesen -> `BT_LINK` bliebe permanent "verbunden"
+haengen, obwohl gar keine Verbindung besteht. **Dieser Branch darf ab 5.102 unter keinen
+Umstaenden auf ein Board ohne die CONNECTION-Umverdrahtung geflasht werden** (CLAUDE.md
+entsprechend aktualisiert).
+
+**Am Geraet noch zu verifizieren:** BLE-Connect/Disconnect-Zyklen mit 5.102 (bisher nur Classic
+SPP getestet), und der oben beschriebene Divergenztest (BLE-Connect ohne sofortige
+GATT-Subscription).
+
+**Geaenderte Dateien:** i2cm.c, sprachen/sictxt.c (-> 5.102).
+
+## Update 5.103 (Branch `connection-pin`): Stufe B WIEDER ENTFERNT - reproduzierbare Haenger am Geraet
+
+**Symptom (Live-Test 5.102, mehrfach reproduziert):** Normaler Ablauf (Boot, per BT verbunden,
+per BT getrennt) - danach:
+1. Erst RS232-Terminal in Zeitlupe (einzelne Zeichen, mehrere Sekunden Verzoegerung).
+2. In einem weiteren Durchlauf: RS232-Terminal "beschmiert" (Datenmuell, weil zu viele/falsche
+   Daten eingelaufen sind) - passt zur alten, eigentlich schon behobenen Bugklasse "Modul sendet
+   noch rohen Event-/Protokolltext ueber UART1, der bei mainmenu() als Tastatureingabe ankommt"
+   (siehe 5.82/5.89-Fixes).
+3. In einem weiteren Durchlauf: Terminal komplett tot, auch nach Power-Cycle zunaechst nicht
+   sicher wiederhergestellt ("nicht rettbar" - Anwenderaussage, Ausgang zum Zeitpunkt dieses
+   Eintrags noch nicht abschliessend geklaert).
+Ausserdem einmal reproduziert: der Menuepunkt "Bluetooth deinstallieren" (`sicom.c:378`, treibt
+CYSPP kurz HIGH per `bt_cmdmode()`, sendet aber KEIN `/DIS`) hat das Geraet haengen lassen -
+"Verbindung bleibt aktiv, aber es geht nichts mehr".
+
+**Verdacht (nicht abschliessend bewiesen):** Die bestehenden Puffer-Flush-Fixes 5.82/5.89/5.93
+(`bxi=rxi`/`bxi1=rxi1` in `bt_disconnect()`, `communication_change()`) sind exakt auf den
+Uebergangszeitpunkt von CYSPP (Bit7) abgestimmt - der Moment, in dem das Modul typischerweise noch
+letzte Event-/Protokolldaten ueber UART1 sendet. Wenn CONNECTION (Bit5) zu einem leicht anderen
+Zeitpunkt umschaltet als Bit7 (frueher oder spaeter), feuert `communication_change()` (die jetzt
+auf Bit5 wartet) moeglicherweise zu einem Zeitpunkt, an dem der Flush nicht mehr zum tatsaechlichen
+Datenstrom passt - alte Bugklasse mit neuer Ursache. **Nicht verifiziert** - dafuer haette es einen
+Logic-Analyzer-Mitschnitt beider Bits UND des UART1-Datenstroms gebraucht, den wir nicht gemacht
+haben, bevor die Symptome auftraten.
+
+**Entscheidung:** Stufe B sofort zurueckgebaut, ohne die genaue Ursache erst zu beweisen - die
+Haeufung reproduzierbarer Haenger direkt nach der Umstellung ist Grund genug, nicht auf einer
+Vermutung weiterzuarbeiten. `get_com_status()` liest jetzt wieder ausschliesslich das rohe
+Register (reines Bit7-Verhalten, wie vor 5.102). Stufe A (`bt_cyspp_monitor()`, reine Diagnose-
+Anzeige beider Bits) bleibt unveraendert bestehen - die dort gewonnenen Messergebnisse (Update
+5.102, Split-Brain-Befund) bleiben gueltig, nur die Produktivumstellung ist zurueckgenommen.
+
+**Lehre:** Bevor eine "eigentlich aequivalente" Statusquelle produktiv getauscht wird, muss nicht
+nur der ENDZUSTAND uebereinstimmen (das hatten wir in Stufe A per Diagnose bestaetigt), sondern
+auch das TIMING des Uebergangs - genau die Art Shared-State-Annahme, die vor dem Flashen am Code
+zu pruefen gewesen waere, nicht erst am haengenden Geraet.
+
+**Offen:** Ob/wie sich CONNECTION (Bit5) noch sinnvoll nutzen laesst (z. B. nur als zusaetzliche
+PLAUSIBILITAETSPRUEFUNG neben Bit7, nicht als alleinige Quelle), ist nicht weiter verfolgt.
+Naechster Schritt waere ein Logic-Analyzer-Mitschnitt (Bit7, Bit5, UART1-RX) genau beim Trennen,
+um das vermutete Timing-Problem tatsaechlich zu belegen oder zu widerlegen, bevor ein neuer Versuch
+unternommen wird.
+
+**Geaenderte Dateien:** i2cm.c, sprachen/sictxt.c (-> 5.103).
