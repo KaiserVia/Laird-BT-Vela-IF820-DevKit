@@ -3984,6 +3984,16 @@ drei Schreibstellen), nicht im verfuegbaren Speicherplatz.
 
 ## Update 5.101 (Branch `connection-pin`): CONNECTION-Pin verdrahtet + Diagnose-Monitor erweitert
 
+**⚠ WICHTIG - 5.101 ist HARDWARE-ABHAENGIG, kein normaler Mainline-Stand:** Diese Version (und
+alle folgenden Versionen auf dem Branch `connection-pin`) setzen die in diesem Eintrag
+beschriebene Umverdrahtung voraus (IF820 Pin 33 auf IC54/IC36-Pad IO5, GND-Bahn dafuer
+aufgetrennt). Auf einem UNVERAENDERTEN Board (IO5 noch auf GND) liefert `bt_cyspp_monitor()`s
+neue `CONNECTION bit5`-Zeile lediglich einen bedeutungslosen, konstanten Wert (Pin liegt weiter
+fest auf GND) - kein Fehler, aber keine verwertbare Information. `communication_change()`/
+`BT_LINK` sind in 5.101 noch unveraendert (siehe Stufe A/B unten), daher ist 5.101 auf einem
+unveraenderten Board funktional identisch zu 5.99 - **nicht** verwechseln mit dem Hauptbranch
+`LTE-Update`, der bei 5.99 bleibt, bis dieser Branch (falls erfolgreich) zurueckgemerged wird.
+
 **Anlass:** Die automatisierten Connect/Disconnect-Tests (`ble_mainboard_test.py`) sind
 gelegentlich fehlerhaft, ohne bekannten Grund. Verdacht: die Doppelrolle von IC54 Bit7
 (CYSPP-Steuerausgang UND einzige Verbindungserkennung) macht die Erkennung angreifbar - siehe
