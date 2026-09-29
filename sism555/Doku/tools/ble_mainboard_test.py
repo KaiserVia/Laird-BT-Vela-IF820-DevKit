@@ -129,6 +129,7 @@ REPORT_DIR = Path(__file__).resolve().parent / "Testreports"
 
 T0 = time.perf_counter()
 TRACE = None
+RUN_REPORT_DIR = None
 
 
 def ts() -> str:
@@ -144,9 +145,16 @@ class TraceLogger:
     """Append-only NDJSON trace; a complete prefix remains readable after an abort."""
 
     def __init__(self, args):
-        REPORT_DIR.mkdir(exist_ok=True)
+        global RUN_REPORT_DIR
         self.run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
-        self.path = REPORT_DIR / f"mainboard-{args.mode}-{self.run_id}.ndjson"
+        self.run_timestamp = self.run_id[:19]
+        self.test_kind = args.mode
+        self.device_name = None
+        RUN_REPORT_DIR = REPORT_DIR / f"{self.run_timestamp}_unbekannt_{self.test_kind}"
+        if RUN_REPORT_DIR.exists():
+            RUN_REPORT_DIR = REPORT_DIR / f"{RUN_REPORT_DIR.name}_{self.run_id[-6:]}"
+        RUN_REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        self.path = RUN_REPORT_DIR / "trace.ndjson"
         self.file = self.path.open("a", encoding="utf-8")
         self.context = {"run_id": self.run_id, "suite": args.mode, "phase": args.mode,
                         "transport": args.transport, "cycle": None}
@@ -155,6 +163,29 @@ class TraceLogger:
 
     def set_context(self, **values) -> None:
         self.context.update(values)
+
+    def set_device_name(self, device_name: str | None) -> None:
+        global RUN_REPORT_DIR
+        if not device_name or self.device_name is not None:
+            return
+        self.device_name = device_name
+        self.context["device_name"] = device_name
+        folder_device_name = re.sub(r'[<>:"/\\|?*]', "_", device_name).strip(". ") or "unbekannt"
+        target_dir = REPORT_DIR / f"{self.run_timestamp}_{folder_device_name}_{self.test_kind}"
+        if target_dir.exists():
+            target_dir = REPORT_DIR / f"{target_dir.name}_{self.run_id[-6:]}"
+        self.file.close()
+        try:
+            RUN_REPORT_DIR.rename(target_dir)
+        except OSError as exc:
+            self.file = self.path.open("a", encoding="utf-8")
+            log(f"Report-Ordner konnte nicht nach Geraet umbenannt werden: {exc}")
+            return
+        RUN_REPORT_DIR = target_dir
+        self.path = target_dir / "trace.ndjson"
+        self.file = self.path.open("a", encoding="utf-8")
+        self.event("report_directory_renamed", report_directory=str(target_dir))
+        log(f"Report-Ordner: {target_dir}")
 
     def event(self, event_name: str, level: str = "info", **details) -> None:
         record = {
@@ -548,9 +579,9 @@ async def navigate_to_transfer_test(client: BleakClient, char, nav_buf: bytearra
 
 
 def write_report(kind: str, data: dict) -> tuple[Path, Path]:
-    REPORT_DIR.mkdir(exist_ok=True)
-    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    base = REPORT_DIR / f"mainboard-{kind}-{stamp}"
+    report_dir = RUN_REPORT_DIR or REPORT_DIR
+    report_dir.mkdir(parents=True, exist_ok=True)
+    base = report_dir / kind
     json_path = base.with_suffix(".json")
     json_path.write_text(__import__("json").dumps(data, indent=2, default=str), encoding="utf-8")
     return json_path, base.with_suffix(".md")
@@ -1066,6 +1097,8 @@ class BleTransport:
             address, self.device_name = device.address, device.name
             self.args.address = address  # fuer Folgezyklen (cycle) wiederverwenden, kein Re-Scan
             self.args.ble_device_name = self.device_name
+        if TRACE is not None:
+            TRACE.set_device_name(self.device_name)
         trace_event("connect_started", transport="ble", address=address, timeout_s=timeout)
         started = time.perf_counter()
         self.client = BleakClient(address)
@@ -1149,6 +1182,8 @@ class ClassicTransport:
             await self._step("SPP-COM-Port abgefragt, aber noch NICHT geoeffnet. RS232 beobachten.")
         self.device_name = self.args.classic_device_name
         self.port = self.args.classic_port
+        if TRACE is not None:
+            TRACE.set_device_name(self.device_name)
         await self._step(f"Jetzt wird {self.port} geoeffnet und damit SPP angefordert. RS232 beobachten.")
         trace_event("connect_started", transport="classic", port=self.port,
                     device_name=self.device_name, timeout_s=timeout)
@@ -1204,8 +1239,9 @@ class ClassicTransport:
         if written != len(data):
             raise ConnectionError(f"Nur {written}/{len(data)} Byte an {self.port} geschrieben.")
         await asyncio.to_thread(self.ser.flush)
-        log(f"{self.port} TX: len={written} hex={data.hex(' ')} ascii={data!r} "
-            "(an Windows uebergeben).")
+        if data != bytes([XMODEM_ACK]):
+            log(f"{self.port} TX: len={written} hex={data.hex(' ')} ascii={data!r} "
+                "(an Windows uebergeben).")
 
     def pin(self) -> str | None:
         return self.args.pin or derive_pin_from_name(self.device_name or "")
@@ -2001,7 +2037,7 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
     diagnostic_keys = {(entry.get("phase"), entry.get("cycle")) for entry in diagnostics}
     diagnostic_keys.update((phase, None) for phase in failed_phases)
     timeline_events = {"connect_started", "connect_succeeded", "classic_reader_started", "notify_subscribed",
-                       "rx_data", "marker_found", "marker_timeout", "pin_prompt_received",
+                       "marker_found", "marker_timeout", "pin_prompt_received",
                        "pin_prompt_missing_fallback", "pin_sent", "disconnect_started",
                        "disconnect_succeeded", "cycle_finished", "phase_finished"}
     timeline = [entry for entry in trace_entries
@@ -2026,9 +2062,13 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
             for cycle in report.get("cycles", []):
                 index = cycle.get("index", 0) - 1
                 hold = holds[index] if index < len(holds) else "-"
+                connect_ms = cycle.get("connect_ms")
+                disconnect_ms = cycle.get("disconnect_ms")
+                connect_display = f"{connect_ms:.0f}" if connect_ms is not None else "-"
+                disconnect_display = f"{disconnect_ms:.0f}" if disconnect_ms is not None else "-"
                 cycle_rows.append(
                     f"<tr><td>{phase['transport']}</td><td>{cycle.get('index')}</td><td>{hold}</td>"
-                    f"<td>{cycle.get('connect_ms', 0):.0f}</td><td>{cycle.get('disconnect_ms', 0):.0f}</td>"
+                    f"<td>{connect_display}</td><td>{disconnect_display}</td>"
                     f"<td class='{cycle.get('status', 'failed')}'>{cycle.get('status')}</td></tr>")
         if report.get("ymodem"):
             ym = report["ymodem"]
@@ -2089,9 +2129,9 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
         ".failed{color:#b3261e;font-weight:700}.skipped{color:#6b7280;font-weight:700}.bar{height:10px;background:#dfe7ec;width:220px}.bar span{display:block;height:100%;background:#167a9d}"
         "code{white-space:pre-wrap;word-break:break-word}.run-header{max-width:1050px}.run-header th{width:140px}</style>"
         f"<h1>{title}</h1><p>{subtitle}</p><p>Ergebnis: <b class='{result['result']}'>{result['result']}</b></p>"
-        "<h2>Laufdetails</h2><table class='run-header'><tbody>" + header_html + "</tbody></table>" + diagnostic_html +
+        "<h2>Laufdetails</h2><table class='run-header'><tbody>" + header_html + "</tbody></table>" +
         "<h2>Phasen und Laufzeiten</h2>" + table(
-            "<tr><th>Phase</th><th>Transport</th><th>COM-Port</th><th>Ergebnis</th><th>Dauer</th><th>relativ</th></tr>", phase_rows) +
+            "<tr><th>Phase</th><th>Transport</th><th>COM-Port</th><th>Ergebnis</th><th>Dauer</th><th>relativ</th></tr>", phase_rows) + diagnostic_html +
         "<h2>Smoke-Timings (ms)</h2>" + table(
             "<tr><th>Transport</th><th>Scan</th><th>Connect</th><th>GATT</th><th>Subscribe</th></tr>", smoke_rows) +
         "<h2>Reconnects (ms)</h2>" + table(
@@ -2114,7 +2154,7 @@ async def run_module_suite(args) -> int:
 
     async def phase(name, transport, test, **overrides):
         old_values = {key: getattr(args, key, None) for key in overrides}
-        reports_before = set(REPORT_DIR.glob("mainboard-*.json"))
+        reports_before = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
         started = time.perf_counter()
         if TRACE is not None:
             TRACE.set_context(phase=name, transport=transport, cycle=None)
@@ -2132,7 +2172,7 @@ async def run_module_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
-        reports_after = set(REPORT_DIR.glob("mainboard-*.json"))
+        reports_after = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
         report_data = None
         new_reports = reports_after - reports_before
         if new_reports:
@@ -2202,7 +2242,7 @@ async def run_fast_suite(args) -> int:
 
     async def phase(name, transport, test, **overrides):
         old_values = {key: getattr(args, key, None) for key in overrides}
-        reports_before = set(REPORT_DIR.glob("mainboard-*.json"))
+        reports_before = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
         started = time.perf_counter()
         if TRACE is not None:
             TRACE.set_context(phase=name, transport=transport, cycle=None)
@@ -2220,7 +2260,7 @@ async def run_fast_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
-        reports_after = set(REPORT_DIR.glob("mainboard-*.json"))
+        reports_after = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
         report_data = None
         new_reports = reports_after - reports_before
         if new_reports:
