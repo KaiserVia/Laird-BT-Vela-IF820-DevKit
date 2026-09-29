@@ -3981,3 +3981,47 @@ Chip-Variante ohne spuerbaren Kapazitaetsverlust moeglich.
 eingestuft) ist ressourcenseitig uneingeschraenkt machbar - der Aufwand liegt ausschliesslich
 im Software-Design (Sequenznummer, atomarer "welcher Slot ist aktuell"-Marker, Anpassung aller
 drei Schreibstellen), nicht im verfuegbaren Speicherplatz.
+
+## Update 5.101 (Branch `connection-pin`): CONNECTION-Pin verdrahtet + Diagnose-Monitor erweitert
+
+**Anlass:** Die automatisierten Connect/Disconnect-Tests (`ble_mainboard_test.py`) sind
+gelegentlich fehlerhaft, ohne bekannten Grund. Verdacht: die Doppelrolle von IC54 Bit7
+(CYSPP-Steuerausgang UND einzige Verbindungserkennung) macht die Erkennung angreifbar - siehe
+`Doku/IF820_Pin_Referenz.md`, Abschnitt 2, und `HW_Massnahmen_Bewertung_2026-08.md`, Maßnahme 2.
+Plan (bereits laenger dokumentiert, bisher zurueckgestellt): den bislang unverdrahteten
+`CONNECTION`-Pin (IF820 Pin 33, P27/CONN_IND) als eigenen, dedizierten Statuseingang nutzen und
+damit Steuerung (CYSPP) und Statuserkennung entkoppeln.
+
+**Hardware (durch Anwender umgesetzt):** IF820 Pin 33 (`CONNECTION`) auf das bisher fest auf GND
+liegende Pad `IO5` (Pad 10) des PCA9554-I2C-Expanders (`IC54`/`IC36`) verdrahtet - die GND-
+Verbindung zu diesem Pad wurde dafuer aufgetrennt. Bit 5 des Expander-Eingaberegisters ist damit
+frei fuer diesen neuen Zweck; im Code war das bereits vorab bestaetigt (`MQTT_LINK (1<<5)` ist ein
+reines Software-Flag, wird nie aus dem echten IC54-Eingaberegister gelesen - kein Konflikt).
+
+**Firmware (Stufe A - reine Diagnose, noch OHNE Aenderung an der Produktionslogik):**
+`bt_cyspp_monitor()` (btio.c, Testmenue -> 8 -> ... CYSPP-Monitor) liest jetzt zusaetzlich Bit 5
+und zeigt beide Signale unabhaengig voneinander live an, sobald sich eines aendert:
+```
+CYSPP bit7      = HIGH (idle / not connected) / LOW (connected / data mode)
+CONNECTION bit5 = HIGH (idle / not ready)     / LOW (data pipe fully established)
+```
+`communication_change()`/`BT_LINK`-Erkennung selbst ist UNVERAENDERT - dieser Schritt liefert
+nur Beobachtungsdaten, aendert nichts am tatsaechlichen Geraeteverhalten. Bewusste Entscheidung:
+zuerst per Diagnose bestaetigen, dass `CONNECTION` sich wie im Datenblatt beschrieben verhaelt
+(insb. ob es fuer Classic SPP genauso funktioniert wie fuer BLE - im Datenblatt nicht eindeutig
+zugesagt, siehe Pin-Referenz), bevor die eigentliche Erkennungslogik angefasst wird.
+
+**Geplanter naechster Schritt (Stufe B, noch NICHT umgesetzt):** sobald die Diagnose bestaetigt,
+dass `CONNECTION` zuverlaessig sowohl bei BLE als auch bei Classic SPP anspringt, `BT_LINK` in
+`communication_change()` auf Bit 5 umstellen (oder Bit 5 UND Bit 7 gemeinsam auswerten) und damit
+die Doppelrolle von Bit 7 tatsaechlich aufloesen. Das ist die eingentliche Verbesserung fuer die
+"manchmal fehlerhaften" Tests - wird aber bewusst erst nach Stufe A angegangen (gemeinsam
+genutzter Erkennungscode, gleiche Vorsicht wie bei der 5.89-5.92-Lehre).
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.101).
+
+**Am Geraet zu verifizieren:** Testmenue -> 8 -> CYSPP-Monitor waehrend eines BLE- UND eines
+Classic-Connect/Disconnect-Zyklus beobachten - zeigt `CONNECTION bit5` in beiden Faellen sauber
+LOW waehrend der Datenkanal steht und HIGH sonst? Insbesondere interessant: Verhaelt es sich
+identisch zu Bit 7, oder gibt es Faelle, in denen sie auseinanderlaufen (genau das waere die
+Erklaerung fuer die "manchmal fehlerhaften" automatisierten Tests).

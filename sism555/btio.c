@@ -490,12 +490,12 @@ void bt_disconnect (void)
  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
 
-void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW-Diagnose (Testmenue)
-{
- int st; uchar now, last=0xFF, sec=0;
+void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) UND CONNECTION (IC54 Bit5,
+{                              // neu verdrahtet: IF820 Pin 33/P27/CONN_IND -> vormals GND-Pad IO5)
+ int st; uchar now7, last7=0xFF, now5, last5=0xFF, sec=0;
  uint cc0=comchange_count;                  // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
  bt_release();                              // sicherstellen: CYSPP als Eingang -> Modul kann treiben
- putln("CYSPP/BT_LINK monitor (IC54 bit7). Now try to connect via BT. Key = exit (max 30s).");
+ putln("CYSPP(bit7)/CONNECTION(bit5) monitor. Now try to connect via BT. Key = exit (max 30s).");
  putstr(" comchange_count bei Start: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69)
  for (sec=0; sec<255; sec++)                // laeuft bis Taste/comchange, aber begrenzt
  {
@@ -503,20 +503,29 @@ void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) fuer HW
   if (st < 0) putln(" I2C read error (IC54)");
   else
   {
-   now = (uchar)((st>>7)&1);                 // Bit7 = CYSPP-Leitung
-   if (now != last)                          // nur bei Aenderung ausgeben
+   now7 = (uchar)((st>>7)&1);                // Bit7 = CYSPP-Leitung
+   if (now7 != last7)                        // nur bei Aenderung ausgeben
    {
-    putstr(" CYSPP bit7 = ");
-    putstr(now ? "HIGH (idle / not connected)" : "LOW  (connected / data mode)");
+    putstr(" CYSPP bit7      = ");
+    putstr(now7 ? "HIGH (idle / not connected)" : "LOW  (connected / data mode)");
     putstr("  [comchange_count="); putnumber(comchange_count,0); putstr("]");  // TEMPORAER (5.69)
     newline();
-    last = now;
+    last7 = now7;
+   }
+   now5 = (uchar)((st>>5)&1);                // Bit5 = CONNECTION-Leitung (neu, Diagnose)
+   if (now5 != last5)                        // nur bei Aenderung ausgeben
+   {
+    putstr(" CONNECTION bit5 = ");
+    putstr(now5 ? "HIGH (idle / not ready)" : "LOW  (data pipe fully established)");
+    putstr("  [comchange_count="); putnumber(comchange_count,0); putstr("]");
+    newline();
+    last5 = now5;
    }
   }
   ResetWDT();
   if (getkey(120) >= 0) break;               // ~120 ms warten; Taste (1) oder comchange (0) -> Ende
  }
- newline(); putstr(" CYSPP monitor ended. comchange_count: "); putnumber(cc0,0);  // TEMPORAER (5.69)
+ newline(); putstr(" CYSPP/CONNECTION monitor ended. comchange_count: "); putnumber(cc0,0);  // TEMPORAER (5.69)
  putstr(" -> "); putnumber(comchange_count,0);
  putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(")"); newline();
 }
