@@ -4316,3 +4316,49 @@ spaetere, sauberere/automatisierte Wiederholung dieser Frage nuetzlich, sobald d
 einem bekannt guten Ausgangszustand ist.
 
 **Pause vereinbart (2026-09-30):** Test an dieser Stelle fuer ca. 20 Minuten unterbrochen.
+
+## Update (kein Versionssprung): Nach Pause - ISP-Bootloader-Haenger + neue Hypothese BT/LTE-Mux-Verdraengung
+
+**Zwischenfall nach dem Power-Cycle:** Geraet liess sich danach gar nicht mehr per RS232
+ansprechen (LED blinkte, Geraet lebte, aber kein Terminalzugriff) - vermutlich im LPC-ISP-
+Bootloader haengengeblieben (Ursache nicht geklaert, evtl. Nebenwirkung der heutigen Loetarbeiten
+am ISP-/Reset-Pin-Bereich). Behoben durch Neuflashen mit Flash Magic - danach normaler Start mit
+5.106.
+
+**Neue Hypothese (Anwenderfrage "liegt es an USB/LTE/GPS?"):** Board 26SC9983 hat laut
+Info-Menue Bluetooth, USB, Modem/Email-LTE UND GPS gleichzeitig aktiv. `uart1_request()`/
+`uart1_release()` (hard.c) zeigen eine MUX-Ressourcen-Verwaltung fuer UART1, bei der ein
+GSM/LTE-Request BT zwangsweise verdraengt (`connect&=~UART1`, MUX umgeschaltet) und beim
+Rueckweg wiederherstellt. Arbeitshypothese: Wenn das IF820-Modul waehrend einer solchen
+Verdraengung (z. B. geplante Email/SMS/MQTT-Aufgabe) die BT-Verbindung nicht sauber
+weiterverarbeiten kann, koennte das beim Rueckweg zu genau dem beobachteten CTS-Wartehaenger
+fuehren (`putb()`, sio.c:63ff., wartet auf CTS, das nach einer gestoerten Session u. U. nie mehr
+kommt).
+
+**⚠ KORREKTUR (Anwender, Hardware-Architektur):** GPS haengt NICHT am selben UART1-Mux wie
+BT/LTE - GPS hat eine **eigene, dedizierte RS232-Verbindung** (vermutlich UART2, siehe
+`Init_UART2()` in hard.c) und ist an dieser Verdraengungs-Problematik unbeteiligt. Der im Code
+sichtbare `MUX_GPS`-Fall in `uart1_request()`/`case MUX_GPS: MUX_GPS_Select` bezieht sich auf
+etwas anderes (vermutlich eine aeltere/optionale Variante) und ist fuer die aktuelle Analyse
+nicht relevant - **nur BT und LTE/GSM teilen sich den UART1-Mux.** Die Hypothese verengt sich
+entsprechend auf BT-vs-LTE-Verdraengung, GPS scheidet als Erklaerung aus.
+
+**Naechster Schritt (noch nicht durchgefuehrt):** LTE-Modem (Email/SMS/MQTT-Zeitplanung)
+voruebergehend deaktivieren (Einstellungen->Funkmodems bzw. Werksmenue) und pruefen, ob das
+Haengenbleiben dann auch bei laengerem BT-Leerlauf ausbleibt.
+
+## Update 5.107: Neues Testwerkzeug - CYSPP manuell HIGH treiben oder freigeben (floatend)
+
+**Anlass (Anwenderwunsch):** "Wie kann ich CYSPP von Hand auf HIGH setzen? Oder floaten lassen?" -
+zum gezielten Testen, ob ein manuell erzwungener Zustand einen haengenden Split-Brain-Fall
+aufloest. Der bestehende Force-Disconnect-Test (5.106) laeuft automatisch in <1s durch (HIGH ->
+/DIS -> Eingang) und laesst sich nicht anhalten/manuell steuern.
+
+**Neu:** Testmenue -> 8 -> **6 = CYSPP manuell HIGH/Freigeben**. Zeigt Bit7-Pegel, Richtung und
+`bt_cyspp_out` an, dann Auswahl: `1` = HIGH treiben (bleibt aktiv HIGH stehen, bis der Anwender
+`2` waehlt), `2` = Freigeben (Eingang/floatend), `9` = zurueck. Der Zustand bleibt jeweils
+bestehen, bis der Anwender ihn aktiv aendert - kein automatisches Timeout. Sicherheitsnetz:
+Verlassen mit `9` gibt die Leitung IMMER zuerst frei (`bt_release()`), falls sie gerade HIGH
+getrieben wird - CYSPP bleibt dadurch nie versehentlich ueber das Testmenue hinaus HIGH haengen.
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.107).

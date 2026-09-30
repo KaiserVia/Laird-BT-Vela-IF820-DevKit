@@ -843,29 +843,62 @@ void bt_force_disconnect_test (void)
  putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); newline();
 }
 
+// Anwenderwunsch (2026-09-30): CYSPP von Hand steuern - HIGH treiben ODER bewusst freigeben
+// (Eingang/floatend), beliebig oft umschaltbar, bis der Anwender selbst '9' drueckt. Anders als
+// bt_force_disconnect_test() (automatischer Kurzpuls) bleibt der gewaehlte Zustand hier so lange
+// stehen, wie der Anwender es will - z. B. um zu testen, ob ein manuell erzwungenes HIGH einen
+// haengenden Split-Brain-Zustand (CYSPP LOW ohne echten Peer) aufloest.
+void bt_cyspp_manual_control (void)
+{
+ int c=-1, st, cfg; uchar tries;
+ if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ putln("CYSPP manuell steuern:  1 = HIGH treiben (Ausgang)   2 = Freigeben (Eingang/floatend)   9 = zurueck");
+ for (;;)
+ {
+  st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
+  putstr(" bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
+  putstr(", Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
+  putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0);
+  putstr("   (1=HIGH treiben, 2=Freigeben, 9=zurueck) "); newline();
+  for (tries=0, c=-1; tries<20; tries++)              // wie bt_diag_menu(): kein Busy-Spin
+  {
+   c = getc(TERMINAL_CHAR_TIMEOUT);
+   if (c=='1' || c=='2' || c=='9') break;
+   ResetWDT();
+   if (c<0) osDelay(50);
+  }
+  if (c=='1') { bt_cmdmode(); putln(" -> CYSPP jetzt aktiv HIGH getrieben (bleibt so, bis du 2 waehlst)."); }
+  else if (c=='2') { bt_release(); putln(" -> CYSPP jetzt Eingang/floatend (Modul darf die Leitung selbst treiben)."); }
+  else if (c=='9') { if (bt_cyspp_out) bt_release(); break; }  // sicher aufraeumen: nie HIGH haengen lassen
+  else putln(" keine gueltige Eingabe - Status erneut anzeigen.");
+ }
+}
+
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
  putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
- putln("              4 = Factory-Reset (/RFAC, Alt-FW-Vergleich!)   5 = Force-Disconnect (/DIS)   9 = zurueck");
+ putln("              4 = Factory-Reset (/RFAC, Alt-FW-Vergleich!)   5 = Force-Disconnect (/DIS)");
+ putln("              6 = CYSPP manuell HIGH/Freigeben   9 = zurueck");
  putstr(" comchange_count: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69, CYSPP-Diagnose)
  for (tries=0; tries<20; tries++)
  {
   if (comchange)                            // echten Schnittstellenwechsel richtig verarbeiten
   { if (!osActiveThread) communication_change(); else clear_comchange(); }
   c = getc(TERMINAL_CHAR_TIMEOUT);
-  if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='9') break;
+  if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') break;
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
  putstr(" comchange_count danach: "); putnumber(comchange_count,0);           // TEMPORAER (5.69)
  putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(", "); putnumber(tries,0); putstr(" Versuche)"); newline();
- if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='9') { putc((char)c); newline(); }
+ if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') { putc((char)c); newline(); }
  else { newline(); putln(" keine gueltige Eingabe (staendiger Schnittstellenwechsel?) - abgebrochen."); }
  if (c=='1') bt_event_sniff();
  else if (c=='2') bt_cyspp_contention_test();
  else if (c=='3') bt_transfer_echo();
  else if (c=='4') bt_factory_reset();
  else if (c=='5') bt_force_disconnect_test();
+ else if (c=='6') bt_cyspp_manual_control();
  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
  // HINWEIS (5.89): Der fruehere Flush hier (5.88, "bxi=rxi vor mainmenu()") ist nicht mehr
  // noetig - Command-Mode-/Protokollbytes (Event-Sniff, Factory-Reset, Contention-Test) landen

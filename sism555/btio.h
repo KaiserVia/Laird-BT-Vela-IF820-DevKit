@@ -201,6 +201,7 @@ extern void bt_cyspp_contention_test (void); // IC54 Bit7 kurz aktiv LOW (Messpr
 extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Test / Factory-Reset - Testmenue
 extern void bt_factory_reset (void);      // TEMPORAER: /RFAC - Modul-Werksreset fuer Alt-FW-Vergleichstest
 extern void bt_force_disconnect_test (void); // TEMPORAER: manuelles /DIS zum Testen des Split-Brain-Zustands
+extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH treiben oder freigeben (floatend)
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
 extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
 
