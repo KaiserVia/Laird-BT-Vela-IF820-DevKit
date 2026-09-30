@@ -1021,15 +1021,15 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
  {
   comstate_neu=state;	 
 	
-	if ((comstate_neu^comstate)&BT_LINK&interfaces) // Bluetooth und �nderung Bluetoothverbindung?
+	if ((interfaces&BT_LINK) && !bt_cyspp_out)          // Bluetooth registriert, Leitung wird nicht gerade selbst getrieben (bt_cmdmode())
   {
-   if ((comstate_neu&BT_LINK)==0) 	// Bluetooth neu verbunden? - BT_LINK ist low aktiv
+   if (((comstate_neu&BT_LINK)==0) && !(connect&BT_LINK))   // HW verbunden, Software weiss es noch nicht - BT_LINK ist low aktiv
    {      	 
 		if (connect&MQTT_LINK) 					// Besteht MQTT Verbindung?
 		{	
      comchange=0;														// reset Schnittstellenwechsel
-		 MQTT_fast_disconnect (1); 							// MQTT Serververbindung besteht? Schlie�e Verbindung mit Abmeldung sofort
-		 if (comchange) state=get_com_status(); // Verbindungs�nderung GSM Modul abfangen
+		 MQTT_fast_disconnect (1); 							// MQTT Serververbindung besteht? Schließe Verbindung mit Abmeldung sofort
+		 if (comchange) state=get_com_status(); // Verbindungsänderung GSM Modul abfangen
      if (state>=0) comstate_neu=state; 			
     }
 		else osDelay(200);
@@ -1047,8 +1047,10 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
 		 if (fp.vspcam) online=0;				// Online Messmodus reset		
 #endif
 		}
-	 }		// end if BT neu verbunden														
-	 else 														// Bluetooth Verbindung beendet
+	 comchange=0;											// Änderung Kommunikationsstatus bearbeitet
+	 thread_comchange=0;
+   }		// end if BT neu verbunden														
+   else if (((comstate_neu&BT_LINK)!=0) && (connect&BT_LINK))  // HW getrennt, Software denkt noch verbunden
 	 {
 		connect&=~(UART1|BT_LINK);			// Daten nicht mehr an UART1 senden
 		bt_pininit=0;										// Reset Bluetooth Pin Initialisierung falls aktiv
@@ -1063,9 +1065,9 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
 #if (VSPCAM)
 		if (fp.vspcam && (connect&UART0)) online=1; 	// viaspeedcam und RS232 Verbindung -> online Messmodus
 #endif
-	 }
-	 comchange=0;											// �nderung Kommunikationsstatus bearbeitet
+	 comchange=0;											// Änderung Kommunikationsstatus bearbeitet
 	 thread_comchange=0;
+	 }
   } // end BT connect/disconnect
 	 
 	if ((comstate_neu^comstate)&GSM_LINK&interfaces) // GSM vorhanden, �nderung GSM-Verbindung?

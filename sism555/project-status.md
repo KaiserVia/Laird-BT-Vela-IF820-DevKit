@@ -4144,3 +4144,60 @@ um das vermutete Timing-Problem tatsaechlich zu belegen oder zu widerlegen, bevo
 unternommen wird.
 
 **Geaenderte Dateien:** i2cm.c, sprachen/sictxt.c (-> 5.103).
+
+## Update 5.104: FIX BT_LINK-Erkennung von Flanken- auf Pegelvergleich umgestellt (neues Board 12SC1234)
+
+**Symptom (neues, unmodifiziertes Board 12SC1234, Firmware 5.99, PC/Viagraph mit bestehender
+Windows-Kopplung):** Nach jedem Boot steht `CYSPP bit7` (CYSPP-Monitor) sofort auf `LOW`
+("verbunden"), obwohl noch niemand bewusst verbunden hat - `comchange_count` bleibt dabei auf 0.
+Viagraph zeigt "verbunden", aber es kommt nie ein PIN-Prompt; `bt_pininit`/`startmessage` werden
+nie ausgeloest.
+
+**Root Cause gefunden ([libtool.c:1013](sism555/libtool.c:1013), `communication_change()`):**
+Die BT_LINK-Erkennung war ein reiner **Flankenvergleich** (`(comstate_neu^comstate)&BT_LINK`),
+mit einer beim Boot einmalig eingelesenen Baseline ([main.c:133](sism555/main.c:133)). Windows
+verbindet sich bei bestehender Kopplung so schnell automatisch wieder, dass die Verbindung oft
+schon steht, BEVOR diese Baseline gelesen wird - die Baseline "sieht" die Verbindung dann von
+Anfang an als gegeben, ein Vergleich kann folglich nie eine Aenderung feststellen, und der ganze
+Connect-Ablauf (`Init_BT_ch()`, `startmessage`, `bt_pininit`) wird schlicht nie angestossen. Fuer
+`RS232_LINK` existierte fuer genau dieses Problem bereits ein Bit-Invertierungstrick
+([main.c:208](sism555/main.c:208)) - fuer `BT_LINK` fehlte das Gegenstueck.
+
+**Erste Loesung (Flanken-Trick analog RS232, verworfen):** Baseline beim Boot gezielt invertieren,
+wenn BT schon als verbunden erkannt wird. Funktioniert nur fuer den Boot-Fall, ist aber ein
+Einmal-Hack ohne Selbstheilung bei jedem aehnlichen zukuenftigen Timing-Problem. Auf Anwenderwunsch
+("gefaellt die Flankengeschichte nicht, geht das nicht robuster mit high und low?") verworfen.
+
+**Umgesetzte, robustere Loesung:** BT_LINK-Erkennung von Flanken- auf **Pegelvergleich** umgestellt
+- statt "hat sich das Bit seit dem letzten Aufruf geaendert?" wird jetzt direkt gefragt "stimmt der
+aktuelle Hardware-Pegel mit dem ueberein, was die Software (`connect&BT_LINK`) gerade glaubt?":
+```c
+if ((interfaces&BT_LINK) && !bt_cyspp_out)   // BT registriert, Leitung nicht selbst getrieben
+{
+ if (((comstate_neu&BT_LINK)==0) && !(connect&BT_LINK))      // HW verbunden, SW weiss es noch nicht
+ { ... unveraendert: Init_BT_ch(), startmessage, bt_pininit, connect|=BT_LINK ... }
+ else if (((comstate_neu&BT_LINK)!=0) && (connect&BT_LINK))  // HW getrennt, SW denkt noch verbunden
+ { ... unveraendert: connect&=~(UART1|BT_LINK), bt_pininit=0, bxi=rxi-Flush ... }
+}
+```
+Selbstheilend bei JEDEM Aufruf (nicht nur beim Boot), unabhaengig davon, ob/wie eine Flanke verpasst
+wurde. Die `!bt_cyspp_out`-Bedingung schuetzt bewusst das Zeitfenster, in dem `bt_cmdmode()`/
+`bt_disconnect()` die Leitung selbst als Ausgang treiben (dort weicht der Pegel bewusst von der
+Software-Wahrheit ab - kein Fehler, keine Aktion noetig) - sonst wuerde der Pegelvergleich
+faelschlich mitten in einer bewussten Trennung eingreifen (dieselbe Race-Klasse wie der 5.93-Fix).
+
+**⚠ Neuer, NOCH NICHT geklaerter Befund beim Live-Test (5.104 auf 12SC1234):** Nach dem Flashen
+zeigte Viagraph den PIN-Prompt zwar jetzt - aber in einer **Endlosschleife**, "PIN = ******" flutet
+das Terminal im Sekundenbruchteil-Takt (Screenshot Anwender). Arbeitshypothese: die BT_LINK-
+Erkennung funktioniert jetzt zum ERSTEN MAL ueberhaupt auf diesem Board - falls `CYSPP` (Bit7) auf
+diesem konkreten Board elektrisch unruhig ist (schnelles Bouncing HIGH/LOW, z. B. durch die in
+`CLAUDE.md` seit laengerem dokumentierte fehlende Entkopplung `C128`/`C58`), wuerde JEDE erkannte
+Verbindungsaenderung (alte Flankenlogik genauso wie die neue Pegellogik) `startmessage=1` und
+`bt_pininit=1` erneut setzen -> Banner+PIN-Prompt wird bei jedem Bounce neu gesendet. **Nicht
+verifiziert** - Anwender wurde gebeten, nach Power-Cycle sofort `comchange_count` im CYSPP-Monitor
+zu beobachten (rasanter Eigenanstieg ohne Nutzeraktion wuerde die Bouncing-Theorie bestaetigen).
+Bis zur Klaerung: Root-Cause-Fix (Flanke -> Pegel) bleibt wie er ist, da er unabhaengig von der
+PIN-Schleife korrekt und sinnvoll ist; die PIN-Schleife selbst ist ein separat zu untersuchender
+Befund.
+
+**Geaenderte Dateien:** libtool.c, sprachen/sictxt.c (-> 5.104).
