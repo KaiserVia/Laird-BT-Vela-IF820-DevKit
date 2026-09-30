@@ -4269,3 +4269,28 @@ das schon lange bekannte, ungeloeste Problem (Modul erkennt einen bestimmten Tre
 siehe `CLAUDE.md`, Abschnitt "BT-Modul faellt gelegentlich komplett aus"/Split-Brain.
 
 **Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.106).
+
+## Update (kein Versionssprung): Neuer Testmodus `idle-latency` in ble_mainboard_test.py
+
+**Anlass:** Anwenderbeobachtung "das Problem kommt auch, wenn man zu lange in einem Menue ist und
+nichts macht" (unabhaengig vom Testmenue) - passt zum im Code gefundenen Minutentick (`measure.c`,
+`bt_release()` bei jeder RTC-Minute, siehe Update 5.106-Kontext). Manuelles Stoppen mit der Uhr war
+umstaendlich und stoerungsanfaellig (jede Pruefung erfordert eine Aktion, die selbst das Timing
+beeinflusst).
+
+**Neuer Modus (aufbauend auf der bestehenden `ClassicTransport`/Marker-Navigation-Infrastruktur,
+wie vom Anwender gewuenscht):** `--mode idle-latency` - verbindet frisch (--transport classic),
+erreicht ueber `authenticate_or_sync_main_menu()` das Hauptmenue, wartet dann **exakt** eine von
+`--idle-times` vorgegebene Leerlaufzeit (Default `20,55,65,90,125`s - bewusst um die vermutete
+60s-Grenze verteilt), und misst danach per einziger minimaler Navigation (Hauptmenue -> Testmenue
+-> zurueck, ueber die bestehenden Marker `MARK_TESTMENU`/`MARK_HAUPTMENU`) die Reaktionszeit in ms.
+Jede Leerlaufzeit bekommt eine frische Verbindung (wie `--mode cycle`) - vermeidet Ordnungseffekte
+zwischen den Messungen. Schreibt JSON+Markdown-Report wie die anderen Modi.
+
+**Erwartetes Ergebnis, falls der Minutentick-Verdacht stimmt:** Laeufe mit Idle-Zeit knapp UNTER
+einer Minutengrenze (20s, 55s) sollten normal schnell reagieren, Laeufe knapp DARUEBER (65s, 90s,
+125s) auffaellig langsamer oder mit Timeout - noch nicht am Geraet verifiziert.
+
+**Aufruf:** `python ble_mainboard_test.py --transport classic --port COM5 --mode idle-latency`
+
+**Geaenderte Dateien:** Doku/tools/ble_mainboard_test.py.

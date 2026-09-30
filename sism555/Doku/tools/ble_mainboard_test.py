@@ -36,6 +36,11 @@ Fuenf Modi
                     Ymodem-Ausgabe, send_vtf_file() in btio.c/sicom.c). Empfaengt den Ymodem-
                     Batch-Transfer (128-Byte-Headerblock + 1k-CRC-Datenbloecke, exakt das
                     Protokoll aus xmodem.c) und misst den tatsaechlichen Durchsatz.
+  --mode idle-latency  [Classic] Verbindet frisch, wartet je --idle-times-Wert GENAU diese
+                    Leerlaufzeit im Hauptmenue (keine Aktion), misst dann die Reaktionszeit auf
+                    eine minimale Navigation (Hauptmenue -> Testmenue -> zurueck). Prueft den
+                    Verdacht "haengt/wird langsam nach ~1 Minute Leerlauf" (measure.c-Minutentick,
+                    siehe project-status.md) reproduzierbar und ohne manuelles Stoppen.
 
 Transport
 ---------
@@ -60,6 +65,8 @@ Aufruf
   python ble_mainboard_test.py --transport classic --port COM5 --mode download --records 2000
   python ble_mainboard_test.py --transport ble --mode cycle --count 10
   python ble_mainboard_test.py --transport ble --mode download --records 2000
+  python ble_mainboard_test.py --transport classic --port COM5 --mode idle-latency
+  python ble_mainboard_test.py --transport classic --port COM5 --mode idle-latency --idle-times 30,60,90,120,150
 
 Ohne --pin bzw. ableitbaren PIN bleibt die BT-Pinabfrage der Firmware offen - das kann dazu
 fuehren, dass die Verbindung nach einer Weile ohne Aktivitaet getrennt wird bzw. das RS232-Menue
@@ -1447,6 +1454,125 @@ def _finish_cycle(result: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Idle-Latency-Test: prueft den Verdacht "haengt/wird langsam, wenn man laenger als
+# ~1 Minute in einem Menue nichts tut" (project-status.md, connection-pin-Untersuchung
+# 2026-09-30). Verbindet frisch (--transport classic), erreicht das Hauptmenue, wartet dann
+# GENAU die angegebene Leerlaufzeit (--idle-times, mehrere Werte rund um 60/120s zum Vergleich),
+# und misst danach die Reaktionszeit auf EINE minimale Navigation (Hauptmenue -> Testmenue -> zurueck).
+# Auffaellig langsame Reaktionszeiten just bei Vielfachen von ~60s wuerden den im Code
+# gefundenen Minutentick-Verdacht (measure.c, bt_release() bei jeder RTC-Minute) direkt belegen.
+# ---------------------------------------------------------------------------
+
+async def run_idle_latency_test(args) -> int:
+    idle_times = args.idle_times or [20.0, 55.0, 65.0, 90.0, 125.0]
+    result = {
+        "mode": "idle-latency",
+        "transport": args.transport,
+        "port": None,
+        "started_at": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+        "idle_seconds_tested": idle_times,
+        "runs": [],
+    }
+
+    for i, idle_seconds in enumerate(idle_times, start=1):
+        if TRACE is not None:
+            TRACE.set_context(run=i, transport=args.transport, idle_seconds=idle_seconds)
+        trace_event("idle_latency_run_started", idle_seconds=idle_seconds)
+        log(f"--- Lauf {i}/{len(idle_times)} (Leerlaufzeit {idle_seconds:g} s) ---")
+        run = {"index": i, "idle_seconds": idle_seconds, "connect_ms": None,
+               "menu_ready_ok": False, "into_testmenu_ms": None, "back_to_hauptmenu_ms": None,
+               "status": "failed", "error": None}
+        transport = await make_transport(args)
+        t0 = time.perf_counter()
+        try:
+            await transport.connect(args.connect_timeout)
+            result["port"] = getattr(transport, "port", None)
+            run["connect_ms"] = round((time.perf_counter() - t0) * 1000.0, 1)
+            log(f"Verbunden nach {run['connect_ms']:.0f} ms.")
+
+            await authenticate_or_sync_main_menu(transport, args, "idle-latency")
+            run["menu_ready_ok"] = True
+
+            log(f"Halte Verbindung {idle_seconds:g} s im Hauptmenue, keine Aktion ...")
+            transport.rx.clear()
+            await asyncio.sleep(idle_seconds)
+
+            t1 = time.perf_counter()
+            await transport.write(b"3")  # Hauptmenue -> Testmenue (rein lesende Navigation)
+            if await transport.rx.wait_for_marker(MARK_TESTMENU, args.menu_timeout):
+                run["into_testmenu_ms"] = round((time.perf_counter() - t1) * 1000.0, 1)
+                log(f"Testmenue erreicht nach {run['into_testmenu_ms']:.0f} ms.")
+            else:
+                log(f"KEIN Testmenue-Marker innerhalb {args.menu_timeout:.0f}s gesehen - haengt/extrem langsam.")
+
+            transport.rx.clear()
+            t2 = time.perf_counter()
+            await transport.write(b"9")  # Testmenue -> zurueck ins Hauptmenue
+            if await transport.rx.wait_for_marker(MARK_HAUPTMENU, args.menu_timeout):
+                run["back_to_hauptmenu_ms"] = round((time.perf_counter() - t2) * 1000.0, 1)
+                log(f"Zurueck im Hauptmenue nach {run['back_to_hauptmenu_ms']:.0f} ms.")
+            else:
+                log(f"KEIN Hauptmenue-Marker innerhalb {args.menu_timeout:.0f}s gesehen - haengt/extrem langsam.")
+
+            run["status"] = ("passed" if (run["into_testmenu_ms"] is not None
+                                           and run["back_to_hauptmenu_ms"] is not None) else "unstable")
+        except Exception as exc:
+            run["error"] = str(exc)
+            log(f"FEHLER: {exc}")
+            trace_event("idle_latency_run_error", level="error", exception_type=type(exc).__name__, error=str(exc))
+        finally:
+            try:
+                await asyncio.wait_for(transport.disconnect(), timeout=15.0)
+            except Exception as exc:
+                log(f"WARNUNG: Trennen hing/schlug fehl ({exc}).")
+
+        result["runs"].append(run)
+        trace_event("idle_latency_run_finished", status=run["status"], idle_seconds=idle_seconds,
+                    into_testmenu_ms=run["into_testmenu_ms"], back_to_hauptmenu_ms=run["back_to_hauptmenu_ms"])
+        if i < len(idle_times):
+            await asyncio.sleep(args.cooldown)
+
+    _finish_idle_latency(result)
+    passed = sum(1 for r in result["runs"] if r["status"] == "passed")
+    return 0 if passed == len(idle_times) else 1
+
+
+def _finish_idle_latency(result: dict) -> None:
+    runs = result["runs"]
+    passed = sum(1 for r in runs if r["status"] == "passed")
+    print()
+    print("=" * 70)
+    print(f"  IDLE-LATENCY-TEST ZUSAMMENFASSUNG ({result['transport']})")
+    print("=" * 70)
+    print(f"  Laeufe bestanden:  {passed}/{len(runs)}")
+    print(f"  {'Idle (s)':>10}  {'->Testmenue (ms)':>18}  {'->Hauptmenue (ms)':>18}  Status")
+    for r in runs:
+        into = f"{r['into_testmenu_ms']:.0f}" if r["into_testmenu_ms"] is not None else "TIMEOUT"
+        back = f"{r['back_to_hauptmenu_ms']:.0f}" if r["back_to_hauptmenu_ms"] is not None else "TIMEOUT"
+        print(f"  {r['idle_seconds']:>10.0f}  {into:>18}  {back:>18}  {r['status']}")
+    print()
+    json_path, md_path = write_report("idle-latency", result)
+    lines = [
+        "# Idle-Latency-Test (Reaktionszeit nach Leerlauf im Menue)",
+        "",
+        f"- Transport: `{result['transport']}`",
+        f"- COM-Port: `{result['port']}`" if result["port"] else None,
+        f"- Bestanden: **{passed}/{len(runs)}**",
+        "",
+        "| Idle (s) | ->Testmenue (ms) | ->Hauptmenue (ms) | Status |",
+        "| ---: | ---: | ---: | --- |",
+    ]
+    lines = [line for line in lines if line is not None]
+    for r in runs:
+        into = f"{r['into_testmenu_ms']:.0f}" if r["into_testmenu_ms"] is not None else "TIMEOUT"
+        back = f"{r['back_to_hauptmenu_ms']:.0f}" if r["back_to_hauptmenu_ms"] is not None else "TIMEOUT"
+        lines.append(f"| {r['idle_seconds']:.0f} | {into} | {back} | {r['status']} |")
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    log(f"JSON-Report: {json_path}")
+    log(f"Markdown-Report: {md_path}")
+
+
+# ---------------------------------------------------------------------------
 # Modus 4: Classic-Smoke-Test (BT-Classic-Aequivalent zu --mode smoke)
 # ---------------------------------------------------------------------------
 
@@ -2338,7 +2464,7 @@ def main() -> int:
     global TRACE
     p = argparse.ArgumentParser(description="BLE/BT-Classic-Test fuer das VIASIS-Mainboard.")
     p.add_argument("--mode", choices=("smoke", "transfer", "classic-smoke", "cycle", "download", "receive",
-                                      "classic-suite", "module-suite", "fast-suite"),
+                                      "classic-suite", "module-suite", "fast-suite", "idle-latency"),
                    default="smoke")
     p.add_argument("--transport", choices=("ble", "classic"), default="ble",
                    help="Uebertragungsweg fuer --mode cycle/download/receive (classic-smoke/classic-suite/smoke/"
@@ -2370,6 +2496,10 @@ def main() -> int:
                         "[cycle] Haltezeit je Zyklus (0 = sofort wieder trennen).")
     p.add_argument("--cycle-holds", type=lambda value: [float(item) for item in value.split(",")], default=None,
                    help="[cycle] komma-getrennte Haltezeiten je Zyklus in Sekunden")
+    p.add_argument("--idle-times", type=lambda value: [float(item) for item in value.split(",")], default=None,
+                   help="[idle-latency] komma-getrennte Leerlaufzeiten in Sekunden, je einmal frisch "
+                        "verbunden getestet (Default: 20,55,65,90,125 - rund um die vermutete "
+                        "60s-Minutentick-Grenze)")
     p.add_argument("--no-report", action="store_true", help="[smoke] keinen Report schreiben")
     p.add_argument("--bytes", type=int, default=DEFAULT_TRANSFER_BYTES,
                    help="[transfer] Nutzdaten-Bytes (Default 40 kB, wie DVK-Referenztest)")
@@ -2399,7 +2529,7 @@ def main() -> int:
 
     if args.mode in ("smoke", "transfer"):
         args.transport = "ble"
-    elif args.mode in ("classic-smoke", "classic-suite"):
+    elif args.mode in ("classic-smoke", "classic-suite", "idle-latency"):
         args.transport = "classic"
     if args.transport == "ble" and BleakClient is None:
         sys.exit("Fehlt: bleak. Installieren mit:  pip install bleak")
@@ -2428,6 +2558,8 @@ def main() -> int:
         return asyncio.run(run_fast_suite(args))
     if args.mode == "cycle":
         return asyncio.run(run_cycle_test(args))
+    if args.mode == "idle-latency":
+        return asyncio.run(run_idle_latency_test(args))
     if args.mode == "receive":
         return asyncio.run(run_receive_test(args))
     return asyncio.run(run_download_test(args))
