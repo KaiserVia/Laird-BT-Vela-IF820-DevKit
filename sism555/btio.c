@@ -810,8 +810,12 @@ void bt_factory_reset (void)
  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
  Init_BT_ch(BT_BAUD);
  putln("Factory-Reset (/RFAC) - Modul wird auf Werkszustand zurueckgesetzt, Baud -> 115200.");
- if (bt_command(T_rfac,T_rfacok,1000)) putln(" /RFAC bestaetigt (@R,...,/RFAC,0000).");
- else putln(" keine /RFAC-Bestaetigung erhalten (evtl. andere Baud/Zustand?).");
+ // FIX (Layout): bt_command() haengt bei positivem pause KEIN abschliessendes Newline an die
+ // "< ..."-Antwortzeile (nur bei RN4678-CRLF-Flag) - ohne eigenes newline() lief die folgende
+ // Meldung bisher auf derselben Zeile weiter ("< ...,0000 /RFAC bestaetigt..."), siehe generelle
+ // Menue-Layout-Konvention (immer eigene Zeile pro Meldung).
+ if (bt_command(T_rfac,T_rfacok,1000)) { newline(); putln(" /RFAC bestaetigt (@R,...,/RFAC,0000)."); }
+ else { newline(); putln(" keine /RFAC-Bestaetigung erhalten (evtl. andere Baud/Zustand?)."); }
  uart1_release(MUX_BT);
  putln("WICHTIG: JETZT SOFORT die Zielfirmware flashen - KEIN Power-Cycle vorher (die aktuelle");
  putln("Firmware wuerde das Werksmodul sonst beim naechsten Boot automatisch neu konfigurieren)!");

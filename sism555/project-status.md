@@ -4362,3 +4362,44 @@ Verlassen mit `9` gibt die Leitung IMMER zuerst frei (`bt_release()`), falls sie
 getrieben wird - CYSPP bleibt dadurch nie versehentlich ueber das Testmenue hinaus HIGH haengen.
 
 **Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.107).
+
+## Update (kein Versionssprung): Vergleichstest 269983 vs. 26SC9994 - Konfiguration ausgeschlossen, Board-Ursache bestaetigt
+
+**Vergleichstest "20s-Huerde":** Board 26SC9994 (unveraendertes Referenzboard, 151 Betriebsstunden,
+Firmware 5.99, heute NICHT angefasst) zeigt das ~20s-Haenge-Problem **nicht** - Verbindung bleibt
+laut Anwendertest normal. Board 269983/26SC9983 (heute x-fach neu geflasht/zurueckgesetzt,
+Firmware 5.106) zeigt es weiterhin. Bestaetigt: **kein allgemeiner Firmware-Bug**, sondern etwas
+board-/modulspezifisches.
+
+**IF820-Parametervergleich (`Hauptmenue->5->Bluetooth->1 Information`, `send_bt_info()`):**
+Vollstaendiger Parameter-Dump auf beiden Boards gezogen und Zeile fuer Zeile verglichen - `/QFV`,
+`GTU`, `.CYSPPGP`, `GBTDC`, `GBTP` (inkl. des zuvor verdaechtigten `T=7D00`-Feldes), `GAP`, `GPEM`,
+`.CYSPPGK`, `GSBP`, `/RLH` sind **byte-identisch** auf beiden Boards - einzige Unterschiede sind
+die erwarteten geraeteindividuellen Werte (Seriennummer im Namen, MAC-Adresse `GBA`) und der
+Sitzungs-Traffic-Zaehler (kein Konfigurationswert). **Die IF820-Konfiguration ist damit als
+Ursache ausgeschlossen** - beide Module sind identisch eingestellt.
+
+**Einordnung:** Da weder Firmware-Version (5.104-5.107 vs. 5.99) noch Modul-Konfiguration den
+Unterschied erklaeren, bleibt als wahrscheinlichste Erklaerung entweder (a) der physische
+Board-/Modulzustand (Verschleiss, Entkopplung - alte C128/C58-Vermutung) oder (b) ein durch den
+heutigen intensiven Testtag (viele Factory-Resets/Reflashs/Reboots) angeschlagener Modulzustand.
+Naechster Schritt zur Unterscheidung: Factory-Reset (Testmenue->8->4) + Power-Cycle auf 269983,
+danach erneuter 20s-Test (siehe vorheriger Eintrag) - noch nicht durchgefuehrt/Ergebnis ausstehend.
+
+## Update 5.108: FIX Layout - Factory-Reset-Meldung lief auf derselben Zeile wie die Modul-Antwort
+
+**Nebenbefund (Anwender):** Nach `/RFAC` im BT-Diagnose-Menue erschien die Bestaetigungsmeldung
+direkt hinter der rohen Modul-Antwort auf derselben Zeile ("< @R,000B,/RFAC,0000 /RFAC
+bestaetigt (@R,...,/RFAC,0000)."), statt wie sonst ueberall in eigener Zeile.
+
+**Ursache:** `bt_command()` (btio.c) haengt nach der `"  < <Antwort>"`-Ausgabe nur dann ein
+abschliessendes `newline()` an, wenn der RN4678-spezifische CRLF-Flag-Pause-Wert genutzt wird
+(`|pause|>10000`) - beim normalen positiven Pause-Wert (wie in `bt_factory_reset()`,
+`bt_command(T_rfac,T_rfacok,1000)`) fehlt das Newline. Jede direkt folgende eigene Ausgabe lief
+dadurch auf derselben Zeile weiter.
+
+**Fix:** `bt_factory_reset()` ruft jetzt vor der eigenen Meldung explizit `newline()` auf.
+**Layout-Konvention festgehalten** (Gedaechtnis): bei jedem `bt_command(...)`-Aufruf mit
+positivem Pause-Wert, dem direkt eigener Text folgt, zuerst pruefen, ob ein `newline()` noetig ist.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.108).
