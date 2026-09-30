@@ -4205,7 +4205,7 @@ Befund.
 ## Update 5.105: FIX PIN-Endlosschleife aufgeklaert - Contention-Test fehlte bt_cyspp_out-Schutz (KEIN Hardwaredefekt)
 
 **Aufklaerung des 5.104-Befunds:** Die "PIN = ******"-Endlosschleife (beobachtet auf 12SC1234
-UND, unabhaengig von jedem 5.104-Code, auf 269983 mit unveraendertem 5.99) trat reproduzierbar
+UND, unabhaengig von jedem 5.104-Code, auf 26SC9983 mit unveraendertem 5.99) trat reproduzierbar
 NUR auf, wenn vorher/waehrend Testmenue -> 8 (BT-Diagnose) genutzt wurde - speziell Option 2
 (Contention-Test). Ohne dieses Diagnose-Menue zu betreten, verbindet sich BT normal und sauber
 (vom Anwender bestaetigt). Die zuvor vermutete Hardwaredefekt-Erklaerung fuer 12SC1234 war damit
@@ -4242,7 +4242,7 @@ Transfer-Test ohnehin wie in `CLAUDE.md` seit laengerem vorgesehen wieder entfer
 
 ## Update 5.106: Split-Brain live bestaetigt (Hardware treibt LOW, nicht wir) + neue Diagnose-/Testwerkzeuge
 
-**Live-Test (5.105, Board 269983):** Nach BT-Verbindungsaufbau via Viagraph/COM5 wieder ausgestiegen
+**Live-Test (5.105, Board 26SC9983):** Nach BT-Verbindungsaufbau via Viagraph/COM5 wieder ausgestiegen
 (Dropout) - RS232 (COM3) blieb danach langsam. `bt_cyspp_monitor()` zeigte `bit7=LOW` UND
 `bit5=LOW`, `comchange_count` unveraendert (Delta=0) ueber den gesamten Beobachtungszeitraum
 (zwei parallele Terminal-Fenster, RS232 + BT, synchron mitgeloggt). Kein Interrupt-Sturm (widerlegt
@@ -4297,7 +4297,7 @@ einer Minutengrenze (20s, 55s) sollten normal schnell reagieren, Laeufe knapp DA
 
 ## Update (kein Versionssprung): Manueller Test - Minutentick-Theorie widerlegt, Modul vermutlich nur "angeschlagen"
 
-**Manueller Test (Board 269983, 5.105, ohne Testmenue 8):** Verbunden, im Kopf bis 20 gezaehlt
+**Manueller Test (Board 26SC9983, 5.105, ohne Testmenue 8):** Verbunden, im Kopf bis 20 gezaehlt
 (keine Aktion), dann einen Menuepunkt angeklickt - **war da schon nicht mehr sauber/langsam.**
 Das widerspricht der Minutentick-Theorie (`measure.c`, `bt_release()` bei jeder RTC-Minute) klar -
 20s ist deutlich kuerzer als die vermutete 60s-Grenze.
@@ -4363,11 +4363,11 @@ getrieben wird - CYSPP bleibt dadurch nie versehentlich ueber das Testmenue hina
 
 **Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.107).
 
-## Update (kein Versionssprung): Vergleichstest 269983 vs. 26SC9994 - Konfiguration ausgeschlossen, Board-Ursache bestaetigt
+## Update (kein Versionssprung): Vergleichstest 26SC9983 vs. 26SC9994 - Konfiguration ausgeschlossen, Board-Ursache bestaetigt
 
 **Vergleichstest "20s-Huerde":** Board 26SC9994 (unveraendertes Referenzboard, 151 Betriebsstunden,
 Firmware 5.99, heute NICHT angefasst) zeigt das ~20s-Haenge-Problem **nicht** - Verbindung bleibt
-laut Anwendertest normal. Board 269983/26SC9983 (heute x-fach neu geflasht/zurueckgesetzt,
+laut Anwendertest normal. Board 26SC9983 (heute x-fach neu geflasht/zurueckgesetzt,
 Firmware 5.106) zeigt es weiterhin. Bestaetigt: **kein allgemeiner Firmware-Bug**, sondern etwas
 board-/modulspezifisches.
 
@@ -4383,7 +4383,7 @@ Ursache ausgeschlossen** - beide Module sind identisch eingestellt.
 Unterschied erklaeren, bleibt als wahrscheinlichste Erklaerung entweder (a) der physische
 Board-/Modulzustand (Verschleiss, Entkopplung - alte C128/C58-Vermutung) oder (b) ein durch den
 heutigen intensiven Testtag (viele Factory-Resets/Reflashs/Reboots) angeschlagener Modulzustand.
-Naechster Schritt zur Unterscheidung: Factory-Reset (Testmenue->8->4) + Power-Cycle auf 269983,
+Naechster Schritt zur Unterscheidung: Factory-Reset (Testmenue->8->4) + Power-Cycle auf 26SC9983,
 danach erneuter 20s-Test (siehe vorheriger Eintrag) - noch nicht durchgefuehrt/Ergebnis ausstehend.
 
 ## Update 5.108: FIX Layout - Factory-Reset-Meldung lief auf derselben Zeile wie die Modul-Antwort
@@ -4404,9 +4404,9 @@ positivem Pause-Wert, dem direkt eigener Text folgt, zuerst pruefen, ob ein `new
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.108).
 
-## Update (kein Versionssprung): Board 269983/26SC9983 - vorlaeufiges Fazit "vermutlich Hardwaredefekt"
+## Update (kein Versionssprung): Board 26SC9983 - vorlaeufiges Fazit "vermutlich Hardwaredefekt"
 
-**Factory-Reset + Power-Cycle auf 269983 durchgefuehrt (siehe vorheriger Eintrag) - Ergebnis:
+**Factory-Reset + Power-Cycle auf 26SC9983 durchgefuehrt (siehe vorheriger Eintrag) - Ergebnis:
 Fehler (Verbindung haelt keine ~20s, siehe fruehere Eintraege) besteht unveraendert weiter.**
 
 **Damit ergibt sich in der Summe der heutigen Tests ein eindeutiges Bild:**
@@ -4422,7 +4422,7 @@ Fehler (Verbindung haelt keine ~20s, siehe fruehere Eintraege) besteht unveraend
 
 **Vorlaeufiges Fazit:** Alles, was sich per Software/Konfiguration/Reset beeinflussen liesse, wurde
 ausgeschlossen. Es spricht viel fuer einen **echten, board-spezifischen Hardwaredefekt auf
-269983/26SC9983** - dasselbe Muster wie beim frueher bereits bestaetigten Fall Board 269996
+26SC9983** - dasselbe Muster wie beim frueher bereits bestaetigten Fall Board 269996
 (Firmware/Konfiguration unauffaellig, ein einzelnes Board reproduzierbar fehlerhaft, am Ende als
 nicht-reparabler Hardwaredefekt identifiziert).
 
@@ -4430,7 +4430,7 @@ nicht-reparabler Hardwaredefekt identifiziert).
 Die alte, nie abschliessend geklaerte Beobachtung aus `CLAUDE.md` - fehlende Entkopplungs-
 kondensatoren `C128`/`C58` (100 nF an den IF820-Power-Pins, in beiden Bestueckungsvarianten als
 nicht bestueckt eingetragen) - passt symptomatisch gut ("laeuft kurz, dann traege/instabil").
-Empfehlung: pruefen, ob C128/C58 auf 269983 bestueckt sind (Vergleich mit 26SC9994), sofern
-Platinenzugriff besteht. Bis dahin: 269983 fuer weitere BT-Stabilitaetstests als **vermutlich
+Empfehlung: pruefen, ob C128/C58 auf 26SC9983 bestueckt sind (Vergleich mit 26SC9994), sofern
+Platinenzugriff besteht. Bis dahin: 26SC9983 fuer weitere BT-Stabilitaetstests als **vermutlich
 hardwaredefekt** einstufen, nicht mehr als repraesentatives Testboard fuer Firmware-Aenderungen
 verwenden.
