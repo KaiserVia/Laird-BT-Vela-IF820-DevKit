@@ -4297,7 +4297,7 @@ einer Minutengrenze (20s, 55s) sollten normal schnell reagieren, Laeufe knapp DA
 
 ## Update (kein Versionssprung): Manueller Test - Minutentick-Theorie widerlegt, Modul vermutlich nur "angeschlagen"
 
-**Manueller Test (Board 269983, 5.106, ohne Testmenue 8):** Verbunden, im Kopf bis 20 gezaehlt
+**Manueller Test (Board 269983, 5.105, ohne Testmenue 8):** Verbunden, im Kopf bis 20 gezaehlt
 (keine Aktion), dann einen Menuepunkt angeklickt - **war da schon nicht mehr sauber/langsam.**
 Das widerspricht der Minutentick-Theorie (`measure.c`, `bt_release()` bei jeder RTC-Minute) klar -
 20s ist deutlich kuerzer als die vermutete 60s-Grenze.
