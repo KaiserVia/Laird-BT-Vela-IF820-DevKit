@@ -4403,3 +4403,34 @@ dadurch auf derselben Zeile weiter.
 positivem Pause-Wert, dem direkt eigener Text folgt, zuerst pruefen, ob ein `newline()` noetig ist.
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.108).
+
+## Update (kein Versionssprung): Board 269983/26SC9983 - vorlaeufiges Fazit "vermutlich Hardwaredefekt"
+
+**Factory-Reset + Power-Cycle auf 269983 durchgefuehrt (siehe vorheriger Eintrag) - Ergebnis:
+Fehler (Verbindung haelt keine ~20s, siehe fruehere Eintraege) besteht unveraendert weiter.**
+
+**Damit ergibt sich in der Summe der heutigen Tests ein eindeutiges Bild:**
+- IF820-Konfiguration: byte-identisch zum unauffaelligen Referenzboard 26SC9994 (siehe voriger
+  Eintrag) - Konfiguration als Ursache ausgeschlossen.
+- Factory-Reset + Power-Cycle (voelliger Neuaufbau des Modul-Zustands): aendert nichts - "durch
+  den heutigen Testtag angeschlagener Software-/Modulzustand" als Erklaerung damit ebenfalls
+  ausgeschlossen.
+- Referenzboard 26SC9994 (gleiche Firmware-Codebasis, andere Hardware-Einheit): zeigt das Problem
+  nicht.
+- Firmware-Versionen 5.99 bis 5.108 (edge- und pegelbasierte BT_LINK-Erkennung, mit und ohne die
+  heutigen Fixes): Problem tritt in allen getesteten Versionen gleichermassen auf.
+
+**Vorlaeufiges Fazit:** Alles, was sich per Software/Konfiguration/Reset beeinflussen liesse, wurde
+ausgeschlossen. Es spricht viel fuer einen **echten, board-spezifischen Hardwaredefekt auf
+269983/26SC9983** - dasselbe Muster wie beim frueher bereits bestaetigten Fall Board 269996
+(Firmware/Konfiguration unauffaellig, ein einzelnes Board reproduzierbar fehlerhaft, am Ende als
+nicht-reparabler Hardwaredefekt identifiziert).
+
+**Konkreter naechster Verdacht (physische Pruefung noetig, nicht per Software feststellbar):**
+Die alte, nie abschliessend geklaerte Beobachtung aus `CLAUDE.md` - fehlende Entkopplungs-
+kondensatoren `C128`/`C58` (100 nF an den IF820-Power-Pins, in beiden Bestueckungsvarianten als
+nicht bestueckt eingetragen) - passt symptomatisch gut ("laeuft kurz, dann traege/instabil").
+Empfehlung: pruefen, ob C128/C58 auf 269983 bestueckt sind (Vergleich mit 26SC9994), sofern
+Platinenzugriff besteht. Bis dahin: 269983 fuer weitere BT-Stabilitaetstests als **vermutlich
+hardwaredefekt** einstufen, nicht mehr als repraesentatives Testboard fuer Firmware-Aenderungen
+verwenden.
