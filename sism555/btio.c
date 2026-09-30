@@ -750,10 +750,15 @@ void bt_cyspp_contention_test (void)
 #if BT_CYSPP
  if ((fp.btmodem==Roving) || (fp.btmodem==Laird)) { putln(" nur IF820 (Modul-Guard)"); return; }
  putln("Contention-Test: IC54 Bit7 wird 500 ms aktiv LOW getrieben - jetzt Delta-U ueber R78 messen.");
+ // FIX: bt_cyspp_out fehlte hier (im Gegensatz zu bt_cmdmode()) - communication_change() hat das
+ // testbedingte LOW deshalb als echten neuen BT-Connect gedeutet (Init_BT_ch, startmessage,
+ // bt_pininit ausgeloest), obwohl gar keine reale Verbindung gemeint war. Reproduziert: PIN-Prompt-
+ // Endlosschleife bei Nutzung dieses Menuepunkts, faelschlich zunaechst als HW-Defekt gedeutet.
+ bt_cyspp_out = 1;                            // Host treibt CYSPP -> keine Status-Fehlinterpretation
  write_i2c_dev(IC54, 2, (0x00<<8)|0x01);      // PCA9554 Output-Register (0x01): Bit 7 = LOW
  write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);      // PCA9554 Config (0x03): Bit 7 = Ausgang
  osDelay(500);                                // kurz halten (< 1 s laut Messprotokoll)
- bt_release();                                // sofort zurueck: alle Pins Eingang
+ bt_release();                                // sofort zurueck: alle Pins Eingang (setzt bt_cyspp_out=0)
  putln(" Contention-Test beendet, Leitung wieder Eingang.");
 #else
  putln(" BT_CYSPP nicht aktiv (Testmodus) - Contention-Test uebersprungen.");

@@ -4201,3 +4201,41 @@ PIN-Schleife korrekt und sinnvoll ist; die PIN-Schleife selbst ist ein separat z
 Befund.
 
 **Geaenderte Dateien:** libtool.c, sprachen/sictxt.c (-> 5.104).
+
+## Update 5.105: FIX PIN-Endlosschleife aufgeklaert - Contention-Test fehlte bt_cyspp_out-Schutz (KEIN Hardwaredefekt)
+
+**Aufklaerung des 5.104-Befunds:** Die "PIN = ******"-Endlosschleife (beobachtet auf 12SC1234
+UND, unabhaengig von jedem 5.104-Code, auf 269983 mit unveraendertem 5.99) trat reproduzierbar
+NUR auf, wenn vorher/waehrend Testmenue -> 8 (BT-Diagnose) genutzt wurde - speziell Option 2
+(Contention-Test). Ohne dieses Diagnose-Menue zu betreten, verbindet sich BT normal und sauber
+(vom Anwender bestaetigt). Die zuvor vermutete Hardwaredefekt-Erklaerung fuer 12SC1234 war damit
+hoechstwahrscheinlich eine Fehldiagnose - beide Boards liefen vermutlich in dieselbe, rein
+software-seitige Falle.
+
+**Root Cause ([btio.c:748](sism555/btio.c:748), `bt_cyspp_contention_test()`):** Der Contention-
+Test treibt IC54 Bit7 (CYSPP) bewusst 500 ms aktiv LOW, um am R78 eine Spannungsdifferenz zu
+messen (Hardware-Diagnose aus der urspruenglichen CYSPP-Untersuchung, Messprotokoll Schritt 6).
+Im Gegensatz zu `bt_cmdmode()` (die dieselbe Leitung als Ausgang treibt, aber VORHER
+`bt_cyspp_out=1` setzt) fehlte dieser Schutz hier komplett. Ohne `bt_cyspp_out` haelt
+`communication_change()` das testbedingte LOW fuer einen echten neuen Bluetooth-Connect und loest
+`Init_BT_ch()`, `startmessage` und `bt_pininit` aus - eine komplett vom Test selbst erzeugte,
+falsche Verbindungserkennung. Trifft das mit einer zeitgleich laufenden echten Verbindung
+zusammen (wie im Testszenario: BT-Diagnose-Menue UND gleichzeitiger echter BT-Connect), kollidieren
+beide Zustaende und erzeugen wiederholte Connect/Disconnect-Zyklen mit staendig neu eingespeisten
+Zeichen - genau das beobachtete Bild.
+
+**Fix:** `bt_cyspp_out=1` vor dem Treiben gesetzt (analog `bt_cmdmode()`), `bt_release()` am Ende
+setzt es wie ueberall sonst ueblich wieder zurueck.
+
+**Einordnung:** Dieser Bug existiert unabhaengig vom 5.104-Fix (Flanke->Pegel) bereits seit
+Einfuehrung des Contention-Tests (Update 5.6x, temporaerer CYSPP-Diagnose-Code) und betrifft nur
+diesen einen manuell aufgerufenen Diagnose-Menuepunkt - keine Auswirkung auf normalen Feldbetrieb
+ohne Testmenue-Nutzung. Damit steht der 5.104-Fix (Pegelvergleich statt Flankenvergleich fuer
+BT_LINK) nicht mehr unter Verdacht, selbst fehlerhaft zu sein.
+
+**Weiterhin offen:** `bt_event_sniff()` (Testmenue 8->1) sollte auf denselben Fehlertyp geprueft
+werden (manipuliert ebenfalls UART1/Puffer waehrend Verbindungsaufbau) - noch nicht untersucht.
+Sobald die CYSPP-Diagnose insgesamt abgeschlossen ist, sollten Contention-Test, Event-Sniff und
+Transfer-Test ohnehin wie in `CLAUDE.md` seit laengerem vorgesehen wieder entfernt werden.
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.105).
