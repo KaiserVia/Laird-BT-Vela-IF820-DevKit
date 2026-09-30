@@ -4294,3 +4294,25 @@ einer Minutengrenze (20s, 55s) sollten normal schnell reagieren, Laeufe knapp DA
 **Aufruf:** `python ble_mainboard_test.py --transport classic --port COM5 --mode idle-latency`
 
 **Geaenderte Dateien:** Doku/tools/ble_mainboard_test.py.
+
+## Update (kein Versionssprung): Manueller Test - Minutentick-Theorie widerlegt, Modul vermutlich nur "angeschlagen"
+
+**Manueller Test (Board 269983, 5.106, ohne Testmenue 8):** Verbunden, im Kopf bis 20 gezaehlt
+(keine Aktion), dann einen Menuepunkt angeklickt - **war da schon nicht mehr sauber/langsam.**
+Das widerspricht der Minutentick-Theorie (`measure.c`, `bt_release()` bei jeder RTC-Minute) klar -
+20s ist deutlich kuerzer als die vermutete 60s-Grenze.
+
+**Neue Arbeitshypothese:** Nach dem sehr intensiven heutigen Testtag (viele Connect/Disconnect-
+Zyklen, mehrere Reflashs 5.101-5.106, Factory-Resets, Contention-Tests) ist das Modul auf diesem
+Board vermutlich schlicht in einem angeschlagenen/degradierten Zustand - nicht, dass ein neues,
+kurzfristiges Zeitproblem existiert. "Leerlaufzeit" waere dann gar nicht die relevante Variable.
+
+**Naechster Schritt (noch nicht durchgefuehrt):** Kompletter Power-Cycle (laenger stromlos), danach
+**sofort** nach dem Verbinden (ohne jede Wartezeit) einen Menuepunkt anklicken. Klappt das schon
+beim allerersten Versuch nicht sauber, bestaetigt das die "Modul angeschlagen"-Hypothese - dann
+waere ein Factory-Reset (Testmenue->8->4) der naheliegende naechste Schritt, nicht die weitere
+Suche nach einem Zeit-Trigger. Der neue `idle-latency`-Testmodus (siehe oben) bleibt fuer eine
+spaetere, sauberere/automatisierte Wiederholung dieser Frage nuetzlich, sobald das Modul wieder in
+einem bekannt guten Ausgangszustand ist.
+
+**Pause vereinbart (2026-09-30):** Test an dieser Stelle fuer ca. 20 Minuten unterbrochen.
