@@ -4434,3 +4434,19 @@ Empfehlung: pruefen, ob C128/C58 auf 26SC9983 bestueckt sind (Vergleich mit 26SC
 Platinenzugriff besteht. Bis dahin: 26SC9983 fuer weitere BT-Stabilitaetstests als **vermutlich
 hardwaredefekt** einstufen, nicht mehr als repraesentatives Testboard fuer Firmware-Aenderungen
 verwenden.
+
+## ✅ AUFGELOEST: Board 26SC9983 - Ursache gefunden, defekter Quarz (IF820)
+
+**Anwenderbefund:** Der mit dem IF820-Modul verbundene Quarz auf Board 26SC9983 war defekt.
+Nach Austausch gegen einen funktionierenden Quarz laeuft das Board einwandfrei - die ~20s-
+Verbindungsinstabilitaet ist damit behoben.
+
+**Einordnung:** Bestaetigt die heutige Elimination in voller Reihenfolge: IF820-Konfiguration
+(byte-identisch zu Referenzboard 26SC9994) und Software-/Modulzustand (Factory-Reset+Power-Cycle
+ohne Wirkung) waren zu Recht ausgeschlossen - es war die ganze Zeit ein echter, physischer
+Hardwaredefekt auf diesem einen Board, kein Firmware- oder Konfigurationsproblem. Passt zum
+bereits bekannten Muster (Board 269996, frueher bestaetigt defekt). Der Verdacht "fehlende
+Entkopplung C128/C58" hat sich damit NICHT bestaetigt - die tatsaechliche Ursache war der Quarz.
+
+**Board-Inventar aktualisieren:** 26SC9983 Status von "vermutlich hardwaredefekt" auf "behoben
+(Quarztausch), wieder normal nutzbar" setzen.
