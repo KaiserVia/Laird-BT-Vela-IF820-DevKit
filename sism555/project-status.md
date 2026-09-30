@@ -4239,3 +4239,33 @@ Sobald die CYSPP-Diagnose insgesamt abgeschlossen ist, sollten Contention-Test, 
 Transfer-Test ohnehin wie in `CLAUDE.md` seit laengerem vorgesehen wieder entfernt werden.
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.105).
+
+## Update 5.106: Split-Brain live bestaetigt (Hardware treibt LOW, nicht wir) + neue Diagnose-/Testwerkzeuge
+
+**Live-Test (5.105, Board 269983):** Nach BT-Verbindungsaufbau via Viagraph/COM5 wieder ausgestiegen
+(Dropout) - RS232 (COM3) blieb danach langsam. `bt_cyspp_monitor()` zeigte `bit7=LOW` UND
+`bit5=LOW`, `comchange_count` unveraendert (Delta=0) ueber den gesamten Beobachtungszeitraum
+(zwei parallele Terminal-Fenster, RS232 + BT, synchron mitgeloggt). Kein Interrupt-Sturm (widerlegt
+die Vermutung "irgendein Interrupt feuert wild") - das Modul haelt die Leitung einfach konstant auf
+LOW, ohne dass sich am I2C-Register ueberhaupt etwas aendert.
+
+**Anwenderfrage: koennte UNSER Board/MCU das selbst auf LOW ziehen?** Um das direkt am Geraet
+auszuschliessen, zeigt `bt_cyspp_monitor()` jetzt zusaetzlich bei jeder Bit7-Aenderung das IC54-
+Richtungsregister (PCA9554 Register 0x03: Bit=1 -> Eingang, Bit=0 -> Ausgang) UND den Software-Merker
+`bt_cyspp_out` mit an. Steht die Richtung auf "Eingang" und `bt_cyspp_out=0`, kann das beobachtete
+LOW nachweislich nicht von unserer Seite kommen (der PCA9554 ist dann rein passiv, das Level kommt
+extern vom Modul). `bt_release()` setzt zu Monitor-Beginn ohnehin auf Eingang - die Anzeige macht
+das jetzt aber laufend sichtbar statt nur einmalig anzunehmen.
+
+**Neues Testwerkzeug (Anwenderwunsch):** Testmenue -> 8 -> **5 = Force-Disconnect** ruft
+`bt_disconnect()` (Command-Mode + `/DIS`) manuell auf und zeigt Bit7/Bit5/Richtung/`bt_cyspp_out`
+jeweils VOR und NACH dem erzwungenen Trennen - damit laesst sich direkt pruefen, ob ein erzwungenes
+`/DIS` den haengenden Split-Brain-Zustand aufloesen kann (Alternative zum Power-Cycle). Noch nicht
+am Geraet getestet.
+
+**Einordnung:** Damit ist die urspruengliche "vielleicht ziehen WIR das runter"-Sorge mit einem
+direkten Messwerkzeug beantwortbar, nicht nur durch Code-Lesen. Der Split-Brain-Fall selbst bleibt
+das schon lange bekannte, ungeloeste Problem (Modul erkennt einen bestimmten Trennungsweg nicht) -
+siehe `CLAUDE.md`, Abschnitt "BT-Modul faellt gelegentlich komplett aus"/Split-Brain.
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.106).
