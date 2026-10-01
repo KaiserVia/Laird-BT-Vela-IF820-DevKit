@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | **269996** | nein | - | **Hardwaredefekt, bestätigt** (nicht reparabel ohne Bauteil-Nacharbeit) | 2026-08 |
 | **26SC9994** | nein | 5.99 | Unauffällig, Referenzboard (151 Betriebsstunden, seit Wochen stabil) | 2026-09-30 |
-| **26SC9983** | nein | 5.108 | **Behoben (Quarztausch)** — Ursache war ein defekter Quarz am IF820, nicht Firmware/Konfiguration. Nach Austausch läuft's normal. Vorher fälschlich "269983" geschrieben. | 2026-09-30 |
+| **26SC9983** | nein | 5.108 | **Behoben (Quarztausch + 10 MΩ Widerstand parallel zum Quarz)** — Ursache war ein defekter Quarz am IF820, nicht Firmware/Konfiguration. Nach Reparatur läuft's normal (bestätigt auf 5.104 und 5.108). Vorher fälschlich "269983" geschrieben. | 2026-10-01 |
 | **12SC1234** | nein | 5.99 | War Contention-Test-Bug (bt_cyspp_out fehlte, behoben in 5.105) — sonst unauffällig | 2026-09-29 |
 | **12SC3456** | **ja** — Hand-Umbau durch Anwender (IF820 Pin33/CONNECTION → IC54 Pad IO5, GND-Bahn dafür aufgetrennt, 18 kΩ Pull-up) | 5.103 (Stage B zurückgebaut) | Split-Brain bestätigt (CONNECTION verhält sich wie CYSPP, keine Divergenz). **Zusätzlich ältere, ungeklärte Historie:** Spannungsversorgungs-Verdacht seit 2026-06-21 (Brownout auf 3,3V-Schiene bei BT/LTE-Sendespitzen, siehe project-status.md ganz oben) — "PC findet Gerät nur schlecht, verliert Verbindung wieder". Nicht mehr auf Mainline flashen ohne den HW-Umbau! | 2026-09-29 |
 

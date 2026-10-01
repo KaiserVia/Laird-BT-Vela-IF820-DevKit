@@ -4438,8 +4438,10 @@ verwenden.
 ## ✅ AUFGELOEST: Board 26SC9983 - Ursache gefunden, defekter Quarz (IF820)
 
 **Anwenderbefund:** Der mit dem IF820-Modul verbundene Quarz auf Board 26SC9983 war defekt.
-Nach Austausch gegen einen funktionierenden Quarz laeuft das Board einwandfrei - die ~20s-
-Verbindungsinstabilitaet ist damit behoben.
+Behoben durch: neuer Quarz **+ 10 MOhm Widerstand parallel zum Quarz** (wie laut Anleitung/
+Datenblatt fuer diese Oszillatorbeschaltung gefordert). Danach laeuft das Board einwandfrei -
+die ~20s-Verbindungsinstabilitaet ist damit behoben. Bestaetigt auf 5.104, 5.108 (jeweils
+sauberer Boot + Connect ohne Testmenue->8, kein Haengen mehr).
 
 **Einordnung:** Bestaetigt die heutige Elimination in voller Reihenfolge: IF820-Konfiguration
 (byte-identisch zu Referenzboard 26SC9994) und Software-/Modulzustand (Factory-Reset+Power-Cycle
