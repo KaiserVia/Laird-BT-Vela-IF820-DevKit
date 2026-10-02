@@ -490,44 +490,42 @@ void bt_disconnect (void)
  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
 
-void bt_cyspp_monitor (void)   // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) UND CONNECTION (IC54 Bit5,
-{                              // neu verdrahtet: IF820 Pin 33/P27/CONN_IND -> vormals GND-Pad IO5)
- int st, cfg; uchar now7, last7=0xFF, now5, last5=0xFF, sec=0;
+// Bewertung des Paares CYSPP (IC54 Bit7, ueber I2C) / CONNECTION (P0.19, direkt am LPC) - beide low aktiv.
+static char *bt_pair_verdict (uchar cyspp, uchar conn)
+{
+ if (!cyspp && !conn) return "beide LOW  -> verbunden, Datenpipe steht (konsistent)";
+ if (cyspp && conn)   return "beide HIGH -> idle, nicht verbunden (konsistent)";
+ if (!cyspp)          return "CYSPP LOW, CONNECTION HIGH -> Datenmodus aktiv, Pipe aber noch nicht vollstaendig (BLE ohne Subscribe? Aufbau/Abbau?)";
+ return                      "CYSPP HIGH, CONNECTION LOW -> ABWEICHUNG (unerwartet)";
+}
+
+void bt_cyspp_monitor (void)   // Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) UND CONNECTION (P0.19, direkter GPIO)
+{                              // CONNECTION = IF820 Pin 33/P27/CONN_IND, seit 5.109 direkt am LPC (vorher IC54 Bit5)
+ int st, cfg; uchar now7=1, last7=0xFF, now5, last5=0xFF, sec=0;
  uint cc0=comchange_count;                  // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
  bt_release();                              // sicherstellen: CYSPP als Eingang -> Modul kann treiben
- putln("CYSPP(bit7)/CONNECTION(bit5) monitor. Now try to connect via BT. Key = exit (max 30s).");
+ putln("CYSPP(IC54 bit7) vs. CONNECTION(P0.19) monitor. Now try to connect via BT. Key = exit (max 30s).");
  putstr(" comchange_count bei Start: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69)
  for (sec=0; sec<255; sec++)                // laeuft bis Taste/comchange, aber begrenzt
  {
   st = read_i2cdev(IC54, 0, 1);             // IC54 Eingangsregister lesen
   if (st < 0) putln(" I2C read error (IC54)");
-  else
+  else now7 = (uchar)((st>>7)&1);           // Bit7 = CYSPP-Leitung (bei I2C-Fehler letzter Wert bleibt)
+  now5 = (FIO0PIN & CONN_PIN) ? 1 : 0;      // CONNECTION direkt vom LPC-Pin P0.19 (kein I2C)
+  if (st >= 0 && (now7 != last7 || now5 != last5))   // nur bei Aenderung eines der beiden ausgeben
   {
-   now7 = (uchar)((st>>7)&1);                // Bit7 = CYSPP-Leitung
-   if (now7 != last7)                        // nur bei Aenderung ausgeben
-   {
-    // DIAGNOSE: treibt UNSER Board Bit7 gerade selbst (Ausgang), oder ist es Eingang - dann kann
-    // ein gelesenes LOW nur vom Modul (oder extern) kommen, nicht von uns. Config-Register (0x03):
-    // Bit=1 -> Eingang, Bit=0 -> Ausgang (PCA9554-Konvention). bt_cyspp_out zusaetzlich als
-    // Software-Sicht (sollte mit der Config uebereinstimmen, wenn nicht: eigener Fehler).
-    cfg = read_i2cdev(IC54, 3, 1);           // IC54 Konfigurations-/Richtungsregister lesen
-    putstr(" CYSPP bit7      = ");
-    putstr(now7 ? "HIGH (idle / not connected)" : "LOW  (connected / data mode)");
-    putstr("  [comchange_count="); putnumber(comchange_count,0); putstr("]");  // TEMPORAER (5.69)
-    putstr("  [Bit7-Richtung="); putstr((cfg>=0) ? (((cfg>>7)&1) ? "Eingang" : "AUSGANG (wir treiben!)") : "?");
-    putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); putstr("]");
-    newline();
-    last7 = now7;
-   }
-   now5 = (uchar)((st>>5)&1);                // Bit5 = CONNECTION-Leitung (neu, Diagnose)
-   if (now5 != last5)                        // nur bei Aenderung ausgeben
-   {
-    putstr(" CONNECTION bit5 = ");
-    putstr(now5 ? "HIGH (idle / not ready)" : "LOW  (data pipe fully established)");
-    putstr("  [comchange_count="); putnumber(comchange_count,0); putstr("]");
-    newline();
-    last5 = now5;
-   }
+   // DIAGNOSE: treibt UNSER Board Bit7 gerade selbst (Ausgang), oder ist es Eingang - dann kann
+   // ein gelesenes LOW nur vom Modul (oder extern) kommen, nicht von uns. Config-Register (0x03):
+   // Bit=1 -> Eingang, Bit=0 -> Ausgang (PCA9554-Konvention). bt_cyspp_out zusaetzlich als
+   // Software-Sicht (sollte mit der Config uebereinstimmen, wenn nicht: eigener Fehler).
+   cfg = read_i2cdev(IC54, 3, 1);           // IC54 Konfigurations-/Richtungsregister lesen
+   putstr(" CYSPP bit7 = "); putstr(now7 ? "HIGH" : "LOW ");
+   putstr("   CONNECTION P0.19 = "); putstr(now5 ? "HIGH" : "LOW ");
+   putstr("   [comchange_count="); putnumber(comchange_count,0); putstr("]"); newline();   // TEMPORAER (5.69)
+   putstr("   -> "); putln(bt_pair_verdict(now7, now5));
+   putstr("   (Bit7-Richtung="); putstr((cfg>=0) ? (((cfg>>7)&1) ? "Eingang" : "AUSGANG (wir treiben!)") : "?");
+   putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); putstr(")"); newline();
+   last7 = now7; last5 = now5;
   }
   ResetWDT();
   if (getkey(120) >= 0) break;               // ~120 ms warten; Taste (1) oder comchange (0) -> Ende
@@ -832,7 +830,7 @@ void bt_force_disconnect_test (void)
  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
  st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
  putstr(" VOR /DIS: bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
- putstr(", bit5="); putstr((st>=0)?(((st>>5)&1)?"HIGH":"LOW"):"?");
+ putstr(", CONNECTION(P0.19)="); putstr((FIO0PIN&CONN_PIN)?"HIGH":"LOW");
  putstr(", Bit7-Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
  putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); newline();
  putln(" erzwinge Trennung: bt_disconnect() (Command-Mode + /DIS)...");
@@ -842,7 +840,7 @@ void bt_force_disconnect_test (void)
  osDelay(200);                        // Modul Zeit geben, die Leitung nach /DIS freizugeben
  st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
  putstr(" NACH /DIS: bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
- putstr(", bit5="); putstr((st>=0)?(((st>>5)&1)?"HIGH":"LOW"):"?");
+ putstr(", CONNECTION(P0.19)="); putstr((FIO0PIN&CONN_PIN)?"HIGH":"LOW");
  putstr(", Bit7-Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
  putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); newline();
 }
@@ -861,6 +859,7 @@ void bt_cyspp_manual_control (void)
  {
   st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
   putstr(" bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
+  putstr(", CONNECTION(P0.19)="); putstr((FIO0PIN&CONN_PIN)?"HIGH":"LOW");
   putstr(", Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
   putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0);
   putstr("   (1=HIGH treiben, 2=Freigeben, 9=zurueck) "); newline();

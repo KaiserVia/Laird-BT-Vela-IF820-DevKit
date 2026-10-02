@@ -14,10 +14,11 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
 - **Aktueller Branch:** `LTE-Update` (Hauptlinie)
 - **⚠ Nebenbranch `connection-pin` (ab 5.101) - HARDWARE-ABHAENGIG, nicht auf normale Boards
-  flashen:** setzt eine Umverdrahtung voraus (IF820 `CONNECTION`-Pin auf IC54/IC36-Pad `IO5`,
-  dessen GND-Verbindung dafür aufgetrennt wurde). Details: `sism555/project-status.md`,
-  Update 5.101. Auf einem unveränderten Board funktional identisch zur Hauptlinie, liefert dort
-  aber nur bedeutungslose Diagnosedaten für das neue `CONNECTION bit5`-Signal.
+  flashen:** setzt eine Umverdrahtung voraus (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**;
+  in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen GND-Verbindung dafür aufgetrennt wurde).
+  Details: `sism555/project-status.md`, Update 5.101 und 5.109. Auf einem unveränderten Board
+  funktional identisch zur Hauptlinie, liefert dort aber nur bedeutungslose Diagnosedaten für das
+  `CONNECTION`-Signal (P0.19 liest durch den internen Pull-up dauerhaft HIGH).
 - **Aktuelle Firmware-Version:** siehe `sism555/project-status.md` (diese Datei hier wird nicht
   bei jeder Version nachgeführt) - `T_version` in `sism555/sprachen/sictxt.c`
 - **Firmware-Quellcode:** `sism555/` (Hauptdatei BT: `btio.c` / `btio.h`)

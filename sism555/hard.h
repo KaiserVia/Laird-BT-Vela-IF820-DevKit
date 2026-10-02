@@ -46,7 +46,8 @@
 // #define	TERM_ON			(1<<17)		// MAX3225 Force On, entf�llt ForceOn gebr�ckt Invalid
 #define GSM_DTR			(1<<18)		// DTR GSM Modul
 //#define EMGOFF			(1<<20)		// M10 emergency off / UC 15 NReset 
-#define PWR_GPS			(1<<21)		// GPS-Modul Spannungsversorgung 
+#define CONN_PIN		(1<<19)		// P0.19 IF820 CONNECTION (CONN_IND/P27), low aktiv, reine Modul-Statusausgabe - NUR LESEN, nie treiben
+#define PWR_GPS			(1<<21)		// GPS-Modul Spannungsversorgung
 #define	DPLUS				(1<<29)		// USB D-Plus
 
 // GPIO Port 1 Pin Definitionen

@@ -4452,3 +4452,58 @@ Entkopplung C128/C58" hat sich damit NICHT bestaetigt - die tatsaechliche Ursach
 
 **Board-Inventar aktualisieren:** 26SC9983 Status von "vermutlich hardwaredefekt" auf "behoben
 (Quarztausch), wieder normal nutzbar" setzen.
+
+## Doku 2026-10-01: Recherche Modul-FW 1.4.12.12 vs. 1.4.18.18 + interner LPO vs. Quarz
+
+**Kein Versionssprung** - reiner Doku-Eintrag. Volle Ausarbeitung mit Fundstelle je Aussage:
+`Doku/HW_Massnahmen_Bewertung_2026-08.md`, Abschnitte **9.1** und **9.2**.
+
+Kernpunkte:
+- 1.4.18.18 behebt u. a. "lockup issue due in heavy UART loading" (PCN #2E-2026 S. 1 Abschn. 3).
+- **Zwei Befunde fuer unseren Code auf 12.12:** `SBTP ... F=01` (btio.h:114, Sniff aus) und
+  "CYSPP HIGH beendet SPP" sind laut PCN #2E-2026 S. 1 Abschn. 3 (New Features 3+4) erst in
+  18.18 implementiert -> auf 12.12 vermutlich wirkungslos. Sniff-Zustand auf 12.12 noch nicht am
+  Geraet geprueft.
+- 18.18 gibt es als Quarz-Image (`int-ant`) und LPO-Image (`int-ant_int-lpo`); Herstellerregel:
+  LPO-Image nur OHNE Quarz (GitHub-Release v1.4.18.18, "EZ-Serial binaries"). Datenblatt empfiehlt
+  den Quarz ("if not, link issue may be occurred", DS S. 27 Fussn. 8/9). Keine ppm-Angabe fuer den
+  LPO. -> Q3 bestueckt lassen, Quarz-Image verwenden.
+- Neue Module ab Date Code 0926102 kommen mit 18.18, vermutlich LPO-Variante (Werksstandard seit
+  16.16, PCN #7C-2024) - Folgerung, nicht belegt; beim ersten neuen Modul pruefen.
+
+## Update 5.109 (Branch `connection-pin`): CONNECTION jetzt direkt an LPC-Pin P0.19 - Diagnose liest GPIO statt I2C
+
+**Hardware (Anwender):** Die `CONNECTION`-Leitung (IF820 Pin 33/P27/CONN_IND) wurde direkt an den
+Mikrocontroller **P0[19]** gefuehrt - nicht mehr ueber IC54/Pad IO5. Folge fuer den Code: der Pegel
+kommt per einfachem GPIO-Read (`FIO0PIN & CONN_PIN`), ohne I2C-Zugriff und ohne gemeinsamen
+IC54-Interrupt.
+
+**Pin-Pruefung vorab (keine Kollision):** P0.19 ist in `hard.h` unbelegt (`USB_PPWR` hat zwar auch
+Bit 19, ist aber Port 1). `PINSEL1[7:6]` bleibt 00 = GPIO (Init_Ports setzt dort nur AD02/AD03/
+CAP30/CAP31), `FIO0DIR` enthaelt Bit 19 nicht -> Eingang, `PINMODE1[7:6]` bleibt 00 = **interner
+Pull-up aktiv** (`PULLUP=0`). Der I2C1-Treiber (dessen SDA1-Alternativpin P0.19 waere) ist im
+Projekt abgeschaltet (`RTE_I2C1 0`), SDA-Pin dort ohnehin P0.0. Kein weiterer Init-Code noetig.
+
+**Aenderungen:**
+- `hard.h`: `#define CONN_PIN (1<<19)` (Port 0, low aktiv, nur lesen).
+- `btio.c` `bt_cyspp_monitor()`: CONNECTION wird direkt von P0.19 gelesen. **Vergleichsanzeige
+  CYSPP vs. CONNECTION:** bei jeder Aenderung eines der beiden Pegel eine Zeile mit beiden Werten
+  plus Bewertung (`bt_pair_verdict()`: beide LOW = verbunden/konsistent, beide HIGH = idle/
+  konsistent, CYSPP LOW + CONNECTION HIGH = Datenmodus ohne vollstaendige Pipe, CYSPP HIGH +
+  CONNECTION LOW = Abweichung). Darunter wie bisher Bit7-Richtung und `bt_cyspp_out`.
+  Vorher kamen zwei getrennte Zeilen mit je eigenem Aenderungstrigger - ein direkter Vergleich war
+  nur durch Zeilen-Zuordnung im Kopf moeglich.
+- `btio.c` Force-Disconnect (8->5) VOR/NACH und manuelle Steuerung (8->6): zeigen
+  `CONNECTION(P0.19)` statt des alten IC54-Bit5.
+
+**Bewusst NICHT geaendert:** Die produktive `BT_LINK`-Erkennung (`get_com_status()`/
+`communication_change()`) liest weiterhin CYSPP (IC54 Bit7). Der Umstieg der Statusquelle auf
+CONNECTION (frueher "Stufe B", in 5.103 zurueckgebaut) ist ein eigener, groesserer Schritt - jetzt
+mit GPIO statt I2C und mit den inzwischen gefixten Bugs (5.104/5.105) neu zu bewerten, aber erst
+nach Auswertung der neuen Vergleichsanzeige am Geraet.
+
+**Am Geraet zu pruefen:** Testmenue 7 (Monitor) bei Verbinden/Trennen: bleiben CYSPP und CONNECTION
+im Normalfall konsistent? Gibt es Abweichungsfaelle (v. a. BLE: CONNECTION erst nach CCCD-Write)?
+Ohne angeschlossenes CONNECTION-Kabel liest P0.19 wegen des internen Pull-ups dauerhaft HIGH.
+
+**Geaenderte Dateien:** hard.h, btio.c, sprachen/sictxt.c (-> 5.109), CLAUDE.md (Branch-Hinweis).
