@@ -490,6 +490,26 @@ void bt_disconnect (void)
  connect = concpy;                          // definierter Zustand (== urspruenglich); Aufrufer maskiert BT-Bits
 }
 
+// Einheitliches Ausgabeformat der BT-Diagnose-Werkzeuge (Anwenderwunsch 2026-10-02): Titel buendig links,
+// Detailzeilen mit 2 Leerzeichen eingerueckt (passt zu bt_command(): "  > cmd" / "  < resp"), EIN Wert je
+// Zeile, Werte-Spalte ausgerichtet, Ergebnis-/Hinweiszeilen "  -> ...", jede Meldung endet mit Zeilenumbruch.
+static void bt_key (char *key)                // "  Schluessel:" + Auffuellen bis Spalte 22, danach folgt der Wert
+{ uchar n=2; putstr("  "); while (*key) { putc(*key++); n++; } putc(':'); n++; while (n<22) { putc(' '); n++; } }
+static void bt_kv (char *key, char *val)  { bt_key(key); putln(val); }
+static void bt_kvn (char *key, uint v)    { bt_key(key); putnumber(v,0); newline(); }
+static char *bt_lvl (int st, uchar bit)       // Pegeltext eines IC54-Bits, "?" bei I2C-Fehler
+{ return (st<0) ? "?" : (((st>>bit)&1) ? "HIGH" : "LOW"); }
+static char *bt_dir7 (int cfg)                // Richtung von IC54 Bit7 (CYSPP) laut Konfigurationsregister
+{ return (cfg<0) ? "?" : (((cfg>>7)&1) ? "Eingang" : "AUSGANG (wir treiben!)"); }
+static void bt_pin_state (void)               // aktueller Pinzustand CYSPP/CONNECTION, je Wert eine Zeile
+{
+ int st = read_i2cdev(IC54, 0, 1), cfg = read_i2cdev(IC54, 3, 1);
+ bt_kv("CYSPP bit7", bt_lvl(st,7));
+ bt_kv("CONNECTION P0.19", (FIO0PIN & CONN_PIN) ? "HIGH" : "LOW");
+ bt_kv("Bit7-Richtung", bt_dir7(cfg));
+ bt_kvn("bt_cyspp_out", bt_cyspp_out);
+}
+
 // Bewertung des Paares CYSPP (IC54 Bit7, ueber I2C) / CONNECTION (P0.19, direkt am LPC) - beide low aktiv.
 static char *bt_pair_verdict (uchar cyspp, uchar conn)
 {
@@ -504,12 +524,13 @@ void bt_cyspp_monitor (void)   // Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) 
  int st, cfg; uchar now7=1, last7=0xFF, now5, last5=0xFF, sec=0;
  uint cc0=comchange_count;                  // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
  bt_release();                              // sicherstellen: CYSPP als Eingang -> Modul kann treiben
- putln("CYSPP(IC54 bit7) vs. CONNECTION(P0.19) monitor. Now try to connect via BT. Key = exit (max 30s).");
- putstr(" comchange_count bei Start: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69)
+ putln("CYSPP/CONNECTION-Monitor:");
+ putln("  Taste = Ende (max. 30 s). Jetzt per BT verbinden/trennen.");
+ bt_kvn("comchange_count", cc0);                   // TEMPORAER (5.69): Startwert
  for (sec=0; sec<255; sec++)                // laeuft bis Taste/comchange, aber begrenzt
  {
   st = read_i2cdev(IC54, 0, 1);             // IC54 Eingangsregister lesen
-  if (st < 0) putln(" I2C read error (IC54)");
+  if (st < 0) putln("  I2C-Lesefehler (IC54)");
   else now7 = (uchar)((st>>7)&1);           // Bit7 = CYSPP-Leitung (bei I2C-Fehler letzter Wert bleibt)
   now5 = (FIO0PIN & CONN_PIN) ? 1 : 0;      // CONNECTION direkt vom LPC-Pin P0.19 (kein I2C)
   if (st >= 0 && (now7 != last7 || now5 != last5))   // nur bei Aenderung eines der beiden ausgeben
@@ -519,12 +540,13 @@ void bt_cyspp_monitor (void)   // Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) 
    // Bit=1 -> Eingang, Bit=0 -> Ausgang (PCA9554-Konvention). bt_cyspp_out zusaetzlich als
    // Software-Sicht (sollte mit der Config uebereinstimmen, wenn nicht: eigener Fehler).
    cfg = read_i2cdev(IC54, 3, 1);           // IC54 Konfigurations-/Richtungsregister lesen
-   putstr(" CYSPP bit7 = "); putstr(now7 ? "HIGH" : "LOW ");
-   putstr("   CONNECTION P0.19 = "); putstr(now5 ? "HIGH" : "LOW ");
-   putstr("   [comchange_count="); putnumber(comchange_count,0); putstr("]"); newline();   // TEMPORAER (5.69)
-   putstr("   -> "); putln(bt_pair_verdict(now7, now5));
-   putstr("   (Bit7-Richtung="); putstr((cfg>=0) ? (((cfg>>7)&1) ? "Eingang" : "AUSGANG (wir treiben!)") : "?");
-   putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); putstr(")"); newline();
+   newline(); putln("Zustand:");
+   bt_kv("CYSPP bit7", now7 ? "HIGH" : "LOW");
+   bt_kv("CONNECTION P0.19", now5 ? "HIGH" : "LOW");
+   bt_kv("Bewertung", bt_pair_verdict(now7, now5));
+   bt_kv("Bit7-Richtung", bt_dir7(cfg));
+   bt_kvn("bt_cyspp_out", bt_cyspp_out);
+   bt_kvn("comchange_count", comchange_count);       // TEMPORAER (5.69)
    last7 = now7; last5 = now5;
   }
   ResetWDT();
@@ -533,10 +555,10 @@ void bt_cyspp_monitor (void)   // Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) 
     if (k == 0) osDelay(50);                 // Verbinden/Trennen-Moment) darf den Vergleich NICHT abbrechen;
   }                                          // osDelay: getkey() kehrt bei comchange sofort zurueck (kein Spin)
  }
- newline(); putstr(" CYSPP/CONNECTION monitor ended. comchange_count: "); putnumber(cc0,0);  // TEMPORAER (5.69)
- putstr(" -> "); putnumber(comchange_count,0);
- putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(")"); newline();
- putstr(" UART0-RX verworfen (Puffer voll, seit Boot): "); putnumber(u0_ovf,0); newline();   // 5.111
+ newline(); putln("Monitor beendet:");
+ bt_key("comchange_count"); putnumber(cc0,0); putstr(" -> "); putnumber(comchange_count,0);   // TEMPORAER (5.69)
+ putstr(" (Delta="); putnumber(comchange_count-cc0,0); putc(')'); newline();
+ bt_kvn("UART0-RX verworfen", u0_ovf);             // 5.111: Puffer voll, seit Boot
 }
 
 // Roher EZ-Serial-Event-Mitschnitt auf UART1 (Diagnose, Testmenue): druckt alles, was am
@@ -581,11 +603,13 @@ static bool sniff_bol;                        // Zeilenanfang (fuer Zeitstempel 
 
 void bt_event_sniff (void)
 {
- if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ if (fp.btmodem!=IF820) { putln("  nur IF820"); return; }
  Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (verdraengt GSM/GPS falls noetig,
                                                // wie bei send_bt_info() - MUX schaltet auf BT)
- putln("Event-Sniff (Hintergrund): rohe Modul-Ausgabe, laeuft 180s im Hintergrund mit - Hauptmenue");
- putln("bleibt normal bedienbar. Jetzt BLE/Classic verbinden.");
+ putln("Event-Sniff (Hintergrund):");
+ putln("  Rohe Modul-Ausgabe, laeuft 180 s im Hintergrund mit.");
+ putln("  Das Hauptmenue bleibt normal bedienbar.");
+ putln("  Jetzt BLE/Classic verbinden.");
  bxi1=rxi1;                                   // sauberer Start, alte Reste ignorieren (rbuf1)
  sniff_t0=mstimer;
  sniff_bol=TRUE;
@@ -628,7 +652,7 @@ void bt_sniff_poll (void)
  {
   sniff_active=FALSE;
   uart1_release(MUX_BT);                      // UART1 wieder freigeben (GSM/GPS koennen zurueck)
-  newline(); putln(" Event-Sniff (Hintergrund) beendet (180s abgelaufen).");
+  newline(); putln("Event-Sniff beendet:"); putln("  180 s abgelaufen.");
  }
 }
 
@@ -684,16 +708,19 @@ void bt_transfer_echo (void)
  uint32_t frames_ok=0, frames_bad=0;
  uchar cc; uint loop; char c;
 
- if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ if (fp.btmodem!=IF820) { putln("  nur IF820"); return; }
  if (bt_pininit)                              // FIX (5.80): siehe bt_event_sniff() - dieselbe Funktion
  {                                             // verschluckt sonst eine waehrenddessen ueber BT eingegebene
                                                // echte PIN als Diagnose-Rohdaten.
-  putln("Transfer-Test: PIN-Abfrage noch offen - erst PIN ueber BT eingeben, dann erneut starten.");
+  putln("Transfer-Test:");
+  putln("  PIN-Abfrage noch offen - erst PIN ueber BT eingeben, dann erneut starten.");
   return;
  }
  Init_BT_ch(BT_BAUD);                         // UART1 aktiv anfordern (wie bt_event_sniff)
  cc=connect; connect=concpy & ~UART1;
- putln("Transfer-Test: wartet auf CYS1-Frames (CRC/Seq), sendet ACK1 zurueck. Laufzeit 120s.");
+ putln("Transfer-Test:");
+ putln("  Wartet auf CYS1-Frames (CRC/Seq), sendet ACK1 zurueck.");
+ putln("  Laufzeit 120 s.");
  connect=cc;
  bxi=rxi;
  for (loop=0; loop<12000; loop++)             // 12000 * 10 ms = 120 s, FEST
@@ -742,8 +769,9 @@ void bt_transfer_echo (void)
  }
  bxi=rxi;                                     // Rest verwerfen - nichts darf ans Menue durchsickern
  cc=connect; connect=concpy & ~UART1;
- newline(); putstr(" Transfer-Test beendet: "); putnumber(frames_ok,0); putstr(" ok, ");
- putnumber(frames_bad,0); putstr(" fehlerhaft."); newline();
+ newline(); putln("Transfer-Test beendet:");
+ bt_kvn("Frames ok", frames_ok);
+ bt_kvn("Frames fehlerhaft", frames_bad);
  connect=cc;
  uart1_release(MUX_BT);
 }
@@ -757,8 +785,10 @@ void bt_transfer_echo (void)
 void bt_cyspp_contention_test (void)
 {
 #if BT_CYSPP
- if ((fp.btmodem==Roving) || (fp.btmodem==Laird)) { putln(" nur IF820 (Modul-Guard)"); return; }
- putln("Contention-Test: IC54 Bit7 wird 500 ms aktiv LOW getrieben - jetzt Delta-U ueber R78 messen.");
+ if ((fp.btmodem==Roving) || (fp.btmodem==Laird)) { putln("  nur IF820 (Modul-Guard)"); return; }
+ putln("Contention-Test:");
+ putln("  IC54 Bit7 wird 500 ms aktiv LOW getrieben.");
+ putln("  -> jetzt Delta-U ueber R78 messen.");
  // FIX: bt_cyspp_out fehlte hier (im Gegensatz zu bt_cmdmode()) - communication_change() hat das
  // testbedingte LOW deshalb als echten neuen BT-Connect gedeutet (Init_BT_ch, startmessage,
  // bt_pininit ausgeloest), obwohl gar keine reale Verbindung gemeint war. Reproduziert: PIN-Prompt-
@@ -768,9 +798,9 @@ void bt_cyspp_contention_test (void)
  write_i2c_dev(IC54, 2, (0x7F<<8)|0x03);      // PCA9554 Config (0x03): Bit 7 = Ausgang
  osDelay(500);                                // kurz halten (< 1 s laut Messprotokoll)
  bt_release();                                // sofort zurueck: alle Pins Eingang (setzt bt_cyspp_out=0)
- putln(" Contention-Test beendet, Leitung wieder Eingang.");
+ putln("  Beendet: Leitung wieder Eingang.");
 #else
- putln(" BT_CYSPP nicht aktiv (Testmodus) - Contention-Test uebersprungen.");
+ putln("  BT_CYSPP nicht aktiv (Testmodus) - Contention-Test uebersprungen.");
 #endif
 }
 
@@ -809,18 +839,20 @@ void bt_cyspp_contention_test (void)
 // flashen (der Flash-Vorgang bootet direkt in die neue Firmware, kein Zwischenlauf der alten).
 void bt_factory_reset (void)
 {
- if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ if (fp.btmodem!=IF820) { putln("  nur IF820"); return; }
  Init_BT_ch(BT_BAUD);
- putln("Factory-Reset (/RFAC) - Modul wird auf Werkszustand zurueckgesetzt, Baud -> 115200.");
+ putln("Factory-Reset (/RFAC):");
+ putln("  Modul wird auf Werkszustand zurueckgesetzt, Baud -> 115200.");
  // FIX (Layout): bt_command() haengt bei positivem pause KEIN abschliessendes Newline an die
  // "< ..."-Antwortzeile (nur bei RN4678-CRLF-Flag) - ohne eigenes newline() lief die folgende
  // Meldung bisher auf derselben Zeile weiter ("< ...,0000 /RFAC bestaetigt..."), siehe generelle
  // Menue-Layout-Konvention (immer eigene Zeile pro Meldung).
- if (bt_command(T_rfac,T_rfacok,1000)) { newline(); putln(" /RFAC bestaetigt (@R,...,/RFAC,0000)."); }
- else { newline(); putln(" keine /RFAC-Bestaetigung erhalten (evtl. andere Baud/Zustand?)."); }
+ if (bt_command(T_rfac,T_rfacok,1000)) { newline(); putln("  -> /RFAC bestaetigt (@R,...,/RFAC,0000)."); }
+ else { newline(); putln("  -> keine /RFAC-Bestaetigung erhalten (evtl. andere Baud/Zustand?)."); }
  uart1_release(MUX_BT);
- putln("WICHTIG: JETZT SOFORT die Zielfirmware flashen - KEIN Power-Cycle vorher (die aktuelle");
- putln("Firmware wuerde das Werksmodul sonst beim naechsten Boot automatisch neu konfigurieren)!");
+ newline(); putln("WICHTIG:");
+ putln("  JETZT SOFORT die Zielfirmware flashen - KEIN Power-Cycle vorher (die aktuelle");
+ putln("  Firmware wuerde das Werksmodul sonst beim naechsten Boot automatisch neu konfigurieren)!");
 }
 
 // Anwenderwunsch (2026-09-30): manuell erzwungenes Trennen zum Testen des Split-Brain-Problems
@@ -830,23 +862,17 @@ void bt_factory_reset (void)
 // aendert (und ob die Leitung je als Ausgang von UNS getrieben war, siehe bt_cyspp_monitor()).
 void bt_force_disconnect_test (void)
 {
- int st, cfg;
- if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
- st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
- putstr(" VOR /DIS: bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
- putstr(", CONNECTION(P0.19)="); putstr((FIO0PIN&CONN_PIN)?"HIGH":"LOW");
- putstr(", Bit7-Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
- putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); newline();
- putln(" erzwinge Trennung: bt_disconnect() (Command-Mode + /DIS)...");
+ if (fp.btmodem!=IF820) { putln("  nur IF820"); return; }
+ putln("Force-Disconnect:");
+ putln("Vorher:");
+ bt_pin_state();
+ putln("  -> erzwinge Trennung: bt_disconnect() (Command-Mode + /DIS) ...");
  bt_disconnect();
  connect&=~(UART1|BT_LINK);          // Software-Zustand ebenfalls zuruecksetzen (wie measure.c es tun wuerde)
  bt_pininit=0;
  osDelay(200);                        // Modul Zeit geben, die Leitung nach /DIS freizugeben
- st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
- putstr(" NACH /DIS: bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
- putstr(", CONNECTION(P0.19)="); putstr((FIO0PIN&CONN_PIN)?"HIGH":"LOW");
- putstr(", Bit7-Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
- putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0); newline();
+ putln("Nachher:");
+ bt_pin_state();
 }
 
 // Anwenderwunsch (2026-09-30): CYSPP von Hand steuern - HIGH treiben ODER bewusst freigeben
@@ -856,20 +882,16 @@ void bt_force_disconnect_test (void)
 // haengenden Split-Brain-Zustand (CYSPP LOW ohne echten Peer) aufloest.
 void bt_cyspp_manual_control (void)
 {
- int c=-1, st, cfg; uchar tries;
- if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
+ int c=-1; uchar tries;
+ if (fp.btmodem!=IF820) { putln("  nur IF820"); return; }
  putstr("CYSPP manuell steuern:");                 // Menuekopf + Punkte wie in den anderen Menues
  put_menuitem("HIGH treiben (Ausgang)",'1');
  put_menuitem("Freigeben (Eingang/floatend)",'2');
  newline();
  for (;;)
  {
-  st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
-  putstr(" Status: bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
-  putstr(", CONNECTION(P0.19)="); putstr((FIO0PIN&CONN_PIN)?"HIGH":"LOW");
-  putstr(", Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
-  putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0);
-  newline();
+  newline(); putln("Status:");
+  bt_pin_state();                                     // je Wert eine eingerueckte Zeile
   select('9',1);                                      // "9. zurueck" + "Ihre Auswahl 1...9?"
   for (tries=0, c=-1; tries<20; tries++)              // wie bt_diag_menu(): kein Busy-Spin
   {
@@ -879,10 +901,10 @@ void bt_cyspp_manual_control (void)
    if (c<0) osDelay(50);
   }
   if (c=='1' || c=='2' || c=='9') { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
-  if (c=='1') { bt_cmdmode(); putln(" -> CYSPP jetzt aktiv HIGH getrieben (bleibt so, bis du 2 waehlst)."); }
-  else if (c=='2') { bt_release(); putln(" -> CYSPP jetzt Eingang/floatend (Modul darf die Leitung selbst treiben)."); }
+  if (c=='1') { bt_cmdmode(); putln("  -> CYSPP jetzt aktiv HIGH getrieben (bleibt so, bis 2 gewaehlt wird)."); }
+  else if (c=='2') { bt_release(); putln("  -> CYSPP jetzt Eingang/floatend (Modul darf die Leitung selbst treiben)."); }
   else if (c=='9') { if (bt_cyspp_out) bt_release(); break; }  // sicher aufraeumen: nie HIGH haengen lassen
-  else { newline(); putln(" keine gueltige Eingabe - Status erneut anzeigen."); }
+  else { newline(); putln("  -> keine gueltige Eingabe, Status wird erneut angezeigt."); }
  }
 }
 
@@ -906,10 +928,10 @@ void bt_diag_menu (void)
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
  if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
- else { newline(); putln(" keine gueltige Eingabe (staendiger Schnittstellenwechsel?) - abgebrochen."); }
+ else { newline(); putln("  -> keine gueltige Eingabe (staendiger Schnittstellenwechsel?), abgebrochen."); }
  if (tries>0 || comchange_count!=cc0)              // TEMPORAER (5.69): comchange-Diagnose nur noch bei Auffaelligkeit
- { putstr(" [comchange_count="); putnumber(comchange_count,0); putstr(", Delta="); putnumber(comchange_count-cc0,0);
-   putstr(", "); putnumber(tries,0); putstr(" Versuche]"); newline(); }
+ { bt_key("comchange_count"); putnumber(comchange_count,0); putstr(" (Delta="); putnumber(comchange_count-cc0,0);
+   putstr(", "); putnumber(tries,0); putstr(" Versuche)"); newline(); }
  if (c=='1') bt_event_sniff();
  else if (c=='2') bt_cyspp_contention_test();
  else if (c=='3') bt_transfer_echo();

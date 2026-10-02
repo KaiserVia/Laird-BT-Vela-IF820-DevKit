@@ -4658,3 +4658,34 @@ navigiert ueber den Marker "BT-Diagnose" und sendet `3` (Transfer-Test).
 **Nicht am Geraet geprueft** (Kompilieren ohne Fehler/Warnungen; Sichtkontrolle am Terminal steht aus).
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.113).
+
+## Update 5.114: Einheitliche Einrueckung/Zeilenumbrueche in ALLEN BT-Diagnose-Ausgaben
+
+**Anlass (Anwender):** "Mir geht es um die Einrueckungen und Zeilenumbrueche. Das soll konsistent
+aussehen. Jeder Punkt bekommt eine neue Zeile." 5.113 hatte nur die Menueliste angeglichen; die Ausgaben
+der Werkzeuge selbst waren uneinheitlich (Titel mal buendig, mal mit 1 Leerzeichen, Details mit 1 oder
+3 Leerzeichen, mehrere Werte kommagetrennt in einer Zeile, Meldungen ohne Zeilenende).
+
+**Festgelegtes Format (gilt fuer alle Diagnose-Werkzeuge in btio.c):**
+- **Titel** buendig links, endet mit `:` (z. B. `Force-Disconnect:`, `Vorher:`, `Zustand:`).
+- **Detailzeilen** genau **2 Leerzeichen** eingerueckt - dasselbe Mass wie `bt_command()` (`  > cmd` /
+  `  < resp`), damit sich alles in einer Sitzung einheitlich liest.
+- **Ein Wert je Zeile**, Werte-Spalte ausgerichtet (`  CYSPP bit7:         HIGH`).
+- **Ergebnis-/Hinweiszeilen** als `  -> ...`.
+- **Jede Meldung endet mit Zeilenumbruch**; Folgeausgaben beginnen in neuer Zeile.
+Umgesetzt ueber kleine Hilfsfunktionen `bt_key()`, `bt_kv()`, `bt_kvn()`, `bt_lvl()`, `bt_dir7()` und
+`bt_pin_state()` (btio.c, vor `bt_cyspp_monitor()`); Eingabeaufforderung und "9. zurueck" weiterhin
+generisch ueber `select()` (`T_ausw`, sio.c) wie in allen Menues.
+
+**Angepasst:** CYSPP/CONNECTION-Monitor (Kopf, Zustandsblock je Pegelwechsel mit je einem Wert pro
+Zeile, Abschlussblock), Force-Disconnect (`Vorher:`/`Nachher:` je vier Zeilen), manuelle CYSPP-
+Steuerung (`Status:`-Block), Contention-Test, Transfer-Test, Event-Sniff (Kopf und Ende), Factory-Reset
+(inkl. `WICHTIG:`-Block), alle "nur IF820"-Hinweise, die `comchange_count`-Auffaelligkeitszeile.
+
+**Bewusst nicht angefasst:** Die BT-Init-Meldungen im Boot-Log (` Step ...`, ` BT-Cfg: ...`, ` BT-Name: ...`,
+1 Leerzeichen Einrueckung) - eigenes Format des Initialisierungslogs, nicht Teil der Diagnose-Menues.
+Menueziffern und der Kopftext `BT-Diagnose` bleiben (`ble_mainboard_test.py` navigiert darueber).
+
+**Nicht am Geraet geprueft** (Kompilieren ohne Fehler/Warnungen; Sichtkontrolle am Terminal steht aus).
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.114).
