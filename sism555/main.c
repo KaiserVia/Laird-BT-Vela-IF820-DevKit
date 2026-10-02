@@ -174,7 +174,7 @@ int main (void)
 		{	
      if (test_gsm(1)>0)							// Antwortet GSM Modem?
 		 {	 
-			interfaces|=GSM_LINK;					// Registrieren	 
+			interfaces|=GSM_LINK; gsm_sim_check(); /* 5.112: SIM bereit (+CPIN: READY)? sonst Fehlerprotokoll, nur bei aktiviertem LTE */					// Registrieren	 
 			if (fp.gps)										// GPS installiert?
 			{
 			 result=test_gps(0);					// GPS Modul L70/LC76F antwortet?			 	

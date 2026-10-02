@@ -345,6 +345,42 @@ int modem_start (void)									// Einschaltsequenz Funkmodem
  return (result);
 }	
 
+// Boot-Pruefung SIM (Anwenderwunsch 2026-10-02): Ist LTE in den Parametern aktiviert (fp.gsm), muss das
+// Modem nach dem Einschalten "+CPIN: READY" melden - sonst Eintrag im Fehlerprotokoll. Einmalig beim
+// Power-On aus main.c, solange das Modem nach test_gsm(1) noch an ist. "SIM PIN" (SIM erkannt, PIN noch
+// nicht eingegeben) ist beim Boot der Normalfall einer PIN-geschuetzten SIM (atcpin() setzt die PIN erst
+// bei der ersten Registrierung) und gilt als OK - fehlt dann aber die PIN in der Konfiguration
+// (fp.simpin==0), wird F12002 protokolliert. Alles andere (kein/NOT READY/Fehler/keine Antwort) -> F12009.
+// Rueckgabe: 1 = SIM bereit bzw. PIN-geschuetzt mit konfigurierter PIN, 0 = Fehler protokolliert,
+// -1 = nicht geprueft (LTE nicht aktiviert oder Modem nicht ansprechbar - kein SIM-Urteil)
+int gsm_sim_check (void)
+{
+ uchar tries, cc=connect; int r=0;
+ if (!fp.gsm) return(-1);                              // LTE nicht aktiviert -> kein Test
+ if (gsm_power(2)<=0) return(-1);                      // UART1/MUX auf Modem; Modem ist nach test_gsm() an
+ for (tries=0; tries<8; tries++)                       // SIM-Init braucht nach Power-On einige Sekunden ("SIM busy")
+ {
+  connect=UART1; bxi=rxi;                              // an Modem senden, Empfangspuffer flush
+  put2str(T_at,T_cpin); putc('?'); newline();          // "AT+CPIN?"
+  connect=cc;
+  if (wait_message(T_ready,XMODEM_CHAR_TIMEOUT)>0)     // "READY" im Puffer ...
+  {
+   if (compare("NOT",cbuf,0,cind)<=0) { r=1; break; }  // ... und nicht "NOT READY" -> SIM bereit
+  }
+  else if (compare(T_simpin,cbuf,0,cind)>0) { r=2; break; }   // "+CPIN: SIM PIN" -> SIM erkannt, PIN noetig
+  osDelay(1000);                                       // busy / noch nicht initialisiert -> erneut fragen
+ }
+ if (r==2)                                             // PIN-geschuetzte SIM
+ {
+  if (fp.simpin) r=1;                                  // PIN konfiguriert -> atcpin() setzt sie spaeter
+  else { puterror(DTC_GSM_SIM_PIN,-1); r=0; }          // F12002: SIM verlangt PIN, keine konfiguriert
+ }
+ else if (r!=1) puterror(DTC_GSM_SIM_NF,-1);           // F12009: kein "+CPIN: READY" erhalten
+ FIO0CLR = CSAF;                                       // MUX GSM Kanal wieder deselect (wie test_gsm(1) beim Einschalten)
+ connect=cc;
+ return (r);
+}
+
 static int sim_inserted (void)	// AT+QSIMSTAT? -> 1=SIM erkannt, 0=keine SIM erkannt, -1=unbekannt
 {																// Erkennt fehlende/defekte SIM zuverlaessig, unabhaengig von PIN-Status
  int p, r=-1; uchar cc=connect;

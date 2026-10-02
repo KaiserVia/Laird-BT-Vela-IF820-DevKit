@@ -4592,3 +4592,45 @@ verworfen: "bau den Fix einfach ein"). Am Geraet pruefbar: Testmenue 7 beenden u
 bei normaler Nutzung muss er 0 bleiben (>0 nur bei Bursts, z. B. grosse Texteingabe ins RS232-Terminal).
 
 **Geaenderte Dateien:** hard.c, hard.h, gsmio.c, btio.c, sprachen/sictxt.c (-> 5.111).
+
+## Update 5.112: SIM-Pruefung beim Hochfahren (+CPIN: READY), sonst Fehlerprotokoll
+
+**Anlass (Anwender, 2026-10-02):** Es gibt Geraete, bei denen die SIM-Karte nicht erkannt wird, das fiel
+bisher beim Hochfahren nicht auf. Wunsch: Ist LTE in den Parametern aktiviert, muss beim Hochfahren ein
+`+CPIN: READY` kommen, sonst Eintrag ins Fehlerprotokoll.
+
+**Bestand:** `atcpin()` prueft zwar per `AT+QSIMSTAT?` auf F12009 (5.50), laeuft aber nur bei der
+geplanten Registrierung bzw. manuell (Menue) - nicht beim Boot. Beim Power-On wurde bisher nur
+`test_gsm(1)` (AT/OK) gemacht, das Modem danach gleich wieder ausgeschaltet.
+
+**Neu:** `gsm_sim_check()` (gsmio.c), aufgerufen in `main.c` im Power-On-Zweig direkt nach erfolgreichem
+`test_gsm(1)` (Modem ist dann noch an, vor dem GPS-Test und vor `gsm_power(0)`):
+- **Nur bei aktiviertem LTE:** der Aufruf liegt im Zweig `if (fp.gsm)` und nur nach erfolgreichem
+  AT-Test; zusaetzlich bricht die Funktion bei `fp.gsm==0` sofort ab (Rueckgabe -1).
+- Schaltet per `gsm_power(2)` UART1/MUX auf das Modem und fragt bis zu 8x `AT+CPIN?` ab (je ~0,5 s
+  Wartezeit + 1 s Pause - die SIM-Initialisierung braucht nach dem Einschalten einige Sekunden und
+  antwortet zunaechst "SIM busy").
+- `+CPIN: READY` (und nicht "NOT READY") -> OK, kein Eintrag.
+- `+CPIN: SIM PIN` -> SIM ist erkannt, PIN noch nicht eingegeben. **Bei konfigurierter PIN
+  (`fp.simpin!=0`) ist das beim Boot der Normalfall** (`atcpin()` setzt die PIN erst bei der ersten
+  Registrierung) und gilt als OK. Ohne konfigurierte PIN -> **F12002** (SIM-PIN-Problem).
+- Alles andere (nie READY, "NOT READY", `+CME ERROR`, keine Antwort) -> **F12009** "SIM-Karte nicht
+  erkannt" per `puterror(...,-1)` (Terminalausgabe + `protocol()` ins Flash-Fehlerprotokoll, wie bereits
+  `F12001` beim Einschalten).
+- Stellt danach den MUX-Zustand wie `test_gsm(1)` her (`FIO0CLR=CSAF`).
+
+**Abweichung zur Formulierung "muss READY geben":** "SIM PIN" bei konfigurierter PIN zaehlt bewusst
+NICHT als Fehler, sonst gaebe jedes Geraet mit PIN-geschuetzter SIM bei jedem Boot einen falschen
+Fehlereintrag. Muss auch der PIN-geschuetzte Fall als Fehler gelten, ist das eine Zeile.
+
+**Nicht geaendert:** Die bestehende `QSIMSTAT`-Pruefung in `atcpin()` (F12009 bei der Registrierung).
+Der Boot-Test nutzt bewusst `CPIN` (Anwenderwunsch) - `+CPIN: SIM PUK` wird wie "nicht bereit" als
+F12009 gemeldet (nicht als eigener Code).
+
+**Nebenwirkungen/zu beachten:** (a) Ohne SIM verlaengert sich der Boot im Fehlerfall um bis zu etwa 12 s
+(8 Versuche); mit SIM kommt READY normalerweise im ersten oder zweiten Versuch. (b) Bei jedem
+Power-On ohne SIM entsteht ein Protokolleintrag (keine Entdoppelung - gewuenscht: "Eintrag ins
+Fehlerprotokoll"). (c) Nicht am Geraet getestet - zu pruefen: mit SIM (READY, kein Eintrag), ohne SIM
+(F12009 + Boot-Dauer), mit PIN-geschuetzter SIM und konfigurierter bzw. fehlender PIN.
+
+**Geaenderte Dateien:** gsmio.c, gsmio.h, main.c, sprachen/sictxt.c (-> 5.112).

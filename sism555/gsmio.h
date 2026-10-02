@@ -128,6 +128,7 @@ extern int modem_start (void);					// Einschaltsequenz Funkmodem
 extern void init_gsm (void);						// Initialisierung GSM Modem
 extern int test_gsm (uchar poweron);		// Pr�fe ob GSM/GPRS Modem antwortet
 extern void gsm_com (uchar modemein);		// Direkte Kommunikation mit GSM Modem
+extern int gsm_sim_check (void);										// 5.112: Boot-Pruefung "+CPIN: READY", sonst Fehlerprotokoll (nur bei aktiviertem LTE)
 extern void atcpin (ushort set, uchar manual);					// Setze Pinnummer oder pr�fe Status
 extern int gsm_nettime (uchar force);					// Quectel Netzzeit -> Zeitsync
 extern int test_registration (void);										// Pr�fe ob Modem eingebucht ist
