@@ -4634,3 +4634,27 @@ Fehlerprotokoll"). (c) Nicht am Geraet getestet - zu pruefen: mit SIM (READY, ke
 (F12009 + Boot-Dauer), mit PIN-geschuetzter SIM und konfigurierter bzw. fehlender PIN.
 
 **Geaenderte Dateien:** gsmio.c, gsmio.h, main.c, sprachen/sictxt.c (-> 5.112).
+
+## Update 5.113: BT-Diagnose-Menue im Standardformat (eine Zeile je Punkt, normaler Prompt)
+
+**Anlass (Anwender, Screenshot):** Die BT-Diagnose sah "hasslich" aus. In 5.108 war nur die verrutschte
+Meldung nach `/RFAC` behoben worden - das Menue selbst nicht. Ausserdem erschien "Layout" dort versprochen.
+
+**Befund (Ist-Zustand):** drei langgezogene Textzeilen mit Spalten ("1 = ...   2 = ...   3 = ..."),
+dazu zwei `comchange_count`-Debugzeilen (5.69) vor und nach der Eingabe, **kein** normaler Prompt
+(Eingabe-Echo stand allein auf einer Zeile) und kein Standardkopf. Die manuelle CYSPP-Steuerung (8->6)
+hatte dasselbe Muster plus Meldungen direkt hinter dem Eingabe-Echo.
+
+**Neu (Format wie Testmenue/Bluetooth-Menue):** Kopf `BT-Diagnose:`, jeder Punkt in eigener Zeile
+ueber `put_menuitem()`, Abschluss `select('9',1)` -> "9. zurueck" und "Ihre Auswahl 1...9?". Das
+Eingabe-Echo steht direkt hinter dem Prompt, Folgemeldungen beginnen in neuer Zeile. Die
+`comchange_count`-Diagnose (TEMPORAER, 5.69) erscheint nur noch bei Auffaelligkeit (`Versuche>0` oder
+`Delta>0`) als eine Zeile `[comchange_count=..., Delta=..., N Versuche]`; im Normalfall ist das Menue
+frei davon (der CYSPP-Monitor zeigt die Zaehler weiterhin). Gleiches Format fuer 8->6.
+
+**Bewusst unveraendert:** Menueziffern (1-6, 9) und der Kopftext `BT-Diagnose` - `ble_mainboard_test.py`
+navigiert ueber den Marker "BT-Diagnose" und sendet `3` (Transfer-Test).
+
+**Nicht am Geraet geprueft** (Kompilieren ohne Fehler/Warnungen; Sichtkontrolle am Terminal steht aus).
+
+**Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.113).

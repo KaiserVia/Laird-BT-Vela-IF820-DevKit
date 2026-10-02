@@ -858,15 +858,19 @@ void bt_cyspp_manual_control (void)
 {
  int c=-1, st, cfg; uchar tries;
  if (fp.btmodem!=IF820) { putln(" nur IF820"); return; }
- putln("CYSPP manuell steuern:  1 = HIGH treiben (Ausgang)   2 = Freigeben (Eingang/floatend)   9 = zurueck");
+ putstr("CYSPP manuell steuern:");                 // Menuekopf + Punkte wie in den anderen Menues
+ put_menuitem("HIGH treiben (Ausgang)",'1');
+ put_menuitem("Freigeben (Eingang/floatend)",'2');
+ newline();
  for (;;)
  {
   st = read_i2cdev(IC54, 0, 1); cfg = read_i2cdev(IC54, 3, 1);
-  putstr(" bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
+  putstr(" Status: bit7="); putstr((st>=0)?(((st>>7)&1)?"HIGH":"LOW"):"?");
   putstr(", CONNECTION(P0.19)="); putstr((FIO0PIN&CONN_PIN)?"HIGH":"LOW");
   putstr(", Richtung="); putstr((cfg>=0)?(((cfg>>7)&1)?"Eingang":"AUSGANG"):"?");
   putstr(", bt_cyspp_out="); putnumber(bt_cyspp_out,0);
-  putstr("   (1=HIGH treiben, 2=Freigeben, 9=zurueck) "); newline();
+  newline();
+  select('9',1);                                      // "9. zurueck" + "Ihre Auswahl 1...9?"
   for (tries=0, c=-1; tries<20; tries++)              // wie bt_diag_menu(): kein Busy-Spin
   {
    c = getc(TERMINAL_CHAR_TIMEOUT);
@@ -874,20 +878,25 @@ void bt_cyspp_manual_control (void)
    ResetWDT();
    if (c<0) osDelay(50);
   }
+  if (c=='1' || c=='2' || c=='9') { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
   if (c=='1') { bt_cmdmode(); putln(" -> CYSPP jetzt aktiv HIGH getrieben (bleibt so, bis du 2 waehlst)."); }
   else if (c=='2') { bt_release(); putln(" -> CYSPP jetzt Eingang/floatend (Modul darf die Leitung selbst treiben)."); }
   else if (c=='9') { if (bt_cyspp_out) bt_release(); break; }  // sicher aufraeumen: nie HIGH haengen lassen
-  else putln(" keine gueltige Eingabe - Status erneut anzeigen.");
+  else { newline(); putln(" keine gueltige Eingabe - Status erneut anzeigen."); }
  }
 }
 
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
- putln("BT-Diagnose:  1 = Event-Sniff   2 = Contention-Test (Schritt 6)   3 = Transfer-Test (CRC/ACK)");
- putln("              4 = Factory-Reset (/RFAC, Alt-FW-Vergleich!)   5 = Force-Disconnect (/DIS)");
- putln("              6 = CYSPP manuell HIGH/Freigeben   9 = zurueck");
- putstr(" comchange_count: "); putnumber(cc0,0); newline();  // TEMPORAER (5.69, CYSPP-Diagnose)
+ putstr("BT-Diagnose:");                           // Menuekopf wie Testmenue; Marker "BT-Diagnose" nutzt ble_mainboard_test.py
+ put_menuitem("Event-Sniff",'1');                  // Ziffern UNVERAENDERT lassen (das Skript sendet '3' = Transfer-Test)
+ put_menuitem("Contention-Test (Schritt 6)",'2');
+ put_menuitem("Transfer-Test (CRC/ACK)",'3');
+ put_menuitem("Factory-Reset (/RFAC, Alt-FW-Vergleich!)",'4');
+ put_menuitem("Force-Disconnect (/DIS)",'5');
+ put_menuitem("CYSPP manuell HIGH/Freigeben",'6');
+ select('9',1);                                    // "9. zurueck" + "Ihre Auswahl 1...9?" wie in allen Menues
  for (tries=0; tries<20; tries++)
  {
   if (comchange)                            // echten Schnittstellenwechsel richtig verarbeiten
@@ -896,10 +905,11 @@ void bt_diag_menu (void)
   if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') break;
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
- putstr(" comchange_count danach: "); putnumber(comchange_count,0);           // TEMPORAER (5.69)
- putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(", "); putnumber(tries,0); putstr(" Versuche)"); newline();
- if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') { putc((char)c); newline(); }
+ if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
  else { newline(); putln(" keine gueltige Eingabe (staendiger Schnittstellenwechsel?) - abgebrochen."); }
+ if (tries>0 || comchange_count!=cc0)              // TEMPORAER (5.69): comchange-Diagnose nur noch bei Auffaelligkeit
+ { putstr(" [comchange_count="); putnumber(comchange_count,0); putstr(", Delta="); putnumber(comchange_count-cc0,0);
+   putstr(", "); putnumber(tries,0); putstr(" Versuche]"); newline(); }
  if (c=='1') bt_event_sniff();
  else if (c=='2') bt_cyspp_contention_test();
  else if (c=='3') bt_transfer_echo();
