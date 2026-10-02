@@ -4507,3 +4507,45 @@ im Normalfall konsistent? Gibt es Abweichungsfaelle (v. a. BLE: CONNECTION erst 
 Ohne angeschlossenes CONNECTION-Kabel liest P0.19 wegen des internen Pull-ups dauerhaft HIGH.
 
 **Geaenderte Dateien:** hard.h, btio.c, sprachen/sictxt.c (-> 5.109), CLAUDE.md (Branch-Hinweis).
+
+**Live-Test 5.109 (Geraet 99SC9923, RS232 = COM3, BT-Classic = COM11):** Verbinden/Trennen/Verbinden
+funktioniert, die Vergleichsanzeige zeigt idle = beide HIGH, verbunden = beide LOW (konsistent).
+**Fehler:** Bei parallel offenem RS232 kamen nach dem Trennen "komische Zeichen", die das RS232-Menue
+weiterfuehrten (im Log: "Ihre Auswahl 1...9?0", danach Hauptmenue -> "1" -> Datenausgabe-Abfragen).
+Ausserdem beendete jeder Verbinden/Trennen-Moment (comchange) den Monitor sofort (Delta=2) - der
+Uebergang selbst war damit nie zu sehen.
+
+## Update 5.110 (Branch `connection-pin`): Datenbruecke am echten CONNECTION-Pegel + Monitor bricht bei comchange nicht mehr ab
+
+**Ursache der Zeichen:** `UART1_IRQHandler` (hard.c) entscheidet per `connect&BT_LINK` (Software-
+Zustand), ob ein Byte Benutzereingabe (`rbuf`) oder Modul-/Event-Text (`rbuf1`) ist. Dieser Zustand
+wird erst nachgefuehrt, wenn EINT1 -> `comchange` -> Messschleife -> I2C-Read -> `communication_change()`
+durchgelaufen sind. Das Modul sendet das `@E,...,BTDIS,...,R=0000`-Event aber SOFORT beim Trennen: die
+Bytes landen in dieser Luecke in `rbuf`, `mainmenu()` liest sie unmittelbar als Tastendruck (Ziffern
+`0`/`1` aus `...R=0000`/`...0012`). Der Flush `bxi=rxi` in `communication_change()` (5.82) kommt
+dann zu spaet - die Bytes sind schon verbraucht. (Selbe Bugklasse wie 5.82/5.89, nur mit dem
+Software-Zustand als Schwachstelle.)
+
+**Fix (der eigentliche Nutzen von CONNECTION direkt am GPIO):** Die Datenbruecke gilt im ISR jetzt nur,
+wenn `connect&BT_LINK` UND `!bt_cyspp_out` UND der echte Hardware-Pegel `CONNECTION (P0.19) == LOW`
+(`BT_CONN_ACTIVE`, btio.h). Sobald das Modul die Datenpipe schliesst, geht CONNECTION HIGH und alle
+weiteren Bytes laufen sofort nach `rbuf1` - ohne Software-Verzoegerung, ohne I2C. Per `BT_CONN_GPIO`
+(btio.h, 1/0) abschaltbar; auf einem Board OHNE P0.19-Verdrahtung muss er auf 0, sonst liest der Pin
+durch den Pull-up dauerhaft HIGH und BT-Eingaben wuerden nach `rbuf1` umgeleitet.
+
+**Shared-State-Pruefung:** Betroffen ist nur der Fall "Software sagt verbunden, CONNECTION HIGH".
+Beim Verbinden ist `BT_LINK` ohnehin noch nicht gesetzt (Bytes gehen schon bisher nach `rbuf1`), danach
+liegt CONNECTION LOW (im Monitor bestaetigt). `rbuf1` wird laufend durch `bt_sniff_poll()` geleert
+(`bxi1` zieht nach, measure.c) und per `rbuf1_full`-Wiederfreigabe (measure.c:368) abgesichert -
+kein Deadlock; im ungünstigen Fall werden Bytes verworfen statt falsch als Taste gelesen.
+
+**Offen/zu pruefen:** (a) Sendet das Modul das BTDIS-Event erst NACH dem Loeschen der Datenpipe
+(CONNECTION HIGH)? Wenn es das Event davor sendet, bleibt ein Rest der Luecke. (b) BLE: CONNECTION
+kommt laut Datenblatt erst nach dem CCCD-Write - Eingaben davor wuerden verworfen (Nutzdaten kommen
+ohnehin erst nach dem Subscribe).
+
+**Monitor:** `bt_cyspp_monitor()` beendet sich nur noch bei einer Taste (`getkey()==1`), nicht mehr bei
+`comchange` - sonst endete er genau im interessanten Verbinden/Trennen-Moment. Bei `comchange` kurzer
+`osDelay(50)`, weil `getkey()` dann sofort zurueckkehrt (kein Spin).
+
+**Geaenderte Dateien:** hard.c, btio.h, btio.c, sprachen/sictxt.c (-> 5.110).

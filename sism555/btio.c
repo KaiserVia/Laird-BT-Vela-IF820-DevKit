@@ -528,7 +528,10 @@ void bt_cyspp_monitor (void)   // Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) 
    last7 = now7; last5 = now5;
   }
   ResetWDT();
-  if (getkey(120) >= 0) break;               // ~120 ms warten; Taste (1) oder comchange (0) -> Ende
+  { int k = getkey(120);                     // ~120 ms warten: 1=Taste, 0=comchange, -1=Timeout
+    if (k == 1) break;                       // nur eine Taste beendet - ein comchange (= genau der interessante
+    if (k == 0) osDelay(50);                 // Verbinden/Trennen-Moment) darf den Vergleich NICHT abbrechen;
+  }                                          // osDelay: getkey() kehrt bei comchange sofort zurueck (kein Spin)
  }
  newline(); putstr(" CYSPP/CONNECTION monitor ended. comchange_count: "); putnumber(cc0,0);  // TEMPORAER (5.69)
  putstr(" -> "); putnumber(comchange_count,0);

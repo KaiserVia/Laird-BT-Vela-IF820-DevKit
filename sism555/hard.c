@@ -221,7 +221,7 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
 								// die BT_LINK-Leitung ein reiner Status-Ausgang, kein bidirektionaler
 								// CYSPP-Datenpin - dort (und nur dort) bleibt alles unveraendert bei rbuf.
 								else if ((uart1_owner==MUX_BT) && (fp.btmodem!=Laird) && (fp.btmodem!=Roving) &&
-								         !((connect&BT_LINK) && !bt_cyspp_out))
+								         !((connect&BT_LINK) && !bt_cyspp_out && BT_CONN_ACTIVE))  /* 5.110: Bruecke nur bei echtem CONNECTION=LOW, siehe btio.h */
 								{
 								 if (bxi1!=(rxi1+1)) { rbuf1[++rxi1]=U1->RBR; bt_time=BT_TIMEOUT; }
 								 else { rbuf1_full=1; NVIC_DisableIRQ(UART1_IRQn); }

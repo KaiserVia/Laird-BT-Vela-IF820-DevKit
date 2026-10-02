@@ -202,6 +202,16 @@ extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Te
 extern void bt_factory_reset (void);      // TEMPORAER: /RFAC - Modul-Werksreset fuer Alt-FW-Vergleichstest
 extern void bt_force_disconnect_test (void); // TEMPORAER: manuelles /DIS zum Testen des Split-Brain-Zustands
 extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH treiben oder freigeben (floatend)
+
+// 5.110: UART1-ISR-Weiche (hard.c) zusaetzlich am ECHTEN Hardware-Pegel von CONNECTION (P0.19, low aktiv)
+// festmachen. Bisher entschied nur connect&BT_LINK (Software-Zustand, hinkt dem Pegel um EINT1 ->
+// Messschleife -> I2C-Read hinterher): das Event-Geschwaetz des Moduls beim Trennen (@E,...,BTDIS,...,
+// R=0000) landete in dieser Luecke in rbuf und wurde von mainmenu() als Tastendruck gelesen (Ziffern
+// "0"/"1" fuehrten das RS232-Menue spontan weiter). Mit 1 gilt die Datenbruecke nur, solange CONNECTION
+// wirklich LOW ist. 0 = altes Verhalten (z. B. Board OHNE P0.19-Verdrahtung: dort liest P0.19 durch den
+// Pull-up dauerhaft HIGH und BT-Eingaben wuerden sonst verworfen).
+#define BT_CONN_GPIO    1
+#define BT_CONN_ACTIVE  ((!BT_CONN_GPIO) || !(FIO0PIN & CONN_PIN))
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
 extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
 
