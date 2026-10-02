@@ -407,7 +407,7 @@ void atcpin (ushort set, uchar manual)	// Setze Pinnummer oder pr�fe Status
 																						// Modem war bereits an (result=1) oder PIN muss gesetzt werden				
  connect=UART1;															// GSM Uart1 ausw�hlen  
  putln(T_cmee);															// sende +CMEE=2
- rxi=bxi;
+ bxi=rxi;
  result=wait_ok_time(XMODEM_BLOCK_TIMEOUT);	// warte auf OK Antwort
  
  if (result<0) 

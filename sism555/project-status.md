@@ -4549,3 +4549,46 @@ ohnehin erst nach dem Subscribe).
 `osDelay(50)`, weil `getkey()` dann sofort zurueckkehrt (kein Spin).
 
 **Geaenderte Dateien:** hard.c, btio.h, btio.c, sprachen/sictxt.c (-> 5.110).
+
+## Update 5.111: Ringpuffer-Review - Vollpruefung korrigiert, UART0-Ueberlaufschutz
+
+**Anlass:** Nach 5.110 (Pufferproblem "Zeichen nach dem Trennen") Anwenderwunsch, alle Ringpuffer zu
+reviewen. Bestand: `rbuf` (UART0/UART1), `rbuf1` (UART1 Command-Mode), `pbuf` (UART0 Plus / UART1
+MQTT), `gbuf` (UART2 GPS) - alle 256 Byte mit `uchar`-Indizes (natuerlicher Wrap), Verbraucher-Index
+`bxi`/`bxi1`/`bpi`/`bx2`, Erzeuger-Index nur im ISR.
+
+**Befund 1 - Vollpruefung greift an genau einer Position nicht (alle vier Ringe):** `bxi!=(rxi+1)`
+vergleicht `uchar` mit `int`: bei `rxi==255` ist `rxi+1 == 256` und kann nie gleich `bxi` sein. Steht
+`bxi` dann auf 0, gilt der Puffer faelschlich als "nicht voll", `rxi` springt auf 0 und gleicht `bxi`
+-> alle 255 ungelesenen Bytes wirken wie "leer", ohne Ueberlaufmeldung/Interrupt-Abschaltung. Nur bei
+echtem Ueberlauf relevant (1 von 256 Positionen). **Fix:** `(uchar)(rxi+1)` an allen fuenf Stellen
+(hard.c: MQTT-`pbuf`, `rbuf1`, `rbuf`, `gbuf`; plus die neuen UART0-Pruefungen).
+
+**Befund 2 - UART0-ISR ohne Ueberlaufschutz** (`rbuf` und Plus-`pbuf`): bei Verbraucher >255 Byte im
+Rueckstand (ca. 22 ms bei 115200 Baud; `mainmenu` verarbeitet max. 16 Byte je Hauptschleife) wurden
+ungelesene Bytes ueberschrieben bzw. der Puffer wirkte wieder leer. **Fix:** ist der Puffer voll, wird
+das neue Byte per Dummy-Read verworfen und `u0_ovf` hochgezaehlt (wie bei `gbuf`). Bewusst KEIN
+Interrupt-Abschalten wie bei UART1, weil UART0 keine Hardware-Flusskontrolle hat (RX-FIFO liefe sonst
+in Overrun). Die aeltesten Bytes bleiben dadurch unversehrt erhalten. `u0_ovf` wird am Ende des
+CYSPP-Monitors (Testmenue 7) angezeigt.
+
+**Befund 3 - Ausreisser `gsmio.c:410` `rxi=bxi;`:** schrieb den Erzeuger-Index aus einem Thread (alle
+anderen Flush-Stellen machen `bxi=rxi`). Wirkung dieselbe (Puffer leer), aber Kollisionsrisiko mit dem
+ISR. **Angeglichen** auf `bxi=rxi;`.
+
+**Weitere Beobachtungen (nicht geaendert):** (a) Flushes zu festen Zeitpunkten (5.82/5.83/5.88/5.93)
+koennen strukturell nicht greifen, weil das Menue die Bytes live liest - wirksam waren nur die Routing-
+Fixes (5.89, 5.110). (b) Modul-Events in `rbuf1` setzen `bt_time` zurueck (`hard.c`, rbuf1-Zweig): ein
+geschwaetziges Modul haelt den Sitzungs-Timeout am Leben. (c) `rbuf1` ist ueber `bt_sniff_poll()`
+(measure.c) immer geleert, die Wiederfreigabe `measure.c:368` haengt am selben Index `bxi1` - kein
+Deadlock. (d) Der `rbuf_full`-/`rbuf1_full`-Interrupt-Abschaltweg bleibt fuer UART1 unveraendert.
+
+**Shared-State-Pruefung:** Nur ISR-Pruefausdruecke (ein `(uchar)`-Cast je Stelle) und der neue
+UART0-Verwerfzweig wurden angefasst - keine Index-/Flag-Semantik der Verbraucher. Der UART0-Zweig
+aendert das Verhalten nur im bisherigen Ueberlauffall (vorher: Datenverlust/Verwuerfelung).
+
+**Nicht belegt:** Die Fehler wurden nicht am Geraet provoziert (Probe war angeboten, vom Anwender
+verworfen: "bau den Fix einfach ein"). Am Geraet pruefbar: Testmenue 7 beenden und `u0_ovf` ansehen;
+bei normaler Nutzung muss er 0 bleiben (>0 nur bei Bursts, z. B. grosse Texteingabe ins RS232-Terminal).
+
+**Geaenderte Dateien:** hard.c, hard.h, gsmio.c, btio.c, sprachen/sictxt.c (-> 5.111).

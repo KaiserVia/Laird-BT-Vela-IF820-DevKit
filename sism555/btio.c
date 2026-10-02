@@ -536,6 +536,7 @@ void bt_cyspp_monitor (void)   // Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) 
  newline(); putstr(" CYSPP/CONNECTION monitor ended. comchange_count: "); putnumber(cc0,0);  // TEMPORAER (5.69)
  putstr(" -> "); putnumber(comchange_count,0);
  putstr(" (Delta="); putnumber(comchange_count-cc0,0); putstr(")"); newline();
+ putstr(" UART0-RX verworfen (Puffer voll, seit Boot): "); putnumber(u0_ovf,0); newline();   // 5.111
 }
 
 // Roher EZ-Serial-Event-Mitschnitt auf UART1 (Diagnose, Testmenue): druckt alles, was am

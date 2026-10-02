@@ -483,6 +483,7 @@ extern volatile uchar bxi;						// Bearbeitungsindex UART Empfangspuffer
 extern volatile uchar rbuf_full;			// 0 wenn UART Empfangspuffer leer
 extern volatile uchar rxi1;					// Empfangsindex rbuf1 (UART1 Command-Mode, siehe 5.89)
 extern volatile uchar bxi1;					// Bearbeitungsindex rbuf1
+extern volatile uint u0_ovf;				// 5.111: von UART0-ISR verworfene Bytes (Diagnose)
 extern volatile uchar rbuf1_full;		// 0 wenn rbuf1 leer
 extern volatile uchar rpi;						// Empfangsindex Empfangsringpuffer MQTT und Plus Kommunikation
 extern volatile uchar bpi;						// Bearbeitungsindex Empfangsringpuffer MQTT und Plus Kommunikation

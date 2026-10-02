@@ -133,6 +133,7 @@ volatile uchar rbuf_full=0;			// 0 wenn UART Empfangspuffer leer
 // siehe UART1_IRQHandler() (Weiche) und die auf rbuf1 umgezogenen Command-Mode-Helfer in btio.c.
 volatile uchar rxi1=0;						// Empfangsindex rbuf1
 volatile uchar bxi1=0;						// Bearbeitungsindex rbuf1
+volatile uint u0_ovf=0;							// 5.111: von UART0-ISR verworfene Bytes (rbuf/pbuf voll), nur Diagnose
 volatile uchar rbuf1_full=0;			// 0 wenn rbuf1 leer (analog rbuf_full)
 volatile uchar tmi=0;						// Messindex Messpuffer IF und Phase
 volatile uchar minute=0;				// Minutenwechsel der Echtzeituhr (RTC Interrupt)
@@ -191,8 +192,8 @@ void UART0_IRQHandler(void) 						// UART0 Sende- und Empfangsinterrupt
  switch (U0->IIR&0x000E)								// Verteile je nach Interruptquelle
  {	
   case 0x0002:	break;																	// Kein Puffer leer Sendeinterrupt
-  case 0x0004: 	if (!plustrans)	rbuf[++rxi]=U0->RBR; 		// Zeichen in allgemeinen Empfangspuffer, pr�inkrement									
-								else pbuf[++rpi]=U0->RBR;								// Zeichen in Plus Empfangspuffer, pr�inkrement
+  case 0x0004: 	if (!plustrans)	{ if (bxi!=(uchar)(rxi+1)) rbuf[++rxi]=U0->RBR; else { c=U0->RBR; u0_ovf++; } } /* 5.111: Ueberlaufschutz, neue Bytes verwerfen+zaehlen statt ungelesene zu ueberschreiben */ 		// Zeichen in allgemeinen Empfangspuffer, pr�inkrement									
+								else { if (bpi!=(uchar)(rpi+1)) pbuf[++rpi]=U0->RBR; else { c=U0->RBR; u0_ovf++; } }								// Zeichen in Plus Empfangspuffer, pr�inkrement
 								break;		
   default: 		c=U0->LSR;	 							// Dummy read Rx Fehlerstatus  
  }
@@ -205,7 +206,7 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
  switch (U1->IIR&0x000E)								// Verteile je nach Interruptquelle
  {	
   case 0x0002:	break;												// Kein Puffer leer Sendeinterrupt
-  case 0x0004: 	if ((connect&MQTT_LINK)&&(bpi!=(rpi+1))) 	// MQTTS Verbindung besteht und Platz in Puffer?
+  case 0x0004: 	if ((connect&MQTT_LINK)&&(bpi!=(uchar)(rpi+1))) 	// MQTTS Verbindung besteht und Platz in Puffer?
 								 pbuf[++rpi]=U1->RBR; 										// Zeichen in Empfangspuffer, pr�inkrement
 								// FIX (5.89): IF820, aber CYSPP-Datenbruecke NICHT aktiv (Command-Mode: Boot-
 								// Meldungen, /PING-Antworten, Connect-/Disconnect-Events) -> eigener Puffer
@@ -223,10 +224,10 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
 								else if ((uart1_owner==MUX_BT) && (fp.btmodem!=Laird) && (fp.btmodem!=Roving) &&
 								         !((connect&BT_LINK) && !bt_cyspp_out && BT_CONN_ACTIVE))  /* 5.110: Bruecke nur bei echtem CONNECTION=LOW, siehe btio.h */
 								{
-								 if (bxi1!=(rxi1+1)) { rbuf1[++rxi1]=U1->RBR; bt_time=BT_TIMEOUT; }
+								 if (bxi1!=(uchar)(rxi1+1)) { rbuf1[++rxi1]=U1->RBR; bt_time=BT_TIMEOUT; }
 								 else { rbuf1_full=1; NVIC_DisableIRQ(UART1_IRQn); }
 								}
-								else if (!(connect&MQTT_LINK) && (bxi!=(rxi+1))) // BT gebrueckt, oder GSM (nicht MQTT)
+								else if (!(connect&MQTT_LINK) && (bxi!=(uchar)(rxi+1))) // BT gebrueckt, oder GSM (nicht MQTT)
 								{
 								 rbuf[++rxi]=U1->RBR; 		// Sonst Zeichen in Empfangspuffer, pr�inkrement
 								 bt_time=BT_TIMEOUT;			// Reset Bluetooth Verbindungstimeout
@@ -248,7 +249,7 @@ void UART2_IRQHandler(void) 						// UART2 Sende- und Empfangsinterrupt
  switch (U2->IIR&0x000E)								// Verteile je nach Interruptquelle
  {	
   case 0x0002:	break;																		// Sendeinterrupt
-  case 0x0004: 	if (bx2!=(rx2+1)) gbuf[++rx2]=U2->RBR; 		// Platz in Puffer? Ja, Zeichen in Empfangspuffer, pr�inkrement															   
+  case 0x0004: 	if (bx2!=(uchar)(rx2+1)) gbuf[++rx2]=U2->RBR; 		// Platz in Puffer? Ja, Zeichen in Empfangspuffer, pr�inkrement															   
 								else c=U2->RBR;														// Dummy read und wegwerfen
 								break;		
   default: 		c=U2->LSR;	 							// Dummy read Rx Fehlerstatus  
