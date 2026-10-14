@@ -90,6 +90,7 @@ import re
 import struct
 import subprocess
 import sys
+import threading
 import time
 import zlib
 from datetime import datetime
@@ -157,6 +158,7 @@ class TraceLogger:
         self.run_timestamp = self.run_id[:19]
         self.test_kind = args.mode
         self.device_name = None
+        self.lock = threading.RLock()  # RS232-Sniffer schreibt aus eigenem Thread
         RUN_REPORT_DIR = REPORT_DIR / f"{self.run_timestamp}_unbekannt_{self.test_kind}"
         if RUN_REPORT_DIR.exists():
             RUN_REPORT_DIR = REPORT_DIR / f"{RUN_REPORT_DIR.name}_{self.run_id[-6:]}"
@@ -181,17 +183,18 @@ class TraceLogger:
         target_dir = REPORT_DIR / f"{self.run_timestamp}_{folder_device_name}_{self.test_kind}"
         if target_dir.exists():
             target_dir = REPORT_DIR / f"{target_dir.name}_{self.run_id[-6:]}"
-        self.file.close()
-        try:
-            RUN_REPORT_DIR.rename(target_dir)
-        except OSError as exc:
+        with self.lock:  # Sniffer-Thread darf waehrend Close/Rename nicht schreiben
+            self.file.close()
+            try:
+                RUN_REPORT_DIR.rename(target_dir)
+            except OSError as exc:
+                self.file = self.path.open("a", encoding="utf-8")
+                log(f"Report-Ordner konnte nicht nach Geraet umbenannt werden: {exc}")
+                return
+            RUN_REPORT_DIR = target_dir
+            self.path = target_dir / "trace.ndjson"
             self.file = self.path.open("a", encoding="utf-8")
-            log(f"Report-Ordner konnte nicht nach Geraet umbenannt werden: {exc}")
-            return
-        RUN_REPORT_DIR = target_dir
-        self.path = target_dir / "trace.ndjson"
-        self.file = self.path.open("a", encoding="utf-8")
-        self.event("report_directory_renamed", report_directory=str(target_dir))
+            self.event("report_directory_renamed", report_directory=str(target_dir))
         log(f"Report-Ordner: {target_dir}")
 
     def event(self, event_name: str, level: str = "info", **details) -> None:
@@ -203,18 +206,182 @@ class TraceLogger:
             "level": level,
             "details": {key: value for key, value in details.items() if value is not None},
         }
-        self.file.write(json.dumps(record, default=str, ensure_ascii=True) + "\n")
-        self.file.flush()
+        with self.lock:
+            self.file.write(json.dumps(record, default=str, ensure_ascii=True) + "\n")
+            self.file.flush()
 
     def close(self, exit_code: int | None = None) -> None:
-        if not self.file.closed:
-            self.event("run_finished", level="error" if exit_code else "info", exit_code=exit_code)
-            self.file.close()
+        with self.lock:
+            if not self.file.closed:
+                self.event("run_finished", level="error" if exit_code else "info", exit_code=exit_code)
+                self.file.close()
 
 
 def trace_event(event_name: str, level: str = "info", **details) -> None:
     if TRACE is not None:
+        if event_name == "marker_timeout" and SNIFFER is not None:
+            details["rs232_tail"] = SNIFFER.tail(10)  # was die Firmware in dem Moment selbst meldet
         TRACE.event(event_name, level, **details)
+
+
+# ---------------------------------------------------------------------------
+# RS232-Mitschnitt der Firmware-Seite (Diagnose parallel zum BT-Test)
+# ---------------------------------------------------------------------------
+
+SNIFFER = None
+RS232_PREFLIGHT_LISTEN_S = 5.0
+RS232_PARTIAL_FLUSH_S = 0.3
+
+
+class Rs232Sniffer:
+    """Liest passiv den RS232-Ausgang der Firmware und schreibt jede Zeile in den Trace.
+
+    Nur lesend: es wird nie etwas an die Firmware gesendet, der Menuezustand bleibt unberuehrt.
+    """
+
+    def __init__(self, port: str, baud: int):
+        self.port = port
+        self.baud = baud
+        self.ser = None
+        self.thread = None
+        self.stop_event = threading.Event()
+        self.pending = bytearray()    # im Preflight gelesene Bytes, gehen nicht verloren
+        self.recent = []              # letzte Zeilen fuer rs232_tail
+        self.lines = 0
+        self.bytes = 0
+        self.lock = threading.Lock()
+
+    def open(self) -> None:
+        self.ser = serial.Serial(self.port, self.baud, timeout=0.1)
+
+    def close_port(self) -> None:
+        if self.ser is not None:
+            try:
+                self.ser.close()
+            except (serial.SerialException, OSError):
+                pass
+
+    def preflight(self, listen_s: float) -> int:
+        """Anzahl Bytes, die innerhalb listen_s ankommen (Port muss offen sein)."""
+        deadline = time.monotonic() + listen_s
+        while time.monotonic() < deadline and not self.pending:
+            self.pending.extend(self.ser.read(256))
+        return len(self.pending)
+
+    def start(self) -> None:
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def tail(self, count: int) -> list:
+        with self.lock:
+            return list(self.recent[-count:])
+
+    def _emit(self, raw: bytes, partial: bool) -> None:
+        text = raw.decode("cp1252", errors="replace").strip("\r\n")
+        if not text.strip():
+            return
+        if text.isdigit() and len(text) == 6:
+            text = "<redacted-pin>"
+        with self.lock:
+            self.lines += 1
+            self.recent.append(text)
+            del self.recent[:-50]
+        trace_event("rs232_line", source="rs232", text=text, partial=partial or None)
+
+    def _run(self) -> None:
+        buf = bytearray()
+        last_rx = time.monotonic()
+        pending, self.pending = bytes(self.pending), bytearray()
+        try:
+            while not self.stop_event.is_set():
+                chunk = pending or self.ser.read(256)
+                pending = b""
+                now = time.monotonic()
+                if chunk:
+                    self.bytes += len(chunk)
+                    last_rx = now
+                    buf.extend(chunk)
+                    while (idx := buf.find(b"\n")) >= 0:
+                        self._emit(bytes(buf[:idx]), False)
+                        del buf[:idx + 1]
+                elif buf and now - last_rx > RS232_PARTIAL_FLUSH_S:
+                    self._emit(bytes(buf), True)  # z. B. Prompt ohne Zeilenende ("PIN = ")
+                    buf.clear()
+        except (serial.SerialException, OSError) as exc:
+            trace_event("rs232_error", level="error", error=str(exc))
+            log(f"RS232-Mitschnitt {self.port} unterbrochen: {exc}")
+
+    def stop(self) -> None:
+        self.stop_event.set()
+        if self.thread is not None:
+            self.thread.join(timeout=2.0)
+        self.close_port()
+        trace_event("rs232_sniffer_stopped", lines=self.lines, bytes=self.bytes)
+
+
+def setup_rs232_sniffer(args) -> bool:
+    """Prueft vor dem Test den RS232-Port; bei Problemen Retry/Weiter/Abbruch fuer den Tester.
+
+    Gibt False zurueck, wenn der Tester abbricht.
+    """
+    global SNIFFER
+    if args.no_rs232:
+        log("RS232-Mitschnitt ausgeschaltet (--no-rs232).")
+        return True
+    if serial is None:
+        log("WARNUNG: pyserial fehlt - kein RS232-Mitschnitt (pip install pyserial).")
+        return True
+    interactive = sys.stdin.isatty()
+    while True:
+        sniffer = Rs232Sniffer(args.rs232_port, args.rs232_baud)
+        opened = False
+        try:
+            sniffer.open()
+            opened = True
+        except (serial.SerialException, OSError) as exc:
+            problem = (f"{args.rs232_port} laesst sich nicht oeffnen ({exc}). Belegt durch ein anderes "
+                       "Programm (Terminal, Keil)? Kabel/Port richtig?")
+        if opened:
+            log(f"RS232 {args.rs232_port} @ {args.rs232_baud} offen, warte "
+                f"{RS232_PREFLIGHT_LISTEN_S:.0f} s auf Daten ...")
+            received = sniffer.preflight(RS232_PREFLIGHT_LISTEN_S)
+            if received:
+                log(f"RS232-Mitschnitt aktiv ({received} Bytes empfangen).")
+                trace_event("rs232_sniffer_started", port=args.rs232_port, baud=args.rs232_baud,
+                            preflight_bytes=received)
+                sniffer.start()
+                SNIFFER = sniffer
+                return True
+            problem = (f"{args.rs232_port} ist offen, aber es kamen {RS232_PREFLIGHT_LISTEN_S:.0f} s lang "
+                       "keine Daten. Geraet an / Firmware aktiv? Falscher Port oder Baudrate? "
+                       "(Eine ruhige Firmware kann auch ohne Fehler schweigen.)")
+        log("WARNUNG RS232: " + problem)
+        trace_event("rs232_preflight_problem", level="warning", port=args.rs232_port, problem=problem)
+        if not interactive:
+            sniffer.close_port()
+            log("Kein Terminal - Test laeuft ohne RS232-Mitschnitt weiter.")
+            return True
+        hint = " Mitschnitt trotzdem [S]tarten," if opened else ""
+        try:
+            answer = input(f"[R]etry,{hint} [W]eiter ohne RS232, [A]bbrechen? ").strip().lower()
+        except EOFError:  # stdin ist kein echtes Terminal (z. B. umgeleitet)
+            answer = "w"
+        if answer.startswith("r"):
+            sniffer.close_port()
+            continue
+        if answer.startswith("a"):
+            sniffer.close_port()
+            return False
+        if opened and answer.startswith("s"):
+            trace_event("rs232_sniffer_started", port=args.rs232_port, baud=args.rs232_baud,
+                        preflight_bytes=0)
+            sniffer.start()
+            SNIFFER = sniffer
+            log("RS232-Mitschnitt aktiv (ohne Vorab-Daten).")
+            return True
+        sniffer.close_port()
+        log("Weiter ohne RS232-Mitschnitt.")
+        return True
 
 
 def payload_summary(data: bytes) -> dict:
@@ -245,10 +412,23 @@ async def scan_for_device(name_prefix: str):
         log("Hinweise: Advertising aktiv? BT am PC eingeschaltet? Adapter BT 4.0+?")
         return None, scan_ms
     if len(hits) > 1:
-        log(f"{len(hits)} passende Geraete gefunden - bitte mit --address eingrenzen:")
-        for d, _ in hits:
-            print(f"    {d.address}   {d.name}")
-        return None, scan_ms
+        hits.sort(key=lambda h: h[0].name)
+        if not sys.stdin.isatty():
+            log(f"{len(hits)} passende Geraete gefunden - bitte mit --address eingrenzen:")
+            for d, _ in hits:
+                print(f"    {d.address}   {d.name}")
+            return None, scan_ms
+        print(f"{len(hits)} passende BLE-Geraete gefunden:")
+        for index, (d, adv) in enumerate(hits, start=1):
+            rssi = getattr(adv, "rssi", None)
+            print(f"  {index}: {d.name} ({d.address})"
+                  f"{f'  RSSI={rssi} dBm' if rssi is not None else ''}")
+        while True:
+            answer = input(f"Geraet auswaehlen [1-{len(hits)}]: ").strip()
+            if answer.isdigit() and 1 <= int(answer) <= len(hits):
+                hits = [hits[int(answer) - 1]]
+                break
+            print("Ungueltige Auswahl.")
     device, adv = hits[0]
     rssi = getattr(adv, "rssi", None)
     log(f"Gefunden nach {scan_ms:.0f} ms: {device.name}  ({device.address})"
@@ -2314,11 +2494,13 @@ async def run_module_suite(args) -> int:
                 duration_s=round(time.perf_counter() - started, 3))
         return status
 
-    def skipped(name, transport):
-        log(f"Suite-Phase uebersprungen: {name} ({transport}-Smoke nicht bestanden).")
+    def skipped(name, transport, reason: str | None = None):
+        reason = reason or f"{transport}-Smoke nicht bestanden"
+        log(f"Suite-Phase uebersprungen: {name} ({reason}).")
         result["phases"].append({"name": name, "transport": transport, "result": "skipped", "duration_s": 0})
 
     classic_ok = await phase("Classic Smoke", "classic", run_classic_smoke_test) == "passed"
+    flash_ok = False
     if classic_ok:
         await phase("Classic Verbindung", "classic", run_cycle_test, cycle_holds=hold_times)
     else:
@@ -2326,21 +2508,30 @@ async def run_module_suite(args) -> int:
     ble_ok = await phase("BLE Smoke", "ble", run_smoke_test) == "passed"
     if ble_ok:
         await phase("BLE Verbindung", "ble", run_cycle_test, cycle_holds=hold_times)
-        await phase("Flash schreiben", "ble", run_download_test,
-                    write_only=True, records=args.module_records)
+        flash_ok = await phase("Flash schreiben", "ble", run_download_test,
+                               write_only=True, records=args.module_records) == "passed"
     else:
         skipped("BLE Verbindung", "ble")
         skipped("Flash schreiben", "ble")
+    # Fallback: Flash ueber Classic schreiben, wenn der BLE-Weg ausgefallen ist, damit die
+    # Downloads trotzdem mit echten Daten laufen (BLE-Downloads bleiben dann uebersprungen).
+    if not flash_ok and classic_ok:
+        log("Flash-Schreiben ueber BLE nicht moeglich - versuche es ueber Classic.")
+        flash_ok = await phase("Flash schreiben (Classic)", "classic", run_download_test,
+                               write_only=True, records=args.module_records) == "passed"
+    # Ohne erfolgreich geschriebene Messwerte waere ein Download nur ein leerer Export
+    # (5 KB) und ein scheinbar bestandener, aber wertloser Test - deshalb nur nach Flash-Schreiben.
+    no_flash = "Flash-Schreibvorgang nicht bestanden oder nicht ausgefuehrt"
     for index in range(1, 4):
-        if classic_ok:
+        if classic_ok and flash_ok:
             await phase(f"Classic Download {index}/3", "classic", run_receive_test)
         else:
-            skipped(f"Classic Download {index}/3", "classic")
+            skipped(f"Classic Download {index}/3", "classic", no_flash if not flash_ok else None)
     for index in range(1, 4):
-        if ble_ok:
+        if ble_ok and flash_ok:
             await phase(f"BLE Download {index}/3", "ble", run_receive_test)
         else:
-            skipped(f"BLE Download {index}/3", "ble")
+            skipped(f"BLE Download {index}/3", "ble", no_flash if not flash_ok else None)
 
     result["result"] = "passed" if all(phase["result"] == "passed" for phase in result["phases"]) else "failed"
     json_path, html_path = write_report("module-suite", result)
@@ -2522,6 +2713,10 @@ def main() -> int:
     p.add_argument("--generation-timeout", type=float, default=None,
                    help="[download] maximaler Timeout fuer das synchrone Schreiben der Testdaten; "
                         "Default: 30 s plus 0,25 s je Messwert")
+    p.add_argument("--rs232-port", default="COM3",
+                   help="RS232-Port der Firmware fuer den passiven Mitschnitt (Default COM3)")
+    p.add_argument("--rs232-baud", type=int, default=115200)
+    p.add_argument("--no-rs232", action="store_true", help="keinen RS232-Mitschnitt starten")
     p.add_argument("--ymodem-timeout", type=float, default=2.0,
                    help="[download/receive] Timeout je Ymodem-Block in Sekunden; muss unter dem "
                         "Firmware-ACK-Timeout von 6 s liegen")
@@ -2542,6 +2737,10 @@ def main() -> int:
           f"Start: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 70)
     log(f"Strukturiertes Trace: {TRACE.path}")
+
+    if not setup_rs232_sniffer(args):
+        log("Abbruch durch Tester (RS232).")
+        return 2
 
     if args.mode == "smoke":
         return asyncio.run(run_smoke_test(args))
@@ -2574,5 +2773,7 @@ if __name__ == "__main__":
         print("\nAbgebrochen.")
         raise SystemExit(130)
     finally:
+        if SNIFFER is not None:
+            SNIFFER.stop()
         if TRACE is not None:
             TRACE.close(exit_code)
