@@ -4748,3 +4748,38 @@ verlassen), weil die Beschriftung "(ein/aus)" den Zustand nicht zeigte.
 bzw. `7. CYSPP monitor (laeuft - 7 = stoppen)` (sicom.c). **TEMPORAER wie der Monitor selbst** - Rueckbau
 zusammen mit ihm (Vermerke in btio.c und CLAUDE.md erweitert).
 **Geaenderte Dateien:** btio.c, btio.h, sicom.c, sprachen/sictxt.c (-> 5.116), CLAUDE.md.
+
+## Update (kein Versionssprung): CONNECTION-Test T7/T8 - BLE zeigt, was CONNECTION wirklich bedeutet
+
+**T7 (Classic, 60 s Leerlauf):** bestanden - Antwort sofort, kein Pegelwechsel waehrend der Sitzung.
+
+**T8 (BLE, `ble_mainboard_test.py --mode smoke --name VIASIS_99SC9923 --no-rs232`, Firmware 5.116):**
+Script-Ergebnis `passed` (Subscribe nach 35 ms quittiert, Banner und `PIN = ` per BLE empfangen, PIN
+akzeptiert, Hauptmenue erreicht, Verbindung hielt 8 s). Der Hintergrund-Monitor zeigte dabei die
+**erste echte Abweichung** zwischen den beiden Signalen:
+- `+110880 ms`: `CYSPP bit7: HIGH`, `CONNECTION P0.19: LOW` -> "ABWEICHUNG (unerwartet)"
+- `+113851 ms` (ca. 3 s spaeter): beide LOW, danach Banner/PIN-Prompt (CYSPP geht mit dem Subscribe)
+- `+127045 ms` (Trennen): beide gemeinsam HIGH.
+
+**Deutung:** `CONNECTION` ist "Verbindung steht" und geht bereits beim Verbindungsaufbau auf LOW (BLE-Link),
+nicht erst bei vollstaendiger Datenpipe (so nur sinngemaess im Datenblatt gelesen - gemessen ist: Link).
+`CYSPP` ist "Datenpipe steht" und geht erst nach dem Subscribe (CCCD-Write) auf LOW. Bei Classic SPP fallen
+beide zusammen (T2-T6: immer gleichzeitig). Die ~3 s Differenz entsteht beim Windows-BLE-Aufbau (GATT-
+Discovery vor dem Subscribe), bei anderen Zentralen kann sie abweichen.
+
+**Entscheidung/Folgerung:**
+- **Stufe B ("`BT_LINK` aus CONNECTION") ist damit sachlich widerlegt:** die Verbindungsbehandlung
+  (`Init_BT_ch`, `startmessage`, PIN-Prompt) wuerde bei BLE ca. 3 s VOR dem Subscribe laufen - das Banner
+  ginge verloren (aehnlich dem urspruenglichen BLE-Fehler). `BT_LINK` bleibt bei CYSPP.
+- **Die 5.110-Weiche ist bei BLE korrekt:** Bruecke gilt bei `BT_LINK` (CYSPP-basiert, erst nach Subscribe)
+  UND CONNECTION LOW - ab dem Subscribe sind beide LOW, die PIN kam per BLE an.
+- **Nutzen von CONNECTION bleibt:** als reiner "Link steht"-Indikator und fuer die Diagnose (Abweichung
+  CYSPP/CONNECTION sichtbar). Fuer die Split-Brain-Erkennung gab es bei Classic keinen Unterschied.
+- Noch nicht beobachtet: Fall "CYSPP LOW bei CONNECTION HIGH" (haengende Datenpipe ohne Link).
+
+**Nebenbefund (Script):** Nach dem eigenen Trennen meldet `ble_mainboard_test.py` kurz "DISCONNECT (vom
+Geraet ausgeloest)" und gleich danach "Sauber getrennt (durch uns)" - wirkt wie eine kosmetische Eigenheit
+des Disconnect-Callbacks (Monitor zeigt einen sauberen Wechsel), nicht geprueft.
+
+**Offen im Testplan:** T9 (automatischer Classic-Zyklenlauf), T10 (Abschluss). Danach: Rueckbau des
+temporaeren Hintergrund-Monitors (siehe 5.115/5.116) und Entscheidung, ob `BT_CONN_GPIO 1` produktiv bleibt.

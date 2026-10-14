@@ -164,10 +164,16 @@ laeuft: ein BT-Connect wurde waehrend des Monitors nicht verarbeitet, kein PIN-P
 | T6 (a) | ok - Fenster schliessen: beide HIGH nach ca. 1,2 s, kein Haengen |
 | T6 (b) | ok - Bluetooth am PC aus: beide HIGH gemeinsam, kein Split-Brain (Windows trennt offenbar sauber) |
 | T6 Zufall | 1x echter Funkabriss nach BT-Reset am PC: beide LOW 19,8 s (= Supervision-Timeout 20 s), dann gemeinsam HIGH, Selbsterholung. CONNECTION = CYSPP, keine Abweichung |
-| T7 | **offen** - erster Versuch ungueltig (Monitor war aus, Leerlauf nicht erkennbar) |
-| T8 BLE | **offen** - hier wird die Abweichung CYSPP/CONNECTION erwartet |
+| T7 | ok (5.116) - 60 s Leerlauf, Antwort sofort, am RS232 nur der eine Block beim Verbinden, danach keine Pegelaenderung |
+| T8 BLE | ok (5.116, `ble_mainboard_test.py --mode smoke --no-rs232`: passed, PIN per BLE akzeptiert, Hauptmenue erreicht). **Abweichung gefunden:** CONNECTION geht ca. 3 s VOR CYSPP auf LOW (Block `+110880 ms`: CYSPP HIGH / CONNECTION LOW -> "ABWEICHUNG"; `+113851 ms`: beide LOW, dann Banner/PIN). Trennen: beide gemeinsam HIGH (`+127045 ms`) |
 | T9, T10 | **offen** |
 
 **Zwischenfazit:** Die Verdrahtung stimmt, die 5.110-Weiche verwirft keine PIN, der Fix gegen die Fehlzeichen
 funktioniert. Fuer Classic liefert CONNECTION keinen Zusatznutzen gegenueber CYSPP (beide identisch, auch
-beim Funkabriss). Entscheidend bleibt BLE (T8).
+beim Funkabriss). **BLE (T8) zeigt den Unterschied:** CONNECTION = "Verbindung (Link) steht" und geht beim
+Verbindungsaufbau, CYSPP = "Datenpipe steht" und geht erst nach dem Subscribe (CCCD-Write) auf LOW; dazwischen
+liegen bei diesem Aufbau (Windows, GATT-Discovery) etwa 3 s. Beim Trennen gehen beide gemeinsam auf HIGH.
+Folge: **CONNECTION eignet sich NICHT als Quelle fuer `BT_LINK`** (Stufe B) - die Verbindungs-Behandlung
+(`Init_BT_ch`, Banner, PIN-Prompt) wuerde bei BLE ca. 3 s VOR dem Subscribe starten, das Banner ginge
+verloren. `BT_LINK` bleibt bei CYSPP. Die 5.110-Weiche (Bruecke nur bei `BT_LINK` UND CONNECTION LOW) ist
+damit auch bei BLE korrekt (beide LOW, sobald Daten fliessen).
