@@ -4689,3 +4689,37 @@ Menueziffern und der Kopftext `BT-Diagnose` bleiben (`ble_mainboard_test.py` nav
 **Nicht am Geraet geprueft** (Kompilieren ohne Fehler/Warnungen; Sichtkontrolle am Terminal steht aus).
 
 **Geaenderte Dateien:** btio.c, sprachen/sictxt.c (-> 5.114).
+
+## Update 5.115 (Branch `connection-pin`): CYSPP/CONNECTION-Monitor als Hintergrundtask - TEMPORAER
+
+**Anlass (Anwender, Test von 5.114):** Befindet sich das Menue nicht im Hauptmenue (z. B. im Monitor),
+wird bei einem BT-Connect keine PIN abgefragt, und es geht nicht weiter. Verbinden vor dem Monitor
+(Hauptmenue, BT, PIN, dann Testmenue 7) zeigte korrekt **beide LOW, konsistent** - P0.19 reagiert also.
+
+**Ursache (mein Fehler aus 5.110):** `bt_cyspp_monitor()` lief blockierend innerhalb von `mainmenu()`
+und hielt damit die Hauptschleife an, in der `communication_change()` laeuft (`measure.c:307`). Ein BT-
+Connect wurde waehrend des Monitors nicht verarbeitet (kein Banner, keine PIN-Abfrage). In 5.109 ging
+es nur, weil der Monitor bei `comchange` abbrach; das hatte 5.110 entfernt. Zusaetzlich waeren die
+Uebergaenge selbst (Verbinden, Trennen bei RS232 im Hauptmenue = Test des 5.110-Fixes) mit einem
+blockierenden Monitor nicht beobachtbar.
+
+**Fix:** Hintergrund-Monitor nach dem Muster von `bt_sniff_poll()`: `Testmenue 7` startet ihn und kehrt
+sofort zurueck (nochmal `7` = beenden, sonst Selbstende nach 5 min); `bt_monitor_poll()` wird einmal je
+Hauptschleifendurchlauf aus `measure.c` aufgerufen, fragt alle 100 ms IC54 Bit7 und P0.19 ab und gibt nur
+bei Pegelaenderung einen `Zustand [+ms]:`-Block aus - **nur ans RS232-Terminal** (`connect&=~UART1`,
+`BT_LINK` bleibt gesetzt, weil die UART1-ISR-Weiche es liest). Kein I2C-Zugriff bei aktivem GSM-/MQTT-
+Thread (`osActiveThread`, wie `communication_change()`).
+
+**⚠ TEMPORAER (Anwenderentscheidung 2026-10-14) - muss zurueckgebaut werden:** Nur fuer den CONNECTION-
+Test (`Doku/Testplan_CONNECTION_P0-19.md`). **Rueckbau:** `bt_monitor_poll()` + `mon_*`-Variablen
+(btio.c), Aufruf (measure.c), Deklaration (btio.h) und "(ein/aus)" im Testmenue-Text (sicom.c)
+entfernen; `bt_cyspp_monitor()` auf die blockierende Fassung aus Commit `d6f8bb8` (5.114) zuruecksetzen
+oder - mit dem uebrigen CYSPP-Diagnosecode - ganz entfernen. Vermerk steht im Code (btio.c, measure.c)
+und in `CLAUDE.md` ("Aufraeumen"). Nicht vergessen: ein spaeter wieder eingefuehrter blockierender
+Monitor darf nicht erneut den `comchange`-Abbruch weglassen (Ursache dieses Updates).
+
+**Nicht am Geraet geprueft:** Das Verhalten des Hintergrundmonitors (Verbinden/Trennen waehrend der
+Beobachtung) - Gegenstand von Testplan T1-T6.
+
+**Geaenderte Dateien:** btio.c, btio.h, measure.c, sicom.c, sprachen/sictxt.c (-> 5.115),
+Doku/Testplan_CONNECTION_P0-19.md (neu), CLAUDE.md.

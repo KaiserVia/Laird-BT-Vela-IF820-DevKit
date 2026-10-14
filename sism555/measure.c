@@ -358,6 +358,7 @@ void runcycle (void)				// Messzyklenbetrieb
 	// 5.81: BT-Event-Sniff (Testmenue-Diagnose) liest ueber einen eigenen, von bxi
 	// unabhaengigen Index nicht-blockierend nach - beeinflusst mainmenu()/PIN-Abfrage nicht.
 	bt_sniff_poll ();
+	bt_monitor_poll ();					// 5.115 TEMPORAER (Rueckbau, siehe CLAUDE.md): CYSPP/CONNECTION-Hintergrund-Monitor (Testmenue 7)
 
 	// FIX (5.93): Wiederfreigabe fuer rbuf1 an dieselbe Bedingung gekoppelt wie das Draining,
 	// das bxi1 vorantreibt (bt_sniff_poll(), s.o.) - die laeuft UNABHAENGIG von osActiveThread.

@@ -519,46 +519,74 @@ static char *bt_pair_verdict (uchar cyspp, uchar conn)
  return                      "CYSPP HIGH, CONNECTION LOW -> ABWEICHUNG (unerwartet)";
 }
 
-void bt_cyspp_monitor (void)   // Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) UND CONNECTION (P0.19, direkter GPIO)
-{                              // CONNECTION = IF820 Pin 33/P27/CONN_IND, seit 5.109 direkt am LPC (vorher IC54 Bit5)
- int st, cfg; uchar now7=1, last7=0xFF, now5, last5=0xFF, sec=0;
- uint cc0=comchange_count;                  // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
- bt_release();                              // sicherstellen: CYSPP als Eingang -> Modul kann treiben
- putln("CYSPP/CONNECTION-Monitor:");
- putln("  Taste = Ende (max. 30 s). Jetzt per BT verbinden/trennen.");
- bt_kvn("comchange_count", cc0);                   // TEMPORAER (5.69): Startwert
- for (sec=0; sec<255; sec++)                // laeuft bis Taste/comchange, aber begrenzt
- {
-  st = read_i2cdev(IC54, 0, 1);             // IC54 Eingangsregister lesen
-  if (st < 0) putln("  I2C-Lesefehler (IC54)");
-  else now7 = (uchar)((st>>7)&1);           // Bit7 = CYSPP-Leitung (bei I2C-Fehler letzter Wert bleibt)
-  now5 = (FIO0PIN & CONN_PIN) ? 1 : 0;      // CONNECTION direkt vom LPC-Pin P0.19 (kein I2C)
-  if (st >= 0 && (now7 != last7 || now5 != last5))   // nur bei Aenderung eines der beiden ausgeben
-  {
-   // DIAGNOSE: treibt UNSER Board Bit7 gerade selbst (Ausgang), oder ist es Eingang - dann kann
-   // ein gelesenes LOW nur vom Modul (oder extern) kommen, nicht von uns. Config-Register (0x03):
-   // Bit=1 -> Eingang, Bit=0 -> Ausgang (PCA9554-Konvention). bt_cyspp_out zusaetzlich als
-   // Software-Sicht (sollte mit der Config uebereinstimmen, wenn nicht: eigener Fehler).
-   cfg = read_i2cdev(IC54, 3, 1);           // IC54 Konfigurations-/Richtungsregister lesen
-   newline(); putln("Zustand:");
-   bt_kv("CYSPP bit7", now7 ? "HIGH" : "LOW");
-   bt_kv("CONNECTION P0.19", now5 ? "HIGH" : "LOW");
-   bt_kv("Bewertung", bt_pair_verdict(now7, now5));
-   bt_kv("Bit7-Richtung", bt_dir7(cfg));
-   bt_kvn("bt_cyspp_out", bt_cyspp_out);
-   bt_kvn("comchange_count", comchange_count);       // TEMPORAER (5.69)
-   last7 = now7; last5 = now5;
-  }
-  ResetWDT();
-  { int k = getkey(120);                     // ~120 ms warten: 1=Taste, 0=comchange, -1=Timeout
-    if (k == 1) break;                       // nur eine Taste beendet - ein comchange (= genau der interessante
-    if (k == 0) osDelay(50);                 // Verbinden/Trennen-Moment) darf den Vergleich NICHT abbrechen;
-  }                                          // osDelay: getkey() kehrt bei comchange sofort zurueck (kein Spin)
- }
+// Hintergrund-Monitor (5.115) - Live-Vergleich CYSPP/BT_LINK (IC54 Bit7, I2C) UND CONNECTION (P0.19, GPIO).
+// CONNECTION = IF820 Pin 33/P27/CONN_IND, seit 5.109 direkt am LPC (vorher IC54 Bit5).
+// Warum Hintergrund: Der fruehere blockierende Monitor lief INNERHALB von mainmenu() und hielt damit die
+// Hauptschleife an, in der communication_change() laeuft (measure.c) - ein BT-Connect wurde waehrend des
+// Monitors gar nicht verarbeitet (kein Banner, keine PIN-Abfrage; 5.109 ging nur, weil der Monitor bei
+// comchange abbrach). Jetzt wie bt_sniff_poll(): Testmenue 7 startet/beendet ihn, bt_monitor_poll() wird
+// einmal je Hauptschleifendurchlauf aufgerufen. Ausgabe nur ans RS232-Terminal, nie ans Modul/BT-Terminal.
+// TEMPORAER (5.115, Anwenderentscheidung 2026-10-14): Hintergrund-Monitor nur fuer den CONNECTION-Test
+// (Doku/Testplan_CONNECTION_P0-19.md). RUECKBAU nach Abschluss des Tests: bt_monitor_poll() samt Zustands-
+// variablen hier, Aufruf in measure.c, Deklaration in btio.h und den Zusatz "(ein/aus)" im Testmenue-Text
+// (sicom.c) entfernen; bt_cyspp_monitor() wieder auf die blockierende Fassung (Commit d6f8bb8, 5.114) oder
+// - mit dem restlichen CYSPP-Diagnosecode - ganz entfernen. Siehe CLAUDE.md, "Aufraeumen".
+#define MON_DURATION_MS  300000UL             // 5 min, danach beendet er sich selbst
+static bool mon_active=FALSE;
+static uint mon_t0, mon_tpoll, mon_cc0;       // Start (mstimer), letzter Abruf, comchange_count bei Start
+static uchar mon_last7, mon_last5;            // zuletzt ausgegebene Pegel (0xFF = noch nichts ausgegeben)
+
+static void bt_monitor_stop (void)
+{
+ mon_active=FALSE;
  newline(); putln("Monitor beendet:");
- bt_key("comchange_count"); putnumber(cc0,0); putstr(" -> "); putnumber(comchange_count,0);   // TEMPORAER (5.69)
- putstr(" (Delta="); putnumber(comchange_count-cc0,0); putc(')'); newline();
+ bt_key("comchange_count"); putnumber(mon_cc0,0); putstr(" -> "); putnumber(comchange_count,0);   // TEMPORAER (5.69)
+ putstr(" (Delta="); putnumber(comchange_count-mon_cc0,0); putc(')'); newline();
  bt_kvn("UART0-RX verworfen", u0_ovf);             // 5.111: Puffer voll, seit Boot
+}
+
+void bt_cyspp_monitor (void)                  // Testmenue 7: Hintergrund-Monitor ein-/ausschalten
+{
+ if (mon_active) { bt_monitor_stop(); return; }
+ bt_release();                                // sicherstellen: CYSPP als Eingang -> Modul kann treiben
+ putln("CYSPP/CONNECTION-Monitor (Hintergrund):");
+ putln("  Laeuft 5 min im Hintergrund, das Menue bleibt bedienbar.");
+ putln("  Jede Pegelaenderung wird am RS232-Terminal ausgegeben.");
+ putln("  Testmenue 7 erneut waehlen = Monitor beenden.");
+ bt_kvn("comchange_count", comchange_count);       // TEMPORAER (5.69): Startwert
+ mon_cc0=comchange_count; mon_t0=mstimer; mon_tpoll=0;
+ mon_last7=0xFF; mon_last5=0xFF;              // erster Abruf gibt den Ausgangszustand aus
+ mon_active=TRUE;
+}
+
+void bt_monitor_poll (void)                   // einmal je Hauptschleifendurchlauf aus measure.c
+{
+ uchar now7, now5, cc; int st, cfg;
+ if (!mon_active) return;
+ if ((uint)(mstimer-mon_tpoll) < 100) return; // alle 100 ms genuegt (I2C-Zugriff sparen)
+ mon_tpoll=mstimer;
+ if ((uint)(mstimer-mon_t0) >= MON_DURATION_MS)
+ { cc=connect; connect&=~UART1; bt_monitor_stop(); connect=cc; return; }   // nur UART1-Bit weg, BT_LINK bleibt (ISR-Weiche liest es)
+ if (osActiveThread) return;                  // I2C nicht neben einem GSM-/MQTT-Thread anfassen (wie communication_change)
+ st = read_i2cdev(IC54, 0, 1);                // IC54 Eingangsregister lesen
+ if (st < 0) return;                          // I2C-Fehler: naechster Abruf versucht es erneut
+ now7 = (uchar)((st>>7)&1);                   // Bit7 = CYSPP-Leitung
+ now5 = (FIO0PIN & CONN_PIN) ? 1 : 0;         // CONNECTION direkt vom LPC-Pin P0.19 (kein I2C)
+ if (now7==mon_last7 && now5==mon_last5) return;   // nur bei Aenderung eines der beiden ausgeben
+ // DIAGNOSE: treibt UNSER Board Bit7 gerade selbst (Ausgang), oder ist es Eingang - dann kann ein
+ // gelesenes LOW nur vom Modul (oder extern) kommen, nicht von uns. Config-Register (0x03):
+ // Bit=1 -> Eingang, Bit=0 -> Ausgang (PCA9554-Konvention). bt_cyspp_out zusaetzlich als Software-Sicht.
+ cfg = read_i2cdev(IC54, 3, 1);
+ cc=connect; connect&=~UART1;                 // nur ans Terminal, nichts ans Modul/BT; BT_LINK bleibt gesetzt (die UART1-ISR-Weiche liest es)
+ newline(); putstr("Zustand [+"); putnumber(mstimer-mon_t0,0); putln(" ms]:");
+ bt_kv("CYSPP bit7", now7 ? "HIGH" : "LOW");
+ bt_kv("CONNECTION P0.19", now5 ? "HIGH" : "LOW");
+ bt_kv("Bewertung", bt_pair_verdict(now7, now5));
+ bt_kv("Bit7-Richtung", bt_dir7(cfg));
+ bt_kvn("bt_cyspp_out", bt_cyspp_out);
+ bt_kvn("comchange_count", comchange_count);  // TEMPORAER (5.69)
+ connect=cc;
+ mon_last7=now7; mon_last5=now5;
 }
 
 // Roher EZ-Serial-Event-Mitschnitt auf UART1 (Diagnose, Testmenue): druckt alles, was am

@@ -1630,7 +1630,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
   } 	
   case 0x0003:					// Testmen�
   {
-   putstr(T_estmenu); putstr("\n7. CYSPP monitor\n8. BT-Diagnose (Event-Sniff/Contention)");	// Testmen�ausgabe
+   putstr(T_estmenu); putstr("\n7. CYSPP monitor (ein/aus)\n8. BT-Diagnose (Event-Sniff/Contention)");	// Testmen�ausgabe
    select ('9',1);				// Men�auswahl senden
    mensel=0; 							// Men�auswahl l�schen und wiederholen
    break;

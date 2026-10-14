@@ -206,6 +206,14 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`
   (hard.c/.h, Update 5.70) - zaehlt EINT1/IC54-Interrupts zur CYSPP-Bounce-Diagnose. Nach
   Abschluss der CYSPP-Diagnose wieder entfernen (Anwenderentscheidung 2026-08-18).
+- **Aufraeumen - TEMPORAER seit 5.115 (Anwenderentscheidung 2026-10-14):** Der
+  **CYSPP/CONNECTION-Hintergrund-Monitor** (`bt_monitor_poll()` + Zustandsvariablen `mon_*` in
+  `btio.c`, Aufruf in `measure.c` neben `bt_sniff_poll()`, Deklaration `btio.h`, Zusatz "(ein/aus)"
+  im Testmenue-Text `sicom.c`) existiert nur fuer den CONNECTION-Test
+  (`sism555/Doku/Testplan_CONNECTION_P0-19.md`). **Rueckbau nach Abschluss des Tests:**
+  `bt_cyspp_monitor()` wieder auf die blockierende Fassung (Commit `d6f8bb8`, 5.114) zuruecksetzen -
+  oder, zusammen mit dem uebrigen CYSPP-Diagnosecode, ganz entfernen. Grund fuer den Hintergrundbetrieb:
+  der blockierende Monitor haelt die Hauptschleife an, ein BT-Connect wird dann nicht verarbeitet.
 - **Entkopplung fehlt:** `C128` und `C58` (je 1 µF an IF820 3P0V/VDDIO, Netz `N$169`) sind
   in **beiden** Bestückungsvarianten als nicht bestückt eingetragen. Das Datenblatt (S. 34)
   fordert 100 nF an **jedem** Power-Pin. Bester Kandidat für „läuft ~1 min, dann träge".
