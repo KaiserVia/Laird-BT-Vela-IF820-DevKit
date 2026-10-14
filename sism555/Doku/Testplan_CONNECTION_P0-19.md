@@ -166,7 +166,12 @@ laeuft: ein BT-Connect wurde waehrend des Monitors nicht verarbeitet, kein PIN-P
 | T6 Zufall | 1x echter Funkabriss nach BT-Reset am PC: beide LOW 19,8 s (= Supervision-Timeout 20 s), dann gemeinsam HIGH, Selbsterholung. CONNECTION = CYSPP, keine Abweichung |
 | T7 | ok (5.116) - 60 s Leerlauf, Antwort sofort, am RS232 nur der eine Block beim Verbinden, danach keine Pegelaenderung |
 | T8 BLE | ok (5.116, `ble_mainboard_test.py --mode smoke --no-rs232`: passed, PIN per BLE akzeptiert, Hauptmenue erreicht). **Abweichung gefunden:** CONNECTION geht ca. 3 s VOR CYSPP auf LOW (Block `+110880 ms`: CYSPP HIGH / CONNECTION LOW -> "ABWEICHUNG"; `+113851 ms`: beide LOW, dann Banner/PIN). Trennen: beide gemeinsam HIGH (`+127045 ms`) |
-| T9, T10 | **offen** |
+| T9 | ok - Classic-Cycle-Test 10/10 bestanden (`--mode cycle --count 10 --hold 20`), Connect-Zeit min/avg/max 50/1979/16763 ms (Maximum = erster Aufbau mit Geraete-Suche); am RS232 je Zyklus Banner, `PIN = ******`, Hauptmenue, **keine Fehlzeichen** |
+| T10 | ok - `UART0-RX verworfen: 0`; Protokoll (`Hauptmenue -> 6 -> 1`) zeigt nur `I1 Eingeschaltet` und `I32 Firmware update`, **keine Fehlereintraege** |
+
+**Testplan abgeschlossen (2026-10-14).** Nebenbefund Uhr: Der Eintrag `I32 Firmware update;02.10.26;17:03:13` liegt
+nach der aktuellen Geraetezeit (16:52:21) - die Uhr (Zeitquelle "ungestellt") springt, Protokollzeiten sind
+ohne Zeitquelle nicht verlaesslich (kein CONNECTION-Thema).
 
 **Zwischenfazit:** Die Verdrahtung stimmt, die 5.110-Weiche verwirft keine PIN, der Fix gegen die Fehlzeichen
 funktioniert. Fuer Classic liefert CONNECTION keinen Zusatznutzen gegenueber CYSPP (beide identisch, auch

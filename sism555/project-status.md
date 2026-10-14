@@ -4781,5 +4781,14 @@ Discovery vor dem Subscribe), bei anderen Zentralen kann sie abweichen.
 Geraet ausgeloest)" und gleich danach "Sauber getrennt (durch uns)" - wirkt wie eine kosmetische Eigenheit
 des Disconnect-Callbacks (Monitor zeigt einen sauberen Wechsel), nicht geprueft.
 
-**Offen im Testplan:** T9 (automatischer Classic-Zyklenlauf), T10 (Abschluss). Danach: Rueckbau des
-temporaeren Hintergrund-Monitors (siehe 5.115/5.116) und Entscheidung, ob `BT_CONN_GPIO 1` produktiv bleibt.
+**T9/T10 (abgeschlossen):** Classic-Cycle-Test 10/10 bestanden, am RS232 pro Zyklus Banner/PIN/Hauptmenue ohne
+Fehlzeichen; `UART0-RX verworfen: 0`; Protokoll ohne Fehlereintraege. **Testplan `Doku/Testplan_CONNECTION_P0-19.md`
+damit komplett durchlaufen (T0-T10 ok).** Nebenbefund: Protokollzeitstempel bei ungestellter Uhr unplausibel
+(`I32 ... 17:03:13` liegt nach der Geraetezeit 16:52:21).
+
+**Noch zu entscheiden:** (1) Rueckbau des temporaeren Hintergrund-Monitors (siehe 5.115/5.116, Vermerke in
+btio.c/CLAUDE.md). (2) Ob `BT_CONN_GPIO 1` (5.110-Weiche) produktiv bleibt - hardwareabhaengig, auf Boards ohne
+P0.19-Verdrahtung muss er auf 0. (3) Welche Aenderungen vom Branch `connection-pin` nach `LTE-Update`
+uebernommen werden: allgemein gueltig sind 5.104 (BT_LINK-Pegelvergleich), 5.105 (Contention-Test-Schutz),
+5.111 (Ringpuffer), 5.112 (SIM-Pruefung), 5.113/5.114 (Menueformat); hardwareabhaengig sind 5.109/5.110
+(P0.19, Weiche) und der temporaere Monitor 5.115/5.116.
