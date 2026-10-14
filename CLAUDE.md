@@ -212,7 +212,8 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   im Testmenue-Text `sicom.c`) existiert nur fuer den CONNECTION-Test
   (`sism555/Doku/Testplan_CONNECTION_P0-19.md`). **Rueckbau nach Abschluss des Tests:**
   `bt_cyspp_monitor()` wieder auf die blockierende Fassung (Commit `d6f8bb8`, 5.114) zuruecksetzen -
-  oder, zusammen mit dem uebrigen CYSPP-Diagnosecode, ganz entfernen. Grund fuer den Hintergrundbetrieb:
+  oder, zusammen mit dem uebrigen CYSPP-Diagnosecode, ganz entfernen; ebenso `bt_monitor_active()` (btio.c/.h) und die zustandsabhaengige Menuezeile 7 in
+  `sicom.c` (5.116). Grund fuer den Hintergrundbetrieb:
   der blockierende Monitor haelt die Hauptschleife an, ein BT-Connect wird dann nicht verarbeitet.
 - **Entkopplung fehlt:** `C128` und `C58` (je 1 µF an IF820 3P0V/VDDIO, Netz `N$169`) sind
   in **beiden** Bestückungsvarianten als nicht bestückt eingetragen. Das Datenblatt (S. 34)

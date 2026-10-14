@@ -4723,3 +4723,28 @@ Beobachtung) - Gegenstand von Testplan T1-T6.
 
 **Geaenderte Dateien:** btio.c, btio.h, measure.c, sicom.c, sprachen/sictxt.c (-> 5.115),
 Doku/Testplan_CONNECTION_P0-19.md (neu), CLAUDE.md.
+
+**Testergebnisse CONNECTION an P0.19 (Board 99SC9923, Firmware 5.115, 2026-10-14; Details im Testplan):**
+- **T1 Idle:** beide HIGH, kein Flackern, `comchange_count` stabil - kein externer Pull-up noetig.
+- **T2/T3 Classic verbinden, PIN, Betrieb:** beide LOW gleichzeitig, PIN-Prompt einmal, PIN wird von der
+  5.110-Weiche akzeptiert, Menues reagieren, keine weiteren Bloecke.
+- **T4/T5 sauber trennen/neu verbinden (2 Laeufe + Zusatzzyklen):** beide HIGH gleichzeitig, **keine
+  Fehlzeichen** am RS232 (5.110-Fix bestaetigt), PIN-Prompt je Verbindung einmal.
+- **T6 hart trennen:** (a) Terminalfenster schliessen und (b) Bluetooth am PC aus: beide Pegel gehen jeweils
+  gleichzeitig auf HIGH (ca. 1,2 s bzw. < 18 s), kein Split-Brain, kein Haengen. Zusaetzlich ein
+  **echter Funkabriss** (nur Zufallstreffer, erster Connect nach BT-Reset am PC, COM11 blieb leer): beide
+  Pegel blieben 19,8 s LOW (= Link-Supervision-Timeout `0x7D00` = 20 s) und gingen **gemeinsam** auf HIGH,
+  das Geraet erholte sich selbst. **CONNECTION weicht in keinem der beobachteten Faelle von CYSPP ab.**
+- **Einordnung:** Die "20 s"-Beobachtungen auf 26SC9983 (Quarz-Defekt) passen zu diesem Timeout - ein
+  instabiler Funklink faellt nach 20 s auf - und haben mit Leerlauf nichts zu tun (plausibel, nicht bewiesen).
+- **T7 (60 s Leerlauf):** noch offen - der erste Versuch war ungueltig (Monitor mit zweitem `7` wieder
+  abgeschaltet, Leerlaufzeit nicht erkennbar). **T8 (BLE), T9, T10:** noch offen.
+
+## Update 5.116: Testmenue-Zeile 7 zeigt den Monitor-Zustand (TEMPORAER)
+
+**Anlass:** `7` schaltete den Hintergrund-Monitor mehrfach ungewollt wieder aus (statt mit `9` das Menue zu
+verlassen), weil die Beschriftung "(ein/aus)" den Zustand nicht zeigte.
+**Fix:** `bt_monitor_active()` (btio.c/.h); die Testmenue-Zeile lautet jetzt `7. CYSPP monitor (7 = starten)`
+bzw. `7. CYSPP monitor (laeuft - 7 = stoppen)` (sicom.c). **TEMPORAER wie der Monitor selbst** - Rueckbau
+zusammen mit ihm (Vermerke in btio.c und CLAUDE.md erweitert).
+**Geaenderte Dateien:** btio.c, btio.h, sicom.c, sprachen/sictxt.c (-> 5.116), CLAUDE.md.

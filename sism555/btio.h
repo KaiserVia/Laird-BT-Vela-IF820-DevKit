@@ -192,7 +192,8 @@ extern volatile uchar bt_cyspp_out;       // 1 = Host treibt CYSPP (IC54 Bit7) a
 extern void bt_cmdmode (void);            // CYSPP HIGH: SPP trennen + Command-Mode erzwingen
 extern void bt_release (void);            // CYSPP loslassen: Status lesbar, bereit fuer Verbindung
 extern void bt_disconnect (void);         // IF820: offene Verbindung sauber trennen (Command-Mode + /DIS)
-extern void bt_monitor_poll (void);       // 5.115: Hintergrund-Monitor CYSPP/CONNECTION, einmal je Hauptschleifendurchlauf (measure.c)
+extern uchar bt_monitor_active (void);    // 5.116: 1 = Hintergrund-Monitor laeuft (Testmenue-Beschriftung)
+extern void bt_monitor_poll (void);      // 5.115: Hintergrund-Monitor CYSPP/CONNECTION, einmal je Hauptschleifendurchlauf (measure.c)
 extern void bt_cyspp_monitor (void);      // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) - Testmenue
 extern void bt_event_sniff (void);        // Roher UART1-Event-Mitschnitt (Diagnose) - Testmenue, startet nur
 extern void bt_sniff_poll (void);         // nicht-blockierendes Nachlesen - 1x je Hauptschleifendurchlauf (measure.c)

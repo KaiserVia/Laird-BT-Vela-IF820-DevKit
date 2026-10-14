@@ -529,7 +529,7 @@ static char *bt_pair_verdict (uchar cyspp, uchar conn)
 // TEMPORAER (5.115, Anwenderentscheidung 2026-10-14): Hintergrund-Monitor nur fuer den CONNECTION-Test
 // (Doku/Testplan_CONNECTION_P0-19.md). RUECKBAU nach Abschluss des Tests: bt_monitor_poll() samt Zustands-
 // variablen hier, Aufruf in measure.c, Deklaration in btio.h und den Zusatz "(ein/aus)" im Testmenue-Text
-// (sicom.c) entfernen; bt_cyspp_monitor() wieder auf die blockierende Fassung (Commit d6f8bb8, 5.114) oder
+// (sicom.c; ab 5.116 samt bt_monitor_active()) entfernen; bt_cyspp_monitor() wieder auf die blockierende Fassung (Commit d6f8bb8, 5.114) oder
 // - mit dem restlichen CYSPP-Diagnosecode - ganz entfernen. Siehe CLAUDE.md, "Aufraeumen".
 #define MON_DURATION_MS  300000UL             // 5 min, danach beendet er sich selbst
 static bool mon_active=FALSE;
@@ -544,6 +544,8 @@ static void bt_monitor_stop (void)
  putstr(" (Delta="); putnumber(comchange_count-mon_cc0,0); putc(')'); newline();
  bt_kvn("UART0-RX verworfen", u0_ovf);             // 5.111: Puffer voll, seit Boot
 }
+
+uchar bt_monitor_active (void) { return (mon_active ? 1 : 0); }   // fuer die Testmenue-Beschriftung (sicom.c)
 
 void bt_cyspp_monitor (void)                  // Testmenue 7: Hintergrund-Monitor ein-/ausschalten
 {

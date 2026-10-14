@@ -150,3 +150,24 @@ laeuft: ein BT-Connect wurde waehrend des Monitors nicht verarbeitet, kein PIN-P
 | T6: CONNECTION weicht von CYSPP ab | CONNECTION ist die zuverlaessigere Statusquelle -> Stufe B lohnt sich (Split-Brain erkennbar). |
 | T6: weiterhin identisch | Kein Zusatznutzen bei Split-Brain; Watchdog-Ansatz (host-seitig) bleibt der Weg. |
 | T2 CONNECTION bleibt HIGH | Hardware/Polaritaet klaeren, bis dahin `BT_CONN_GPIO 0`. |
+
+## Ergebnisse (Stand 2026-10-14, Firmware 5.115)
+
+| Schritt | Ergebnis |
+|---|---|
+| T0 | ok - 5.115, `/PING` ok |
+| T1 | ok - beide HIGH, kein Flackern, Delta 0 (kein externer Pull-up noetig) |
+| T2 | ok - beide LOW gleichzeitig (+6,3 s nach Start), Banner und `PIN = ` auf beiden Terminals |
+| T3 | ok - PIN akzeptiert, Menues reagieren, keine weiteren Bloecke |
+| T4 | ok - 2 Laeufe, beide HIGH gleichzeitig, **keine Fehlzeichen** am RS232 |
+| T5 | ok - mehrere Zyklen, PIN-Prompt je Verbindung einmal |
+| T6 (a) | ok - Fenster schliessen: beide HIGH nach ca. 1,2 s, kein Haengen |
+| T6 (b) | ok - Bluetooth am PC aus: beide HIGH gemeinsam, kein Split-Brain (Windows trennt offenbar sauber) |
+| T6 Zufall | 1x echter Funkabriss nach BT-Reset am PC: beide LOW 19,8 s (= Supervision-Timeout 20 s), dann gemeinsam HIGH, Selbsterholung. CONNECTION = CYSPP, keine Abweichung |
+| T7 | **offen** - erster Versuch ungueltig (Monitor war aus, Leerlauf nicht erkennbar) |
+| T8 BLE | **offen** - hier wird die Abweichung CYSPP/CONNECTION erwartet |
+| T9, T10 | **offen** |
+
+**Zwischenfazit:** Die Verdrahtung stimmt, die 5.110-Weiche verwirft keine PIN, der Fix gegen die Fehlzeichen
+funktioniert. Fuer Classic liefert CONNECTION keinen Zusatznutzen gegenueber CYSPP (beide identisch, auch
+beim Funkabriss). Entscheidend bleibt BLE (T8).
