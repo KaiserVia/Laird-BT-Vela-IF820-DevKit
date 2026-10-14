@@ -206,6 +206,12 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`
   (hard.c/.h, Update 5.70) - zaehlt EINT1/IC54-Interrupts zur CYSPP-Bounce-Diagnose. Nach
   Abschluss der CYSPP-Diagnose wieder entfernen (Anwenderentscheidung 2026-08-18).
+- **Aufraeumen - TEMPORAER seit 5.118 (Anwenderentscheidung 2026-10-14):** `bt_session_summary()`
+  (btio.c/.h) gibt beim BT-Trennen eine Zeile `[BT-Sitzung beendet] TX=... ctswait=... ctsDrop=...` ans Terminal,
+  Aufruf in `libtool.c` (`communication_change()`, Trennen-Zweig). Nur fuer die Ymodem-/CTS-Fehlersuche (5.117),
+  damit der RS232-Sniffer die Zaehler je Sitzung im Trace sieht. **Wieder entfernen**, sobald der Fehler
+  abgeschlossen ist. Der Zaehler `bt_cts_drop` (sio.c/.h) und die Anzeige `ctsDrop=` in `bt_show_counters()`
+  duerfen bleiben.
 - **Aufraeumen - TEMPORAER seit 5.115 (Anwenderentscheidung 2026-10-14):** Der
   **CYSPP/CONNECTION-Hintergrund-Monitor** (`bt_monitor_poll()` + Zustandsvariablen `mon_*` in
   `btio.c`, Aufruf in `measure.c` neben `bt_sniff_poll()`, Deklaration `btio.h`, Zusatz "(ein/aus)"

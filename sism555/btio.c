@@ -1425,6 +1425,24 @@ void bt_show_counters (void)
  newline(); connect=cc;
 }
 
+// TEMPORAER (5.118, NUR DEBUG): eine Zeile mit den Sitzungszaehlern beim BT-Trennen (nur Terminal, nie ans
+// Modul). Zweck: Der automatische Testlauf (ble_mainboard_test.py, RS232-Sniffer) soll CTS-Bremse und verworfene
+// Bytes je Sitzung im Trace sehen, ohne dass jemand das Info-Menue abruft. SPAETER WIEDER ENTFERNEN, sobald der
+// Ymodem-/CTS-Fehler (5.117) abgeschlossen ist: diese Funktion, Deklaration in btio.h und den Aufruf in
+// libtool.c (communication_change(), Trennen-Zweig).
+void bt_session_summary (void)
+{
+ uchar cc=connect; connect&=~UART1;
+ newline();
+ putstr("[BT-Sitzung beendet]");
+ putstr(" TX=");        putnumber(bt_tx_bytes,0);
+ putstr(" ctswait=");   putnumber(bt_cts_wait,0);
+ putstr(" ctsDrop=");   putnumber(bt_cts_drop,0);
+ putstr(" TXstuck=");   putnumber(bt_tx_stuck,0);
+ putstr(" lost_ms=");   putnumber(bt_cts_sleep,0);
+ newline(); connect=cc;
+}
+
 void bt_reset_counters (void)   // Zaehler nullen - je BT-Sitzung von vorn zaehlen
 {
  bt_tx_bytes=0; bt_cts_wait=0; bt_cts_sleep=0; bt_cts_drop=0; bt_tx_stuck=0; usb_tx_stuck=0;

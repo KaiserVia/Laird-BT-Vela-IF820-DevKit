@@ -4821,3 +4821,13 @@ zurueck, bis CTS wieder LOW ist - das begrenzt die Blockadezeit bei Funkabriss. 
 **Verifikation:** Build 0 Error(s), 0 Warning(s). **Am Geraet noch nicht getestet.** Test: `ble_mainboard_test.py
 --mode receive --transport classic` (und BLE) mit 419430 Messwerten; erfolgreich, wenn der Download
 durchlaeuft und `ctsDrop=0`.
+
+
+## Update 5.118: Sitzungszaehler beim BT-Trennen als eine Zeile (TEMPORAER, nur Debug)
+
+Beim Trennen einer BT-Verbindung gibt die Firmware eine Zeile `[BT-Sitzung beendet] TX=.. ctswait=.. ctsDrop=..
+TXstuck=.. lost_ms=..` nur ans Terminal aus (`bt_session_summary()`, btio.c; Aufruf in libtool.c). Der
+RS232-Sniffer des Testskripts schreibt sie in den Trace - die Zaehler muessen nicht mehr von Hand im Info-Menue
+abgerufen werden. Reine Anzeige, kein Eingriff in die Uebertragung. **TEMPORAER:** nach Abschluss der
+CTS-/Ymodem-Untersuchung (5.117) wieder entfernen, Hinweis in CLAUDE.md ("Aufraeumen").
+Build 0 Error(s), 0 Warning(s); am Geraet nicht getestet.

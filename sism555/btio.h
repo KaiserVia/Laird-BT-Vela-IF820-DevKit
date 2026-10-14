@@ -216,6 +216,7 @@ extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH t
 #define BT_CONN_ACTIVE  ((!BT_CONN_GPIO) || !(FIO0PIN & CONN_PIN))
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
 extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
+extern void bt_session_summary (void);    // TEMPORAER (5.118, nur Debug): Sitzungszaehler als Zeile beim Trennen - spaeter entfernen
 
 #endif // BTIO_H_
 

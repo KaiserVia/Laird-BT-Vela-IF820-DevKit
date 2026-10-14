@@ -1053,6 +1053,7 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
    else if (((comstate_neu&BT_LINK)!=0) && (connect&BT_LINK))  // HW getrennt, Software denkt noch verbunden
 	 {
 		connect&=~(UART1|BT_LINK);			// Daten nicht mehr an UART1 senden
+		bt_session_summary();						// TEMPORAER (5.118, nur Debug): Sitzungszaehler als Zeile ans Terminal - spaeter wieder entfernen, siehe CLAUDE.md
 		bt_pininit=0;										// Reset Bluetooth Pin Initialisierung falls aktiv
 		bxi=rxi;							// FIX (5.82): Rest im gemeinsamen Ringpuffer verwerfen - beim
 											// (fremdinitiierten) Trennen sendet das Modul noch rohen Event-/
