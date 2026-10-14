@@ -4792,3 +4792,32 @@ P0.19-Verdrahtung muss er auf 0. (3) Welche Aenderungen vom Branch `connection-p
 uebernommen werden: allgemein gueltig sind 5.104 (BT_LINK-Pegelvergleich), 5.105 (Contention-Test-Schutz),
 5.111 (Ringpuffer), 5.112 (SIM-Pruefung), 5.113/5.114 (Menueformat); hardwareabhaengig sind 5.109/5.110
 (P0.19, Weiche) und der temporaere Monitor 5.115/5.116.
+
+
+## Update 5.117: Ymodem-Download scheiterte am 1. Datenblock - CTS-Timeout in putb() verwarf Bytes
+
+**Symptom (Board 99SC9923, 5.116, 2026-10-14):** Nach dem Flash-Schreiben (419430 Messwerte) schlugen alle
+Downloads (Classic und BLE) fehl: Ymodem-Header und ACK ok, der 1. Datenblock kam am PC mit ~1023-1025 statt
+1029 Byte an, der PC sendete nach ~1,9 s NAK, das Gerät wiederholte den Block - ebenfalls zu kurz - bis zum
+Abbruch (F13010 Kommunikations-Protokollfehler). Im Fast-Lauf (100 Messwerte) trat derselbe Fehler beim 1. Versuch
+ebenfalls auf, dort half erst der Retry. Auch der 5.108-Lauf vom 2026-10-01 zeigte "Retries 3" - der Fehler ist
+also nicht neu und nicht durch 5.109-5.116 entstanden.
+
+**Beleg (Zaehler im Info-Menue nach dem fehlgeschlagenen Lauf):** `W11015 CTS Timeout` direkt nach dem ersten
+`/PING`, `ctswait=30` (= 6 Versuche x 5 Bytes), `TXstuck=0`. RS232 (UART0-Spiegel) zeigte alle 6 Versuche
+vollstaendig. Das Modul bremst am Ende des ersten Blocks laenger als 50 ms per CTS.
+
+**Ursache:** `putb()` (sio.c) wartete je Byte hoechstens `CTS_WAIT_MS` = 50 ms auf CTS-LOW und verwarf das
+Byte dann mit `return(-1)`. `sendblock()` (xmodem.c) wertet den Rueckgabewert nicht aus. Die verworfenen Bytes
+fehlten im Block; der Retry traf dieselbe Bremse wieder. Die 50 ms waren als Totmodul-Erkennung gedacht (5.59
+hatte schon den FIFO-Stau auf 1 s gesetzt, die CTS-Schleife aber nicht angepasst).
+
+**Fix (5.117, sio.c):** Bei aktiver BT-Datenverbindung (`connect&BT_LINK`) wartet `putb()` bis zu
+`CTS_WAIT_LINK_MS` = 1000 ms auf CTS-LOW. Laeuft das ab (Link tot), schaltet `cts_stalled` auf die kurzen 50 ms
+zurueck, bis CTS wieder LOW ist - das begrenzt die Blockadezeit bei Funkabriss. GSM/Kommandomodus
+(ohne BT_LINK) unveraendert 50 ms. Neuer Diagnosezaehler `bt_cts_drop` (verworfene Bytes) im Info-Menue als
+`ctsDrop=` neben `ctsTO=`.
+
+**Verifikation:** Build 0 Error(s), 0 Warning(s). **Am Geraet noch nicht getestet.** Test: `ble_mainboard_test.py
+--mode receive --transport classic` (und BLE) mit 419430 Messwerten; erfolgreich, wenn der Download
+durchlaeuft und `ctsDrop=0`.

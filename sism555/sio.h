@@ -73,6 +73,7 @@ extern volatile uchar cts_timeout;                  /* putb(): CTS-Wait abgelauf
 extern volatile uchar usb_tx_stuck;                  /* USB-CDC-Wait Timeout-Zaehler (Host holt nicht ab) */
 extern volatile uint bt_tx_bytes;                    /* Diagnose: an UART1 gesendete Bytes */
 extern volatile uint bt_cts_wait;                    /* Diagnose: Bytes, die auf CTS warten mussten */
+extern volatile uint bt_cts_drop;                    /* Diagnose (5.117): wegen CTS-Timeout verworfene Bytes */
 extern volatile uint bt_cts_sleep;                   /* Diagnose: osDelay(1)-Durchlaeufe (~ verlorene ms) */
 extern void putparameter (text *s, uint wert, uint format, text *u);	// Parameterwerte formatiert ausgeben
 extern int list_selection	(text *titel, text *liste, uchar *Parameter, uchar items, uchar size);	// Listenauswahl

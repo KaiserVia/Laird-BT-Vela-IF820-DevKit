@@ -27,6 +27,13 @@
 #include "dtc_text.h"	// generierte Code->Typ/Kurztext-Tabelle (aus Diagnose-Codes.csv)
 
 #define CTS_WAIT_MS 50           // max. Wartezeit auf CTS-LOW je Byte (ms) - bounded, kein Dauerhang
+#define CTS_WAIT_LINK_MS 1000    // 5.117: bei aktiver BT-Datenverbindung (BT_LINK) gilt CTS-HIGH als Rueckstau der
+                                 // Funkstrecke, nicht als totes Modul -> Byte NICHT nach 50 ms verwerfen (sonst fehlen
+                                 // am Ymodem-Blockende ~5 Bytes, Block zu kurz, Abbruch F13010). Totes Modul faengt
+                                 // Init_BT_ch() beim Start ab.
+static uchar cts_stalled=0;      // 5.117: 1 = letzte lange CTS-Wartezeit lief ab (Link tot) -> wieder kurz (50 ms) warten,
+                                 // bis CTS wieder LOW ist; begrenzt die Blockadezeit bei Funkabriss
+volatile uint bt_cts_drop=0;     // 5.117 Diagnose: wegen CTS-Timeout verworfene Bytes
 #define BT_TXWAIT_MS 1000        // max. Wartezeit auf THRE (TX-FIFO frei) je Byte (5.59): grosszuegig,
                                  // damit CTS-Rueckstau das Byte NICHT verwirft (Werksmodul/Dead-Fall
                                  // faengt schon die CTS-Schleife mit CTS_WAIT_MS ab)
@@ -64,14 +71,17 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
  {
 	if (!cts_bypass)                         // Bring-up/Werksmodul (F=00): CTS-Handshake ueberspringen
 	{ uint _ct0=mstimer;                     // CTS-Wartezeit begrenzen (Flow-Control/Verdrahtung)
+	 uint _cw=((connect&BT_LINK) && !cts_stalled) ? CTS_WAIT_LINK_MS : CTS_WAIT_MS;  // 5.117: lang nur bei aktivem BT-Link
 	 if (FIO2PIN & CTS) bt_cts_wait++;        // Diagnose (5.53): dieses Byte muss bremsen
 	 while (FIO2PIN & CTS)                    // Wait for CTS LOW (Modem empfangsbereit)
 	 {
-	  if ((uint)(mstimer-_ct0) >= CTS_WAIT_MS) { cts_timeout=1; return(-1); } // CTS bleibt High -> Flag + Abbruch
+	  if ((uint)(mstimer-_ct0) >= _cw)        // CTS bleibt High -> Flag + Abbruch
+	  { cts_timeout=1; bt_cts_drop++; if (connect&BT_LINK) cts_stalled=1; return(-1); }
 	  if (WDTV<1000) { ResetWDT(); return(-1); }                             // Sicherheitsnetz Watchdog
 	  bt_cts_sleep++;                        // Diagnose (5.53): ein osDelay(1) = mind. 1 ms verloren
 	  osDelay(1);                            // WICHTIG: Taskwechsel zulassen -> kein System-Freeze bei BT-Backpressure (kein Busy-Spin)
 	 }
+	 cts_stalled=0;                           // 5.117: CTS ist LOW -> Stau vorbei, wieder lange warten
 	}
 	{ uint _tt=mstimer;                    // TX-FIFO-Wait begrenzen (kein Dauerhang)
 	while (!(U1->LSR & THRE)) 		// Warte UART1 Transmitter FIFO leer?

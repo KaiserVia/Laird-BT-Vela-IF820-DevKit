@@ -1419,6 +1419,7 @@ void bt_show_counters (void)
  putstr(" sleeps=");        putnumber(bt_cts_sleep,0);
  putstr(" lost=");          putnumber(bt_cts_sleep/1000,0); putstr("s");
  putstr(" ctsTO=");         putnumber(cts_timeout,0);
+ putstr(" ctsDrop=");       putnumber(bt_cts_drop,0);                   // 5.117: verworfene Bytes (CTS-Timeout)
  putstr(" TXstuck=");       putnumber(bt_tx_stuck,0);
  putstr(" USBstuck=");      putnumber(usb_tx_stuck,0);
  newline(); connect=cc;
@@ -1426,7 +1427,7 @@ void bt_show_counters (void)
 
 void bt_reset_counters (void)   // Zaehler nullen - je BT-Sitzung von vorn zaehlen
 {
- bt_tx_bytes=0; bt_cts_wait=0; bt_cts_sleep=0; bt_tx_stuck=0; usb_tx_stuck=0;
+ bt_tx_bytes=0; bt_cts_wait=0; bt_cts_sleep=0; bt_cts_drop=0; bt_tx_stuck=0; usb_tx_stuck=0;
 }
 
 void send_bt_info (void)							// Bluetooth Informationen ausgeben
