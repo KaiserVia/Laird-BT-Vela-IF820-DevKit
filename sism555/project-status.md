@@ -4831,3 +4831,17 @@ RS232-Sniffer des Testskripts schreibt sie in den Trace - die Zaehler muessen ni
 abgerufen werden. Reine Anzeige, kein Eingriff in die Uebertragung. **TEMPORAER:** nach Abschluss der
 CTS-/Ymodem-Untersuchung (5.117) wieder entfernen, Hinweis in CLAUDE.md ("Aufraeumen").
 Build 0 Error(s), 0 Warning(s); am Geraet nicht getestet.
+
+
+## Verifikation 5.117/5.118 am Geraet (Board 99SC9923, 2026-10-14): Ymodem-Download laeuft durch
+
+- **Fast-Suite (100 Messwerte)** `2026-10-14_16-32-36`: bestanden (104 s). In allen BT-Sitzungen `ctsDrop=0`,
+  `TXstuck=0`; Classic-Download `ctswait=0`, BLE-Downloads `ctswait` 1-2. Kein Retry beim 1. Datenblock (mit 5.116
+  war im Fast-Lauf ein NAK-Retry noetig).
+- **Grosser Fall (419430 Messwerte, Classic)** `2026-10-14_16-35-44`: **bestanden** - 4.199.424 Byte in 4101
+  Bloecken, 561,9 s, 7474 B/s, **Retries 0**. Sitzungszeile: `TX=4273086 ctswait=1270 ctsDrop=0 TXstuck=0
+  lost_ms=14679`. Das Modul bremst also 1270 Mal per CTS (zusammen ~14,7 s von 562 s), es geht aber kein Byte
+  mehr verloren. Mit 5.116 scheiterte derselbe Test am 1. Datenblock (F13010).
+- **Noch offen:** gleicher grosser Test ueber BLE; Wiederholung zur Absicherung (Fehler trat vorher nicht bei jedem
+  Lauf auf); Vergleich mit 5.99 (`sism555/fw_5.99/`, nicht committet) nur noch noetig, wenn der Fehler wieder
+  auftritt; Rueckbau von `bt_session_summary()` (5.118, TEMPORAER) nach Abschluss.
