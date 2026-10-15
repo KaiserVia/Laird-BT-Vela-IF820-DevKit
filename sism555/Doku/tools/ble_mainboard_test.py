@@ -2078,7 +2078,22 @@ async def run_download_test(args) -> int:
         generate_timeout = args.generation_timeout or max(
             args.menu_timeout, 30.0 + args.records * 0.25)
         transport.rx.clear()
-        if not await transport.rx.wait_for_marker(MARK_COMPMENU, generate_timeout):
+        # Selbst pollen statt wait_for_marker(), damit waehrend des langen Schreibens alle 10 s
+        # eine Fortschrittszeile (aktueller Zaehlerstand des Geraets) ins Log kommt.
+        progress_needle = MARK_COMPMENU.encode("ascii")
+        progress_start = time.monotonic()
+        progress_deadline = progress_start + generate_timeout
+        next_progress = progress_start + 10.0
+        while progress_needle not in transport.rx.buf and time.monotonic() < progress_deadline:
+            await asyncio.sleep(0.2)
+            if time.monotonic() >= next_progress:
+                next_progress += 10.0
+                seen = re.findall(rb"\d+", bytes(transport.rx.buf).replace(b"\x08", b" "))
+                last_seen = int(seen[-1]) if seen else 0
+                elapsed_s = time.monotonic() - progress_start
+                log(f"Flash-Erzeugung laeuft: {last_seen}/{args.records} "
+                    f"({100.0 * last_seen / max(args.records, 1):.0f} %), {elapsed_s:.0f} s")
+        if progress_needle not in transport.rx.buf:
             log("Kein Fertig-Signal von write_flash() gesehen (Timeout) - Abbruch.")
             result["result"] = "generate_timeout"
             _finish_download(result)
@@ -2087,7 +2102,14 @@ async def run_download_test(args) -> int:
         result["generation_feedback"] = generation_feedback.decode("latin-1", "replace")
         final_counter = re.search(rf"(?<!\d){args.records}(?!\d)", result["generation_feedback"])
         result["generation_counter_ok"] = bool(final_counter)
-        log(f"Flash-Erzeugung, Geraeteantwort: {generation_feedback!r}")
+        # Fortschrittsanzeige des Geraets (Zaehler mit Backspaces) verdichten: volle Antwort bleibt im JSON-Report.
+        cleaned_feedback = re.sub(r"\x08+", " ", result["generation_feedback"])
+        counters = re.findall(r"\d+", cleaned_feedback)
+        if counters:
+            log(f"Flash-Erzeugung, Geraeteantwort: {len(generation_feedback)} Bytes, "
+                f"{len(counters)} Zaehlerschritte, erster={counters[0]}, letzter={counters[-1]}")
+        else:
+            log(f"Flash-Erzeugung, Geraeteantwort: {cleaned_feedback.strip()!r}")
         if not result["generation_counter_ok"]:
             log(f"WARNUNG: Zielzaehler {args.records} nicht in der Geraeteantwort gesehen.")
             result["result"] = "generation_counter_missing"
