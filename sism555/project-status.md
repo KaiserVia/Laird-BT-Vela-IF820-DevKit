@@ -4845,3 +4845,65 @@ Build 0 Error(s), 0 Warning(s); am Geraet nicht getestet.
 - **Noch offen:** gleicher grosser Test ueber BLE; Wiederholung zur Absicherung (Fehler trat vorher nicht bei jedem
   Lauf auf); Vergleich mit 5.99 (`sism555/fw_5.99/`, nicht committet) nur noch noetig, wenn der Fehler wieder
   auftritt; Rueckbau von `bt_session_summary()` (5.118, TEMPORAER) nach Abschluss.
+
+
+## Dauertest 5.118 am Geraet (Board 99SC9923, 2026-10-15): zwei komplette Modul-Suiten bestanden
+
+**Laeufe:** `Testreports/2026-10-15_08-16-38_VIASIS_99SC9923_module-suite` (08:16-09:56) und
+`.../2026-10-15_10-00-52_...` (10:00-11:40), je ~99 min, Firmware 5.118 (enthaelt 5.117), RS232-Sniffer auf COM3 aktiv.
+Beide Laeufe **passed**, alle 11 Phasen je Lauf: Classic Smoke, Classic 12 Zyklen (Haltezeiten 0-300 s), BLE Smoke,
+BLE 12 Zyklen, Flash schreiben (419430 Messwerte, je 161,2 s), 3x Classic- und 3x BLE-Ymodem-Download.
+
+| Messgroesse | Lauf 08:16 | Lauf 10:00 |
+|---|---|---|
+| Classic-Zyklen 12/12, PIN+Menue ok | ja (Connect 50-1751 ms) | ja (48-1477 ms) |
+| BLE-Zyklen 12/12, PIN+Menue ok | ja (Connect 3,1-9,2 s) | ja (3,1-5,5 s) |
+| Downloads je 4.199.424 Byte / 4101 Bloecke | 6/6, Retries 0 | 6/6, Retries 0 |
+| Download Classic | 7303 B/s (575 s) | 7480 B/s (561 s) |
+| Download BLE | 6559 B/s (640 s) | ca. 6,6 KB/s (625-640 s) |
+| `ctsDrop` / `TXstuck` in allen 33 BT-Sitzungen | 0 / 0 | 0 / 0 |
+| F-/W-Codes, Watchdog, Reset auf RS232 | keine | keine |
+
+**Pruefungen / Querbezuege (alle stimmig):**
+- `TX` je Download-Sitzung ist in **allen 12 Downloads identisch: 4.220.641 Byte** - ein einziger Retry (+1029) oder
+  verworfenes Byte wuerde sich sofort zeigen. Das ist der staerkste Beleg dafuer, dass 5.117 den Ymodem-Fehler
+  (Update 5.117) behoben hat.
+- **CTS-Bremse nur bei Classic:** `ctswait` je 4,2-MB-Download Classic 1426-1598 (Zeitverlust 15-18 s von ~570 s,
+  also ~3 %), BLE nur 2-9 (< 0,1 s). Das Modul bremst per CTS nur auf dem Classic-Pfad; dort greift die
+  CTS-Wartezeit-Aenderung von 5.117 (vorher: 50-ms-Limit verwarf Bytes).
+- Exportdateien durchnummeriert `_019`...`_024` (Lauf 1) und `_025`...`_030` (Lauf 2) - lueckenlos, es gab keine
+  versteckten oder wiederholten Exporte.
+- UART0-Spiegel: Sniffer zaehlte 25.384.820 bzw. 25.384.897 Byte (= 6 Downloads x ~4,22 MB) in beiden Laeufen -
+  praktisch identisch.
+- 5.116 scheiterte bei gleichem Test am 1. Datenblock (F13010); der Fast-Lauf desselben Tages brauchte dort einen
+  NAK-Retry. Diese Retries sind mit 5.117/5.118 verschwunden (Retries 0 in 12/12 Downloads).
+
+**Unstimmigkeiten im Testskript/Bericht (kein Firmware- oder Testergebnisfehler, `ble_mainboard_test.py`):**
+1. **Berichte werden ueberschrieben:** `write_report()` schreibt je Art immer dieselbe Datei (`download.json`,
+   `cycle.json`). `phase()` in `run_module_suite()` erkennt neue Berichte per Dateimengen-Differenz; nur der erste
+   Lauf je Art wird gefunden. Folge: In `module-suite.json` und im HTML (Tabelle "Ymodem-Downloads", Zyklen) stehen nur
+   Classic Download 1/3 und die Classic-Zyklen; fuer die anderen 5 Downloads und die BLE-Zyklen ist `report: null`,
+   die Ordner-Dateien `download.json`/`cycle.json` enthalten nur den letzten Lauf (BLE). Das Ergebnis `passed`
+   stimmt trotzdem (Rueckgabecode); die Einzelwerte sind im `trace.ndjson` und in den `BT-Sitzung`-Zeilen.
+2. **`unexpected_disconnect: True` bei jedem erfolgreichen BLE-Smoke** (`disconnect_reason:
+   hold_time_elapsed_still_connected`): der Disconnect-Callback setzt das Flag auch beim eigenen, gewollten Trennen
+   (`ble_mainboard_test.py` ~Z. 813). Das Wort "vom Geraet ausgeloest" im Log ist dadurch irrefuehrend.
+3. **Ymodem-Dateigroesse wird nicht geparst:** Log "Groesse=None", `filesize: null` - der Test kann die gemeldete
+   Groesse (4.199.420) nicht gegen die empfangenen 4.199.424 Byte (Blockauffuellung) pruefen. Es gibt ausserdem keine
+   Inhaltspruefung ueber die Block-CRC hinaus (Dateiinhalt der 12 Downloads wird nicht verglichen).
+4. **Sitzungszeile eine Phase verschoben:** Die Zeile `[BT-Sitzung beendet]` (5.118) erscheint erst, wenn die
+   Firmware das Trennen erkennt, und wird daher im Trace der **folgenden** Phase zugeordnet (z. B. steht der
+   Flash-Schreiben-Sitzung `TX=52733` unter "Classic Download 1/3"). Beim Auswerten um eine Sitzung versetzt lesen
+   (33 Zeilen fuer 33 Sitzungen, Reihenfolge stimmt).
+5. **BLE-Smoke schreibt keine Verbindungs-Events in den Trace** (nur `marker_found`), die Smoke-Zeiten stehen nur in
+   `smoke.json`.
+
+**Weitere Auffaelligkeit (Firmware, bekannt):** Die Exportdateinamen tragen das Geraetedatum `141026`, am Testtag war
+aber der 15.10.2026 - die Geraeteuhr ist nicht gestellt/driftet (siehe T10 im Testplan CONNECTION: Protokollzeiten
+bei ungestellter Uhr unplausibel).
+
+**Fazit:** 5.117/5.118 bestehen den kompletten Dauertest auf Classic und BLE zweimal hintereinander fehlerfrei.
+Offen: Vergleichslauf mit 5.99 (`sism555/fw_5.99/`, nur noetig, falls das Problem wiederkehrt); Rueckbau von
+`bt_session_summary()` (5.118) und des CYSPP/CONNECTION-Monitors (5.115/5.116); Entscheidung `BT_CONN_GPIO`; Uebernahme
+der allgemeinen Aenderungen (5.104/5.105/5.111/5.112/5.113/5.114/5.117) nach `LTE-Update`; Behebung der
+Skript-Unstimmigkeiten 1-3.

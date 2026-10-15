@@ -64,6 +64,11 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
   fehlerfrei (bis auf einen einmaligen, nicht reproduzierten Classic-Ausreißer). Ein zuvor auf
   einem neuen Board aufgetretenes "nicht sichtbar beim Pairing"-Problem wurde vom Anwender per
   Hardware-Maßnahme behoben (Details noch nicht dokumentiert).
+- **2026-10-15: Dauertest auf Board 99SC9923 mit 5.118 zweimal komplett bestanden** (je ~99 min, Classic +
+  BLE, 12 Zyklen je Transport, 419430-Messwerte-Flash, 6 Ymodem-Downloads je Lauf, Retries 0, `ctsDrop=0`).
+  Ursache des vorher scheiternden Downloads (5.116: F13010, Block am Ende zu kurz) war das 50-ms-CTS-Limit
+  in `putb()`; behoben in 5.117. Details: `sism555/project-status.md`, Updates 5.117/5.118 und "Dauertest
+  5.118 am Geraet". Das Testskript hat bekannte Berichts-Unstimmigkeiten (dort aufgelistet).
 - Gerätename BLE + Classic einheitlich `VIASIS_<serno>`.
 - Zugangsschutz über bestehende **App-Layer-PIN** (kein BT-Passkey).
 - BT-Baud fix über `#define IF820_BAUD 460800` in `btio.h` (921600 verworfen — HW-Limit LPC1766).
