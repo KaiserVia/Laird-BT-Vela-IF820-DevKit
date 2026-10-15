@@ -810,8 +810,11 @@ async def run_smoke_test(args) -> int:
     result["phases_ms"]["scan"] = round(scan_ms, 1)
 
     disconnected = asyncio.Event()
+    closing = {"by_us": False}   # True ab dem gewollten Trennen am Testende: der Callback feuert dann auch
 
     def on_disconnect(_client):
+        if closing["by_us"]:
+            return               # eigenes, gewolltes Trennen - weder "unerwartet" noch "vom Geraet ausgeloest"
         result["unexpected_disconnect"] = True
         log("*** DISCONNECT (vom Geraet ausgeloest) ***")
         disconnected.set()
@@ -894,6 +897,7 @@ async def run_smoke_test(args) -> int:
         result["result"] = ("passed" if result["subscribe_ok"] and result["pin_menu_ok"]
                             and not result["unexpected_disconnect"] else "unstable")
     finally:
+        closing["by_us"] = True
         if client.is_connected:
             await client.disconnect()
             log("Sauber getrennt (durch uns).")
@@ -1876,7 +1880,17 @@ async def _read_ymodem_block(rx: ByteStream, timeout: float):
     return "DATA", blkno, data
 
 
-async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5) -> dict:
+VTF_BYTES_PER_RECORD = 10.0118   # gemessen: 419430 Messwerte -> 4199424 Byte Ymodem-Datei (mehrere Laeufe)
+
+
+def estimate_vtf_size(menu_text: bytes) -> int | None:
+    """Schaetzt die Ymodem-Dateigroesse aus 'Anzahl Messwerte = N' im Menuetext (Ymodem-Header enthaelt keine Groesse)."""
+    match = re.search(rb"Anzahl Messwerte\s*=\s*(\d+)", menu_text)
+    return round(int(match.group(1)) * VTF_BYTES_PER_RECORD) if match else None
+
+
+async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5,
+                         expected_size: int | None = None) -> dict:
     """Empfaengt einen Ymodem-Batch-Transfer, exakt wie ihn sendblock()/send_vtf_file()/
     ymodem_close() in sism555/xmodem.c + sicom.c erzeugen: 128-Byte-SOH-Headerblock (Dateiname
     + Groesse), dann 1024-Byte-STX-CRC-Datenbloecke, EOT, abschliessender Null-Headerblock."""
@@ -1907,7 +1921,13 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5) 
         header_str = data[:name_end].decode("ascii", "ignore") if name_end > 0 else ""
         parts = header_str.split(" ") if header_str else []
         stats["filename"] = parts[0] if parts else None
-        stats["filesize"] = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+        # Ymodem-Header: "Dateiname\0Groesse ...\0" - die Groesse steht NACH dem ersten Nullbyte
+        # (frueher wurde nur der Text vor dem Nullbyte geteilt -> filesize blieb immer None).
+        size_token = data[name_end + 1:].split(b"\x00")[0].split(b" ")[0] if name_end > 0 else b""
+        if size_token.isdigit():
+            stats["filesize"] = int(size_token)
+        else:
+            stats["filesize"] = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
         log(f"Ymodem-Header: Datei='{stats['filename']}' Groesse={stats['filesize']} Byte.")
         await transport.write(bytes([XMODEM_ACK]))
         await transport.write(b"C")   # fordert ersten Datenblock (CRC-Modus) an - sendblock() mit get_C=1
@@ -1927,8 +1947,8 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5) 
                 if now >= next_progress:
                     next_progress = now + 10.0
                     elapsed = now - t_start
-                    size = stats["filesize"]
-                    pct = f", {100.0 * stats['bytes'] / size:.0f} %" if size else ""
+                    size = stats["filesize"] or expected_size
+                    pct = f", ca. {min(100.0, 100.0 * stats['bytes'] / size):.0f} %" if size else ""
                     log(f"Ymodem: {stats['blocks']} Bloecke / {stats['bytes']} Byte "
                         f"({stats['bytes']/elapsed:.0f} B/s{pct}) ...")
             elif blkno == ((expected - 1) & 0xFF):
@@ -1940,6 +1960,17 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5) 
         kind, blkno, data = await read_with_retry()
         if kind == "DATA" and blkno == 0:
             await transport.write(bytes([XMODEM_ACK]))
+
+        # Gegenprobe gegen die im Header gemeldete Dateigroesse: die Block-CRC erkennt keinen fehlenden
+        # Schluss. Ymodem fuellt den letzten Block auf 1024 Byte auf, also gilt filesize <= bytes < filesize+1024.
+        if stats["filesize"] is not None:
+            stats["size_ok"] = stats["filesize"] <= stats["bytes"] < stats["filesize"] + 1024
+            if stats["bytes"] < stats["filesize"]:
+                raise ValueError(f"Datei abgeschnitten: {stats['bytes']} Byte empfangen, "
+                                 f"Header meldet {stats['filesize']}.")
+            if not stats["size_ok"]:
+                log(f"WARNUNG: empfangen {stats['bytes']} Byte, Header meldet {stats['filesize']} "
+                    "(mehr als eine Blockauffuellung Unterschied).")
 
         stats["duration_s"] = round(time.perf_counter() - t_start, 3)
         stats["throughput_bps"] = round(stats["bytes"] / stats["duration_s"], 1) if stats["duration_s"] else 0
@@ -2168,6 +2199,7 @@ async def run_download_test(args) -> int:
             result["result"] = "export_prompt_failed"
             _finish_download(result)
             return 2
+        expected_size = estimate_vtf_size(bytes(transport.rx.buf))
         await asyncio.sleep(0.2)
         transport.rx.clear()
         if args.transport == "classic" and args.classic_step:
@@ -2176,7 +2208,8 @@ async def run_download_test(args) -> int:
         await asyncio.sleep(0.3)
 
         log("Empfange Ymodem-Transfer ...")
-        stats = await ymodem_receive(transport, block_timeout=args.ymodem_timeout)
+        stats = await ymodem_receive(transport, block_timeout=args.ymodem_timeout,
+                                     expected_size=expected_size)
         result["ymodem"] = stats
         result["result"] = "passed"
         log(f"Download abgeschlossen: {stats['bytes']} Byte in {stats['blocks']} Bloecken, "
@@ -2221,6 +2254,7 @@ async def run_receive_test(args) -> int:
         await transport.write(b"1")
         if not await transport.rx.wait_for_marker(MARK_DAUS, args.menu_timeout):
             raise ConnectionError(f"Kein 'Daten ausgeben?'-Prompt gesehen: {bytes(transport.rx.buf)!r}")
+        expected_size = estimate_vtf_size(bytes(transport.rx.buf))
 
         await asyncio.sleep(0.2)
         transport.rx.clear()
@@ -2229,7 +2263,8 @@ async def run_receive_test(args) -> int:
         await wait_for_menu_step(args, "'Daten ausgeben?' sichtbar. Sende 'C' fuer Ymodem.")
         await transport.write(b"C")
         log("Empfange Ymodem-Transfer ...")
-        result["ymodem"] = await ymodem_receive(transport, block_timeout=args.ymodem_timeout)
+        result["ymodem"] = await ymodem_receive(transport, block_timeout=args.ymodem_timeout,
+                                                expected_size=expected_size)
         result["result"] = "passed"
         stats = result["ymodem"]
         log(f"Download abgeschlossen: {stats['bytes']} Byte in {stats['blocks']} Bloecken, "
@@ -2482,6 +2517,36 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
             "<tr><th>Phase</th><th>Transport</th><th>Bytes</th><th>Dauer (s)</th><th>Durchsatz (B/s)</th><th>Retries</th></tr>", download_rows))
 
 
+SUITE_SUMMARY_FILES = ("module-suite.json", "fast-suite.json")
+
+
+def collect_phase_report(phase_name: str, started_wall: float, index: int) -> dict | None:
+    """Liest den Bericht, den die Phase geschrieben hat (neueste JSON-Datei, die seit Phasenstart geaendert wurde),
+    und sichert ihn zusaetzlich unter eigenem Namen (phase_NN_<Phase>.json).
+
+    write_report() nutzt je Art immer denselben Dateinamen (download.json, cycle.json, ...) und ueberschreibt ihn.
+    Die frueher verwendete Mengendifferenz der Dateien fand deshalb nur den jeweils ersten Bericht je Art: alle
+    weiteren Downloads/Zyklen/BLE-Phasen hatten 'report: null' im Gesamtbericht."""
+    report_dir = RUN_REPORT_DIR or REPORT_DIR
+    try:
+        fresh = [path for path in report_dir.glob("*.json")
+                 if path.name not in SUITE_SUMMARY_FILES and not path.name.startswith("phase_")
+                 and path.stat().st_mtime >= started_wall - 1.0]
+        if not fresh:
+            return None
+        newest = max(fresh, key=lambda path: path.stat().st_mtime)
+        text = newest.read_text(encoding="utf-8")
+        data = json.loads(text)
+    except (OSError, json.JSONDecodeError):
+        return None
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", phase_name).strip("_")
+    try:
+        (report_dir / f"phase_{index:02d}_{slug}.json").write_text(text, encoding="utf-8")
+    except OSError:
+        pass
+    return data
+
+
 async def run_module_suite(args) -> int:
     """Kompletter, fortsetzbarer Classic-/BLE-Modultest mit einem Flash-Schreibvorgang."""
     hold_times = [0, 1, 2, 5, 10, 20, 30, 60, 120, 180, 240, 300]
@@ -2496,7 +2561,7 @@ async def run_module_suite(args) -> int:
 
     async def phase(name, transport, test, **overrides):
         old_values = {key: getattr(args, key, None) for key in overrides}
-        reports_before = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
+        started_wall = time.time()
         started = time.perf_counter()
         if TRACE is not None:
             TRACE.set_context(phase=name, transport=transport, cycle=None)
@@ -2514,14 +2579,7 @@ async def run_module_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
-        reports_after = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
-        report_data = None
-        new_reports = reports_after - reports_before
-        if new_reports:
-            try:
-                report_data = json.loads(max(new_reports, key=lambda path: path.stat().st_mtime).read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                pass
+        report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"), "result": status,
                                  "duration_s": round(time.perf_counter() - started, 3), "report": report_data})
         if TRACE is not None:
@@ -2595,7 +2653,7 @@ async def run_fast_suite(args) -> int:
 
     async def phase(name, transport, test, **overrides):
         old_values = {key: getattr(args, key, None) for key in overrides}
-        reports_before = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
+        started_wall = time.time()
         started = time.perf_counter()
         if TRACE is not None:
             TRACE.set_context(phase=name, transport=transport, cycle=None)
@@ -2613,14 +2671,7 @@ async def run_fast_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
-        reports_after = set((RUN_REPORT_DIR or REPORT_DIR).glob("*.json"))
-        report_data = None
-        new_reports = reports_after - reports_before
-        if new_reports:
-            try:
-                report_data = json.loads(max(new_reports, key=lambda path: path.stat().st_mtime).read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                pass
+        report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"), "result": status,
                                  "duration_s": round(time.perf_counter() - started, 3), "report": report_data})
         if TRACE is not None:

@@ -4907,3 +4907,14 @@ Offen: Vergleichslauf mit 5.99 (`sism555/fw_5.99/`, nur noetig, falls das Proble
 `bt_session_summary()` (5.118) und des CYSPP/CONNECTION-Monitors (5.115/5.116); Entscheidung `BT_CONN_GPIO`; Uebernahme
 der allgemeinen Aenderungen (5.104/5.105/5.111/5.112/5.113/5.114/5.117) nach `LTE-Update`; Behebung der
 Skript-Unstimmigkeiten 1-3.
+
+**Nachtrag 2026-10-15: Skript-Unstimmigkeiten 1-3 behoben** (`ble_mainboard_test.py`, offline mit Beispieldaten
+getestet, noch nicht in einem echten Lauf):
+1. `collect_phase_report()` ersetzt die Mengendifferenz: je Phase wird der neueste seit Phasenstart geaenderte Bericht
+   gelesen und zusaetzlich als `phase_NN_<Phase>.json` gesichert - Gesamtbericht/HTML enthalten damit alle Downloads,
+   Zyklen und BLE-Phasen.
+2. Der Disconnect-Callback des BLE-Smoke ignoriert das eigene, gewollte Trennen (`unexpected_disconnect` bleibt bei
+   erfolgreichem Test `False`).
+3. Die Ymodem-Dateigroesse wird nach dem ersten Nullbyte des Header-Blocks gelesen (Beispiel `4199420`); am Ende wird
+   `filesize <= bytes < filesize+1024` geprueft (`size_ok`), ein abgeschnittener Empfang schlaegt fehl.
+Punkte 4 (Sitzungszeile eine Phase verschoben) und 5 (BLE-Smoke ohne Trace-Events) bleiben offen.
