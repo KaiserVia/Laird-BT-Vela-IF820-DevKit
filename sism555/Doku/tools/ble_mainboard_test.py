@@ -1882,6 +1882,7 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5) 
     + Groesse), dann 1024-Byte-STX-CRC-Datenbloecke, EOT, abschliessender Null-Headerblock."""
     stats = {"blocks": 0, "bytes": 0, "filename": None, "filesize": None, "retries": 0}
     t_start = time.perf_counter()
+    next_progress = t_start + 10.0   # Fortschrittszeile alle 10 s, unabhaengig von der Uebertragungsrate
 
     async def read_with_retry():
         last_exc = None
@@ -1922,10 +1923,14 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5) 
                 stats["bytes"] += len(data)
                 expected += 1
                 await transport.write(bytes([XMODEM_ACK]))
-                if stats["blocks"] % 20 == 0:
-                    elapsed = time.perf_counter() - t_start
+                now = time.perf_counter()
+                if now >= next_progress:
+                    next_progress = now + 10.0
+                    elapsed = now - t_start
+                    size = stats["filesize"]
+                    pct = f", {100.0 * stats['bytes'] / size:.0f} %" if size else ""
                     log(f"Ymodem: {stats['blocks']} Bloecke / {stats['bytes']} Byte "
-                        f"({stats['bytes']/elapsed:.0f} B/s) ...")
+                        f"({stats['bytes']/elapsed:.0f} B/s{pct}) ...")
             elif blkno == ((expected - 1) & 0xFF):
                 await transport.write(bytes([XMODEM_ACK]))   # Duplikat/erneut gesendeter Block
             else:
@@ -2084,8 +2089,17 @@ async def run_download_test(args) -> int:
         progress_start = time.monotonic()
         progress_deadline = progress_start + generate_timeout
         next_progress = progress_start + 10.0
+        stall_limit_s = 30.0   # Abbruch, wenn das Geraet so lange keinen neuen Zaehlerstand mehr sendet
+        last_buf_len = len(transport.rx.buf)
+        last_growth = progress_start
         while progress_needle not in transport.rx.buf and time.monotonic() < progress_deadline:
             await asyncio.sleep(0.2)
+            if len(transport.rx.buf) != last_buf_len:
+                last_buf_len = len(transport.rx.buf)
+                last_growth = time.monotonic()
+            elif time.monotonic() - last_growth > stall_limit_s:
+                log(f"Flash-Erzeugung: seit {stall_limit_s:.0f} s kein Fortschritt - Abbruch.")
+                break
             if time.monotonic() >= next_progress:
                 next_progress += 10.0
                 seen = re.findall(rb"\d+", bytes(transport.rx.buf).replace(b"\x08", b" "))
@@ -2094,7 +2108,7 @@ async def run_download_test(args) -> int:
                 log(f"Flash-Erzeugung laeuft: {last_seen}/{args.records} "
                     f"({100.0 * last_seen / max(args.records, 1):.0f} %), {elapsed_s:.0f} s")
         if progress_needle not in transport.rx.buf:
-            log("Kein Fertig-Signal von write_flash() gesehen (Timeout) - Abbruch.")
+            log("Kein Fertig-Signal von write_flash() gesehen (Timeout/Stillstand) - Abbruch.")
             result["result"] = "generate_timeout"
             _finish_download(result)
             return 2
