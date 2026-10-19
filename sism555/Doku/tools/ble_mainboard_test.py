@@ -2848,6 +2848,62 @@ def _last_session_line(lines_after: int, sniffer=None) -> dict | None:
     return None
 
 
+USB_BOARD_VIDPID = {(0x1FC9, 0x80F7)}   # LPC1766-USB-CDC der Mainboards (an COM13 gemessen); ohne eigene Seriennummer
+
+
+def find_usb_boards(exclude: set) -> list:
+    """USB-COM-Ports von Mainboards (VID/PID des LPC-CDC), ohne die ausgeschlossenen Ports (z. B. den RS232-Adapter)."""
+    if serial is None:
+        return []
+    from serial.tools import list_ports
+    ports = [p.device for p in list_ports.comports()
+             if (p.vid, p.pid) in USB_BOARD_VIDPID and p.device not in exclude]
+    return sorted(ports, key=lambda name: (len(name), name))
+
+
+async def verify_device_ports(devices: list, sniffer_a, sniffer_b) -> list:
+    """Ordnet die Geraetenamen den Mitschnitt-Ports zu: je Geraet kurz per BLE verbinden und abonnieren, die Firmware gibt
+    dann das Banner ('Viasis 3003M ... PIN =') auf ihrem Terminal aus - auf RS232 (A) oder USB (B). Liefert die
+    Geraeteliste so sortiert, dass Eintrag 0 zu sniffer_a und Eintrag 1 zu sniffer_b gehoert (bei Mehrdeutigkeit
+    unveraendert, mit Warnung)."""
+    where = {}
+    for device in devices[:2]:
+        found, _ = await scan_for_device(device)
+        if found is None:
+            log(f"Portzuordnung: {device} per BLE nicht gefunden - Reihenfolge bleibt.")
+            return devices
+        before = {"A": sniffer_a.lines, "B": sniffer_b.lines}
+        client = BleakClient(found.address)
+        try:
+            await client.connect(timeout=20.0)
+            char = find_char_by_suffix(client, "ca102")
+            if char is not None:
+                await client.start_notify(char, lambda _sender, _data: None)
+            await asyncio.sleep(4.0)
+        finally:
+            if client.is_connected:
+                await client.disconnect()
+        hits = []
+        for key, sniffer in (("A", sniffer_a), ("B", sniffer_b)):
+            new = sniffer.lines - before[key]
+            if new > 0 and any("Viasis 3003M" in line or "PIN = " in line for line in sniffer.tail(min(new, 30))):
+                hits.append(key)
+        trace_event("port_assignment_probe", device=device, banner_on=hits)
+        if len(hits) != 1:
+            log(f"Portzuordnung: {device} nicht eindeutig (Banner auf {hits or 'keinem Port'}) - Reihenfolge bleibt.")
+            return devices
+        where[device] = hits[0]
+        await asyncio.sleep(2.0)
+    if where.get(devices[0]) == "B" and where.get(devices[1]) == "A":
+        log(f"Portzuordnung: {devices[0]} haengt am USB-Port, {devices[1]} am RS232-Port - Reihenfolge getauscht.")
+        return [devices[1], devices[0]] + devices[2:]
+    if where.get(devices[0]) == "A" and where.get(devices[1]) == "B":
+        log("Portzuordnung bestaetigt (erstes Geraet RS232, zweites USB).")
+        return devices
+    log(f"Portzuordnung widerspruechlich ({where}) - Reihenfolge bleibt.")
+    return devices
+
+
 async def run_soak(args) -> int:
     """Dauer-Messreihe: schreibt einmal Testdaten und laedt sie dann bis --soak-hours Stunden lang im Wechsel ueber BLE
     und Classic herunter (Pause --soak-pause-s dazwischen). Je Download eine CSV-Zeile (soak.csv): Rate, Retries,
@@ -2873,18 +2929,32 @@ async def run_soak(args) -> int:
     if multi:
         if SNIFFER is not None:
             SNIFFER.label = "A"
-        if args.rs232_port_b and serial is not None:
-            sniffer_b = Rs232Sniffer(args.rs232_port_b, args.rs232_baud, label="B")
+        port_b = args.rs232_port_b
+        if port_b and port_b.lower() == "auto":      # USB-COM des zweiten Boards selbst finden
+            usb_boards = find_usb_boards({args.rs232_port})
+            if len(usb_boards) == 1:
+                port_b = usb_boards[0]
+                log(f"USB-Board automatisch erkannt: {port_b}.")
+            else:
+                log(f"WARNUNG: --rs232-port-b auto fand {len(usb_boards)} USB-Boards ({usb_boards}) - "
+                    "bitte den Port mit --rs232-port-b COMxx angeben. Zweites Geraet laeuft ohne Mitschnitt.")
+                port_b = None
+        if port_b and serial is not None:
+            sniffer_b = Rs232Sniffer(port_b, args.rs232_baud, label="B")
             try:
                 sniffer_b.open()
                 sniffer_b.start()
-                sniffers[devices[1]] = sniffer_b
-                trace_event("rs232_sniffer_started", port=args.rs232_port_b, baud=args.rs232_baud, dev="B")
-                log(f"RS232-Mitschnitt fuer {devices[1]} auf {args.rs232_port_b} aktiv.")
+                trace_event("rs232_sniffer_started", port=port_b, baud=args.rs232_baud, dev="B")
+                log(f"Mitschnitt fuer das zweite Geraet auf {port_b} aktiv.")
             except (serial.SerialException, OSError) as exc:
-                log(f"WARNUNG: {args.rs232_port_b} laesst sich nicht oeffnen ({exc}) - "
-                    f"keine Sitzungszaehler fuer {devices[1]}.")
+                log(f"WARNUNG: {port_b} laesst sich nicht oeffnen ({exc}) - keine Sitzungszaehler fuer das zweite Geraet.")
                 sniffer_b = None
+        if sniffer_b is not None and SNIFFER is not None and not args.no_verify_ports:
+            devices = await verify_device_ports(devices, SNIFFER, sniffer_b)
+            result["devices"] = devices
+        if sniffer_b is not None:
+            sniffers[devices[1]] = sniffer_b
+        sniffers[devices[0]] = SNIFFER
     state = {device: {} for device in devices}      # je Geraet gemerkte Zieldaten (BLE-Adresse, Classic-Name/-Port)
     target_keys = ("address", "ble_device_name", "classic_device_name", "classic_port")
 
@@ -3267,7 +3337,10 @@ def main() -> int:
                    help="[soak] zwei Geraete im Wechsel messen (Kontrollmessung), z. B. "
                         "VIASIS_99SC9923,VIASIS_26SC9994 (Namenspraefix je Geraet, BLE-Name ohne _BLE reicht)")
     p.add_argument("--rs232-port-b", default=None,
-                   help="[soak mit --devices] RS232/USB-COM-Port des zweiten Geraets fuer dessen Mitschnitt")
+                   help="[soak mit --devices] RS232/USB-COM-Port des zweiten Geraets fuer dessen Mitschnitt; "
+                        "'auto' sucht den USB-Port des Mainboards (VID/PID 1FC9:80F7)")
+    p.add_argument("--no-verify-ports", action="store_true",
+                   help="[soak mit --devices] Zuordnung Geraet <-> Mitschnitt-Port nicht per BLE-Banner pruefen")
     p.add_argument("--soak-skip-write", action="store_true",
                    help="[soak] Flash nicht neu beschreiben (vorhandene Messdaten verwenden)")
     p.add_argument("--soak-settle-s", type=float, default=8.0,

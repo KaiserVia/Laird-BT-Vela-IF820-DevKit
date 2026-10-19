@@ -5024,3 +5024,13 @@ eine Auswertung je Gerät/Transport (n, Fehler, Rate mittel/min/max). Lesart: wi
 liegt es an Gerät/Modul; werden beide gleichzeitig schlecht, an PC/Funk. Die Zieldaten (BLE-Adresse, Classic-Name und -Port)
 werden je Gerät beim ersten Durchlauf gemerkt. Voraussetzung: beide Boards sind am PC gekoppelt (Classic-COM-Port), beide
 laufen mit Firmware >= 5.118/5.119.
+
+**Nachtrag 2026-10-19: automatische Port-Erkennung für das zweite Board** (`soak --devices`, `ble_mainboard_test.py`; Erkennung
+auf diesem PC real geprüft, Zuordnungslogik mit simulierten Bannern, noch nicht mit zwei echten Boards):
+- `--rs232-port-b auto` sucht den USB-Port des Mainboards über VID/PID `1FC9:80F7` (LPC1766-CDC; auf diesem PC genau ein
+  Treffer: COM13 = Board 26SC9983 am USB). Die USB-Beschreibung enthält keine echte Seriennummer (Windows vergibt
+  `7&...`-IDs je Port), der Port verrät also nur "ein Mainboard", nicht welches.
+- Welches Board an welchem Port hängt, ermittelt `verify_device_ports()`: je Gerät kurz per BLE verbinden und abonnieren,
+  die Firmware gibt dann das Banner (`Viasis 3003M ... PIN =`) auf RS232 bzw. USB aus; der Port mit dem Banner gehört zum
+  Gerät. Bei vertauschter Reihenfolge wird die Geräteliste getauscht, bei Mehrdeutigkeit bleibt sie (mit Warnung).
+  Abschaltbar mit `--no-verify-ports`.
