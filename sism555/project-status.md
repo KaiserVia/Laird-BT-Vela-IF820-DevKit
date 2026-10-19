@@ -5014,3 +5014,13 @@ Geraet). Mit dem vorhandenen Aufbau (PC, ein Geraet, RS232-Mitschnitt, Classic +
   Zeigt Verlangsamung ueber die Geraetelaufzeit und Pufferlecks; Gegenstueck zur Uptime-Reihe (Test 12/20) ohne
   Neustart des Geraets. Fuer eine Reihe ueber mehrere Tage das Geraet einfach laufen lassen und `--soak-skip-write`
   verwenden.
+
+**Nachtrag 2026-10-19: Kontrollmessung mit zwei Geräten (`soak --devices`)** (`ble_mainboard_test.py`; Ablauf offline mit zwei
+simulierten Geräten getestet, noch nicht am Gerät): `--mode soak --devices VIASIS_<sernoA>,VIASIS_<sernoB>
+--rs232-port COM3 --rs232-port-b <USB-COM des zweiten Boards>` schreibt auf beiden Geräten Testdaten und lädt dann
+abwechselnd A-BLE, A-Classic, B-BLE, B-Classic herunter, alles unter denselben PC-Bedingungen. Je Gerät wird der RS232-/USB-
+Mitschnitt gelesen (Sitzungszählerzeile `ctswait`/`lost_ms`/`ctsDrop`); `soak.csv` hat die Spalte `geraet`; am Ende steht
+eine Auswertung je Gerät/Transport (n, Fehler, Rate mittel/min/max). Lesart: wird nur ein Gerät langsam oder fehlerhaft,
+liegt es an Gerät/Modul; werden beide gleichzeitig schlecht, an PC/Funk. Die Zieldaten (BLE-Adresse, Classic-Name und -Port)
+werden je Gerät beim ersten Durchlauf gemerkt. Voraussetzung: beide Boards sind am PC gekoppelt (Classic-COM-Port), beide
+laufen mit Firmware >= 5.118/5.119.

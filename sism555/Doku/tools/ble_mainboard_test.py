@@ -257,9 +257,10 @@ class Rs232Sniffer:
     Nur lesend: es wird nie etwas an die Firmware gesendet, der Menuezustand bleibt unberuehrt.
     """
 
-    def __init__(self, port: str, baud: int):
+    def __init__(self, port: str, baud: int, label: str | None = None):
         self.port = port
         self.baud = baud
+        self.label = label            # z. B. "A"/"B" bei zwei Geraeten; erscheint als dev= in den Trace-Zeilen
         self.ser = None
         self.thread = None
         self.stop_event = threading.Event()
@@ -304,7 +305,8 @@ class Rs232Sniffer:
             self.lines += 1
             self.recent.append(text)
             del self.recent[:-50]
-        trace_event("rs232_line", source="rs232", text=text, partial=partial or None)
+        extra = {"dev": self.label} if self.label else {}
+        trace_event("rs232_line", source="rs232", text=text, partial=partial or None, **extra)
 
     def _run(self) -> None:
         buf = bytearray()
@@ -2833,11 +2835,12 @@ async def run_interleave(args) -> int:
     return 0 if failures == 0 else 1
 
 
-def _last_session_line(lines_after: int) -> dict | None:
+def _last_session_line(lines_after: int, sniffer=None) -> dict | None:
     """Letzte Zeile '[BT-Sitzung beendet] TX=.. ctswait=.. ctsDrop=.. TXstuck=.. lost_ms=..' aus den neuesten RS232-Zeilen."""
-    if SNIFFER is None or lines_after <= 0:
+    sniffer = sniffer or SNIFFER
+    if sniffer is None or lines_after <= 0:
         return None
-    for text in reversed(SNIFFER.tail(min(lines_after, 60))):
+    for text in reversed(sniffer.tail(min(lines_after, 60))):
         match = re.search(r"\[BT-Sitzung beendet\] TX=(\d+) ctswait=(\d+) ctsDrop=(\d+) TXstuck=(\d+) lost_ms=(\d+)", text)
         if match:
             keys = ("tx", "ctswait", "ctsdrop", "txstuck", "lost_ms")
@@ -2849,70 +2852,147 @@ async def run_soak(args) -> int:
     """Dauer-Messreihe: schreibt einmal Testdaten und laedt sie dann bis --soak-hours Stunden lang im Wechsel ueber BLE
     und Classic herunter (Pause --soak-pause-s dazwischen). Je Download eine CSV-Zeile (soak.csv): Rate, Retries,
     Langsam-Markierung, RSSI, PC-Laufzeit und die Sitzungszaehler der Firmware (ctswait, lost_ms, ctsDrop).
-    Zeigt Verlangsamung ueber die Geraete-Laufzeit, Pufferlecks und Wechselfehler."""
+    Zeigt Verlangsamung ueber die Geraete-Laufzeit, Pufferlecks und Wechselfehler.
+
+    Mit --devices NAME1,NAME2 laufen zwei (oder mehr) Geraete abwechselnd unter denselben PC-Bedingungen
+    (Kontrollmessung: wird nur ein Geraet langsam -> Geraet/Modul, beide gleichzeitig -> PC/Funk). Der RS232-Mitschnitt
+    gehoert zum ersten Geraet (--rs232-port); fuer das zweite --rs232-port-b (z. B. dessen USB-COM-Port)."""
+    devices = [item.strip() for item in (args.devices or "").split(",") if item.strip()]
+    multi = len(devices) >= 2
+    if not multi:
+        devices = [args.name]
     result = {"mode": "soak", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-              "soak_hours": args.soak_hours, "records": args.soak_records, "phases": []}
-    if not await resolve_suite_target(args):
+              "soak_hours": args.soak_hours, "records": args.soak_records, "devices": devices, "phases": []}
+    if not multi and not await resolve_suite_target(args):
         result["result"] = "device_not_found"
         write_report("soak", result)
         return 2
+
+    sniffers = {devices[0]: SNIFFER}
+    sniffer_b = None
+    if multi:
+        if SNIFFER is not None:
+            SNIFFER.label = "A"
+        if args.rs232_port_b and serial is not None:
+            sniffer_b = Rs232Sniffer(args.rs232_port_b, args.rs232_baud, label="B")
+            try:
+                sniffer_b.open()
+                sniffer_b.start()
+                sniffers[devices[1]] = sniffer_b
+                trace_event("rs232_sniffer_started", port=args.rs232_port_b, baud=args.rs232_baud, dev="B")
+                log(f"RS232-Mitschnitt fuer {devices[1]} auf {args.rs232_port_b} aktiv.")
+            except (serial.SerialException, OSError) as exc:
+                log(f"WARNUNG: {args.rs232_port_b} laesst sich nicht oeffnen ({exc}) - "
+                    f"keine Sitzungszaehler fuer {devices[1]}.")
+                sniffer_b = None
+    state = {device: {} for device in devices}      # je Geraet gemerkte Zieldaten (BLE-Adresse, Classic-Name/-Port)
+    target_keys = ("address", "ble_device_name", "classic_device_name", "classic_port")
+
+    def select_device(device: str) -> None:
+        """Zieldaten des Geraets in args setzen; unbekannte Felder entfernen, damit neu gesucht wird."""
+        if not multi:
+            return
+        args.name = device
+        for key in target_keys:
+            if key in state[device]:
+                setattr(args, key, state[device][key])
+            elif hasattr(args, key):
+                delattr(args, key)
+        if "address" not in state[device]:
+            args.address = None
+
+    def remember_device(device: str) -> None:
+        if multi:
+            for key in target_keys:
+                if getattr(args, key, None):
+                    state[device][key] = getattr(args, key)
+
     phase = make_phase_runner(args, result, "DAUERREIHE")
-    if not args.soak_skip_write:
-        written = await phase("Flash schreiben", "ble", run_download_test, write_only=True,
-                              records=args.soak_records) == "passed"
-        if not written:
-            log("Flash-Schreiben fehlgeschlagen - Dauerreihe abgebrochen.")
-            result["result"] = "failed"
-            write_suite_report("soak", result, "VIASIS Dauer-Messreihe", "Flash-Schreiben fehlgeschlagen.")
-            return 1
-    report_dir = RUN_REPORT_DIR or REPORT_DIR
-    csv_path = report_dir / "soak.csv"
-    columns = ["zeit", "verstrichen_h", "pc_laufzeit_h", "nr", "transport", "status", "bytes", "dauer_s", "bps",
-               "retries", "langsam", "rssi", "ctswait", "lost_ms", "ctsdrop", "txstuck"]
-    csv_path.write_text(";".join(columns) + "\n", encoding="utf-8")
-    t_begin = time.time()
-    deadline = t_begin + args.soak_hours * 3600.0
-    transports = ["ble", "classic"]
-    number = 0
-    failures = 0
-    while time.time() < deadline:
-        transport = transports[number % 2]
-        number += 1
-        lines_before = SNIFFER.lines if SNIFFER is not None else 0
-        name = f"Soak {number:03d} {transport}"
-        status = await phase(name, transport, run_receive_test)
-        await asyncio.sleep(args.soak_settle_s)   # die Firmware meldet die Sitzungszeile erst nach dem Trennen
-        lines_after = (SNIFFER.lines - lines_before) if SNIFFER is not None else 0
-        session = _last_session_line(lines_after) or {}
-        report = result["phases"][-1].get("report") or {}
-        ym = report.get("ymodem") or {}
-        uptime = pc_uptime_s()
-        row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), f"{(time.time() - t_begin) / 3600:.3f}",
-               f"{uptime / 3600:.2f}" if uptime is not None else "", number, transport, status, ym.get("bytes", ""),
-               ym.get("duration_s", ""), ym.get("throughput_bps", ""), ym.get("retries", ""),
-               int(bool(ym.get("slow"))) if ym else "", BLE_INFO.get("rssi", "") if transport == "ble" else "",
-               session.get("ctswait", ""), session.get("lost_ms", ""), session.get("ctsdrop", ""),
-               session.get("txstuck", "")]
-        with csv_path.open("a", encoding="utf-8") as handle:
-            handle.write(";".join(str(item) for item in row) + "\n")
-        trace_event("soak_sample", level="info" if status == "passed" else "warning", nr=number,
-                    transport=transport, status=status, bps=ym.get("throughput_bps"),
-                    ctswait=session.get("ctswait"), lost_ms=session.get("lost_ms"))
-        if status != "passed":
-            failures += 1
-            if args.max_failures and failures >= args.max_failures:
-                log(f"Abbruch: {failures} fehlgeschlagene Downloads erreicht (--max-failures).")
-                break
-        if time.time() + args.soak_pause_s < deadline:
-            await asyncio.sleep(args.soak_pause_s)
-    pc_events_export()
-    result["samples"] = number
-    result["result"] = "passed" if failures == 0 else "failed"
-    log(f"Dauerreihe beendet: {number} Downloads, {failures} fehlgeschlagen, CSV: {csv_path}")
-    write_suite_report("soak", result, "VIASIS Dauer-Messreihe",
-                       f"{args.soak_hours:g} h, Wechsel BLE/Classic, {args.soak_records} Messwerte je Download, "
-                       f"Pause {args.soak_pause_s:g} s.")
-    return 0 if failures == 0 else 1
+    try:
+        if not args.soak_skip_write:
+            for device in devices:
+                select_device(device)
+                written = await phase(f"Flash schreiben ({device})", "ble", run_download_test, write_only=True,
+                                      records=args.soak_records) == "passed"
+                remember_device(device)
+                if not written:
+                    log(f"Flash-Schreiben fehlgeschlagen ({device}) - Dauerreihe abgebrochen.")
+                    result["result"] = "failed"
+                    write_suite_report("soak", result, "VIASIS Dauer-Messreihe", "Flash-Schreiben fehlgeschlagen.")
+                    return 1
+        report_dir = RUN_REPORT_DIR or REPORT_DIR
+        csv_path = report_dir / "soak.csv"
+        columns = ["zeit", "verstrichen_h", "pc_laufzeit_h", "nr", "geraet", "transport", "status", "bytes",
+                   "dauer_s", "bps", "retries", "langsam", "rssi", "ctswait", "lost_ms", "ctsdrop", "txstuck"]
+        csv_path.write_text(";".join(columns) + "\n", encoding="utf-8")
+        t_begin = time.time()
+        deadline = t_begin + args.soak_hours * 3600.0
+        combos = [(device, transport) for device in devices for transport in ("ble", "classic")]
+        number = 0
+        failures = 0
+        stats: dict = {}
+        while time.time() < deadline:
+            device, transport = combos[number % len(combos)]
+            number += 1
+            select_device(device)
+            sniffer = sniffers.get(device)
+            lines_before = sniffer.lines if sniffer is not None else 0
+            name = f"Soak {number:03d} {transport}" + (f" ({device})" if multi else "")
+            status = await phase(name, transport, run_receive_test)
+            remember_device(device)
+            await asyncio.sleep(args.soak_settle_s)   # die Firmware meldet die Sitzungszeile erst nach dem Trennen
+            lines_after = (sniffer.lines - lines_before) if sniffer is not None else 0
+            session = _last_session_line(lines_after, sniffer) or {}
+            report = result["phases"][-1].get("report") or {}
+            ym = report.get("ymodem") or {}
+            uptime = pc_uptime_s()
+            row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), f"{(time.time() - t_begin) / 3600:.3f}",
+                   f"{uptime / 3600:.2f}" if uptime is not None else "", number, device, transport, status,
+                   ym.get("bytes", ""), ym.get("duration_s", ""), ym.get("throughput_bps", ""),
+                   ym.get("retries", ""), int(bool(ym.get("slow"))) if ym else "",
+                   BLE_INFO.get("rssi", "") if transport == "ble" else "", session.get("ctswait", ""),
+                   session.get("lost_ms", ""), session.get("ctsdrop", ""), session.get("txstuck", "")]
+            with csv_path.open("a", encoding="utf-8") as handle:
+                handle.write(";".join(str(item) for item in row) + "\n")
+            entry = stats.setdefault((device, transport), {"n": 0, "fehler": 0, "bps": []})
+            entry["n"] += 1
+            if status == "passed" and ym.get("throughput_bps"):
+                entry["bps"].append(ym["throughput_bps"])
+            elif status != "passed":
+                entry["fehler"] += 1
+            trace_event("soak_sample", level="info" if status == "passed" else "warning", nr=number, device=device,
+                        transport=transport, status=status, bps=ym.get("throughput_bps"),
+                        ctswait=session.get("ctswait"), lost_ms=session.get("lost_ms"))
+            if status != "passed":
+                failures += 1
+                if args.max_failures and failures >= args.max_failures:
+                    log(f"Abbruch: {failures} fehlgeschlagene Downloads erreicht (--max-failures).")
+                    break
+            if time.time() + args.soak_pause_s < deadline:
+                await asyncio.sleep(args.soak_pause_s)
+        summary = {}
+        log("Auswertung je Geraet/Transport:")
+        for (device, transport), entry in sorted(stats.items()):
+            rates = entry["bps"]
+            line = {"n": entry["n"], "fehler": entry["fehler"],
+                    "bps_mittel": round(sum(rates) / len(rates)) if rates else None,
+                    "bps_min": round(min(rates)) if rates else None, "bps_max": round(max(rates)) if rates else None}
+            summary[f"{device} {transport}"] = line
+            log(f"  {device:20} {transport:8} n={line['n']:3} Fehler={line['fehler']:2} "
+                f"B/s mittel/min/max = {line['bps_mittel']}/{line['bps_min']}/{line['bps_max']}")
+        result["summary"] = summary
+        trace_event("soak_summary", level="warning" if failures else "info", failures=failures, summary=summary)
+        pc_events_export()
+        result["samples"] = number
+        result["result"] = "passed" if failures == 0 else "failed"
+        log(f"Dauerreihe beendet: {number} Downloads, {failures} fehlgeschlagen, CSV: {csv_path}")
+        write_suite_report("soak", result, "VIASIS Dauer-Messreihe",
+                           f"{args.soak_hours:g} h, {', '.join(devices)}, Wechsel BLE/Classic, {args.soak_records} "
+                           f"Messwerte je Download, Pause {args.soak_pause_s:g} s.")
+        return 0 if failures == 0 else 1
+    finally:
+        if sniffer_b is not None:
+            sniffer_b.stop()
 
 
 async def run_module_suite(args) -> int:
@@ -3183,6 +3263,11 @@ def main() -> int:
     p.add_argument("--soak-pause-s", type=float, default=60.0, help="[soak] Pause zwischen zwei Downloads")
     p.add_argument("--soak-records", type=int, default=50000,
                    help="[soak] Messwerte je Download (50000 = ca. 500 KB, ~80 s)")
+    p.add_argument("--devices", default="",
+                   help="[soak] zwei Geraete im Wechsel messen (Kontrollmessung), z. B. "
+                        "VIASIS_99SC9923,VIASIS_26SC9994 (Namenspraefix je Geraet, BLE-Name ohne _BLE reicht)")
+    p.add_argument("--rs232-port-b", default=None,
+                   help="[soak mit --devices] RS232/USB-COM-Port des zweiten Geraets fuer dessen Mitschnitt")
     p.add_argument("--soak-skip-write", action="store_true",
                    help="[soak] Flash nicht neu beschreiben (vorhandene Messdaten verwenden)")
     p.add_argument("--soak-settle-s", type=float, default=8.0,
