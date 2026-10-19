@@ -5034,3 +5034,13 @@ auf diesem PC real geprüft, Zuordnungslogik mit simulierten Bannern, noch nicht
   die Firmware gibt dann das Banner (`Viasis 3003M ... PIN =`) auf RS232 bzw. USB aus; der Port mit dem Banner gehört zum
   Gerät. Bei vertauschter Reihenfolge wird die Geräteliste getauscht, bei Mehrdeutigkeit bleibt sie (mit Warnung).
   Abschaltbar mit `--no-verify-ports`.
+
+**Erster Lauf `soak --devices` (2026-10-19 15:22, 99SC9923 + 26SC9983):** Ergebnis: Board A (99SC9923) lief, **Board B (26SC9983) ging
+nicht**: BLE-Verbindung und Subscribe ok (`connect_succeeded`, `notify_subscribed`), aber kein Banner/`PIN = ` und kein
+Hauptmenue (`buffered_bytes: 0`); sein USB-Mitschnitt (COM13) lieferte in der ganzen Zeit **0 Zeilen/0 Byte**. Die Reihe brach
+beim Flash-Schreiben von B ab. Erstes Live-Ergebnis von **5.119 auf A**: `[BT-Event] @E,0035,C,C=01,A=...,T=00,I=0006,L=0000,
+O=0064,B=00` (Verbindungsintervall 6 x 1,25 = **7,5 ms**, Latenz 0, Supervision-Timeout 0x64 x 10 ms = **1 s**) und beim Trennen
+`@E,0010,DIS,C=01,R=0913` (Gegenstelle hat getrennt) sowie `[BT-Sitzung beendet] TX=8392 ctswait=1 ctsDrop=0`.
+Skript danach angepasst: Portzuordnung wartet bis 10 s auf Banner **oder** Verbindungs-Event und loggt die Characteristic;
+faellt ein Geraet beim Flash-Schreiben aus, laeuft die Reihe mit den uebrigen weiter (`ausgefallen` im Bericht).
+Offen: warum B kein Banner sendet (Firmware-Version, USB-Terminal, Bluetooth-Einstellung) - noch ungeklaert.

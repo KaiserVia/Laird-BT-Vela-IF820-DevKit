@@ -2877,17 +2877,24 @@ async def verify_device_ports(devices: list, sniffer_a, sniffer_b) -> list:
         try:
             await client.connect(timeout=20.0)
             char = find_char_by_suffix(client, "ca102")
+            log(f"Portzuordnung: {device} verbunden, Daten-Characteristic {'gefunden' if char is not None else 'NICHT gefunden'}.")
             if char is not None:
                 await client.start_notify(char, lambda _sender, _data: None)
-            await asyncio.sleep(4.0)
+
+            def evidence(sniffer, key):
+                new = sniffer.lines - before[key]
+                return new > 0 and any("Viasis 3003M" in line or "PIN = " in line or "[BT-Event]" in line
+                                       for line in sniffer.tail(min(new, 30)))
+
+            hits = []
+            for _ in range(20):                       # bis zu 10 s auf Banner oder Verbindungs-Event warten
+                await asyncio.sleep(0.5)
+                hits = [key for key, sniffer in (("A", sniffer_a), ("B", sniffer_b)) if evidence(sniffer, key)]
+                if hits:
+                    break
         finally:
             if client.is_connected:
                 await client.disconnect()
-        hits = []
-        for key, sniffer in (("A", sniffer_a), ("B", sniffer_b)):
-            new = sniffer.lines - before[key]
-            if new > 0 and any("Viasis 3003M" in line or "PIN = " in line for line in sniffer.tail(min(new, 30))):
-                hits.append(key)
         trace_event("port_assignment_probe", device=device, banner_on=hits)
         if len(hits) != 1:
             log(f"Portzuordnung: {device} nicht eindeutig (Banner auf {hits or 'keinem Port'}) - Reihenfolge bleibt.")
@@ -2980,11 +2987,18 @@ async def run_soak(args) -> int:
     phase = make_phase_runner(args, result, "DAUERREIHE")
     try:
         if not args.soak_skip_write:
-            for device in devices:
+            for device in list(devices):
                 select_device(device)
                 written = await phase(f"Flash schreiben ({device})", "ble", run_download_test, write_only=True,
                                       records=args.soak_records) == "passed"
                 remember_device(device)
+                if not written and multi and len(devices) > 1:
+                    log(f"WARNUNG: Flash-Schreiben auf {device} fehlgeschlagen - Geraet wird aus der Reihe genommen, "
+                        "die Messreihe laeuft mit den uebrigen weiter (kein Vergleich moeglich).")
+                    result.setdefault("ausgefallen", []).append(device)
+                    trace_event("soak_device_dropped", level="warning", device=device)
+                    devices.remove(device)
+                    continue
                 if not written:
                     log(f"Flash-Schreiben fehlgeschlagen ({device}) - Dauerreihe abgebrochen.")
                     result["result"] = "failed"
