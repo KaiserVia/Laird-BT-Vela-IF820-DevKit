@@ -229,6 +229,24 @@ def trace_event(event_name: str, level: str = "info", **details) -> None:
 # ---------------------------------------------------------------------------
 
 SNIFFER = None
+BLE_INFO: dict = {}          # z. B. rssi des gewaehlten BLE-Geraets
+
+# Langsam-Erkennung bei Downloads (2026-10-19): Nach 4 Tagen Geraetelaufzeit / frisch gestartetem PC lief der BLE-Download mit
+# konstant 3,1 statt 6,6 KB/s. Schwellen je Transport (B/s); --min-bps ueberschreibt, 0 schaltet aus.
+SLOW_DEFAULT_BPS = {"ble": 4500.0, "classic": 5500.0}
+SLOW_MIN_BYTES = 4096        # darunter ist die Rate wegen Anlauf/Overhead nicht aussagekraeftig
+SLOW_EARLY_MIN_SIZE = 300_000   # Fruehabbruch nur bei grossen Transfers (kleine sind in < 60 s fertig)
+
+
+class SlowLinkError(Exception):
+    """Der Ymodem-Durchsatz liegt nach der Pruefzeit unter der Schwelle (Link/PC/Modul in schlechtem Zustand)."""
+
+
+def slow_threshold(args) -> float:
+    """Schwelle in B/s fuer den aktuellen Transport; 0 = Pruefung aus."""
+    if getattr(args, "min_bps", None) is not None:
+        return float(args.min_bps)
+    return SLOW_DEFAULT_BPS.get(args.transport, 0.0)
 RS232_PREFLIGHT_LISTEN_S = 5.0
 RS232_PARTIAL_FLUSH_S = 0.3
 
@@ -434,6 +452,7 @@ async def scan_for_device(name_prefix: str):
     log(f"Gefunden nach {scan_ms:.0f} ms: {device.name}  ({device.address})"
         f"{f'  RSSI={rssi} dBm' if rssi is not None else ''}")
     trace_event("ble_device_selected", name=device.name, address=device.address, rssi=rssi)
+    BLE_INFO["rssi"] = rssi   # fuer die Langsam-Warnung der Downloads
     return device, scan_ms
 
 
@@ -1890,7 +1909,8 @@ def estimate_vtf_size(menu_text: bytes) -> int | None:
 
 
 async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5,
-                         expected_size: int | None = None) -> dict:
+                         expected_size: int | None = None, min_bps: float = 0.0,
+                         slow_check_s: float = 60.0) -> dict:
     """Empfaengt einen Ymodem-Batch-Transfer, exakt wie ihn sendblock()/send_vtf_file()/
     ymodem_close() in sism555/xmodem.c + sicom.c erzeugen: 128-Byte-SOH-Headerblock (Dateiname
     + Groesse), dann 1024-Byte-STX-CRC-Datenbloecke, EOT, abschliessender Null-Headerblock."""
@@ -1951,6 +1971,12 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5,
                     pct = f", ca. {min(100.0, 100.0 * stats['bytes'] / size):.0f} %" if size else ""
                     log(f"Ymodem: {stats['blocks']} Bloecke / {stats['bytes']} Byte "
                         f"({stats['bytes']/elapsed:.0f} B/s{pct}) ...")
+                    # Fruehe Langsam-Erkennung: bei grossen Transfers nicht 10-20 Minuten abwarten
+                    if (min_bps and elapsed >= slow_check_s and size and size >= SLOW_EARLY_MIN_SIZE
+                            and stats["bytes"] / elapsed < min_bps):
+                        raise SlowLinkError(
+                            f"Durchsatz {stats['bytes']/elapsed:.0f} B/s nach {elapsed:.0f} s liegt unter der "
+                            f"Schwelle {min_bps:.0f} B/s.")
             elif blkno == ((expected - 1) & 0xFF):
                 await transport.write(bytes([XMODEM_ACK]))   # Duplikat/erneut gesendeter Block
             else:
@@ -2226,8 +2252,9 @@ async def run_download_test(args) -> int:
     return 0 if result["result"] == "passed" else 1
 
 
-async def run_receive_test(args) -> int:
-    """Empfaengt vorhandene Messdaten, ohne den Flash zu beschreiben."""
+async def _receive_once(args, min_bps: float) -> tuple[int, dict]:
+    """Ein Download-Versuch (vorhandene Messdaten, Flash wird nicht beschrieben). min_bps > 0: Fruehabbruch bei
+    zu langsamem Transfer (result['result'] == 'slow_link')."""
     result = {
         "mode": "receive",
         "transport": args.transport,
@@ -2264,12 +2291,29 @@ async def run_receive_test(args) -> int:
         await transport.write(b"C")
         log("Empfange Ymodem-Transfer ...")
         result["ymodem"] = await ymodem_receive(transport, block_timeout=args.ymodem_timeout,
-                                                expected_size=expected_size)
+                                                expected_size=expected_size, min_bps=min_bps,
+                                                slow_check_s=args.slow_check_s)
         result["result"] = "passed"
         stats = result["ymodem"]
         log(f"Download abgeschlossen: {stats['bytes']} Byte in {stats['blocks']} Bloecken, "
             f"{stats['duration_s']} s, {stats['throughput_bps']:.0f} B/s "
             f"({stats['retries']} Retries).")
+        threshold = slow_threshold(args)
+        stats["slow"] = bool(threshold and stats["bytes"] >= SLOW_MIN_BYTES
+                             and stats["throughput_bps"] < threshold)
+        stats["slow_threshold_bps"] = threshold or None
+        if stats["slow"]:
+            log(f"WARNUNG: langsamer Link - {stats['throughput_bps']:.0f} B/s liegt unter der Schwelle "
+                f"{threshold:.0f} B/s (RSSI {BLE_INFO.get('rssi')}).")
+            trace_event("slow_link", level="warning", transport=args.transport,
+                        throughput_bps=stats["throughput_bps"], threshold_bps=threshold,
+                        rssi=BLE_INFO.get("rssi"), aborted=False)
+    except SlowLinkError as exc:
+        result["result"] = "slow_link"
+        result["error"] = str(exc)
+        log(f"LANGSAMER LINK: {exc}")
+        trace_event("slow_link", level="warning", transport=args.transport, reason=str(exc),
+                    threshold_bps=min_bps, rssi=BLE_INFO.get("rssi"), aborted=True)
     except Exception as exc:
         result["result"] = "failed"
         result["error"] = str(exc)
@@ -2278,7 +2322,25 @@ async def run_receive_test(args) -> int:
         await transport.disconnect()
 
     _finish_download(result)
-    return 0 if result["result"] == "passed" else 1
+    return (0 if result["result"] == "passed" else 1), result
+
+
+async def run_receive_test(args) -> int:
+    """Empfaengt vorhandene Messdaten. Erkennt einen zu langsamen Link frueh (nach --slow-check-s), wartet
+    --slow-wait-s und wiederholt bis zu --slow-retries Mal. Der letzte Versuch laeuft ohne Fruehabbruch zu Ende und
+    wird bei zu niedriger Rate nur als 'langsam' markiert (Ergebnis bleibt passed)."""
+    threshold = slow_threshold(args)
+    retries = max(0, int(args.slow_retries)) if threshold else 0
+    for attempt in range(1, retries + 2):
+        last = attempt == retries + 1
+        code, result = await _receive_once(args, 0.0 if last else threshold)
+        if result["result"] != "slow_link":
+            return code
+        log(f"Link zu langsam (Versuch {attempt}/{retries + 1}) - warte {args.slow_wait_s:.0f} s und "
+            "wiederhole. Hinweis: der Abbruch erzeugt am Geraet einen Protokolleintrag (F13010) und verbraucht "
+            "eine Dateinummer.")
+        await asyncio.sleep(args.slow_wait_s)
+    return 1
 
 
 def _finish_download(result: dict) -> None:
@@ -2452,7 +2514,9 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
             download_rows.append(
                 f"<tr><td>{phase['name']}</td><td>{phase['transport']}</td><td>{ym.get('bytes', 0):,}</td>"
                 f"<td>{ym.get('duration_s', 0):.3f}</td><td>{ym.get('throughput_bps', 0):,.0f}</td>"
-                f"<td>{ym.get('retries', 0)}</td></tr>")
+                f"<td>{ym.get('retries', 0)}</td>"
+                + ("<td class='failed'>langsam</td>" if ym.get("slow") else "<td class='passed'>ok</td>")
+                + "</tr>")
         if report.get("mode") == "smoke":
             timings = report.get("phases_ms", {})
             smoke_rows.append(
@@ -2514,7 +2578,7 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
         "<h2>Reconnects (ms)</h2>" + table(
             "<tr><th>Transport</th><th>Zyklus</th><th>Haltezeit (s)</th><th>Connect</th><th>Disconnect</th><th>Ergebnis</th></tr>", cycle_rows) +
         "<h2>Ymodem-Downloads</h2>" + table(
-            "<tr><th>Phase</th><th>Transport</th><th>Bytes</th><th>Dauer (s)</th><th>Durchsatz (B/s)</th><th>Retries</th></tr>", download_rows))
+            "<tr><th>Phase</th><th>Transport</th><th>Bytes</th><th>Dauer (s)</th><th>Durchsatz (B/s)</th><th>Retries</th><th>Link</th></tr>", download_rows))
 
 
 SUITE_SUMMARY_FILES = ("module-suite.json", "fast-suite.json")
@@ -2806,6 +2870,14 @@ def main() -> int:
                    help="RS232-Port der Firmware fuer den passiven Mitschnitt (Default COM3)")
     p.add_argument("--rs232-baud", type=int, default=115200)
     p.add_argument("--no-rs232", action="store_true", help="keinen RS232-Mitschnitt starten")
+    p.add_argument("--min-bps", type=float, default=None,
+                   help="Schwelle in B/s fuer 'langsamer Link' bei Downloads (Standard: BLE 4500, Classic 5500; 0 = aus)")
+    p.add_argument("--slow-check-s", type=float, default=60.0,
+                   help="nach dieser Zeit wird der Durchsatz grosser Downloads gegen --min-bps geprueft")
+    p.add_argument("--slow-retries", type=int, default=1,
+                   help="Wiederholungen nach Fruehabbruch bei langsamem Link (0 = nie abbrechen)")
+    p.add_argument("--slow-wait-s", type=float, default=120.0,
+                   help="Wartezeit vor der Wiederholung nach einem Fruehabbruch")
     p.add_argument("--ymodem-timeout", type=float, default=2.0,
                    help="[download/receive] Timeout je Ymodem-Block in Sekunden; muss unter dem "
                         "Firmware-ACK-Timeout von 6 s liegen")

@@ -4951,3 +4951,16 @@ Gerät/Modul; sonst an Umgebung/PC.
 **Testskript:** Beim Auswerten fiel auf, dass `collect_phase_report()` (Nachtrag 2026-10-15) mit 1 s Spielraum den
 `cycle.json`-Bericht der Vorphase der Phase "Flash schreiben" zuordnete (doppelte Zyklenzeilen im HTML). Spielraum
 entfernt. Die neue Dateigrößenprüfung und die Phasenberichte `phase_NN_*.json` haben im echten Lauf funktioniert.
+
+**Nachtrag 2026-10-19: Langsam-Erkennung im Testskript** (`ble_mainboard_test.py`; offline mit simuliertem
+Ymodem-Transport und gepatchtem Wiederholungslauf getestet, noch nicht in einem echten Lauf):
+- Je Download wird die Rate gegen eine Schwelle geprueft (Standard BLE 4500 B/s, Classic 5500 B/s; `--min-bps`,
+  `0` = aus). Liegt sie darunter, steht `slow: true` im Bericht, die HTML-Tabelle "Ymodem-Downloads" zeigt in der neuen
+  Spalte "Link" `langsam`, und ein Trace-Eintrag `slow_link` (Warnung, mit RSSI) erscheint unter "Warnungen und Fehler".
+  Das Testergebnis bleibt `passed`.
+- Bei grossen Downloads (>= 300 KB) wird nach `--slow-check-s` (60 s) frueh abgebrochen, wenn der Schnitt unter der
+  Schwelle liegt; nach `--slow-wait-s` (120 s) folgt ein neuer Versuch (`--slow-retries`, Standard 1). Der letzte
+  Versuch laeuft ohne Fruehabbruch zu Ende und wird nur markiert. Nebenwirkung: Der Abbruch erzeugt am Geraet einen
+  Protokolleintrag F13010 und verbraucht eine Dateinummer.
+- Gilt fuer den Modus `receive` (Downloads der Suites); der Modus `download` (Schreiben + Export in einem Lauf)
+  prueft nur die Markierung, bricht aber nicht frueh ab.
