@@ -5044,3 +5044,24 @@ O=0064,B=00` (Verbindungsintervall 6 x 1,25 = **7,5 ms**, Latenz 0, Supervision-
 Skript danach angepasst: Portzuordnung wartet bis 10 s auf Banner **oder** Verbindungs-Event und loggt die Characteristic;
 faellt ein Geraet beim Flash-Schreiben aus, laeuft die Reihe mit den uebrigen weiter (`ausgefallen` im Bericht).
 Offen: warum B kein Banner sendet (Firmware-Version, USB-Terminal, Bluetooth-Einstellung) - noch ungeklaert.
+
+
+## Update 5.120: BT-Eingabe-Weiche `BT_CONN_GPIO` aus - CONNECTION wird nicht mehr für die Funktion gebraucht
+
+**Anlass (2026-10-19):** Auf Board 26SC9983 (ohne P0.19-Draht) liess sich die PIN per Bluetooth nicht tippen. Ursache im Code:
+Seit 5.110 geht der UART1-Empfang nur dann in den Menüpuffer `rbuf`, wenn `BT_LINK` gesetzt ist **und** P0.19 (CONNECTION)
+LOW ist (`hard.c`, `BT_CONN_ACTIVE`). Ohne Draht liest P0.19 durch den Pull-up dauerhaft HIGH: jede BT-Taste landete in
+`rbuf1` und wurde verworfen. Die Aussage "auf einem unveränderten Board funktional identisch zur Hauptlinie" stimmte seit 5.110 nicht.
+
+**Entscheidung (Anwender):** CONNECTION wird nicht mehr gebraucht. `BT_LINK` bleibt allein an `CYSPP` (Stufe B war widerlegt, siehe
+Testplan CONNECTION), `CONNECTION` taugt nur noch als Diagnose.
+**Änderung:** `BT_CONN_GPIO` von 1 auf 0 (`btio.h`), Version 5.120. Build 0 Error(s), 0 Warning(s). **Am Gerät nicht getestet.**
+
+**Offene Prüfung:** Die Weiche war die Gegenmaßnahme für "Stray-Zeichen nach dem Trennen" (Event-Geschwätz des Moduls landete in der
+Lücke zwischen Pegelwechsel und Softwareerkennung im Menüpuffer). Ob das ohne Weiche zurückkehrt, ist noch nicht gemessen. Prüfung am
+verdrahteten Board 99SC9923 mit RS232-Mitschnitt: `--mode interleave` (oder `cycle`) laufen lassen und das Trace mit
+`Doku/tools/trace_stray_check.py` prüfen (meldet Menütitel ohne Navigation und Steuerzeichen auf dem Terminal in Phasen, in denen
+der Test nicht navigiert). **Vergleichswert mit Weiche (5.116-5.119):** die Zyklen-Phasen der Suite-Läufe `2026-10-15_10-00-52`,
+`2026-10-19_08-23-08` und `2026-10-19_10-04-59` (zusammen 733.922 RS232-Zeilen) ergeben **0 Auffälligkeiten**. Kehren die Zeichen
+zurück, braucht es eine Weiche ohne P0.19 (z. B. Verwerfen der Bytes in einem kurzen Fenster nach dem Trennen).
+Werkzeug neu: `Doku/tools/trace_stray_check.py` (nur lesend).

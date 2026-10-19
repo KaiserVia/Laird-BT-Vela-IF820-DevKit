@@ -16,9 +16,12 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 - **⚠ Nebenbranch `connection-pin` (ab 5.101) - HARDWARE-ABHAENGIG, nicht auf normale Boards
   flashen:** setzt eine Umverdrahtung voraus (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**;
   in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen GND-Verbindung dafür aufgetrennt wurde).
-  Details: `sism555/project-status.md`, Update 5.101 und 5.109. Auf einem unveränderten Board
-  funktional identisch zur Hauptlinie, liefert dort aber nur bedeutungslose Diagnosedaten für das
-  `CONNECTION`-Signal (P0.19 liest durch den internen Pull-up dauerhaft HIGH).
+  Details: `sism555/project-status.md`, Update 5.101 und 5.109. **Seit 5.120 (2026-10-19) braucht die
+  Funktion die Verdrahtung nicht mehr:** `BT_CONN_GPIO` in `btio.h` steht auf 0, `BT_LINK` hängt allein an
+  `CYSPP`; `CONNECTION` (P0.19) wird nur noch für Diagnoseanzeigen gelesen (auf unveränderten Boards dauerhaft
+  HIGH, dort bedeutungslos). Mit der Weiche auf 1 (5.110-5.119) war auf Boards ohne P0.19-Draht jede
+  BT-Eingabe tot (PIN nicht tippbar). OFFEN: ob die "Stray-Zeichen nach dem Trennen" (5.110) ohne die Weiche
+  zurückkehren - Prüfung mit `sism555/Doku/tools/trace_stray_check.py` auf dem verdrahteten Board 99SC9923.
 - **Aktuelle Firmware-Version:** siehe `sism555/project-status.md` (diese Datei hier wird nicht
   bei jeder Version nachgeführt) - `T_version` in `sism555/sprachen/sictxt.c`
 - **Firmware-Quellcode:** `sism555/` (Hauptdatei BT: `btio.c` / `btio.h`)

@@ -212,7 +212,11 @@ extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH t
 // "0"/"1" fuehrten das RS232-Menue spontan weiter). Mit 1 gilt die Datenbruecke nur, solange CONNECTION
 // wirklich LOW ist. 0 = altes Verhalten (z. B. Board OHNE P0.19-Verdrahtung: dort liest P0.19 durch den
 // Pull-up dauerhaft HIGH und BT-Eingaben wuerden sonst verworfen).
-#define BT_CONN_GPIO    1
+// 5.120: Standard jetzt 0 (Anwenderentscheidung 2026-10-19: CONNECTION wird nicht mehr fuer die Funktion gebraucht;
+// BT_LINK bleibt allein an CYSPP). Auf Boards ohne P0.19-Draht (z. B. 26SC9983) war die BT-Eingabe mit 1 komplett
+// tot. OFFEN: ob die "Stray-Zeichen nach dem Trennen" (siehe oben) ohne die Weiche zurueckkehren - am verdrahteten
+// Board 99SC9923 mit RS232-Mitschnitt pruefen; kehren sie zurueck, brauchen wir eine Weiche ohne P0.19.
+#define BT_CONN_GPIO    0
 #define BT_CONN_ACTIVE  ((!BT_CONN_GPIO) || !(FIO0PIN & CONN_PIN))
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
 extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
