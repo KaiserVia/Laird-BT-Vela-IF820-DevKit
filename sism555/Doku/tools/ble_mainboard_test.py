@@ -2584,6 +2584,135 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
 SUITE_SUMMARY_FILES = ("module-suite.json", "fast-suite.json")
 
 
+# ---------------------------------------------------------------------------
+# PC-Seite mitprotokollieren (2026-10-19): Damit Fehler dem PC oder Geraet+Modul zugeordnet werden koennen.
+# - PC wachhalten (SetThreadExecutionState: kein Standby/Ruhezustand waehrend des Tests)
+# - PC-Laufzeit und Stromquelle ins Trace (Warnung bei frisch gestartetem PC)
+# - am Ende Windows-Systemereignisse des Testzeitraums (Kernel-Power: Standby/Netzwechsel, Bluetooth/USB/PnP)
+#   als pc_events.json in den Report-Ordner; Standby-Phasen und Bluetooth-Meldungen als Trace-Warnungen.
+# ---------------------------------------------------------------------------
+
+PC_STATE: dict = {"start_wall": None, "exported": False, "awake": False}
+PC_EVENT_PROVIDERS = r"Kernel-Power|bth|bluetooth|usb|Kernel-PnP|Kernel-Boot|Kernel-Processor-Power"
+PC_FRESH_BOOT_S = 900.0     # PC juenger als 15 Minuten: Wartung/Treiberstart laeuft noch -> Warnung
+
+
+class _SystemPowerStatus(ctypes.Structure):
+    _fields_ = [("ACLineStatus", ctypes.c_ubyte), ("BatteryFlag", ctypes.c_ubyte),
+                ("BatteryLifePercent", ctypes.c_ubyte), ("SystemStatusFlag", ctypes.c_ubyte),
+                ("BatteryLifeTime", ctypes.c_ulong), ("BatteryFullLifeTime", ctypes.c_ulong)]
+
+
+def pc_uptime_s() -> float | None:
+    try:
+        fn = ctypes.windll.kernel32.GetTickCount64
+        fn.restype = ctypes.c_ulonglong
+        return fn() / 1000.0
+    except Exception:
+        return None
+
+
+def pc_power_status() -> dict:
+    try:
+        status = _SystemPowerStatus()
+        ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status))
+        return {"stromquelle": {0: "Akku", 1: "Netz"}.get(status.ACLineStatus, "unbekannt"),
+                "akku_prozent": None if status.BatteryLifePercent == 255 else status.BatteryLifePercent}
+    except Exception:
+        return {}
+
+
+def pc_logging_start(args) -> None:
+    """Beim Teststart: PC wachhalten, PC-Zustand ins Trace."""
+    PC_STATE["start_wall"] = time.time()
+    try:   # ES_CONTINUOUS | ES_SYSTEM_REQUIRED: System bleibt wach (Anzeige darf ausgehen)
+        fn = ctypes.windll.kernel32.SetThreadExecutionState
+        fn.argtypes = [ctypes.c_uint]
+        fn.restype = ctypes.c_uint
+        PC_STATE["awake"] = fn(0x80000001) != 0
+    except Exception:
+        PC_STATE["awake"] = False
+    uptime = pc_uptime_s()
+    power = pc_power_status()
+    fresh = uptime is not None and uptime < PC_FRESH_BOOT_S
+    trace_event("pc_info", level="warning" if fresh else "info", uptime_s=uptime, keep_awake=PC_STATE["awake"],
+                **power)
+    log(f"PC: laeuft seit {uptime / 60:.0f} min, {power.get('stromquelle', '?')}"
+        f"{f', Akku {power['akku_prozent']} %' if power.get('akku_prozent') is not None else ''}; "
+        f"Wachhalten {'aktiv' if PC_STATE['awake'] else 'NICHT moeglich'}."
+        if uptime is not None else "PC: Laufzeit nicht ermittelbar.")
+    if fresh:
+        log("WARNUNG: PC ist erst vor wenigen Minuten gestartet - Wartung/Treiberstart kann den Bluetooth-Link "
+            "beeinflussen (Messwerte mit Vorsicht deuten).")
+
+
+def pc_logging_stop() -> None:
+    """Wachhalten wieder aufheben."""
+    try:
+        fn = ctypes.windll.kernel32.SetThreadExecutionState
+        fn.argtypes = [ctypes.c_uint]
+        fn.restype = ctypes.c_uint
+        fn(0x80000000)   # ES_CONTINUOUS ohne Anforderung
+    except Exception:
+        pass
+
+
+def pc_events_export() -> None:
+    """Windows-Systemereignisse des Testzeitraums exportieren und auswerten (einmal je Lauf)."""
+    if PC_STATE["exported"] or PC_STATE["start_wall"] is None:
+        return
+    PC_STATE["exported"] = True
+    start = datetime.fromtimestamp(PC_STATE["start_wall"] - 60).strftime("%Y-%m-%dT%H:%M:%S")
+    script = (
+        "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+        f"$s=[datetime]'{start}'; "
+        "Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=$s} -ErrorAction SilentlyContinue | "
+        f"Where-Object {{ $_.ProviderName -match '{PC_EVENT_PROVIDERS}' }} | Sort-Object TimeCreated | "
+        "Select-Object @{n='time';e={$_.TimeCreated.ToString('s')}},ProviderName,Id,LevelDisplayName,"
+        "@{n='msg';e={($_.Message -split \"`n\")[0]}} | ConvertTo-Json -Compress")
+    try:
+        done = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                              capture_output=True, timeout=90)
+        text = done.stdout.decode("utf-8", "replace").strip()
+        events = json.loads(text) if text else []
+        if isinstance(events, dict):
+            events = [events]
+    except Exception as exc:
+        log(f"PC-Ereignisexport nicht moeglich: {exc}")
+        trace_event("pc_events_error", level="warning", error=str(exc))
+        return
+    report_dir = RUN_REPORT_DIR or REPORT_DIR
+    try:
+        report_dir.mkdir(parents=True, exist_ok=True)
+        (report_dir / "pc_events.json").write_text(json.dumps(events, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+    standby_enter = None
+    standby_phases = 0
+    for event in events:
+        provider, event_id, when = event.get("ProviderName", ""), event.get("Id"), event.get("time")
+        if "Kernel-Power" in provider and event_id == 506:      # Wechsel in den modernen Standby
+            standby_enter = when
+        elif "Kernel-Power" in provider and event_id == 507:    # Standby beendet
+            standby_phases += 1
+            trace_event("pc_standby", level="warning", entered=standby_enter, exited=when,
+                        hinweis="PC war im modernen Standby - Bluetooth kann dabei getrennt/gedrosselt werden")
+            standby_enter = None
+        elif "Kernel-Power" in provider and event_id in (42, 107):   # Ruhezustand / Fortsetzen
+            trace_event("pc_sleep_event", level="warning", id=event_id, time=when, msg=event.get("msg"))
+        elif "Kernel-Power" in provider and event_id == 105:    # Stromquellenwechsel
+            trace_event("pc_power_source_change", level="warning", time=when)
+        elif (re.search("bth|bluetooth|usb", provider, re.I) and event.get("LevelDisplayName") in
+              ("Fehler", "Warnung", "Error", "Warning", "Kritisch", "Critical")):
+            trace_event("pc_bluetooth_usb_event", level="warning", provider=provider, id=event_id, time=when,
+                        msg=(event.get("msg") or "")[:200])
+    if standby_enter is not None:
+        trace_event("pc_standby", level="warning", entered=standby_enter, exited=None,
+                    hinweis="PC war am Testende noch/ erneut im Standby")
+        standby_phases += 1
+    log(f"PC-Ereignisse im Testzeitraum: {len(events)} (pc_events.json), Standby-Phasen: {standby_phases}.")
+
+
 def collect_phase_report(phase_name: str, started_wall: float, index: int) -> dict | None:
     """Liest den Bericht, den die Phase geschrieben hat (neueste JSON-Datei, die seit Phasenstart geaendert wurde),
     und sichert ihn zusaetzlich unter eigenem Namen (phase_NN_<Phase>.json).
@@ -2693,6 +2822,7 @@ async def run_module_suite(args) -> int:
         else:
             skipped(f"BLE Download {index}/3", "ble", no_flash if not flash_ok else None)
 
+    pc_events_export()   # PC-Ereignisse (Standby, Bluetooth/USB) vor dem Bericht ins Trace, damit sie im HTML erscheinen
     result["result"] = "passed" if all(phase["result"] == "passed" for phase in result["phases"]) else "failed"
     json_path, html_path = write_report("module-suite", result)
     html_path = html_path.with_suffix(".html")
@@ -2783,6 +2913,7 @@ async def run_fast_suite(args) -> int:
     else:
         skipped("BLE Download", "ble")
 
+    pc_events_export()   # PC-Ereignisse (Standby, Bluetooth/USB) vor dem Bericht ins Trace, damit sie im HTML erscheinen
     result["result"] = "passed" if all(phase["result"] == "passed" for phase in result["phases"]) else "failed"
     json_path, md_path = write_report("fast-suite", result)
     lines = ["# BT-Fast-Suite", "", f"- Ergebnis: **{result['result']}**", "",
@@ -2902,6 +3033,7 @@ def main() -> int:
     if not setup_rs232_sniffer(args):
         log("Abbruch durch Tester (RS232).")
         return 2
+    pc_logging_start(args)
 
     if args.mode == "smoke":
         return asyncio.run(run_smoke_test(args))
@@ -2934,6 +3066,8 @@ if __name__ == "__main__":
         print("\nAbgebrochen.")
         raise SystemExit(130)
     finally:
+        pc_events_export()     # greift nur, falls die Suite es nicht schon getan hat
+        pc_logging_stop()
         if SNIFFER is not None:
             SNIFFER.stop()
         if TRACE is not None:

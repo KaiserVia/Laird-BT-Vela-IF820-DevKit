@@ -4984,3 +4984,17 @@ verworfen; bei laufendem Event-Sniff aendert sich nichts. Build 0 Error(s), 0 Wa
 **Grenzen:** Das Event erreicht rbuf1 nur, wenn die Bruecke zum Zeitpunkt nicht aktiv ist (ISR-Routing nach
 `BT_LINK`/`BT_CONN_ACTIVE`); ein `DIS` waehrend die Firmware noch `BT_LINK` haelt kann im Bruecken-Puffer landen und
 fehlt dann. **TEMPORAER:** nach Abschluss der Untersuchung entfernen (Hinweis in CLAUDE.md "Aufraeumen").
+
+**Nachtrag 2026-10-19: PC-Seite im Testskript mitprotokolliert** (`ble_mainboard_test.py`; auf diesem PC offline gegen die
+echten Windows-Ereignisse der letzten 6 h getestet - es findet genau die drei Standby-Phasen des Tages und die
+Stromquellenwechsel -, noch nicht in einem kompletten Testlauf):
+- **Wachhalten:** `SetThreadExecutionState(ES_CONTINUOUS|ES_SYSTEM_REQUIRED)` waehrend des Laufs. Ob das den modernen
+  Standby tatsaechlich verhindert, ist noch offen (die Anzeige darf ausgehen); im naechsten Lauf an den Kernel-Power-
+  Ereignissen 506/507 pruefen.
+- **Trace `pc_info`** zu Beginn: PC-Laufzeit, Stromquelle, Akku, Wachhalten ja/nein; Warnung bei < 15 min seit PC-Start.
+- **Am Ende (vor dem Bericht)** werden die Windows-Systemereignisse des Testzeitraums (Kernel-Power, Bluetooth/USB, PnP) in
+  `pc_events.json` im Report-Ordner abgelegt; Standby-Phasen (`pc_standby`), Ruhezustand, Stromquellenwechsel und
+  Bluetooth-/USB-Fehler erscheinen als Trace-Warnungen und damit im HTML unter "Warnungen und Fehler".
+- Hintergrund: Auf diesem PC sind keine Bluetooth-Betriebslogs aktiviert; die Systemereignisse sind die einzige verfuegbare
+  PC-Quelle. Am 2026-10-19 ging der PC waehrend der Laeufe dreimal in den modernen Standby (08:36-08:44, 11:14-11:14,
+  11:19-11:30) und wurde um 07:59 neu gestartet (Testlauf ab 08:23).
