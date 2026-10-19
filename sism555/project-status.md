@@ -4918,3 +4918,36 @@ getestet, noch nicht in einem echten Lauf):
 3. Die Ymodem-Dateigroesse wird nach dem ersten Nullbyte des Header-Blocks gelesen (Beispiel `4199420`); am Ende wird
    `filesize <= bytes < filesize+1024` geprueft (`size_ok`), ein abgeschnittener Empfang schlaegt fehl.
 Punkte 4 (Sitzungszeile eine Phase verschoben) und 5 (BLE-Smoke ohne Trace-Events) bleiben offen.
+
+
+## Beobachtung 2026-10-19: BLE-Download nach 4 Tagen Laufzeit nur noch halb so schnell (Board 99SC9923, 5.118)
+
+**Lauf:** `Testreports/2026-10-19_08-23-08_VIASIS_99SC9923_module-suite` (Gerät zuvor 4 Tage am Stück eingeschaltet,
+5.118). Der Test lief nur teilweise: **Classic Smoke fehlgeschlagen** (Verbindung steht nach 0,5 s, aber kein
+Banner/`PIN = ` innerhalb 8 s, obwohl die Firmware die 70 Byte Banner an UART1 gesendet hat), dadurch Classic-Phasen
+übersprungen. BLE-Smoke, 12 BLE-Zyklen, Flash schreiben und 3 BLE-Downloads bestanden (Retries 0, `ctsDrop=0`,
+Größenprüfung `4199420` ok).
+
+| Messgröße | 2026-10-15 (frisch eingeschaltet) | 2026-10-19 (nach 4 Tagen) |
+|---|---|---|
+| BLE-Download Durchsatz | ca. 6,6 KB/s (625-640 s) | **3,12-3,15 KB/s (1335-1346 s)** |
+| `ctswait` je 4,2-MB-BLE-Download | 2-9 | **13.300-13.400** |
+| `lost_ms` (Zeit in der CTS-Wartschleife) | < 100 ms | **~457-459 s (ca. 34 % der Dauer)** |
+| BLE-Connect je Zyklus | 3,1-5,5 s (einzeln bis 9,2 s) | 5,1-7,6 s |
+
+**Befund:** Die Rate ist über die drei Downloads konstant (kein schleichender Abfall innerhalb des Laufs), aber
+halbiert gegenüber dem Frischstart. Die Firmware verbringt etwa ein Drittel der Zeit damit, auf CTS-LOW des Moduls zu
+warten: das **IF820 bremst bei BLE jetzt ~13.400-mal** (vorher kaum), sein Sendepuffer läuft über die Funkstrecke
+nicht schnell genug leer. Kein Byte geht verloren (`ctsDrop=0`, einzelne Wartezeiten < 1 s; mit dem alten
+50-ms-Limit vor 5.117 wäre das riskant gewesen). Gleichzeitig ist der BLE-Verbindungsaufbau langsamer und der
+Classic-Datenpfad fiel beim ersten Connect aus. Das spricht für einen schlechteren BLE-/Funkzustand (Modulzustand nach
+langer Laufzeit, Verbindungsparameter oder Umgebung); die Firmware-Seite (Flash-Lesen, `putb()`) ist nicht die
+Bremse. Ursache **noch nicht geklärt**.
+
+**Nächste Schritte (zur Trennung der Ursachen):** gleicher BLE-Download (a) nach PC-Bluetooth aus/an, (b) über Classic,
+(c) nach Aus-/Einschalten des Geräts. Ist (c) wieder bei ~6,5 KB/s mit `ctswait` < 10, hängt es an der Laufzeit von
+Gerät/Modul; sonst an Umgebung/PC.
+
+**Testskript:** Beim Auswerten fiel auf, dass `collect_phase_report()` (Nachtrag 2026-10-15) mit 1 s Spielraum den
+`cycle.json`-Bericht der Vorphase der Phase "Flash schreiben" zuordnete (doppelte Zyklenzeilen im HTML). Spielraum
+entfernt. Die neue Dateigrößenprüfung und die Phasenberichte `phase_NN_*.json` haben im echten Lauf funktioniert.

@@ -2531,7 +2531,9 @@ def collect_phase_report(phase_name: str, started_wall: float, index: int) -> di
     try:
         fresh = [path for path in report_dir.glob("*.json")
                  if path.name not in SUITE_SUMMARY_FILES and not path.name.startswith("phase_")
-                 and path.stat().st_mtime >= started_wall - 1.0]
+                 and path.stat().st_mtime >= started_wall]   # streng: kein Spielraum, sonst wird der Bericht der
+                                                             # Vorphase (z. B. cycle.json) einer Phase ohne eigenen
+                                                             # Bericht (Flash schreiben) zugeschrieben
         if not fresh:
             return None
         newest = max(fresh, key=lambda path: path.stat().st_mtime)
