@@ -4998,3 +4998,19 @@ Stromquellenwechsel -, noch nicht in einem kompletten Testlauf):
 - Hintergrund: Auf diesem PC sind keine Bluetooth-Betriebslogs aktiviert; die Systemereignisse sind die einzige verfuegbare
   PC-Quelle. Am 2026-10-19 ging der PC waehrend der Laeufe dreimal in den modernen Standby (08:36-08:44, 11:14-11:14,
   11:19-11:30) und wurde um 07:59 neu gestartet (Testlauf ab 08:23).
+
+**Nachtrag 2026-10-19: neue Testmodi `interleave` und `soak`** (`ble_mainboard_test.py`; Ablauf offline mit simulierten
+Zyklen/Downloads getestet - Reihenfolge, Haltezeit-Rotation, Fehlerzaehlung je Uebergang, Abbruch, CSV -, noch nicht am
+Geraet). Mit dem vorhandenen Aufbau (PC, ein Geraet, RS232-Mitschnitt, Classic + BLE) sind die folgenden Tests moeglich:
+- **Schneller Zyklentest (Verbinden/Trennen im Sekundentakt)** - gab es schon: `--mode cycle --count 500 --hold 1
+  --cooldown 0 --transport ble` (bzw. `classic`).
+- **`--mode interleave`:** strikter Wechsel Classic/BLE; je Runde ein Classic- und ein BLE-Zyklus mit rotierenden Haltezeiten
+  (Standard 1/2/5/10/20 s, `--cycle-holds`), `--rounds` (20), `--max-failures` (10). Ausgabe: Erfolg je Uebergang
+  ("ble nach classic" usw.) und je Schritt `interleave_step` im Trace. Ziel: Fehler wie "BLE ohne Daten nach der
+  Classic-Phase" einem Transportwechsel zuordnen.
+- **`--mode soak`:** schreibt einmal `--soak-records` (50000 = ~500 KB) Messwerte und laedt sie dann `--soak-hours` (8)
+  lang im Wechsel BLE/Classic herunter (`--soak-pause-s` 60). Je Download eine Zeile in `soak.csv`: Rate, Retries,
+  Langsam-Markierung, RSSI, PC-Laufzeit und die Firmware-Sitzungszaehler (`ctswait`, `lost_ms`, `ctsDrop`, `TXstuck`).
+  Zeigt Verlangsamung ueber die Geraetelaufzeit und Pufferlecks; Gegenstueck zur Uptime-Reihe (Test 12/20) ohne
+  Neustart des Geraets. Fuer eine Reihe ueber mehrere Tage das Geraet einfach laufen lassen und `--soak-skip-write`
+  verwenden.

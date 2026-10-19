@@ -2742,6 +2742,179 @@ def collect_phase_report(phase_name: str, started_wall: float, index: int) -> di
     return data
 
 
+def make_phase_runner(args, result: dict, label: str):
+    """Liefert phase(name, transport, test, **overrides) fuer eigene Suiten (gleiche Logik wie in module-/fast-suite)."""
+    async def phase(name, transport, test, **overrides):
+        old_values = {key: getattr(args, key, None) for key in overrides}
+        started_wall = time.time()
+        started = time.perf_counter()
+        if TRACE is not None:
+            TRACE.set_context(phase=name, transport=transport, cycle=None)
+        trace_event("phase_started", test=test.__name__)
+        args.transport = transport
+        for key, value in overrides.items():
+            setattr(args, key, value)
+        print(f"\n{'=' * 70}\n  {label}: {name}\n{'=' * 70}")
+        try:
+            code = await test(args)
+            status = "passed" if code == 0 else "failed"
+        except Exception as exc:
+            log(f"FEHLER in Phase {name}: {exc}")
+            status = "failed"
+        finally:
+            for key, value in old_values.items():
+                setattr(args, key, value)
+        report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
+        result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"),
+                                 "result": status, "duration_s": round(time.perf_counter() - started, 3),
+                                 "report": report_data})
+        if TRACE is not None:
+            TRACE.set_context(cycle=None)
+        trace_event("phase_finished", status=status, duration_s=round(time.perf_counter() - started, 3))
+        return status
+    return phase
+
+
+def write_suite_report(kind: str, result: dict, title: str, subtitle: str) -> None:
+    json_path, html_path = write_report(kind, result)
+    html_path = html_path.with_suffix(".html")
+    html_path.write_text(render_suite_html(
+        result, title, subtitle,
+        {"JSON": json_path.name, "Trace": TRACE.path.name if TRACE else "-", "HTML": html_path.name}),
+        encoding="utf-8")
+    log(f"Gesamtbericht JSON: {json_path}")
+    log(f"Gesamtbericht HTML: {html_path}")
+
+
+async def run_interleave(args) -> int:
+    """Classic und BLE im strikten Wechsel (je Runde ein Classic- und ein BLE-Zyklus, Haltezeiten rotierend).
+
+    Prueft, ob der Transportwechsel selbst Fehler ausloest (z. B. 'BLE ohne Daten direkt nach Classic'). Je Schritt wird
+    der vorherige Transport mitprotokolliert; am Ende steht eine Erfolgsquote je Transport und je Uebergang."""
+    holds = args.cycle_holds or [1.0, 2.0, 5.0, 10.0, 20.0]
+    result = {"mode": "interleave", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "rounds": args.rounds, "cycle_holds": holds, "phases": []}
+    if not await resolve_suite_target(args):
+        result["result"] = "device_not_found"
+        write_report("interleave", result)
+        return 2
+    phase = make_phase_runner(args, result, "WECHSEL")
+    steps = []                      # (transport, vorheriger Transport, Status)
+    previous = None
+    failures = 0
+    for round_no in range(1, args.rounds + 1):
+        hold = holds[(round_no - 1) % len(holds)]
+        for transport in ("classic", "ble"):
+            name = f"Runde {round_no:03d} {transport} (Halten {hold:g} s, vorher {previous or '-'})"
+            status = await phase(name, transport, run_cycle_test, cycle_holds=[hold])
+            trace_event("interleave_step", level="info" if status == "passed" else "warning", round=round_no,
+                        transport=transport, previous=previous, hold_s=hold, status=status)
+            steps.append((transport, previous, status))
+            previous = transport
+            if status != "passed":
+                failures += 1
+        if args.max_failures and failures >= args.max_failures:
+            log(f"Abbruch: {failures} fehlgeschlagene Schritte erreicht (--max-failures).")
+            break
+    summary = {}
+    for transport, prev, status in steps:
+        key = f"{transport} nach {prev or 'Start'}"
+        entry = summary.setdefault(key, {"ok": 0, "fehler": 0})
+        entry["ok" if status == "passed" else "fehler"] += 1
+    result["summary"] = summary
+    log("Erfolg je Uebergang:")
+    for key, entry in sorted(summary.items()):
+        log(f"  {key:22} ok {entry['ok']:4}   Fehler {entry['fehler']:4}")
+    trace_event("interleave_summary", level="warning" if failures else "info", failures=failures, summary=summary)
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("interleave", result, "VIASIS Transportwechsel-Test",
+                       f"Classic/BLE im Wechsel, {args.rounds} Runden, Haltezeiten {', '.join(f'{h:g}' for h in holds)} s.")
+    return 0 if failures == 0 else 1
+
+
+def _last_session_line(lines_after: int) -> dict | None:
+    """Letzte Zeile '[BT-Sitzung beendet] TX=.. ctswait=.. ctsDrop=.. TXstuck=.. lost_ms=..' aus den neuesten RS232-Zeilen."""
+    if SNIFFER is None or lines_after <= 0:
+        return None
+    for text in reversed(SNIFFER.tail(min(lines_after, 60))):
+        match = re.search(r"\[BT-Sitzung beendet\] TX=(\d+) ctswait=(\d+) ctsDrop=(\d+) TXstuck=(\d+) lost_ms=(\d+)", text)
+        if match:
+            keys = ("tx", "ctswait", "ctsdrop", "txstuck", "lost_ms")
+            return dict(zip(keys, map(int, match.groups())))
+    return None
+
+
+async def run_soak(args) -> int:
+    """Dauer-Messreihe: schreibt einmal Testdaten und laedt sie dann bis --soak-hours Stunden lang im Wechsel ueber BLE
+    und Classic herunter (Pause --soak-pause-s dazwischen). Je Download eine CSV-Zeile (soak.csv): Rate, Retries,
+    Langsam-Markierung, RSSI, PC-Laufzeit und die Sitzungszaehler der Firmware (ctswait, lost_ms, ctsDrop).
+    Zeigt Verlangsamung ueber die Geraete-Laufzeit, Pufferlecks und Wechselfehler."""
+    result = {"mode": "soak", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "soak_hours": args.soak_hours, "records": args.soak_records, "phases": []}
+    if not await resolve_suite_target(args):
+        result["result"] = "device_not_found"
+        write_report("soak", result)
+        return 2
+    phase = make_phase_runner(args, result, "DAUERREIHE")
+    if not args.soak_skip_write:
+        written = await phase("Flash schreiben", "ble", run_download_test, write_only=True,
+                              records=args.soak_records) == "passed"
+        if not written:
+            log("Flash-Schreiben fehlgeschlagen - Dauerreihe abgebrochen.")
+            result["result"] = "failed"
+            write_suite_report("soak", result, "VIASIS Dauer-Messreihe", "Flash-Schreiben fehlgeschlagen.")
+            return 1
+    report_dir = RUN_REPORT_DIR or REPORT_DIR
+    csv_path = report_dir / "soak.csv"
+    columns = ["zeit", "verstrichen_h", "pc_laufzeit_h", "nr", "transport", "status", "bytes", "dauer_s", "bps",
+               "retries", "langsam", "rssi", "ctswait", "lost_ms", "ctsdrop", "txstuck"]
+    csv_path.write_text(";".join(columns) + "\n", encoding="utf-8")
+    t_begin = time.time()
+    deadline = t_begin + args.soak_hours * 3600.0
+    transports = ["ble", "classic"]
+    number = 0
+    failures = 0
+    while time.time() < deadline:
+        transport = transports[number % 2]
+        number += 1
+        lines_before = SNIFFER.lines if SNIFFER is not None else 0
+        name = f"Soak {number:03d} {transport}"
+        status = await phase(name, transport, run_receive_test)
+        await asyncio.sleep(args.soak_settle_s)   # die Firmware meldet die Sitzungszeile erst nach dem Trennen
+        lines_after = (SNIFFER.lines - lines_before) if SNIFFER is not None else 0
+        session = _last_session_line(lines_after) or {}
+        report = result["phases"][-1].get("report") or {}
+        ym = report.get("ymodem") or {}
+        uptime = pc_uptime_s()
+        row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), f"{(time.time() - t_begin) / 3600:.3f}",
+               f"{uptime / 3600:.2f}" if uptime is not None else "", number, transport, status, ym.get("bytes", ""),
+               ym.get("duration_s", ""), ym.get("throughput_bps", ""), ym.get("retries", ""),
+               int(bool(ym.get("slow"))) if ym else "", BLE_INFO.get("rssi", "") if transport == "ble" else "",
+               session.get("ctswait", ""), session.get("lost_ms", ""), session.get("ctsdrop", ""),
+               session.get("txstuck", "")]
+        with csv_path.open("a", encoding="utf-8") as handle:
+            handle.write(";".join(str(item) for item in row) + "\n")
+        trace_event("soak_sample", level="info" if status == "passed" else "warning", nr=number,
+                    transport=transport, status=status, bps=ym.get("throughput_bps"),
+                    ctswait=session.get("ctswait"), lost_ms=session.get("lost_ms"))
+        if status != "passed":
+            failures += 1
+            if args.max_failures and failures >= args.max_failures:
+                log(f"Abbruch: {failures} fehlgeschlagene Downloads erreicht (--max-failures).")
+                break
+        if time.time() + args.soak_pause_s < deadline:
+            await asyncio.sleep(args.soak_pause_s)
+    pc_events_export()
+    result["samples"] = number
+    result["result"] = "passed" if failures == 0 else "failed"
+    log(f"Dauerreihe beendet: {number} Downloads, {failures} fehlgeschlagen, CSV: {csv_path}")
+    write_suite_report("soak", result, "VIASIS Dauer-Messreihe",
+                       f"{args.soak_hours:g} h, Wechsel BLE/Classic, {args.soak_records} Messwerte je Download, "
+                       f"Pause {args.soak_pause_s:g} s.")
+    return 0 if failures == 0 else 1
+
+
 async def run_module_suite(args) -> int:
     """Kompletter, fortsetzbarer Classic-/BLE-Modultest mit einem Flash-Schreibvorgang."""
     hold_times = [0, 1, 2, 5, 10, 20, 30, 60, 120, 180, 240, 300]
@@ -2939,7 +3112,8 @@ def main() -> int:
     global TRACE
     p = argparse.ArgumentParser(description="BLE/BT-Classic-Test fuer das VIASIS-Mainboard.")
     p.add_argument("--mode", choices=("smoke", "transfer", "classic-smoke", "cycle", "download", "receive",
-                                      "classic-suite", "module-suite", "fast-suite", "idle-latency"),
+                                      "classic-suite", "module-suite", "fast-suite", "idle-latency",
+                                      "interleave", "soak"),
                    default="smoke")
     p.add_argument("--transport", choices=("ble", "classic"), default="ble",
                    help="Uebertragungsweg fuer --mode cycle/download/receive (classic-smoke/classic-suite/smoke/"
@@ -3001,6 +3175,18 @@ def main() -> int:
                    help="RS232-Port der Firmware fuer den passiven Mitschnitt (Default COM3)")
     p.add_argument("--rs232-baud", type=int, default=115200)
     p.add_argument("--no-rs232", action="store_true", help="keinen RS232-Mitschnitt starten")
+    p.add_argument("--rounds", type=int, default=20,
+                   help="[interleave] Runden (je Runde ein Classic- und ein BLE-Zyklus)")
+    p.add_argument("--max-failures", type=int, default=10,
+                   help="[interleave/soak] Abbruch nach so vielen fehlgeschlagenen Schritten (0 = nie)")
+    p.add_argument("--soak-hours", type=float, default=8.0, help="[soak] Dauer der Messreihe in Stunden")
+    p.add_argument("--soak-pause-s", type=float, default=60.0, help="[soak] Pause zwischen zwei Downloads")
+    p.add_argument("--soak-records", type=int, default=50000,
+                   help="[soak] Messwerte je Download (50000 = ca. 500 KB, ~80 s)")
+    p.add_argument("--soak-skip-write", action="store_true",
+                   help="[soak] Flash nicht neu beschreiben (vorhandene Messdaten verwenden)")
+    p.add_argument("--soak-settle-s", type=float, default=8.0,
+                   help="[soak] Wartezeit nach dem Download, bis die Sitzungszeile der Firmware vorliegt")
     p.add_argument("--min-bps", type=float, default=None,
                    help="Schwelle in B/s fuer 'langsamer Link' bei Downloads (Standard: BLE 4500, Classic 5500; 0 = aus)")
     p.add_argument("--slow-check-s", type=float, default=60.0,
@@ -3048,6 +3234,10 @@ def main() -> int:
         return asyncio.run(run_module_suite(args))
     if args.mode == "fast-suite":
         return asyncio.run(run_fast_suite(args))
+    if args.mode == "interleave":
+        return asyncio.run(run_interleave(args))
+    if args.mode == "soak":
+        return asyncio.run(run_soak(args))
     if args.mode == "cycle":
         return asyncio.run(run_cycle_test(args))
     if args.mode == "idle-latency":
