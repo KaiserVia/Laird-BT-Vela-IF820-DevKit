@@ -211,6 +211,10 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`
   (hard.c/.h, Update 5.70) - zaehlt EINT1/IC54-Interrupts zur CYSPP-Bounce-Diagnose. Nach
   Abschluss der CYSPP-Diagnose wieder entfernen (Anwenderentscheidung 2026-08-18).
+- **Aufraeumen - TEMPORAER seit 5.119 (Anwenderentscheidung 2026-10-19):** `ev_line`/`ev_n`/`bt_event_line()`
+  und der Aufruf im else-Zweig von `bt_sniff_poll()` (btio.c) geben die Modul-Events `C` (Verbindungsparameter
+  I=/L=/O=) und `DIS` (Trenngrund R=) immer als Zeile `[BT-Event] @E,...` auf RS232 aus. Nur fuer die Ursachensuche
+  bei BLE-Abbruechen/Langsamlauf (PC vs. Modul). **Wieder entfernen**, sobald die Untersuchung abgeschlossen ist.
 - **Aufraeumen - TEMPORAER seit 5.118 (Anwenderentscheidung 2026-10-14):** `bt_session_summary()`
   (btio.c/.h) gibt beim BT-Trennen eine Zeile `[BT-Sitzung beendet] TX=... ctswait=... ctsDrop=...` ans Terminal,
   Aufruf in `libtool.c` (`communication_change()`, Trennen-Zweig). Nur fuer die Ymodem-/CTS-Fehlersuche (5.117),

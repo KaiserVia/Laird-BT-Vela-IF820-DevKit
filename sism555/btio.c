@@ -657,9 +657,38 @@ void bt_event_sniff (void)
 // der mit der eigentlichen Ueberlauflogik gar nichts zu tun hatte - rbuf1 konnte aus bxi1s Sicht
 // trotzdem volllaufen und den UART1-Empfang dauerhaft lahmlegen). Nur die Anzeige mit
 // Zeitstempel ist an sniff_active gebunden, das Leeren selbst nicht mehr.
+// DIAGNOSE (5.119): Modul-Events "C" (gap_connected: Verbindungsparameter I=Intervall L=Latenz O=Timeout) und
+// "DIS" (gap_disconnected: R=Grund, z. B. 0913 Gegenstelle beendet, 0916 lokal beendet, 0908 Supervision-
+// Timeout) werden - auch ohne laufenden Event-Sniff - als EINE Zeile "[BT-Event] @E,..." ans Terminal (RS232)
+// ausgegeben. Zweck: Bei BLE-Abbruechen/Langsamlauf im Testtrace sehen, WARUM die Verbindung endete und mit welchen
+// Parametern sie lief (PC-Stack vs. Modul/Funk). Reiner Mitleser ueber bxi1 wie bisher (keine neuen Index-
+// Verbraucher). Alle anderen rbuf1-Bytes werden wie vorher verworfen. SPAETER WIEDER ENTFERNEN (siehe CLAUDE.md):
+// ev_line/ev_n, bt_event_line() und der Aufruf im else-Zweig von bt_sniff_poll().
+static char ev_line[100];
+static uchar ev_n=0;
+
+static void bt_event_line (char c)
+{
+ if (c=='\r') return;
+ if (c=='\n')
+ {
+  ev_line[ev_n]=0;
+  if (ev_n>8 && ev_line[0]=='@' && ev_line[1]=='E' && ev_line[2]==',' &&
+      (strstr(ev_line,",C,") || strstr(ev_line,",DIS,")))
+  {
+   uchar cc=connect; connect=concpy & ~UART1;   // nur ans Terminal, nie zurueck ans Modul
+   newline(); putstr("[BT-Event] "); putstr(ev_line); newline();
+   connect=cc;
+  }
+  ev_n=0;
+  return;
+ }
+ if (ev_n<sizeof(ev_line)-1) ev_line[ev_n++]=(c>=32 && c<127) ? c : '.';   // zu lange Zeilen abschneiden
+}
+
 void bt_sniff_poll (void)
 {
- char c; uchar cc;
+ char c; uchar cc, end;
  if (bxi1!=rxi1)
  {
   if (sniff_active)
@@ -675,7 +704,11 @@ void bt_sniff_poll (void)
    }
    connect=cc;
   }
-  else bxi1=rxi1;                               // kein Sniff aktiv -> nur leeren, nichts anzeigen
+  else                                          // kein Sniff aktiv -> leeren; nur "C"/"DIS"-Events anzeigen (5.119)
+  {
+   end=rxi1;                                    // Momentaufnahme: waehrenddessen eintreffende Bytes bleiben fuer den naechsten Durchlauf
+   while (bxi1!=end) { c=rbuf1[++bxi1]; bt_event_line(c); }
+  }
  }
  if (!sniff_active) return;
  if ((uint)(mstimer-sniff_t0)>=SNIFF_DURATION_MS)

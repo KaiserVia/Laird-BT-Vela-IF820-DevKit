@@ -4964,3 +4964,23 @@ Ymodem-Transport und gepatchtem Wiederholungslauf getestet, noch nicht in einem 
   Protokolleintrag F13010 und verbraucht eine Dateinummer.
 - Gilt fuer den Modus `receive` (Downloads der Suites); der Modus `download` (Schreiben + Export in einem Lauf)
   prueft nur die Markierung, bricht aber nicht frueh ab.
+
+
+## Update 5.119: Modul-Events "C" und "DIS" immer als Zeile auf RS232 (TEMPORAER, nur Diagnose)
+
+**Anlass:** BLE-Download 2/3 im Lauf `2026-10-19_10-04-59` brach bei ~96 % mit `Not connected` ab, danach fand der PC das
+Geraet 30 s lang nicht (kein Advertising), und die Firmware merkte vom Abbruch erst 25 s spaeter (`F13010 ...
+67290`, wartet danach am Prompt `Daten loeschen (j/n)?`). Warum die Verbindung endete, steht in keiner Datei: das
+Modul meldet es als `@E,...,DIS,C=01,R=....` (R=0913 Gegenstelle beendet, 0916 lokal beendet, 0908 Supervision-
+Timeout), diese Zeile wurde aber nur im manuellen 180-s-Event-Sniff angezeigt. Dasselbe fuer den Langsamlauf vom
+2026-10-19: das `C`-Event nennt die Verbindungsparameter (`I=` Intervall, `L=` Latenz, `O=` Timeout; Beispiel
+`@E,0035,C,C=01,A=...,T=00,I=0006,L=0000,O=0064,B=00`).
+
+**Aenderung:** `bt_sniff_poll()` (btio.c) liest rbuf1 weiter ausschliesslich ueber `bxi1` (unveraendert einziger
+Verbraucher, Momentaufnahme `end=rxi1`), setzt die Bytes aber zu Zeilen zusammen (`bt_event_line()`) und gibt
+Events mit `,C,` oder `,DIS,` als `[BT-Event] @E,...` ans Terminal aus (nie ans Modul). Alles andere wird wie bisher
+verworfen; bei laufendem Event-Sniff aendert sich nichts. Build 0 Error(s), 0 Warning(s). **Am Geraet nicht getestet.**
+
+**Grenzen:** Das Event erreicht rbuf1 nur, wenn die Bruecke zum Zeitpunkt nicht aktiv ist (ISR-Routing nach
+`BT_LINK`/`BT_CONN_ACTIVE`); ein `DIS` waehrend die Firmware noch `BT_LINK` haelt kann im Bruecken-Puffer landen und
+fehlt dann. **TEMPORAER:** nach Abschluss der Untersuchung entfernen (Hinweis in CLAUDE.md "Aufraeumen").
