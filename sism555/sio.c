@@ -43,6 +43,7 @@ volatile uchar bt_tx_stuck=0;    // Zaehler: TX-FIFO-Wait (THRE) lief in Timeout
 
 #define USB_WAIT_MS 50           // max. Wartezeit auf USB-CDC-Puffer je Byte (ms) - bounded, kein Dauerhang
 volatile uchar usb_tx_stuck=0;   // Zaehler: USB-CDC-Wait lief in Timeout -> Host holt nicht ab
+static volatile uchar usb_stalled=0;   // 5.121: 1 = Host liest nicht (nach USB_WAIT_MS-Timeout), putb() wartet dann nicht mehr
 
 // Messzaehler BT-Durchsatz (5.53, NUR Diagnose - kein Eingriff ins Sendeverhalten).
 // Frage, die sie beantworten: Wie oft bremst das Modul per CTS, und wie viel Zeit kostet
@@ -112,12 +113,23 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 	// offen), dann drehte diese Schleife pro Byte endlos und blockierte das ganze System.
 	// osThreadYield() statt osDelay(1): gibt die CPU ab, erzwingt aber keine 1-ms-Pause je Byte
 	// (genau die Falle, die den BT-Durchsatz kostet - siehe Diagnosezaehler oben).
-	uint _ut=mstimer;
-	while (USBD_CDC_ACM_PutChar (0, ch) != ch)            // Zeichen -> USB, ggf. wiederholen
+	// 5.121: Nach dem ersten Timeout gilt der Host als "nicht lesend" (usb_stalled): dann nur noch EIN Versuch
+	// je Byte ohne Warten. Vorher kostete jedes Byte bei steckendem, aber ungelesenem USB-Kabel volle 50 ms
+	// und bremste damit auch RS232 und Bluetooth (Menue ~1 Zeile/s, BLE ~20 Byte/s). Sobald der Host wieder
+	// liest (PutChar gelingt), ist der Stau aufgehoben.
+	if (usb_stalled)
 	{
-	 if ((uint)(mstimer-_ut) >= USB_WAIT_MS) { usb_tx_stuck++; break; }  // Host holt nicht ab -> Byte verwerfen
-	 if (WDTV<1000) { ResetWDT(); break; }                              // Sicherheitsnetz Watchdog
-	 osThreadYield();                                                   // CPU abgeben, ohne Zwangspause
+	 if (USBD_CDC_ACM_PutChar (0, ch) == ch) usb_stalled=0;   // Host liest wieder
+	}
+	else
+	{
+	 uint _ut=mstimer;
+	 while (USBD_CDC_ACM_PutChar (0, ch) != ch)            // Zeichen -> USB, ggf. wiederholen
+	 {
+	  if ((uint)(mstimer-_ut) >= USB_WAIT_MS) { usb_tx_stuck++; usb_stalled=1; break; }  // Host holt nicht ab -> Byte verwerfen, Stau merken
+	  if (WDTV<1000) { ResetWDT(); break; }                              // Sicherheitsnetz Watchdog
+	  osThreadYield();                                                   // CPU abgeben, ohne Zwangspause
+	 }
 	}
  }
  return(1);

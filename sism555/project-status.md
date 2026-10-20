@@ -5065,3 +5065,17 @@ der Test nicht navigiert). **Vergleichswert mit Weiche (5.116-5.119):** die Zykl
 `2026-10-19_08-23-08` und `2026-10-19_10-04-59` (zusammen 733.922 RS232-Zeilen) ergeben **0 Auffälligkeiten**. Kehren die Zeichen
 zurück, braucht es eine Weiche ohne P0.19 (z. B. Verwerfen der Bytes in einem kurzen Fenster nach dem Trennen).
 Werkzeug neu: `Doku/tools/trace_stray_check.py` (nur lesend).
+
+
+## Update 5.121: USB-Ausgabe blockiert RS232/Bluetooth nicht mehr, wenn der Host den USB-Port nicht liest
+
+**Symptom/Ursache:** Steckt ein USB-Kabel und liest der PC den USB-COM-Port nicht (kein Terminal offen), wartete `putb()` (sio.c) bei
+**jedem** Byte bis zu `USB_WAIT_MS` = 50 ms auf Platz im CDC-Puffer. `putb()` sendet jedes Byte nacheinander an RS232, UART1 (Bluetooth)
+und USB, die gesamte Ausgabe lief dadurch auf ~20 Byte/s (Menü ~1 Zeile/s, BLE-Banner 70 Byte >= 3,5 s, Ymodem praktisch unmöglich).
+Zusätzlich hängt mit USB am Gerät die GSM/LTE-Aufgabenplanung (`measure.c:203`) und beim Anstecken wird MQTT geschlossen (`measure.c:289`)
+- beides gewollt, nur dokumentiert.
+
+**Fix (5.121, sio.c):** Nach dem ersten Timeout merkt sich `usb_stalled`, dass der Host nicht liest; dann gibt es je Byte nur noch **einen**
+Versuch ohne Warten (Byte wird bei vollem Puffer verworfen). Gelingt `USBD_CDC_ACM_PutChar` wieder, ist der Stau aufgehoben. Wirkt nur auf
+die USB-Ausgabe; RS232 und Bluetooth bleiben unberührt. Build 0 Error(s), 0 Warning(s). **Am Gerät nicht getestet** (Test: USB stecken,
+kein Terminal öffnen, per BLE verbinden - Banner und PIN-Prompt müssen sofort erscheinen).
