@@ -5123,3 +5123,31 @@ USB wirklich verbunden war (`usb_linked`). Eine Zeitgrenze (z. B. 10 s) habe ich
 dauernd neu starten (Init/Connect/Timeout/Uninit im Takt), ohne dass jemand etwas davon hat; das Warten ohne Link kostet nichts.
 Build 0 Error(s), 0 Warning(s). **Am Gerät nicht getestet.** Zu prüfen: (1) PC-USB-Verbindung funktioniert wie vorher (Terminal, Banner, Menü); (2) Ladegerät/Powerbank
 ohne Daten anstecken - `USB` darf `connect` nicht setzen, LTE-Aufgaben laufen weiter; (3) Kabel während der Enumeration ziehen und neu stecken.
+
+
+## Prüfrunde mit Firmware 5.124 (2026-10-20): beide Boards, Zwei-Geräte-Vergleich
+
+**Schritt 1 - Board A (99SC9923), `--mode interleave --rounds 15`:** 30 Zyklen (15x Classic, 15x BLE im Wechsel) alle bestanden, Übergänge "BLE nach Classic" 15/15 und
+"Classic nach BLE" 14/14; `trace_stray_check.py` auf 391 RS232-Zeilen: **0 Auffälligkeiten** (BT_CONN_GPIO ist seit 5.120 aus). Alle Sitzungszeilen `ctsDrop=0`.
+Vorbehalt: nur 30 Trennvorgänge; mit abgeschalteter Weiche fehlen die `DIS`-Zeilen im Trace (die Event-Bytes landen beim Trennen im Brückenpuffer und werden von der
+Firmware verworfen) - der Trenngrund ist dadurch nicht mehr sichtbar, das `C`-Event schon. In diesem Lauf wählte Windows bei 13 von 15 BLE-Verbindungen 7,5 ms Intervall
+(Timeout 1 s), bei 2 von 15 52,5 ms (Timeout 9,6 s).
+**Schritt 2 - Board B (26SC9983):** Der Fehler vom 19.10. (BLE-Verbindung steht, aber kein Banner) ist **weg**: BLE-Smoke bestanden (Banner, PIN akzeptiert, 8 s gehalten);
+PIN von Hand per Classic-Terminal (Viagraph, COM8) getippt - Sternchen und Hauptmenü erscheinen, die Eingabe erreicht also die PIN-Abfrage. Ursache des früheren Fehlers
+nicht sicher geklärt (unbekannte Vorversion auf B und/oder abgeschaltete Weiche).
+**Schritt 3 - `soak --devices VIASIS_99SC9923,VIASIS_26SC9983 --rs232-port-b auto`, 9 Downloads, alle bestanden, USB-Mitschnitt von B (COM13) lieferte Zeilen:**
+
+| Gerät | Transport | Rate | ctswait je ~500 KB | Verbindungsparameter (C-Event) |
+|---|---|---|---|---|
+| 99SC9923 | BLE | 6,6-6,7 KB/s | 0 | Intervall 7,5 ms, Timeout 1 s |
+| 99SC9923 | Classic | 7,2-7,4 KB/s | 168-178 | - |
+| 26SC9983 | **BLE** | **3,06-3,13 KB/s** (Langsam-Erkennung brach den 1. Versuch nach 60 s ab, 2. Versuch lief durch) | **1427-1445** (lost_ms ~48 s) | **Intervall 60 ms, Timeout 9,6 s** |
+| 26SC9983 | Classic | 6,9-7,5 KB/s | 114-178 | - |
+
+**Befund:** Gleicher PC, gleiche Zeit, im Wechsel gemessen: nur **B über BLE** ist halb so schnell. Classic ist auf B normal. Das BLE-Verbindungsintervall war bei B 60 ms
+gegenüber 7,5 ms bei A (gemessen für die jeweils erste Verbindung; bei den späteren Sitzungen fehlten die `C`-Zeilen im Trace, Grund nicht geklärt). Das erklärt die
+Kette: langes Intervall -> weniger Pakete je Sekunde -> das Modul-Sendepuffer läuft voll -> Modul bremst per CTS (1427x) -> halbe Rate. Die Firmware setzt keine bevorzugten
+Verbindungsparameter (`/RLH,H=0007` liefert auf beiden Boards Nullen); das Intervall wählt der PC. **Vermutung (nicht geprüft):** Windows verwendet für B einen
+zwischengespeicherten oder anders ausgehandelten Parameter (B ist das Board der PPCP-Versuche 5.6x). **Gegenprobe:** Gerät `VIASIS_26SC9983_BLE` in den Windows-
+Bluetooth-Einstellungen entfernen, neu koppeln, B-BLE-Download wiederholen. **Hinweis zum Skript:** Die Spalte `rssi` in `soak.csv` ist nach der ersten Suche je Gerät
+veraltet (beide Boards zeigen -57); die Langsam-Erkennung (5.-Update im Skript) hat im echten Lauf funktioniert.

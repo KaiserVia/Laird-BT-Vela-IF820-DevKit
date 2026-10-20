@@ -72,6 +72,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
   Ursache des vorher scheiternden Downloads (5.116: F13010, Block am Ende zu kurz) war das 50-ms-CTS-Limit
   in `putb()`; behoben in 5.117. Details: `sism555/project-status.md`, Updates 5.117/5.118 und "Dauertest
   5.118 am Geraet". Das Testskript hat bekannte Berichts-Unstimmigkeiten (dort aufgelistet).
+- **2026-10-20: Prüfrunde mit 5.124 auf zwei Boards** (`sism555/project-status.md`, "Prüfrunde mit Firmware 5.124"): Weiche aus (5.120) ohne Stray-Zeichen in 30
+  Zyklen, Board B (26SC9983) funktioniert per BLE und Classic. **BLE-Durchsatz hängt am vom PC gewählten Verbindungsintervall:** B lief mit 60 ms (3,1 KB/s, Modul bremst per CTS
+  ~1430x), A mit 7,5 ms (6,6 KB/s). Offen: warum Windows für B ein langes Intervall wählt (Gerät in Windows entfernen und neu koppeln als Gegenprobe).
 - Gerätename BLE + Classic einheitlich `VIASIS_<serno>`.
 - Zugangsschutz über bestehende **App-Layer-PIN** (kein BT-Passkey).
 - BT-Baud fix über `#define IF820_BAUD 460800` in `btio.h` (921600 verworfen — HW-Limit LPC1766).
