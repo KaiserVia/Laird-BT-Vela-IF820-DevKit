@@ -261,6 +261,8 @@ class Rs232Sniffer:
         self.port = port
         self.baud = baud
         self.label = label            # z. B. "A"/"B" bei zwei Geraeten; erscheint als dev= in den Trace-Zeilen
+        self.rx = None                # optional: ByteStream, der die gelesenen Bytes mitbekommt (Geraeteidentifikation)
+        self.loop = None
         self.ser = None
         self.thread = None
         self.stop_event = threading.Event()
@@ -295,6 +297,20 @@ class Rs232Sniffer:
         with self.lock:
             return list(self.recent[-count:])
 
+    def attach(self, loop):
+        """Gelesene Bytes zusaetzlich an einen ByteStream geben (fuer die Menue-Navigation, z. B. Geraeteinfo)."""
+        self.loop = loop
+        self.rx = ByteStream("rs232" if not self.label else f"rs232-{self.label}")
+        return self.rx
+
+    def detach(self) -> None:
+        self.rx = None
+
+    def write(self, data: bytes) -> None:
+        """Aktives Senden an die Firmware (nur fuer die Geraeteidentifikation; der Mitschnitt selbst bleibt rein lesend)."""
+        self.ser.write(data)
+        self.ser.flush()
+
     def _emit(self, raw: bytes, partial: bool) -> None:
         text = raw.decode("cp1252", errors="replace").strip("\r\n")
         if not text.strip():
@@ -320,6 +336,9 @@ class Rs232Sniffer:
                 if chunk:
                     self.bytes += len(chunk)
                     last_rx = now
+                    stream = self.rx
+                    if stream is not None and self.loop is not None:   # Menue-Navigation (Geraeteinfo) mithoeren lassen
+                        self.loop.call_soon_threadsafe(stream.feed, bytes(chunk))
                     buf.extend(chunk)
                     while (idx := buf.find(b"\n")) >= 0:
                         self._emit(bytes(buf[:idx]), False)
@@ -791,6 +810,8 @@ def write_report(kind: str, data: dict) -> tuple[Path, Path]:
     report_dir.mkdir(parents=True, exist_ok=True)
     base = report_dir / kind
     json_path = base.with_suffix(".json")
+    if DEVICE_INFO and kind in ("module-suite", "fast-suite", "interleave", "soak", "device-info"):
+        data = {**data, "device_info": DEVICE_INFO}    # Firmware/Seriennummer der getesteten Geraete im Gesamtbericht
     json_path.write_text(__import__("json").dumps(data, indent=2, default=str), encoding="utf-8")
     return json_path, base.with_suffix(".md")
 
@@ -2542,6 +2563,17 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
         ("Classic", html.escape(" / ".join(str(classic_connection.get(key, "-")) for key in ("device_name", "port")))),
         ("Dateien", report_links),
     ]
+    for dev_label, dev_info in DEVICE_INFO.items():     # Geraeteidentifikation (Firmware, Seriennummer, ...)
+        parts = [f"Seriennr. {dev_info.get('seriennummer', '?')}", f"Firmware {dev_info.get('firmware', '?')}",
+                 f"HW {dev_info.get('hardware', '?')}"]
+        if dev_info.get("betriebsstunden") is not None:
+            parts.append(f"{dev_info['betriebsstunden']} h Betrieb")
+        if dev_info.get("datum"):
+            parts.append(f"Geraeteuhr {dev_info['datum']} {dev_info.get('zeit', '')}"
+                         f"{' (Abweichung ' + str(dev_info['uhr_abweichung_s']) + ' s)' if 'uhr_abweichung_s' in dev_info else ''}")
+        if dev_info.get("schnittstellen"):
+            parts.append(", ".join(dev_info["schnittstellen"]))
+        header_rows.insert(-1, (f"Geraet {html.escape(str(dev_label))}", html.escape("; ".join(parts))))
     header_html = "".join(f"<tr><th>{label}</th><td>{value}</td></tr>" for label, value in header_rows)
     diagnostic_html = ""
     if diagnostics or failed_phases:
@@ -2742,6 +2774,236 @@ def collect_phase_report(phase_name: str, started_wall: float, index: int) -> di
     except OSError:
         pass
     return data
+
+
+# ---------------------------------------------------------------------------
+# Geraete-Identifikation (2026-10-20): Hauptmenue -> Information -> zurueck, daraus Firmware, Seriennummer, Hardware,
+# Betriebsstunden, Schnittstellen, Uhrzeit. Laeuft als erster Schritt jedes Tests (siehe preflight_identify) und geht
+# ueber jeden Kanal mit einem Eingangsstrom (.rx, ByteStream) und write(): Bluetooth (BLE/Classic-Transport),
+# RS232 und USB (ueber den Mitschnitt-Thread, Rs232Sniffer.attach). Erkennt die Menues sprachunabhaengig an den
+# Auswahlbereichen "1...6?" (Hauptmenue) und "1...9?" (Informationsmenue).
+# ---------------------------------------------------------------------------
+
+DEVICE_INFO: dict = {}                 # Label ("A", "B", "RS232", "bt" ...) -> Info-Dict (inkl. Rohtext)
+MARK_MAIN_RANGE = "1...6?"             # Hauptmenue: "Ihre Auswahl 1...6?"
+MARK_INFO_RANGE = "1...9?"             # Informationsmenue: "9. zurueck", "Ihre Auswahl 1...9?"
+SERIAL_RE = re.compile(r"\b(\d{2}[A-Z]{2}\d{4})\b")
+CLOCK_WARN_S = 600                     # Geraeteuhr weicht mehr als 10 Minuten von der PC-Uhr ab -> Hinweis
+
+# Stichwoerter der Anzeigetexte (Sprachtabellen sictxt_*.c); alles, was nicht erkannt wird, bleibt im Rohtext erhalten.
+_KW_HOURS = r"(Betriebsstunden|Operating hours|Heures de fonctionnement|Orario d'esercizio|Roboczogodzin|Horas de funcionamiento|Provozn|Obratovalnih)"
+_KW_PSET = r"(Aktiver Parametersatz|Active parameter set|Jeu de param|Set di parametri|Aktivni|Conjunto de par|Aktywny zestaw)"
+_KW_IFACE = r"(Schnittstellen|Interfaces|Interfacce|Rozhran|Vmesnik|Interfaz)"
+_KW_TZONE = r"(Zeitzone|Time zone|Fuseau horaire|Fuso orario|Strefa czasu|Casov|Zona horaria)"
+
+
+def parse_info_screen(text: str) -> dict:
+    """Zerlegt den Text des Informationsmenues in Felder. Alle Felder sind optional; der Rohtext bleibt in 'raw'."""
+    info: dict = {"raw": text}
+    lines = [line.strip() for line in re.split(r"[\r\n]+", text)]
+    lines = [line for line in lines if line]
+    for line in lines:                                          # "Viasis 3003M - Version 5.124: J2"
+        if re.search(r"3003|viasis", line, re.I) and re.search(r"\d+\.\d{2,3}", line):
+            version = re.search(r"(\d+\.\d{2,3})", line)
+            info["firmware"] = version.group(1)
+            model = re.split(r"\s+-\s+", line, maxsplit=1)[0].strip()
+            if model and not re.search(r"\d+\.\d{2,3}", model):
+                info["modell"] = model
+            hardware = re.search(r"\d+\.\d{2,3}\s*:\s*(\S+)", line)
+            if hardware:
+                info["hardware"] = hardware.group(1)
+            break
+    serial = SERIAL_RE.search(text)
+    if serial:
+        info["seriennummer"] = serial.group(1)
+    for line in lines:
+        if re.search(_KW_HOURS, line, re.I):
+            number = re.search(r"(\d+)\s*h\b", line)
+            if number:
+                info["betriebsstunden"] = int(number.group(1))
+        elif re.search(_KW_PSET, line, re.I):
+            number = re.search(r":\s*(\d+)", line)
+            if number:
+                info["parametersatz"] = int(number.group(1))
+        elif re.search(_KW_TZONE, line, re.I) and "zeitzone" not in info:
+            number = re.search(r":\s*(-?\d+)", line)
+            if number:
+                info["zeitzone"] = int(number.group(1))
+        elif re.match(r"Zeitquelle\s*:", line, re.I):
+            info["zeitquelle"] = line.split(":", 1)[1].strip()
+        elif re.search(r"Automatische Zeit|Automatic time", line, re.I):
+            info["automatische_zeit"] = line.split(":", 1)[1].strip() if ":" in line else None
+    for index, line in enumerate(lines):                        # "Schnittstellen: Bluetooth, USB, GSM/GPRS-LTE, GPS"
+        if re.match(_KW_IFACE + r"\s*:", line, re.I):
+            collected = line.split(":", 1)[1]
+            for follow in lines[index + 1:index + 3]:           # Fortsetzungszeilen ohne Menuenummer/Label
+                if re.match(r"\d\.|[A-Za-zÀ-ÿ /-]+:", follow):
+                    break
+                collected += " " + follow
+            info["schnittstellen"] = [part.strip() for part in re.split(r"[,;]", collected) if part.strip()]
+            break
+    date = re.search(r"\b(\d{1,2}\.\d{1,2}\.\d{2,4})\b", text)
+    clock = re.search(r"\b(\d{1,2}:\d{2}:\d{2})\b", text)
+    if date:
+        info["datum"] = date.group(1)
+    if clock:
+        info["zeit"] = clock.group(1)
+    return info
+
+
+def device_clock_offset_s(info: dict) -> float | None:
+    """Geraeteuhr minus PC-Uhr in Sekunden (nur Datum/Zeit, keine Zeitzonenumrechnung); None wenn nicht lesbar."""
+    if "datum" not in info or "zeit" not in info:
+        return None
+    for fmt in ("%d.%m.%y %H:%M:%S", "%d.%m.%Y %H:%M:%S"):
+        try:
+            device = datetime.strptime(f"{info['datum']} {info['zeit']}", fmt)
+        except ValueError:
+            continue
+        return (device - datetime.now()).total_seconds()
+    return None
+
+
+async def read_device_info(channel, timeout: float = 8.0) -> dict | None:
+    """Hauptmenue -> Information -> zurueck ueber einen Kanal (.rx ByteStream, async write). Liefert das geparste Info-Dict
+    (mit 'raw') oder None, wenn das Hauptmenue nicht erreichbar war. Voraussetzung: das Geraet ist ansprechbar, bei
+    Bluetooth ist die PIN bereits eingegeben."""
+    rx = channel.rx
+    rx.clear()
+    await channel.write(b"H")                                    # Hauptmenue ausgeben
+    if not await rx.wait_for_marker(MARK_MAIN_RANGE, timeout):
+        return None
+    await asyncio.sleep(0.3)
+    rx.clear()
+    await channel.write(b"6")                                    # 6 = Information und Zeit
+    shown = await rx.wait_for_marker(MARK_INFO_RANGE, timeout)
+    await asyncio.sleep(0.2)
+    text = bytes(rx.buf).decode("cp1252", errors="replace")
+    rx.clear()
+    await channel.write(b"9")                                    # 9 = zurueck
+    back = await rx.wait_for_marker(MARK_MAIN_RANGE, timeout)
+    info = parse_info_screen(text)
+    info["info_menue_gesehen"] = bool(shown)
+    info["zurueck_im_hauptmenue"] = bool(back)
+    return info
+
+
+class SnifferChannel:
+    """Kanal-Adapter fuer RS232/USB: nutzt den ohnehin laufenden Mitschnitt-Thread (Lesen) und dessen Schnittstelle (Schreiben)."""
+
+    def __init__(self, sniffer):
+        self.sniffer = sniffer
+        self.rx = sniffer.attach(asyncio.get_running_loop())
+
+    async def write(self, data: bytes) -> None:
+        await asyncio.to_thread(self.sniffer.write, data)
+
+    def close(self) -> None:
+        self.sniffer.detach()
+
+
+def _record_device_info(label: str, info: dict, args, source: str) -> None:
+    """Meldung, Trace und Plausibilitaetspruefungen (Name/Seriennummer, Firmware, Uhr)."""
+    info["quelle"] = source
+    offset = device_clock_offset_s(info)
+    if offset is not None:
+        info["uhr_abweichung_s"] = round(offset)
+    DEVICE_INFO[label] = info
+    shown = {key: info.get(key) for key in ("modell", "firmware", "hardware", "seriennummer", "betriebsstunden",
+                                            "parametersatz", "schnittstellen", "datum", "zeit", "zeitquelle")}
+    trace_event("device_info", label=label, source=source, **shown, uhr_abweichung_s=info.get("uhr_abweichung_s"),
+                info_menue_gesehen=info.get("info_menue_gesehen"), zurueck=info.get("zurueck_im_hauptmenue"))
+    log(f"Geraet {label} ({source}): {info.get('modell', '?')} FW {info.get('firmware', '?')} "
+        f"HW {info.get('hardware', '?')} Serien-Nr. {info.get('seriennummer', '?')}, "
+        f"{info.get('betriebsstunden', '?')} h, Uhr {info.get('datum', '?')} {info.get('zeit', '?')}"
+        f"{f', Schnittstellen: ' + ', '.join(info['schnittstellen']) if info.get('schnittstellen') else ''}.")
+    wanted = getattr(args, "expect_fw", None)
+    if wanted and info.get("firmware") and info["firmware"] != wanted:
+        trace_event("device_firmware_mismatch", level="warning", label=label, found=info["firmware"], expected=wanted)
+        log(f"WARNUNG: Firmware {info['firmware']} auf Geraet {label}, erwartet {wanted}.")
+    name = str(getattr(args, "name", "") or "")
+    serial = info.get("seriennummer")
+    if serial and SERIAL_RE.search(name) and SERIAL_RE.search(name).group(1) != serial:
+        trace_event("device_serial_mismatch", level="warning", label=label, serial=serial, name=name)
+        log(f"WARNUNG: Seriennummer {serial} passt nicht zum Zielnamen '{name}'.")
+    if offset is not None and abs(offset) > CLOCK_WARN_S:
+        trace_event("device_clock_off", level="warning", label=label, abweichung_s=round(offset))
+        log(f"HINWEIS: Geraeteuhr weicht {offset / 3600:+.1f} h von der PC-Uhr ab (Zeitquelle: "
+            f"{info.get('zeitquelle', '?')}); Zeitstempel in Protokoll und Dateinamen sind dann nicht verlaesslich.")
+    if not info.get("firmware"):
+        log(f"WARNUNG: Firmware auf Geraet {label} nicht aus der Info-Seite lesbar (Rohtext im Bericht).")
+
+
+async def identify_channel(channel, label: str, args, source: str) -> dict | None:
+    """Liest die Info-Seite ueber den Kanal und registriert das Ergebnis (None, wenn das Menue nicht erreichbar war)."""
+    try:
+        info = await read_device_info(channel)
+    except Exception as exc:           # Kommunikationsfehler duerfen den eigentlichen Test nie verhindern
+        log(f"Geraeteinfo {label} ({source}) nicht lesbar: {exc}")
+        trace_event("device_info_error", level="warning", label=label, source=source, error=str(exc))
+        return None
+    if info is None:
+        log(f"Geraeteinfo {label} ({source}): Hauptmenue nicht erreichbar (Marker {MARK_MAIN_RANGE}).")
+        trace_event("device_info_error", level="warning", label=label, source=source, error="kein Hauptmenue")
+        return None
+    _record_device_info(label, info, args, source)
+    return info
+
+
+async def identify_via_bluetooth(args, label: str = "bt") -> dict | None:
+    """Verbindet einmal ueber den gewaehlten Bluetooth-Transport, gibt ggf. die PIN ein und liest die Info-Seite."""
+    transport = await make_transport(args)
+    try:
+        await transport.connect(args.connect_timeout)
+        await authenticate_or_sync_main_menu(transport, args, "Geraeteinfo")
+        return await identify_channel(transport, label, args, f"Bluetooth {args.transport}")
+    except Exception as exc:
+        log(f"Geraeteinfo ueber Bluetooth nicht lesbar: {exc}")
+        trace_event("device_info_error", level="warning", label=label, source="bluetooth", error=str(exc))
+        return None
+    finally:
+        await transport.disconnect()
+
+
+async def preflight_identify(args) -> None:
+    """Erster Schritt jedes Tests: Gerat identifizieren. --via auto: RS232/USB (Mitschnitt-Port), sonst Bluetooth."""
+    via = getattr(args, "via", "auto")
+    if via == "auto":
+        via = "rs232" if SNIFFER is not None else "bt"
+    if via == "rs232":
+        if SNIFFER is None:
+            log("Geraeteidentifikation uebersprungen: kein RS232-/USB-Port aktiv (--no-rs232).")
+            return
+        channel = SnifferChannel(SNIFFER)
+        try:
+            await identify_channel(channel, "A" if getattr(args, "devices", "") else "RS232", args,
+                                   f"RS232/USB {SNIFFER.port}")
+        finally:
+            channel.close()
+    else:
+        await identify_via_bluetooth(args)
+
+
+def report_device_info(args) -> int:
+    """Modus info: Ergebnis der Geraeteidentifikation ausgeben und als device-info.json (mit Rohtext) ablegen."""
+    print("\n" + "=" * 70 + "\n  GERAETEINFO\n" + "=" * 70)
+    if not DEVICE_INFO:
+        print("  Keine Geraeteinformation lesbar (siehe Log: Hauptmenue nicht erreichbar?).")
+        return 1
+    for label, info in DEVICE_INFO.items():
+        print(f"  Geraet {label} (via {info.get('quelle')}):")
+        for key in ("modell", "firmware", "hardware", "seriennummer", "betriebsstunden", "parametersatz",
+                    "schnittstellen", "datum", "zeit", "zeitzone", "zeitquelle", "automatische_zeit", "uhr_abweichung_s"):
+            if info.get(key) is not None:
+                print(f"    {key:18}: {info[key]}")
+        print(f"    {'Info-Seite Rohtext':18}:")
+        for line in info.get("raw", "").splitlines():
+            if line.strip():
+                print(f"      | {line.rstrip()}")
+    json_path, _ = write_report("device-info", {"mode": "device-info",
+                                                "started_at": datetime.now().astimezone().isoformat(timespec="seconds")})
+    log(f"Bericht: {json_path}")
+    return 0
 
 
 def make_phase_runner(args, result: dict, label: str):
@@ -2957,7 +3219,29 @@ async def run_soak(args) -> int:
                 log(f"WARNUNG: {port_b} laesst sich nicht oeffnen ({exc}) - keine Sitzungszaehler fuer das zweite Geraet.")
                 sniffer_b = None
         if sniffer_b is not None and SNIFFER is not None and not args.no_verify_ports:
-            devices = await verify_device_ports(devices, SNIFFER, sniffer_b)
+            # 1. Wahl: Seriennummer aus der Info-Seite beider Geraete (RS232 fuer A liegt aus dem Preflight vor, USB fuer B
+            # wird jetzt gelesen) gegen die Geraetenamen pruefen - eindeutig und ohne Bluetooth.
+            channel_b = SnifferChannel(sniffer_b)
+            try:
+                await identify_channel(channel_b, "B", args, f"USB {sniffer_b.port}")
+            finally:
+                channel_b.close()
+            serial_a = (DEVICE_INFO.get("A") or {}).get("seriennummer")
+            serial_b = (DEVICE_INFO.get("B") or {}).get("seriennummer")
+            matched = False
+            if serial_a and serial_b:
+                if serial_a in devices[1] and serial_b in devices[0]:
+                    log(f"Portzuordnung per Seriennummer: {devices[0]} haengt am USB-Port ({serial_b}), "
+                        f"{devices[1]} am RS232-Port ({serial_a}) - Reihenfolge getauscht.")
+                    devices = [devices[1], devices[0]] + devices[2:]
+                    matched = True
+                elif serial_a in devices[0] and serial_b in devices[1]:
+                    log(f"Portzuordnung per Seriennummer bestaetigt ({serial_a} RS232, {serial_b} USB).")
+                    matched = True
+                else:
+                    log(f"WARNUNG: Seriennummern {serial_a}/{serial_b} passen nicht zu den Namen {devices[:2]}.")
+            if not matched:                                # 2. Wahl: Banner beim Bluetooth-Connect (bisheriges Verfahren)
+                devices = await verify_device_ports(devices, SNIFFER, sniffer_b)
             result["devices"] = devices
         if sniffer_b is not None:
             sniffers[devices[1]] = sniffer_b
@@ -3277,7 +3561,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description="BLE/BT-Classic-Test fuer das VIASIS-Mainboard.")
     p.add_argument("--mode", choices=("smoke", "transfer", "classic-smoke", "cycle", "download", "receive",
                                       "classic-suite", "module-suite", "fast-suite", "idle-latency",
-                                      "interleave", "soak"),
+                                      "interleave", "soak", "info"),
                    default="smoke")
     p.add_argument("--transport", choices=("ble", "classic"), default="ble",
                    help="Uebertragungsweg fuer --mode cycle/download/receive (classic-smoke/classic-suite/smoke/"
@@ -3339,6 +3623,13 @@ def main() -> int:
                    help="RS232-Port der Firmware fuer den passiven Mitschnitt (Default COM3)")
     p.add_argument("--rs232-baud", type=int, default=115200)
     p.add_argument("--no-rs232", action="store_true", help="keinen RS232-Mitschnitt starten")
+    p.add_argument("--via", choices=("auto", "rs232", "bt"), default="auto",
+                   help="Geraeteidentifikation (Info-Seite) ueber RS232/USB (--rs232-port) oder Bluetooth (--transport); "
+                        "auto = RS232/USB, wenn der Mitschnitt-Port aktiv ist, sonst Bluetooth")
+    p.add_argument("--no-identify", action="store_true",
+                   help="Geraeteidentifikation (Hauptmenue -> Information) zu Beginn nicht ausfuehren")
+    p.add_argument("--expect-fw", default=None,
+                   help="erwartete Firmware-Version (z. B. 5.124); weicht die Info-Seite ab, gibt es eine Warnung")
     p.add_argument("--rounds", type=int, default=20,
                    help="[interleave] Runden (je Runde ein Classic- und ein BLE-Zyklus)")
     p.add_argument("--max-failures", type=int, default=10,
@@ -3392,6 +3683,10 @@ def main() -> int:
         log("Abbruch durch Tester (RS232).")
         return 2
     pc_logging_start(args)
+    if args.mode == "info" or not args.no_identify:        # erster Schritt jedes Tests: Geraet identifizieren
+        asyncio.run(preflight_identify(args))
+    if args.mode == "info":
+        return report_device_info(args)
 
     if args.mode == "smoke":
         return asyncio.run(run_smoke_test(args))

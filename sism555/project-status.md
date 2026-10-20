@@ -5151,3 +5151,24 @@ Verbindungsparameter (`/RLH,H=0007` liefert auf beiden Boards Nullen); das Inter
 zwischengespeicherten oder anders ausgehandelten Parameter (B ist das Board der PPCP-Versuche 5.6x). **Gegenprobe:** Gerät `VIASIS_26SC9983_BLE` in den Windows-
 Bluetooth-Einstellungen entfernen, neu koppeln, B-BLE-Download wiederholen. **Hinweis zum Skript:** Die Spalte `rssi` in `soak.csv` ist nach der ersten Suche je Gerät
 veraltet (beide Boards zeigen -57); die Langsam-Erkennung (5.-Update im Skript) hat im echten Lauf funktioniert.
+
+
+## Testskript: Geräteidentifikation als erster Schritt jedes Tests (2026-10-20)
+
+**Ziel:** Bei jedem Lauf stehen Firmware, Seriennummer und weitere Gerätedaten im Bericht, ohne dass man danach fragen muss; wichtig für Vergleiche zwischen Boards und
+Firmware-Ständen (z. B. B lief am 19.10. mit unbekannter Version).
+**Ablauf (`read_device_info()` in `ble_mainboard_test.py`):** `H` (Hauptmenü) -> warten auf `1...6?` -> `6` (Information und Zeit) -> warten auf `1...9?` -> Text sichern -> `9`
+(zurück) -> warten auf `1...6?`. Die Menüs werden sprachunabhängig an den Auswahlbereichen `1...6?`/`1...9?` erkannt (die Anzeigetexte gibt es in mehreren Sprachen).
+**Kanäle:** Alles, was einen Eingangsstrom (`.rx`) und `write()` hat: Bluetooth-Transporte (BLE/Classic, mit PIN über `authenticate_or_sync_main_menu`) und **RS232/USB**
+über den ohnehin laufenden Mitschnitt-Thread (`Rs232Sniffer.attach/write/detach`, `SnifferChannel`), also ohne den Port ein zweites Mal zu öffnen.
+**Auswertung (`parse_info_screen()`):** Modell, Firmware, Hardware-Revision, Seriennummer (`\d{2}[A-Z]{2}\d{4}`), Betriebsstunden, aktiver Parametersatz, Schnittstellen, Datum,
+Uhrzeit, Zeitzone, Zeitquelle, "Automatische Zeit"; alles optional, der **Rohtext bleibt im Bericht** (`device_info`).
+**Prüfungen/Warnungen (Trace + Log):** Firmware gegen `--expect-fw`; Seriennummer gegen den Zielnamen (`--name VIASIS_<serno>`); Geräteuhr weicht mehr als 10 min von der PC-Uhr
+ab (Hinweis auf unzuverlässige Zeitstempel); Info-Seite nicht lesbar.
+**Einbau:** `main()` ruft `preflight_identify()` vor jedem Modus auf (`--via auto|rs232|bt`; auto = RS232/USB, wenn der Mitschnitt-Port aktiv ist, sonst Bluetooth;
+`--no-identify` schaltet es ab). Das Ergebnis steht in `DEVICE_INFO`, im Trace (`device_info`), in den JSON-Gesamtberichten (`device_info`) und in der Kopfzeile des HTML-Berichts
+("Gerät A: Seriennr. ..., Firmware ..., Betriebsstunden, Geräteuhr ..."). Neuer Modus `--mode info` gibt die Seite aus und schreibt `device-info.json`.
+**Zwei Geräte (`soak --devices`):** Board A wird über RS232, Board B über USB identifiziert; die Seriennummern ordnen Port und Gerätename **eindeutig und ohne Bluetooth** zu (Reihenfolge
+wird bei Bedarf getauscht); nur wenn das nicht eindeutig ist, greift das alte Banner-Verfahren.
+**Stand:** Parser und Ablauf mit nachgebildeten Info-Seiten (Deutsch/Englisch), stummem Gerät und simulierten Zwei-Geräte-Läufen getestet. **Der echte Text der Info-Seite ist noch nicht
+mit dem Gerät abgeglichen** (Format aus dem Quelltext `infomenu()` abgeleitet): einmal `--mode info` laufen lassen und die Ausgabe prüfen/schicken, dann werden die Muster nachgezogen.
