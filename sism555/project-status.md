@@ -5230,3 +5230,17 @@ einmal `H` (Hauptmenü, harmlos) und wartet auf die Antwort. Das "offen" in der 
 Chronik: bis 09:40 alles bestanden (Interleave 30/30, Zwei-Geräte-Messreihe, B-Smoke); danach bei beiden Boards überwiegend kein Banner (10:29 A und B, 10:58 A und B, 12:42 A, 12:46 A), eine Ausnahme (12:45 A).
 Offen: **intermittierend, beide Boards betroffen -> Verdacht PC-/Windows-Bluetooth-Zustand** (am 19.10. morgens ähnlich), nicht Firmware (unverändert 5.124) und nicht die Boards (Classic und BLE liefen zuvor stundenlang fehlerfrei).
 Trennversuche: BLE auf B, Classic auf A, danach Bluetooth am PC aus/ein.
+
+## Diskriminierungstest BLE-Intermittenz (2026-10-20, 12:51-12:56, 5.124, ohne Identifikation)
+
+Ziel: klaeren, ob der intermittierende BLE-Fehler ("verbunden + Subscribe ok, kein Banner, Geraet trennt nach ca. 5,5 s") am PC, an den Boards oder an der Firmware liegt.
+
+| Lauf | Board | Modus | Ergebnis |
+|---|---|---|---|
+| 12:51 | B 26SC9983 | BLE smoke | unstable (kein PIN-Prompt, Trennung nach ca. 5,5 s) |
+| 12:52 | A 99SC9923 | Classic smoke | bestanden |
+| 12:52-12:54 | A 99SC9923 | BLE cycle, 6 Zyklen (hold 3 s, cooldown 5 s) | 6/6 bestanden |
+| 12:54 | A 99SC9923 | BLE smoke | unstable (kein PIN-Prompt, Trennung nach ca. 5,5 s) |
+| 12:55 | A 99SC9923 | BLE smoke | bestanden (Banner, PIN, Hauptmenue) |
+
+Befund: Classic stabil; BLE fehlerhaft nur im smoke-Modus, und zwar auf beiden Boards intermittierend (A: 1 von 2). Der cycle-Modus lief direkt dazwischen 6/6. Fehler haengt damit weder an einem Board noch an der Identifikation noch an der Firmware-Version. Verdacht: PC-BLE-Stack / Verbindungsaufbau im smoke-Modus (jeweils neuer 15-s-Scan und neuer BleakClient, gegenueber cycle mit wiederverwendeter Adresse). Offen: Bluetooth-Funk am PC aus/ein (Systemeinstellung, muss der Anwender machen); smoke mehrfach wiederholen und mit cycle vergleichen.
