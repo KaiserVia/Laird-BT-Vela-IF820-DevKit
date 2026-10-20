@@ -5093,3 +5093,7 @@ Build 0 Error(s), 0 Warning(s). **Am Gerät nicht getestet** (zu prüfen: USB-Te
 gestecktem USB nicht langsamer).
 **Offen / optional:** `__WFI()` im Idle-Thread würde das Gerät insgesamt sparsamer machen (Wecken über SysTick im 1-ms-Takt), ändert aber
 das Zeitverhalten des ganzen Systems und gehört getrennt bewertet und getestet.
+
+**Prüfung am Gerät 2026-10-20 (Anwender, 5.121/5.122):** (1) USB gesteckt ohne geöffnetes Terminal, Bluetooth-Verbindung: Banner und PIN-Aufforderung
+erscheinen ohne Verzögerung - **bestanden**. (2) USB-Terminal: Eingabe fühlt sich unverändert an - **bestanden**. (3) BT-Download bei gestecktem USB
+im Vergleich zu ohne USB: noch nicht geprüft (später).
