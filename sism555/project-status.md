@@ -5214,3 +5214,13 @@ kein Banner mehr (Verbindung und Subscribe ok, `buffered_bytes: 0`), das Flash-S
 Ziel-Abgleich (`target_address_ok`) liefen dabei fehlerfrei. **Ursache nicht gefunden:** `send_bt_info()` (btio.c) lässt CYSPP laut Code unberührt (`bt_command` ruft `bt_cmdmode()` nicht auf, `bt_cyspp_out` bleibt 0) und gibt UART1
 am Ende frei; trotzdem ist das der einzige Unterschied zu den erfolgreichen Läufen davor. **Maßnahme:** Die Modul-Abfrage ist in Tests jetzt **aus** (`--bt-module-info` schaltet sie ein; im Modus `info` bleibt sie an,
 `--no-bt-module-info` schaltet sie dort ab). **Zu klären (A/B-Test):** (1) `soak --devices ...` ohne Modul-Abfrage -> läuft BLE wieder? (2) `--mode info` (mit Modul-Abfrage), danach `--mode smoke --no-identify` -> fehlt das Banner?
+
+**Lauf 2026-10-20 10:58 (`soak --devices ...`, Modul-Abfrage aus):** Gleiches Fehlerbild auf **beiden** Boards (BLE verbunden und abonniert, kein Banner, A: "kein PIN-Prompt", B: "Not connected"); auch die `[BT-Event] C`-Zeilen fehlen,
+die Firmware hat die Verbindung also gar nicht erkannt. Identifikation (Info-Seite über RS232/USB, Seriennummern, Port-Zuordnung) lief wieder fehlerfrei. **Damit ist die Modul-Abfrage im Lauf selbst nicht der Auslöser - aber die Boards waren
+seit den Abfragen (A: 10:15 und 10:30, B: 10:30) nicht neu gestartet:** ein dauerhaft hängender Zustand nach `send_bt_info()` bleibt möglich. **Zu prüfen (Boards vorher aus-/einschalten):** (1) `--mode smoke --no-identify`: läuft BLE?
+(2) `--mode smoke` mit Identifikation (nur Info-Seite): läuft BLE? (3) `--mode info` (mit Modul-Abfrage), danach `--mode smoke --no-identify`: fehlt das Banner?
+
+**Lauf 2026-10-20 12:42 (`--mode smoke --name VIASIS_99SC9923`, mit Identifikation, Board A nach Aus-/Einschalten; die Uhr stand danach auf 14.10.2026 16:23:39, war also neu gestartet):** BLE verbindet (RSSI -54 dBm), Subscribe
+ok, **kein Banner, nach 5,5 s trennt das Gerät** ("DISCONNECT vom Gerät ausgelöst", Ergebnis unstable). Das ist **nach einem Neustart** und nur mit der Info-Seite (ohne Modul-Abfrage) passiert - die Kontrolle ohne Identifikation (`--no-identify`)
+fehlt noch (der erste Versuch war ein Tippfehler im Befehl). **Skript:** Die RS232-Vorprüfung meldete "COM3 ist offen, aber keine Daten", weil eine ruhige Firmware nichts von selbst sendet; sie sendet jetzt nach 2 s Stille
+einmal `H` (Hauptmenü, harmlos) und wartet auf die Antwort. Das "offen" in der Meldung heißt "geöffnet", nicht "belegt"; der Prozess wartete lediglich auf die Eingabe [R]etry/[S]/[W]/[A]bbrechen und hielt den Port dabei.

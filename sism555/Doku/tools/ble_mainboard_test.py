@@ -247,7 +247,8 @@ def slow_threshold(args) -> float:
     if getattr(args, "min_bps", None) is not None:
         return float(args.min_bps)
     return SLOW_DEFAULT_BPS.get(args.transport, 0.0)
-RS232_PREFLIGHT_LISTEN_S = 5.0
+RS232_PREFLIGHT_LISTEN_S = 5.0     # Gesamtzeit der Vorpruefung (davon die ersten 2 s passiv, dann 1x "H" senden)
+RS232_PREFLIGHT_PASSIVE_S = 2.0
 RS232_PARTIAL_FLUSH_S = 0.3
 
 
@@ -381,9 +382,16 @@ def setup_rs232_sniffer(args) -> bool:
             problem = (f"{args.rs232_port} laesst sich nicht oeffnen ({exc}). Belegt durch ein anderes "
                        "Programm (Terminal, Keil)? Kabel/Port richtig?")
         if opened:
-            log(f"RS232 {args.rs232_port} @ {args.rs232_baud} offen, warte "
-                f"{RS232_PREFLIGHT_LISTEN_S:.0f} s auf Daten ...")
-            received = sniffer.preflight(RS232_PREFLIGHT_LISTEN_S)
+            log(f"RS232 {args.rs232_port} @ {args.rs232_baud} offen, warte auf Daten ...")
+            received = sniffer.preflight(RS232_PREFLIGHT_PASSIVE_S)
+            if not received:
+                # Eine ruhige Firmware schweigt von selbst (Menue steht, nichts passiert) - das ist kein Fehler.
+                # Deshalb einmal "H" (Hauptmenue ausgeben, harmlos) senden und auf die Antwort warten.
+                try:
+                    sniffer.write(b"H")
+                except (serial.SerialException, OSError):
+                    pass
+                received = sniffer.preflight(RS232_PREFLIGHT_LISTEN_S - RS232_PREFLIGHT_PASSIVE_S)
             if received:
                 log(f"RS232-Mitschnitt aktiv ({received} Bytes empfangen).")
                 trace_event("rs232_sniffer_started", port=args.rs232_port, baud=args.rs232_baud,
