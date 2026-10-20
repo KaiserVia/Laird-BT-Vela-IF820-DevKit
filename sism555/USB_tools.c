@@ -46,13 +46,21 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
 	 {
     if (puterror (DTC_USB_DEV_CONN, USBD_Connect (0))==0)       	// USB Device 0 Connect
     {		
+		 uchar usb_linked=0;								// 5.124: 1 sobald der Host das Geraet konfiguriert hat
+		 //putstr(T_usbcon);
+     // 5.124: USB_LINK erst setzen, wenn der Host das Geraet wirklich eingerichtet hat. Vorher war USB_LINK schon
+     // gesetzt und diese Schleife hatte keinen Ausstieg: Ladegeraet/Powerbank (VBUS ohne Datenhost) oder Kabelzug
+     // waehrend der Enumeration liessen USB_LINK dauerhaft stehen (GSM/LTE-Aufgaben gesperrt, measure.c:203).
+     // Jetzt endet das Warten mit VBUS; ohne Host bleibt USB_LINK ungesetzt und der Dienst raeumt sauber auf.
+     while ((USBD_Configured (0)==0) && (FIO1PIN&VBUS)) osDelay(10);
+     if (USBD_Configured (0))								// Host hat konfiguriert?
+     {
+		  usb_linked=1;
 		 connect|=USB_LINK;												// USB-Verbindung hergestellt, ab hier sendet putb()
 		 concpy=connect;													// Kopie sichern		
 #if (VSPCAM)
  		 if (fp.vspcam) online=0;									// viaspeedcam online Modus beenden		
 #endif			
-		 //putstr(T_usbcon);
-     while (USBD_Configured (0)==0) osDelay(10);
 		 putstr(T_usbcf);		 			
 		 while (FIO1PIN&VBUS)										// Solange Host-Versorgung angeschlossen
 		 {
@@ -68,9 +76,10 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
 		 } // end while VBUS
 		 connect&=~USB_LINK;		 								// ab hier sendet putb() nicht mehr
 		 concpy=connect;												// Kopie sichern
+     } // end if USB konfiguriert
 		 if (puterror (DTC_USB_DEV_DISC, USBD_Disconnect(0))==0) putstr(T_usbdcon);
 #if (VSPCAM)		 
-		 if (fp.vspcam && (connect&UART0)) online=1; 	// viaspeedcam und RS232 Verbindung -> online Messmodus
+		 if (usb_linked && fp.vspcam && (connect&UART0)) online=1; 	// viaspeedcam und RS232 Verbindung -> online Messmodus
 #endif		 
     } // end if USB connect
 		puterror (DTC_USB_DEV_UNINIT, USBD_Uninitialize (0));	// Return Code bei Fehler ausgeben

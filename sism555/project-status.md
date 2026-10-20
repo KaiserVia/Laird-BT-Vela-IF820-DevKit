@@ -5109,3 +5109,17 @@ Parameterkennung (`!retry`, z. B. neuer Flash oder geänderter Parameterblock) o
 (flash.c:335, "Reset auf Standardparameter", `InitParameter(2)` über `X` im Menü) setzt nur überschreibbare Parameter (Schaltschwellen, Zeitpläne usw.) und
 lässt die Schnittstellen unberührt. Konstanten `Def_*` stehen in `hard.h`. **Gilt nur für neu initialisierte Geräte:** Bei bereits konfigurierten Geräten bleibt der
 gespeicherte Wert von `fp.usb` bestehen (einmal in der Konfiguration auf `J` stellen). Build 0 Error(s), 0 Warning(s); am Gerät nicht getestet.
+
+
+## Update 5.124: USB_LINK erst setzen, wenn der Host das Gerät eingerichtet hat (Ladegerät/Powerbank sperrt LTE nicht mehr)
+
+**Befund (Codeanalyse, nicht am Gerät nachgestellt):** `USB_HostService()` (USB_tools.c) setzte `connect|=USB_LINK` unmittelbar nach `USBD_Connect()` und wartete dann
+mit `while (USBD_Configured(0)==0) osDelay(10);` **ohne Ausstieg** auf die Konfiguration durch den Host. Wurde das Kabel vor Abschluss der Enumeration gezogen oder
+war nur ein Ladegerät/eine Powerbank (VBUS ohne Datenhost) angeschlossen, blieb der Thread dort hängen und `USB_LINK` dauerhaft gesetzt: Die geplanten GSM/LTE-Aufgaben
+(`measure.c:203` verlangt "keine Schnittstelle aktiv") starteten bis zum Neustart nicht mehr, MQTT war beim Anstecken bereits geschlossen worden (`measure.c:289`).
+**Fix:** Die Wartezeit endet jetzt auch, wenn `VBUS` wegfällt, und `USB_LINK` wird erst gesetzt, wenn `USBD_Configured()` wahr ist (mit der Meldung `T_usbcf`);
+ohne Host bleibt `USB_LINK` aus, der Dienst räumt nach `VBUS`-Verlust sauber auf (`USBD_Disconnect`/`Uninitialize`). `online=1` (speedcam) beim Trennen nur noch, wenn
+USB wirklich verbunden war (`usb_linked`). Eine Zeitgrenze (z. B. 10 s) habe ich bewusst nicht eingebaut: Sie würde bei angeschlossenem Ladegerät den USB-Treiber
+dauernd neu starten (Init/Connect/Timeout/Uninit im Takt), ohne dass jemand etwas davon hat; das Warten ohne Link kostet nichts.
+Build 0 Error(s), 0 Warning(s). **Am Gerät nicht getestet.** Zu prüfen: (1) PC-USB-Verbindung funktioniert wie vorher (Terminal, Banner, Menü); (2) Ladegerät/Powerbank
+ohne Daten anstecken - `USB` darf `connect` nicht setzen, LTE-Aufgaben laufen weiter; (3) Kabel während der Enumeration ziehen und neu stecken.
