@@ -5097,3 +5097,15 @@ das Zeitverhalten des ganzen Systems und gehört getrennt bewertet und getestet.
 **Prüfung am Gerät 2026-10-20 (Anwender, 5.121/5.122):** (1) USB gesteckt ohne geöffnetes Terminal, Bluetooth-Verbindung: Banner und PIN-Aufforderung
 erscheinen ohne Verzögerung - **bestanden**. (2) USB-Terminal: Eingabe fühlt sich unverändert an - **bestanden**. (3) BT-Download bei gestecktem USB
 im Vergleich zu ohne USB: noch nicht geprüft (später).
+
+
+## Update 5.123: USB ist in der Werkseinstellung aktiv
+
+**Anlass:** Nach einer Werkinitialisierung war USB aus (`fp.usb=0` in `werkparameter()`), man musste in der Konfiguration jedes Mal "USB (J/N)?" mit `J`
+beantworten, um per USB verbinden zu können.
+**Änderung:** `werkparameter()` (flash.c) setzt `fp.usb=1`. Die Abfrage in der Konfiguration und das Abschalten (Menü, MQTT-Befehl 199) bleiben unverändert.
+**Wo die Voreinstellungen liegen:** `werkparameter()` (flash.c:266) setzt den Werkszustand inkl. installierter Schnittstellen (BT/GSM/GPS/USB); sie läuft bei falscher
+Parameterkennung (`!retry`, z. B. neuer Flash oder geänderter Parameterblock) oder über das Menü (`InitParameter(1)`, sicom.c:807). `default_parameter()`
+(flash.c:335, "Reset auf Standardparameter", `InitParameter(2)` über `X` im Menü) setzt nur überschreibbare Parameter (Schaltschwellen, Zeitpläne usw.) und
+lässt die Schnittstellen unberührt. Konstanten `Def_*` stehen in `hard.h`. **Gilt nur für neu initialisierte Geräte:** Bei bereits konfigurierten Geräten bleibt der
+gespeicherte Wert von `fp.usb` bestehen (einmal in der Konfiguration auf `J` stellen). Build 0 Error(s), 0 Warning(s); am Gerät nicht getestet.

@@ -317,7 +317,7 @@ uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
  fp.btmodem=0;										// Reset installiertes Bluetooth Modem
  fp.gsm=0;												// Reset installiertes GSM/GPRS Modem
  fp.gps=0;												// Reset installiertes GPS Modul
- fp.usb=0;												// Reset installierte USB Schnittstelle(n)
+ fp.usb=1;												// 5.123: USB standardmaessig aktiv (in der Konfiguration abschaltbar)
  fp.ledspot=0;										// Reset installierte LED Blinklampe
  fp.sense=4;											// Sensitivity auf 100%
  fp.txrcon=Def_txrcon;						// Verst�rker und Transceiver - Schaltregler auf 3V3 und ein   
