@@ -5208,3 +5208,9 @@ Firmware-Ausgabe, nach der Identifikation mit Seriennummer und Firmware: "COM3: 
 Ausgabe: Log am Laufende ("Vom Test benutzte Ports"), Trace `ports_used`, JSON-Gesamtbericht `ports_used`, HTML-Kopfzeile "Verwendete Ports".
 **Kleines Hilfsprogramm `Doku/tools/comports.bat`** (Doppelklick, nur lesend, ohne Python): listet alle COM-Ports mit Art und Verbindung (Bluetooth-Ports mit Gerätename und Adresse, USB-Mainboard, RS232-Adapter,
 ungenutzte ausgehende Ports).
+
+**Rückschritt 2026-10-20 10:30 (Zwei-Geräte-Lauf `soak`):** Direkt nach der Geräteidentifikation inkl. **Bluetooth-Modul-Abfrage** (`Funkmodems -> Bluetooth -> Information`, 5.124 auf beiden Boards) kam bei **beiden** Boards über BLE
+kein Banner mehr (Verbindung und Subscribe ok, `buffered_bytes: 0`), das Flash-Schreiben schlug auf beiden fehl (Phase 1 A -> aus der Reihe genommen, Phase 2 B -> Abbruch). Identifikation, Seriennummern, Port-Zuordnung (COM3/COM13) und
+Ziel-Abgleich (`target_address_ok`) liefen dabei fehlerfrei. **Ursache nicht gefunden:** `send_bt_info()` (btio.c) lässt CYSPP laut Code unberührt (`bt_command` ruft `bt_cmdmode()` nicht auf, `bt_cyspp_out` bleibt 0) und gibt UART1
+am Ende frei; trotzdem ist das der einzige Unterschied zu den erfolgreichen Läufen davor. **Maßnahme:** Die Modul-Abfrage ist in Tests jetzt **aus** (`--bt-module-info` schaltet sie ein; im Modus `info` bleibt sie an,
+`--no-bt-module-info` schaltet sie dort ab). **Zu klären (A/B-Test):** (1) `soak --devices ...` ohne Modul-Abfrage -> läuft BLE wieder? (2) `--mode info` (mit Modul-Abfrage), danach `--mode smoke --no-identify` -> fehlt das Banner?

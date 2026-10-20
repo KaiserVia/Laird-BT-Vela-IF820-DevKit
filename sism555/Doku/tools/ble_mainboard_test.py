@@ -3263,7 +3263,8 @@ async def preflight_identify(args) -> None:
         channel = SnifferChannel(SNIFFER)
         try:
             await identify_channel(channel, "A" if getattr(args, "devices", "") else "RS232", args,
-                                   f"RS232/USB {SNIFFER.port}", bt_module=True)
+                                   f"RS232/USB {SNIFFER.port}",
+                                   bt_module=(getattr(args, "mode", None) == "info" or getattr(args, "bt_module_info", False)))
         finally:
             channel.close()
     else:
@@ -3526,7 +3527,8 @@ async def run_soak(args) -> int:
             # wird jetzt gelesen) gegen die Geraetenamen pruefen - eindeutig und ohne Bluetooth.
             channel_b = SnifferChannel(sniffer_b)
             try:
-                await identify_channel(channel_b, "B", args, f"USB {sniffer_b.port}", bt_module=True)
+                await identify_channel(channel_b, "B", args, f"USB {sniffer_b.port}",
+                                       bt_module=getattr(args, "bt_module_info", False))
             finally:
                 channel_b.close()
             serial_a = (DEVICE_INFO.get("A") or {}).get("seriennummer")
@@ -3935,8 +3937,12 @@ def main() -> int:
                    help="erwartete Firmware-Version (z. B. 5.124); weicht die Info-Seite ab, gibt es eine Warnung")
     p.add_argument("--expect-module-fw", default=None,
                    help="erwartete Firmware des Bluetooth-Moduls (z. B. 1.4.12.12); Abweichung gibt eine Warnung")
+    p.add_argument("--bt-module-info", action="store_true",
+                   help="bei der Geraeteidentifikation zusaetzlich das Bluetooth-Modul auslesen (Funkmodems -> Bluetooth -> Information, "
+                        "ca. 10 s, nur RS232/USB). Standard AUS in Tests: am 2026-10-20 blieb danach auf beiden Boards das BLE-Banner aus; "
+                        "im Modus info ist es immer an")
     p.add_argument("--no-bt-module-info", action="store_true",
-                   help="Bluetooth-Modul (Version, Adresse, Namen) nicht auslesen (spart ca. 10 s; nur RS232/USB moeglich)")
+                   help="im Modus info das Bluetooth-Modul nicht auslesen")
     p.add_argument("--rounds", type=int, default=20,
                    help="[interleave] Runden (je Runde ein Classic- und ein BLE-Zyklus)")
     p.add_argument("--max-failures", type=int, default=10,
