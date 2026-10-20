@@ -5224,3 +5224,9 @@ seit den Abfragen (A: 10:15 und 10:30, B: 10:30) nicht neu gestartet:** ein daue
 ok, **kein Banner, nach 5,5 s trennt das Gerät** ("DISCONNECT vom Gerät ausgelöst", Ergebnis unstable). Das ist **nach einem Neustart** und nur mit der Info-Seite (ohne Modul-Abfrage) passiert - die Kontrolle ohne Identifikation (`--no-identify`)
 fehlt noch (der erste Versuch war ein Tippfehler im Befehl). **Skript:** Die RS232-Vorprüfung meldete "COM3 ist offen, aber keine Daten", weil eine ruhige Firmware nichts von selbst sendet; sie sendet jetzt nach 2 s Stille
 einmal `H` (Hauptmenü, harmlos) und wartet auf die Antwort. Das "offen" in der Meldung heißt "geöffnet", nicht "belegt"; der Prozess wartete lediglich auf die Eingabe [R]etry/[S]/[W]/[A]bbrechen und hielt den Port dabei.
+
+**Läufe 2026-10-20 12:45 und 12:46 (Board A, beide `--mode smoke --no-identify`, also ohne jede Identifikation):** 12:45:46 **bestanden** (`[BT-Event] C ... I=0006`, Banner, PIN, Hauptmenü, 8 s gehalten), 12:46:54
+(nur 1 Minute später, gleicher Befehl) **unstable**: verbunden, Subscribe ok, kein Banner, kein `C`-Event, nach 5,5 s trennt das Gerät. Damit sind **Identifikation und Modul-Abfrage als Auslöser widerlegt**: gleicher Aufruf, einmal gut, einmal schlecht.
+Chronik: bis 09:40 alles bestanden (Interleave 30/30, Zwei-Geräte-Messreihe, B-Smoke); danach bei beiden Boards überwiegend kein Banner (10:29 A und B, 10:58 A und B, 12:42 A, 12:46 A), eine Ausnahme (12:45 A).
+Offen: **intermittierend, beide Boards betroffen -> Verdacht PC-/Windows-Bluetooth-Zustand** (am 19.10. morgens ähnlich), nicht Firmware (unverändert 5.124) und nicht die Boards (Classic und BLE liefen zuvor stundenlang fehlerfrei).
+Trennversuche: BLE auf B, Classic auf A, danach Bluetooth am PC aus/ein.
