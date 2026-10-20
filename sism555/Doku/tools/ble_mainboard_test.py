@@ -1332,6 +1332,7 @@ class BleTransport:
             self.args.ble_device_name = self.device_name
         if TRACE is not None:
             TRACE.set_device_name(self.device_name)
+        check_target_address(address, "BLE")
         trace_event("connect_started", transport="ble", address=address, timeout_s=timeout)
         started = time.perf_counter()
         self.client = BleakClient(address)
@@ -1410,6 +1411,7 @@ class ClassicTransport:
                     choose_classic_device, candidates)
                 log(f"Gefunden: BT-Geraet '{self.args.classic_device_name}' ({address}).")
             await self._step("Bluetooth-Geraetesuche beendet, SPP-COM-Port noch NICHT abgefragt. RS232 beobachten.")
+            check_target_address(address, "Classic")
             self.args.classic_port = await asyncio.to_thread(find_classic_port, address, self.args.port)
             log(f"SPP-Port fuer {self.args.classic_device_name}: {self.args.classic_port}.")
             await self._step("SPP-COM-Port abgefragt, aber noch NICHT geoeffnet. RS232 beobachten.")
@@ -3024,6 +3026,31 @@ async def read_bt_module_info(channel, timeout: float = 30.0) -> dict | None:
     await channel.write(b"H")                                          # zurueck ins Hauptmenue
     await rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
     return result
+
+
+_WARNED_ADDRESSES: set = set()
+
+
+def check_target_address(address, transport: str) -> None:
+    """Prueft, ob die Bluetooth-Adresse des Verbindungsziels zu einem identifizierten Geraet passt (Adresse aus dem
+    Bluetooth-Modul, gelesen ueber RS232/USB). Verhindert, dass der Test ein anderes Board anspricht als dasjenige,
+    dessen RS232-/USB-Ausgabe mitgeschnitten wird. Ohne identifizierte Module passiert nichts."""
+    known = {str((info.get("bt_modul") or {}).get("adresse", "")).replace(":", "").upper(): label
+             for label, info in DEVICE_INFO.items() if (info.get("bt_modul") or {}).get("adresse")}
+    if not known or not address:
+        return
+    normalized = str(address).replace(":", "").upper()
+    if normalized in known:
+        trace_event("target_address_ok", transport=transport, address=str(address), device=known[normalized])
+        return
+    if normalized in _WARNED_ADDRESSES:
+        return
+    _WARNED_ADDRESSES.add(normalized)
+    trace_event("target_address_unknown", level="warning", transport=transport, address=str(address),
+                known=sorted(known))
+    log(f"WARNUNG: Bluetooth-Ziel {address} ({transport}) gehoert zu keinem der identifizierten Geraete "
+        f"({', '.join(f'{label}={addr}' for addr, label in known.items())}) - Mitschnitt und Test beziehen sich "
+        "womoeglich auf verschiedene Boards.")
 
 
 async def identify_channel(channel, label: str, args, source: str, bt_module: bool = False) -> dict | None:

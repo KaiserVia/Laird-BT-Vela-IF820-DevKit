@@ -5187,3 +5187,9 @@ CYSPP-Modus, Classic-Supervision-Timeout (`GBTP T=7D00` = 20 s), Sniff-Modus. Er
 bei aktiver BT-Verbindung gesperrt (`sicom.c` Fall 0x0051, `T_noacc`) - über Bluetooth steht dann "nicht zugänglich". Das Mobilfunk-Modem hat im Gerät **kein** Informationsmenü (nur Zeitplan, PIN, Server,
 APN/SMS/SMTP), seine Version ist daher nicht lesbar. Fixture: `Doku/tools/testdata/bt_info_5.124_26SC9983.txt` (echte Ausgabe von Board B). Parser und Menüführung mit dieser echten Ausgabe und einer
 simulierten Menüführung getestet (inkl. gesperrtem BT-Menü); die Navigation selbst am Gerät noch nicht gelaufen.
+
+**Lauf am Gerät (2026-10-20 10:15, Board 99SC9923, `--mode info`, 8 s):** Info-Seite und Bluetooth-Modul vollständig gelesen: **IF820, Modul-Firmware 1.4.12.12, Stack 3.1.0.0, Protokoll 1.4, Hardware F1, Adresse
+CD:49:1B:93:00:5F** (stimmt mit der Windows-Adresse des Boards überein), Namen `VIASIS_99SC9923_BLE`/`VIASIS_99SC9923`, 460800 Baud, CYSPP-Modus 02, Classic-Supervision 20 s, Sniff aus. Die Geräteuhr
+läuft (12:25 min Anzeige gegen 12:25 min Realzeit seit dem ersten Lauf), ist aber ungestellt ("Zeitquelle: ungestellt", Datum 14.10.2026).
+**Ziel-Abgleich (neu):** `check_target_address()` vergleicht die Bluetooth-Adresse jedes BLE-/Classic-Verbindungsziels mit den Adressen der über RS232/USB identifizierten Module und warnt, wenn das Ziel zu keinem davon
+gehört (Test und Mitschnitt würden sich dann auf verschiedene Boards beziehen, z. B. bei mehreren VIASIS-Geräten in Reichweite). Trace: `target_address_ok` / `target_address_unknown`.
