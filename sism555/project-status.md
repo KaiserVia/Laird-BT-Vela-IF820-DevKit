@@ -5193,3 +5193,11 @@ CD:49:1B:93:00:5F** (stimmt mit der Windows-Adresse des Boards überein), Namen 
 läuft (12:25 min Anzeige gegen 12:25 min Realzeit seit dem ersten Lauf), ist aber ungestellt ("Zeitquelle: ungestellt", Datum 14.10.2026).
 **Ziel-Abgleich (neu):** `check_target_address()` vergleicht die Bluetooth-Adresse jedes BLE-/Classic-Verbindungsziels mit den Adressen der über RS232/USB identifizierten Module und warnt, wenn das Ziel zu keinem davon
 gehört (Test und Mitschnitt würden sich dann auf verschiedene Boards beziehen, z. B. bei mehreren VIASIS-Geräten in Reichweite). Trace: `target_address_ok` / `target_address_unknown`.
+
+**Nachtrag 2026-10-20: COM-Port-Zuordnung und PC-Bluetooth im Bericht** (`ble_mainboard_test.py`; auf diesem PC real geprüft):
+- **COM-Port-Übersicht** (`build_com_overview()`, Log + Trace `com_ports` + JSON `com_ports` + HTML-Kopfzeile "COM-Ports"): Quelle sind pyserial (USB-Kennung, Bluetooth-Adresse im Hardware-Pfad der SPP-Ports) und die identifizierten
+  Geräte (Terminal-Port, Modul-Adresse); Namen nicht identifizierter Bluetooth-Geräte kommen aus den Windows-Geräten (PowerShell, nur lesend). Beispiel dieses PCs: COM3 = USB-RS232-Adapter (Prolific) -> RS232-Terminal Board 99SC9923;
+  COM13 = USB-Anschluss Mainboard (LPC1766, 1FC9:80F7) -> USB-Terminal Board 26SC9983; COM11 = Classic Board 99SC9923 (`CD491B93005F`); COM8 = Classic Board 26SC9983 (`FF4F7F9EEEBA`); COM6 = VIASIS_26SC9994; COM10 = VIASIS_12SC1234;
+  COM5/7/9/12 = ausgehende Bluetooth-Ports, ungenutzt.
+- **Auf welchem Bluetooth läuft der Test (PC-Seite):** `pc_bluetooth_adapter()` liest Adapter, Hersteller, Treiberversion/-datum, USB-Kennung, Windows-Stack und Dienststatus (Trace `pc_bluetooth`, JSON `pc_bluetooth`, HTML "PC-Bluetooth").
+  Dieser PC: **Intel(R) Wireless Bluetooth(R), Intel Corporation, Treiber 24.50.0.4 vom 2026-08-05, USB 8087:0033, Windows-Stack 10.0.26100.9711, Dienst bthserv läuft**.

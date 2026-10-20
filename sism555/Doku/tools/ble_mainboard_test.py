@@ -811,7 +811,7 @@ def write_report(kind: str, data: dict) -> tuple[Path, Path]:
     base = report_dir / kind
     json_path = base.with_suffix(".json")
     if DEVICE_INFO and kind in ("module-suite", "fast-suite", "interleave", "soak", "device-info"):
-        data = {**data, "device_info": DEVICE_INFO}    # Firmware/Seriennummer der getesteten Geraete im Gesamtbericht
+        data = {**data, "device_info": DEVICE_INFO, "com_ports": COM_PORTS, "pc_bluetooth": PC_BT}   # Geraete, Ports, PC-Bluetooth
     json_path.write_text(__import__("json").dumps(data, indent=2, default=str), encoding="utf-8")
     return json_path, base.with_suffix(".md")
 
@@ -2565,6 +2565,14 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
         ("Classic", html.escape(" / ".join(str(classic_connection.get(key, "-")) for key in ("device_name", "port")))),
         ("Dateien", report_links),
     ]
+    if PC_BT:
+        header_rows.insert(-1, ("PC-Bluetooth", html.escape(
+            f"{PC_BT.get('name', '?')} ({PC_BT.get('hersteller', '?')}), Treiber {PC_BT.get('treiber', '?')} vom "
+            f"{PC_BT.get('datum', '?')}, USB {PC_BT.get('usb_id', '?')}; Windows-Stack {PC_BT.get('stack', '?')}; "
+            f"Dienst {PC_BT.get('dienst', '?')}")))
+    if COM_PORTS:
+        header_rows.insert(-1, ("COM-Ports", "<br>".join(
+            html.escape(f"{entry['port']}: {entry['zuordnung']} [{entry['art']}]") for entry in COM_PORTS)))
     for dev_label, dev_info in DEVICE_INFO.items():     # Geraeteidentifikation (Firmware, Seriennummer, ...)
         parts = [f"Seriennr. {dev_info.get('seriennummer', '?')}", f"Firmware {dev_info.get('firmware', '?')}",
                  f"HW {dev_info.get('hardware', '?')}"]
@@ -2664,9 +2672,43 @@ def pc_power_status() -> dict:
         return {}
 
 
+PC_BT: dict = {}        # Bluetooth-Adapter des PCs (Name, Hersteller, Treiber, Windows-Stack, Dienst)
+
+
+def pc_bluetooth_adapter() -> dict:
+    """Auf welchem Bluetooth laeuft der Test? Funkadapter des PCs, Treiberversion, Windows-Stack und Dienststatus (nur lesend)."""
+    script = (
+        "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+        "$d=Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue | Where-Object { $_.DeviceClass -eq 'BLUETOOTH' }; "
+        r"$a=$d | Where-Object { $_.DeviceID -match '^(USB|PCI|ACPI|UART)\\' } | Select-Object -First 1; "
+        "$s=$d | Where-Object { $_.InfName -eq 'bth.inf' } | Select-Object -First 1; "
+        "$v=(Get-Service bthserv -ErrorAction SilentlyContinue).Status; "
+        "[pscustomobject]@{name=$a.DeviceName; hersteller=$a.Manufacturer; treiber=$a.DriverVersion; "
+        "datum=$(if ($a.DriverDate) { $a.DriverDate.ToString('yyyy-MM-dd') }); id=$a.DeviceID; stack=$s.DriverVersion; "
+        "dienst=\"$v\"} | ConvertTo-Json -Compress")
+    try:
+        done = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                              capture_output=True, timeout=60)
+        data = json.loads(done.stdout.decode("utf-8", "replace").strip() or "{}")
+    except Exception:
+        return {}
+    if data.get("name"):
+        match = re.search(r"VID_([0-9A-F]{4})&PID_([0-9A-F]{4})", data.get("id") or "")
+        data["usb_id"] = f"{match.group(1)}:{match.group(2)}" if match else None
+    PC_BT.clear()
+    PC_BT.update({key: value for key, value in data.items() if value})
+    return PC_BT
+
+
 def pc_logging_start(args) -> None:
     """Beim Teststart: PC wachhalten, PC-Zustand ins Trace."""
     PC_STATE["start_wall"] = time.time()
+    adapter = pc_bluetooth_adapter()
+    if adapter:
+        trace_event("pc_bluetooth", **adapter)
+        log(f"PC-Bluetooth: {adapter.get('name', '?')} ({adapter.get('hersteller', '?')}), Treiber "
+            f"{adapter.get('treiber', '?')} vom {adapter.get('datum', '?')}, USB-Kennung {adapter.get('usb_id', '?')}, "
+            f"Windows-Stack {adapter.get('stack', '?')}, Dienst {adapter.get('dienst', '?')}.")
     try:   # ES_CONTINUOUS | ES_SYSTEM_REQUIRED: System bleibt wach (Anzeige darf ausgehen)
         fn = ctypes.windll.kernel32.SetThreadExecutionState
         fn.argtypes = [ctypes.c_uint]
@@ -3028,6 +3070,87 @@ async def read_bt_module_info(channel, timeout: float = 30.0) -> dict | None:
     return result
 
 
+COM_PORTS: list = []                   # Zuordnung COM-Port -> Verwendung (wird bei der Geraeteidentifikation aufgebaut)
+_BT_NAMES: dict = {}                   # Bluetooth-Adresse (12 Hex) -> Windows-Geraetename, einmal je Lauf geladen
+USB_ROLES = {(0x1FC9, 0x80F7): "USB-Anschluss Mainboard (LPC1766)", (0x067B, 0x23A3): "USB-RS232-Adapter (Prolific)"}
+
+
+def _load_bt_names() -> None:
+    """Windows-Namen der gekoppelten Bluetooth-Geraete (Adresse -> Name) per PowerShell, nur lesend; Fehler werden ignoriert."""
+    if _BT_NAMES:
+        return
+    script = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | "
+              "Where-Object { $_.InstanceId -match 'DEV_[0-9A-F]{12}' } | ForEach-Object { $_.InstanceId + '|' + $_.FriendlyName }")
+    try:
+        done = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                              capture_output=True, timeout=30)
+        for line in done.stdout.decode("utf-8", "replace").splitlines():
+            found = re.search(r"DEV_([0-9A-F]{12}).*\|(.+)$", line.strip())
+            if found:
+                _BT_NAMES[found.group(1)] = found.group(2).strip()
+    except Exception:
+        pass
+
+
+def build_com_overview() -> list:
+    """Welcher COM-Port ist womit verbunden? Quellen: pyserial (USB-Kennung, Bluetooth-Adresse im Hardware-Pfad) und die
+    identifizierten Geraete (DEVICE_INFO: Terminal-Port und Bluetooth-Adresse des Moduls). Ergebnis in COM_PORTS."""
+    COM_PORTS.clear()
+    if serial is None:
+        return COM_PORTS
+    from serial.tools import list_ports
+    _load_bt_names()
+    by_address = {str((info.get("bt_modul") or {}).get("adresse", "")).replace(":", "").upper(): label
+                  for label, info in DEVICE_INFO.items() if (info.get("bt_modul") or {}).get("adresse")}
+    by_terminal = {info.get("terminal_port"): label for label, info in DEVICE_INFO.items() if info.get("terminal_port")}
+
+    def device_text(label: str) -> str:
+        info = DEVICE_INFO.get(label, {})
+        return f"Board {info.get('seriennummer', label)}"
+
+    ports = sorted(list_ports.comports(), key=lambda port: int(re.sub(r"\D", "", port.device) or 0))
+    unused = []
+    for port in ports:
+        entry = {"port": port.device, "art": port.description.split("(")[0].strip(), "zuordnung": ""}
+        hwid = port.hwid or ""
+        spp = re.search(r"&([0-9A-F]{12})_C00000000", hwid)
+        if "BTHENUM" in hwid and "LOCALMFG" in hwid:
+            unused.append(port.device)
+            continue
+        if spp:                                              # Bluetooth-SPP-Port eines gekoppelten Geraets (Classic)
+            address = spp.group(1)
+            entry["art"] = "Bluetooth Classic (SPP)"
+            entry["bt_adresse"] = address
+            if address in by_address:
+                entry["zuordnung"] = f"{device_text(by_address[address])} ({_BT_NAMES.get(address, address)})"
+            else:
+                entry["zuordnung"] = _BT_NAMES.get(address, f"Bluetooth-Geraet {address}")
+        elif (port.vid, port.pid) in USB_ROLES:
+            entry["art"] = USB_ROLES[(port.vid, port.pid)]
+            if port.device in by_terminal:
+                kind = "RS232" if (port.vid, port.pid) == (0x067B, 0x23A3) else "USB"
+                entry["zuordnung"] = f"{kind}-Terminal von {device_text(by_terminal[port.device])} (Mitschnitt/Geraeteinfo)"
+            else:
+                entry["zuordnung"] = "nicht belegt/ unbekannt"
+        else:
+            entry["zuordnung"] = port.description
+        COM_PORTS.append(entry)
+    if unused:
+        COM_PORTS.append({"port": ", ".join(unused), "art": "Bluetooth (ausgehend)", "zuordnung": "ungenutzt"})
+    return COM_PORTS
+
+
+def log_com_overview() -> None:
+    """Uebersicht ins Log und in den Trace."""
+    build_com_overview()
+    if not COM_PORTS:
+        return
+    log("COM-Ports:")
+    for entry in COM_PORTS:
+        log(f"  {entry['port']:18} {entry['art']:36} {entry['zuordnung']}")
+    trace_event("com_ports", ports=COM_PORTS)
+
+
 _WARNED_ADDRESSES: set = set()
 
 
@@ -3074,6 +3197,9 @@ async def identify_channel(channel, label: str, args, source: str, bt_module: bo
             module = {"nicht_zugaenglich": f"Fehler: {exc}"}
         if module:
             info["bt_modul"] = module
+    sniffer = getattr(channel, "sniffer", None)
+    if sniffer is not None:
+        info["terminal_port"] = sniffer.port                           # RS232/USB-Port, ueber den die Seite gelesen wurde
     _record_device_info(label, info, args, source)
     module = info.get("bt_modul") or {}
     if module and "nicht_zugaenglich" not in module:
@@ -3126,6 +3252,8 @@ async def preflight_identify(args) -> None:
             channel.close()
     else:
         await identify_via_bluetooth(args)
+    if not getattr(args, "devices", ""):          # bei zwei Geraeten folgt die Uebersicht nach der Identifikation von B
+        await asyncio.to_thread(log_com_overview)
 
 
 def report_device_info(args) -> int:
@@ -3134,6 +3262,13 @@ def report_device_info(args) -> int:
     if not DEVICE_INFO:
         print("  Keine Geraeteinformation lesbar (siehe Log: Hauptmenue nicht erreichbar?).")
         return 1
+    if PC_BT:
+        print(f"  PC-Bluetooth: {PC_BT.get('name')} ({PC_BT.get('hersteller')}), Treiber {PC_BT.get('treiber')} vom "
+              f"{PC_BT.get('datum')}, USB {PC_BT.get('usb_id')}, Windows-Stack {PC_BT.get('stack')}, Dienst {PC_BT.get('dienst')}")
+    if COM_PORTS:
+        print("  COM-Ports:")
+        for entry in COM_PORTS:
+            print(f"    {entry['port']:18} {entry['art']:36} {entry['zuordnung']}")
     for label, info in DEVICE_INFO.items():
         print(f"  Geraet {label} (via {info.get('quelle')}):")
         for key in ("modell", "firmware", "hardware", "seriennummer", "betriebsstunden", "parametersatz",
@@ -3378,6 +3513,7 @@ async def run_soak(args) -> int:
                 await identify_channel(channel_b, "B", args, f"USB {sniffer_b.port}", bt_module=True)
             finally:
                 channel_b.close()
+            await asyncio.to_thread(log_com_overview)       # COM-Port-Uebersicht jetzt, wo A und B identifiziert sind
             serial_a = (DEVICE_INFO.get("A") or {}).get("seriennummer")
             serial_b = (DEVICE_INFO.get("B") or {}).get("seriennummer")
             matched = False
