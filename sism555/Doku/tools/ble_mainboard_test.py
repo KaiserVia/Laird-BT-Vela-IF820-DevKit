@@ -390,6 +390,7 @@ def setup_rs232_sniffer(args) -> bool:
                             preflight_bytes=received)
                 sniffer.start()
                 SNIFFER = sniffer
+                register_port(args.rs232_port, "RS232-/USB-Terminal: Mitschnitt der Firmware-Ausgabe (Geraet A)")
                 return True
             problem = (f"{args.rs232_port} ist offen, aber es kamen {RS232_PREFLIGHT_LISTEN_S:.0f} s lang "
                        "keine Daten. Geraet an / Firmware aktiv? Falscher Port oder Baudrate? "
@@ -416,6 +417,7 @@ def setup_rs232_sniffer(args) -> bool:
                         preflight_bytes=0)
             sniffer.start()
             SNIFFER = sniffer
+            register_port(args.rs232_port, "RS232-/USB-Terminal: Mitschnitt der Firmware-Ausgabe (Geraet A)")
             log("RS232-Mitschnitt aktiv (ohne Vorab-Daten).")
             return True
         sniffer.close_port()
@@ -811,7 +813,7 @@ def write_report(kind: str, data: dict) -> tuple[Path, Path]:
     base = report_dir / kind
     json_path = base.with_suffix(".json")
     if DEVICE_INFO and kind in ("module-suite", "fast-suite", "interleave", "soak", "device-info"):
-        data = {**data, "device_info": DEVICE_INFO, "com_ports": COM_PORTS, "pc_bluetooth": PC_BT}   # Geraete, Ports, PC-Bluetooth
+        data = {**data, "device_info": DEVICE_INFO, "ports_used": dict(USED_PORTS)}   # Geraete und vom Test benutzte Ports
     json_path.write_text(__import__("json").dumps(data, indent=2, default=str), encoding="utf-8")
     return json_path, base.with_suffix(".md")
 
@@ -1333,6 +1335,7 @@ class BleTransport:
         if TRACE is not None:
             TRACE.set_device_name(self.device_name)
         check_target_address(address, "BLE")
+        register_port(f"BLE {address}", f"Bluetooth-LE-Verbindung zu {self.device_name or '?'}")
         trace_event("connect_started", transport="ble", address=address, timeout_s=timeout)
         started = time.perf_counter()
         self.client = BleakClient(address)
@@ -1417,6 +1420,7 @@ class ClassicTransport:
             await self._step("SPP-COM-Port abgefragt, aber noch NICHT geoeffnet. RS232 beobachten.")
         self.device_name = self.args.classic_device_name
         self.port = self.args.classic_port
+        register_port(self.port, f"Bluetooth-Classic-Verbindung (SPP) zu {self.device_name}")
         if TRACE is not None:
             TRACE.set_device_name(self.device_name)
         await self._step(f"Jetzt wird {self.port} geoeffnet und damit SPP angefordert. RS232 beobachten.")
@@ -2565,14 +2569,9 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
         ("Classic", html.escape(" / ".join(str(classic_connection.get(key, "-")) for key in ("device_name", "port")))),
         ("Dateien", report_links),
     ]
-    if PC_BT:
-        header_rows.insert(-1, ("PC-Bluetooth", html.escape(
-            f"{PC_BT.get('name', '?')} ({PC_BT.get('hersteller', '?')}), Treiber {PC_BT.get('treiber', '?')} vom "
-            f"{PC_BT.get('datum', '?')}, USB {PC_BT.get('usb_id', '?')}; Windows-Stack {PC_BT.get('stack', '?')}; "
-            f"Dienst {PC_BT.get('dienst', '?')}")))
-    if COM_PORTS:
-        header_rows.insert(-1, ("COM-Ports", "<br>".join(
-            html.escape(f"{entry['port']}: {entry['zuordnung']} [{entry['art']}]") for entry in COM_PORTS)))
+    if USED_PORTS:                                      # welche Ports hat der Test wofuer benutzt
+        header_rows.insert(-1, ("Verwendete Ports", "<br>".join(
+            html.escape(f"{port}: {purpose}") for port, purpose in USED_PORTS.items())))
     for dev_label, dev_info in DEVICE_INFO.items():     # Geraeteidentifikation (Firmware, Seriennummer, ...)
         parts = [f"Seriennr. {dev_info.get('seriennummer', '?')}", f"Firmware {dev_info.get('firmware', '?')}",
                  f"HW {dev_info.get('hardware', '?')}"]
@@ -2704,11 +2703,8 @@ def pc_logging_start(args) -> None:
     """Beim Teststart: PC wachhalten, PC-Zustand ins Trace."""
     PC_STATE["start_wall"] = time.time()
     adapter = pc_bluetooth_adapter()
-    if adapter:
+    if adapter:                                          # nice to know: nur im Trace, nicht im Testlog/-bericht
         trace_event("pc_bluetooth", **adapter)
-        log(f"PC-Bluetooth: {adapter.get('name', '?')} ({adapter.get('hersteller', '?')}), Treiber "
-            f"{adapter.get('treiber', '?')} vom {adapter.get('datum', '?')}, USB-Kennung {adapter.get('usb_id', '?')}, "
-            f"Windows-Stack {adapter.get('stack', '?')}, Dienst {adapter.get('dienst', '?')}.")
     try:   # ES_CONTINUOUS | ES_SYSTEM_REQUIRED: System bleibt wach (Anzeige darf ausgehen)
         fn = ctypes.windll.kernel32.SetThreadExecutionState
         fn.argtypes = [ctypes.c_uint]
@@ -3070,7 +3066,25 @@ async def read_bt_module_info(channel, timeout: float = 30.0) -> dict | None:
     return result
 
 
-COM_PORTS: list = []                   # Zuordnung COM-Port -> Verwendung (wird bei der Geraeteidentifikation aufgebaut)
+USED_PORTS: dict = {}                  # vom TEST tatsaechlich benutzte Ports/Kanaele -> wofuer (fuer Log, JSON und Bericht)
+
+
+def register_port(port: str, purpose: str) -> None:
+    """Merkt, welchen Port/Kanal der Test benutzt hat und wofuer (spaetere Eintraege ueberschreiben, z. B. mit Seriennummer)."""
+    USED_PORTS[str(port)] = purpose
+
+
+def log_used_ports() -> None:
+    """Am Laufende: welche Ports hat der Test wofuer benutzt (einmal ins Log und in den Trace)."""
+    if not USED_PORTS:
+        return
+    log("Vom Test benutzte Ports:")
+    for port, purpose in USED_PORTS.items():
+        log(f"  {port:24} {purpose}")
+    trace_event("ports_used", ports=dict(USED_PORTS))
+
+
+COM_PORTS: list = []                   # Uebersicht ALLER COM-Ports des PCs (nur fuer --mode info; im Alltag comports.bat)
 _BT_NAMES: dict = {}                   # Bluetooth-Adresse (12 Hex) -> Windows-Geraetename, einmal je Lauf geladen
 USB_ROLES = {(0x1FC9, 0x80F7): "USB-Anschluss Mainboard (LPC1766)", (0x067B, 0x23A3): "USB-RS232-Adapter (Prolific)"}
 
@@ -3200,6 +3214,8 @@ async def identify_channel(channel, label: str, args, source: str, bt_module: bo
     sniffer = getattr(channel, "sniffer", None)
     if sniffer is not None:
         info["terminal_port"] = sniffer.port                           # RS232/USB-Port, ueber den die Seite gelesen wurde
+        register_port(sniffer.port, f"RS232-/USB-Terminal: Mitschnitt Board {info.get('seriennummer', '?')} "
+                                    f"(Firmware {info.get('firmware', '?')}, Geraet {label})")
     _record_device_info(label, info, args, source)
     module = info.get("bt_modul") or {}
     if module and "nicht_zugaenglich" not in module:
@@ -3252,8 +3268,6 @@ async def preflight_identify(args) -> None:
             channel.close()
     else:
         await identify_via_bluetooth(args)
-    if not getattr(args, "devices", ""):          # bei zwei Geraeten folgt die Uebersicht nach der Identifikation von B
-        await asyncio.to_thread(log_com_overview)
 
 
 def report_device_info(args) -> int:
@@ -3265,6 +3279,7 @@ def report_device_info(args) -> int:
     if PC_BT:
         print(f"  PC-Bluetooth: {PC_BT.get('name')} ({PC_BT.get('hersteller')}), Treiber {PC_BT.get('treiber')} vom "
               f"{PC_BT.get('datum')}, USB {PC_BT.get('usb_id')}, Windows-Stack {PC_BT.get('stack')}, Dienst {PC_BT.get('dienst')}")
+    build_com_overview()                                # --mode info: komplette Uebersicht (im Alltag: comports.bat)
     if COM_PORTS:
         print("  COM-Ports:")
         for entry in COM_PORTS:
@@ -3500,6 +3515,7 @@ async def run_soak(args) -> int:
             try:
                 sniffer_b.open()
                 sniffer_b.start()
+                register_port(port_b, "RS232-/USB-Terminal: Mitschnitt der Firmware-Ausgabe (Geraet B)")
                 trace_event("rs232_sniffer_started", port=port_b, baud=args.rs232_baud, dev="B")
                 log(f"Mitschnitt fuer das zweite Geraet auf {port_b} aktiv.")
             except (serial.SerialException, OSError) as exc:
@@ -3513,7 +3529,6 @@ async def run_soak(args) -> int:
                 await identify_channel(channel_b, "B", args, f"USB {sniffer_b.port}", bt_module=True)
             finally:
                 channel_b.close()
-            await asyncio.to_thread(log_com_overview)       # COM-Port-Uebersicht jetzt, wo A und B identifiziert sind
             serial_a = (DEVICE_INFO.get("A") or {}).get("seriennummer")
             serial_b = (DEVICE_INFO.get("B") or {}).get("seriennummer")
             matched = False
@@ -4016,6 +4031,7 @@ if __name__ == "__main__":
         raise SystemExit(130)
     finally:
         pc_events_export()     # greift nur, falls die Suite es nicht schon getan hat
+        log_used_ports()       # welche Ports hat der Test wofuer benutzt
         pc_logging_stop()
         if SNIFFER is not None:
             SNIFFER.stop()

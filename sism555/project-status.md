@@ -5201,3 +5201,10 @@ gehört (Test und Mitschnitt würden sich dann auf verschiedene Boards beziehen,
   COM5/7/9/12 = ausgehende Bluetooth-Ports, ungenutzt.
 - **Auf welchem Bluetooth läuft der Test (PC-Seite):** `pc_bluetooth_adapter()` liest Adapter, Hersteller, Treiberversion/-datum, USB-Kennung, Windows-Stack und Dienststatus (Trace `pc_bluetooth`, JSON `pc_bluetooth`, HTML "PC-Bluetooth").
   Dieser PC: **Intel(R) Wireless Bluetooth(R), Intel Corporation, Treiber 24.50.0.4 vom 2026-08-05, USB 8087:0033, Windows-Stack 10.0.26100.9711, Dienst bthserv läuft**.
+
+**Korrektur 2026-10-20 (Anwenderwunsch): Testbericht zeigt nur, welche Ports der TEST benutzt hat.** Die vollständige COM-Port-Übersicht des PCs und das PC-Bluetooth sind "nice to know" und stehen nicht mehr im Testlog/-bericht
+(das PC-Bluetooth nur noch als Trace-Ereignis `pc_bluetooth`, die Übersicht nur in `--mode info`). Neu: `register_port()` merkt sich beim Benutzen eines Ports, wofür er diente - **RS232-/USB-Terminal** (Mitschnitt der
+Firmware-Ausgabe, nach der Identifikation mit Seriennummer und Firmware: "COM3: ... Board 99SC9923 (Firmware 5.124, Gerät A)"), **Bluetooth-Classic-Verbindung** (COM-Port und Zielgerät), **Bluetooth-LE-Verbindung** (Adresse und Name).
+Ausgabe: Log am Laufende ("Vom Test benutzte Ports"), Trace `ports_used`, JSON-Gesamtbericht `ports_used`, HTML-Kopfzeile "Verwendete Ports".
+**Kleines Hilfsprogramm `Doku/tools/comports.bat`** (Doppelklick, nur lesend, ohne Python): listet alle COM-Ports mit Art und Verbindung (Bluetooth-Ports mit Gerätename und Adresse, USB-Mainboard, RS232-Adapter,
+ungenutzte ausgehende Ports).
