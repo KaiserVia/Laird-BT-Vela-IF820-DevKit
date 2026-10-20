@@ -5079,3 +5079,17 @@ Zusätzlich hängt mit USB am Gerät die GSM/LTE-Aufgabenplanung (`measure.c:203
 Versuch ohne Warten (Byte wird bei vollem Puffer verworfen). Gelingt `USBD_CDC_ACM_PutChar` wieder, ist der Stau aufgehoben. Wirkt nur auf
 die USB-Ausgabe; RS232 und Bluetooth bleiben unberührt. Build 0 Error(s), 0 Warning(s). **Am Gerät nicht getestet** (Test: USB stecken,
 kein Terminal öffnen, per BLE verbinden - Banner und PIN-Prompt müssen sofort erscheinen).
+
+
+## Update 5.122: USB-Empfangsdienst pollt nicht mehr im Dauer-Yield
+
+**Befund (Codeanalyse, nicht gemessen):** `USB_HostService()` (USB_tools.c) fragt solange VBUS anliegt in einer Schleife nach Daten und rief bei
+leerem Puffer nur `osThreadYield()` auf - der Thread wird dadurch nie blockiert, sondern ist immer "ready". Mit Round-Robin (1 ms Zeitscheibe,
+`OS_ROBIN`/`OS_ROBINTOUT` in `RTX_Conf_CM.c`) bekommt er in jeder Runde einen Kontextwechsel, solange USB steckt (kleine, aber dauernde
+Rechenzeit-Abgabe, relevant vor allem bei langen BT-Downloads). Strom spart ein Wechsel auf `osDelay` **nicht**: der Idle-Thread
+(`os_idle_demon`, RTX_Conf_CM.c) ist eine leere Schleife ohne `__WFI()`, die CPU schläft nie, auch ohne USB.
+**Fix:** Bei leerem USB-Empfangspuffer `osDelay(1)` statt `osThreadYield()` (Empfangslatenz <= 1 ms; der Puffer-voll-Zweig ist unverändert).
+Build 0 Error(s), 0 Warning(s). **Am Gerät nicht getestet** (zu prüfen: USB-Terminaleingabe fühlt sich unverändert an; BT-Download mit
+gestecktem USB nicht langsamer).
+**Offen / optional:** `__WFI()` im Idle-Thread würde das Gerät insgesamt sparsamer machen (Wecken über SysTick im 1-ms-Takt), ändert aber
+das Zeitverhalten des ganzen Systems und gehört getrennt bewertet und getestet.

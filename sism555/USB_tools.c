@@ -64,7 +64,7 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
 				 if (bxi!=rxi+1) rbuf[++rxi] = USBD_CDC_ACM_GetChar (0); 	// Byte(s) lesen		
 				 else osThreadYield();			 															// Pufferüberlauf? -> Taskwechsel
 			  }	}	
-      else osThreadYield();																		// kein(e) Zeichen Taskwechsel 
+      else osDelay(1);       /* 5.122: nicht mehr Dauer-Yield (Busy-Poll) - 1 ms Pause, andere Threads bekommen die Zeit */																		// kein(e) Zeichen Taskwechsel 
 		 } // end while VBUS
 		 connect&=~USB_LINK;		 								// ab hier sendet putb() nicht mehr
 		 concpy=connect;												// Kopie sichern
