@@ -2574,6 +2574,12 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
         if dev_info.get("schnittstellen"):
             parts.append(", ".join(dev_info["schnittstellen"]))
         header_rows.insert(-1, (f"Geraet {html.escape(str(dev_label))}", html.escape("; ".join(parts))))
+        bt_mod = dev_info.get("bt_modul") or {}
+        if bt_mod and "nicht_zugaenglich" not in bt_mod:
+            header_rows.insert(-1, (f"BT-Modul {html.escape(str(dev_label))}", html.escape(
+                f"{bt_mod.get('modul', '?')} FW {bt_mod.get('modul_firmware', '?')} (Stack {bt_mod.get('modul_stack', '?')}); "
+                f"Adresse {bt_mod.get('adresse', '?')}; {bt_mod.get('name_ble', '?')} / {bt_mod.get('name_classic', '?')}; "
+                f"{bt_mod.get('baudrate', '?')} Baud")))
     header_html = "".join(f"<tr><th>{label}</th><td>{value}</td></tr>" for label, value in header_rows)
     diagnostic_html = ""
     if diagnostics or failed_phases:
@@ -2935,8 +2941,94 @@ def _record_device_info(label: str, info: dict, args, source: str) -> None:
         log(f"WARNUNG: Firmware auf Geraet {label} nicht aus der Info-Seite lesbar (Rohtext im Bericht).")
 
 
-async def identify_channel(channel, label: str, args, source: str) -> dict | None:
-    """Liest die Info-Seite ueber den Kanal und registriert das Ergebnis (None, wenn das Menue nicht erreichbar war)."""
+def _version_from_hex(value: str) -> str:
+    """'01040C0C' -> '1.4.12.12' (je ein Byte pro Teil)."""
+    try:
+        return ".".join(str(int(value[index:index + 2], 16)) for index in range(0, len(value), 2))
+    except ValueError:
+        return value
+
+
+def parse_bt_info(text: str) -> dict:
+    """Zerlegt die Ausgabe von Funkmodems -> Bluetooth -> Information (EZ-Serial-Antworten des IF820) in Felder."""
+    info: dict = {"raw": text}
+    if re.search(r"IF820", text):
+        info["modul"] = "IF820"
+    found = re.search(r"/QFV[^\n]*?E=(\w+),S=(\w+),P=(\w+),H=(\w+)", text)
+    if found:
+        info["modul_firmware"] = _version_from_hex(found.group(1))      # E=01040C0C -> 1.4.12.12
+        info["modul_stack"] = _version_from_hex(found.group(2))         # S=03010000 -> 3.1.0.0
+        info["modul_protokoll"] = _version_from_hex(found.group(3))     # P=0104 -> 1.4
+        info["modul_hardware"] = found.group(4)
+    found = re.search(r"GBA[^\n]*?A=([0-9A-Fa-f]{12})", text)
+    if found:
+        raw_address = found.group(1).upper()
+        info["adresse"] = ":".join(raw_address[index:index + 2] for index in range(0, 12, 2))
+    for key, label in (("00", "name_ble"), ("01", "name_classic")):
+        found = re.search(rf"GDN,T={key}[^\n]*?N=([^\s,]+)", text)
+        if found:
+            info[label] = found.group(1)
+    found = re.search(r"GTU[^\n]*?B=(\w+)", text)
+    if found:
+        try:
+            info["baudrate"] = int(found.group(1), 16)
+        except ValueError:
+            pass
+    found = re.search(r"\.CYSPPGP[^\n]*?E=(\w+)", text)
+    if found:
+        info["cyspp_aktiv_modus"] = found.group(1)
+    found = re.search(r"GBTP[^\n]*?T=(\w+)", text)
+    if found:
+        try:
+            info["classic_supervision_s"] = int(found.group(1), 16) * 0.625 / 1000.0   # Einheit 0,625 ms
+        except ValueError:
+            pass
+    found = re.search(r"GSBP[^\n]*?M=(\w+)", text)
+    if found:
+        info["sniff_modus"] = found.group(1)
+    found = re.search(r"TX bytes=(\d+)", text)
+    if found:
+        info["zaehler_zeile"] = found.group(0)
+    return info
+
+
+async def read_bt_module_info(channel, timeout: float = 30.0) -> dict | None:
+    """Hauptmenue -> 5 Funkmodems -> 1 Bluetooth Modem -> 1 Information -> zurueck zum Hauptmenue (nur ueber RS232/USB:
+    das Bluetooth-Menue ist bei aktiver BT-Verbindung gesperrt). Liefert die geparsten Moduldaten, {'nicht_zugaenglich': ...}
+    oder None, wenn das Hauptmenue nicht erreichbar war."""
+    rx = channel.rx
+    rx.clear()
+    await channel.write(b"H")
+    if not await rx.wait_for_marker(MARK_MAIN_RANGE, 8.0):
+        return None
+    result: dict | None = None
+    await asyncio.sleep(0.3)
+    rx.clear()
+    await channel.write(b"5")                                          # 5 = Funkmodems
+    if await rx.wait_for_any_marker(("1...3?", "1...4?"), 6.0):
+        await asyncio.sleep(0.3)
+        rx.clear()
+        await channel.write(b"1")                                      # 1 = Bluetooth Modem
+        if await rx.wait_for_any_marker(("1...3?",), 6.0):
+            await asyncio.sleep(0.3)
+            rx.clear()
+            await channel.write(b"1")                                  # 1 = Information (ca. 8-10 s, Modembefehle)
+            if await rx.wait_for_marker("TX bytes=", timeout):
+                await rx.wait_for_marker("1...3?", 6.0)                # Menue-Prompt nach der Ausgabe
+                await asyncio.sleep(0.2)
+                result = parse_bt_info(bytes(rx.buf).decode("cp1252", errors="replace"))
+        else:
+            result = {"nicht_zugaenglich": "Bluetooth-Menue nicht erreichbar (aktive BT-Verbindung?)"}
+    await asyncio.sleep(0.3)
+    rx.clear()
+    await channel.write(b"H")                                          # zurueck ins Hauptmenue
+    await rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
+    return result
+
+
+async def identify_channel(channel, label: str, args, source: str, bt_module: bool = False) -> dict | None:
+    """Liest die Info-Seite ueber den Kanal und registriert das Ergebnis (None, wenn das Menue nicht erreichbar war).
+    bt_module=True liest zusaetzlich die Daten des Bluetooth-Moduls (nur ueber RS232/USB moeglich, ca. 10 s)."""
     try:
         info = await read_device_info(channel)
     except Exception as exc:           # Kommunikationsfehler duerfen den eigentlichen Test nie verhindern
@@ -2947,7 +3039,31 @@ async def identify_channel(channel, label: str, args, source: str) -> dict | Non
         log(f"Geraeteinfo {label} ({source}): Hauptmenue nicht erreichbar (Marker {MARK_MAIN_RANGE}).")
         trace_event("device_info_error", level="warning", label=label, source=source, error="kein Hauptmenue")
         return None
+    if bt_module and any("bluetooth" in part.lower() for part in info.get("schnittstellen", [])) \
+            and not getattr(args, "no_bt_module_info", False):
+        try:
+            module = await read_bt_module_info(channel)
+        except Exception as exc:
+            module = {"nicht_zugaenglich": f"Fehler: {exc}"}
+        if module:
+            info["bt_modul"] = module
     _record_device_info(label, info, args, source)
+    module = info.get("bt_modul") or {}
+    if module and "nicht_zugaenglich" not in module:
+        trace_event("bt_module_info", label=label, **{key: module.get(key) for key in (
+            "modul", "modul_firmware", "modul_stack", "modul_protokoll", "modul_hardware", "adresse", "name_ble",
+            "name_classic", "baudrate", "cyspp_aktiv_modus", "classic_supervision_s", "sniff_modus")})
+        log(f"Bluetooth-Modul {label}: {module.get('modul', '?')} FW {module.get('modul_firmware', '?')} "
+            f"(Stack {module.get('modul_stack', '?')}), Adresse {module.get('adresse', '?')}, "
+            f"Namen {module.get('name_ble', '?')} / {module.get('name_classic', '?')}, "
+            f"{module.get('baudrate', '?')} Baud, CYSPP-Modus {module.get('cyspp_aktiv_modus', '?')}.")
+        wanted = getattr(args, "expect_module_fw", None)
+        if wanted and module.get("modul_firmware") and module["modul_firmware"] != wanted:
+            trace_event("bt_module_firmware_mismatch", level="warning", label=label,
+                        found=module["modul_firmware"], expected=wanted)
+            log(f"WARNUNG: Modul-Firmware {module['modul_firmware']} auf Geraet {label}, erwartet {wanted}.")
+    elif module:
+        log(f"Bluetooth-Modul {label}: {module['nicht_zugaenglich']}")
     return info
 
 
@@ -2978,7 +3094,7 @@ async def preflight_identify(args) -> None:
         channel = SnifferChannel(SNIFFER)
         try:
             await identify_channel(channel, "A" if getattr(args, "devices", "") else "RS232", args,
-                                   f"RS232/USB {SNIFFER.port}")
+                                   f"RS232/USB {SNIFFER.port}", bt_module=True)
         finally:
             channel.close()
     else:
@@ -2997,6 +3113,14 @@ def report_device_info(args) -> int:
                     "schnittstellen", "datum", "zeit", "zeitzone", "zeitquelle", "automatische_zeit", "uhr_abweichung_s"):
             if info.get(key) is not None:
                 print(f"    {key:18}: {info[key]}")
+        module = info.get("bt_modul") or {}
+        if module:
+            print("    Bluetooth-Modul:")
+            for key in ("modul", "modul_firmware", "modul_stack", "modul_protokoll", "modul_hardware", "adresse",
+                        "name_ble", "name_classic", "baudrate", "cyspp_aktiv_modus", "classic_supervision_s",
+                        "sniff_modus", "nicht_zugaenglich"):
+                if module.get(key) is not None:
+                    print(f"      {key:22}: {module[key]}")
         print(f"    {'Info-Seite Rohtext':18}:")
         for line in info.get("raw", "").splitlines():
             if line.strip():
@@ -3224,7 +3348,7 @@ async def run_soak(args) -> int:
             # wird jetzt gelesen) gegen die Geraetenamen pruefen - eindeutig und ohne Bluetooth.
             channel_b = SnifferChannel(sniffer_b)
             try:
-                await identify_channel(channel_b, "B", args, f"USB {sniffer_b.port}")
+                await identify_channel(channel_b, "B", args, f"USB {sniffer_b.port}", bt_module=True)
             finally:
                 channel_b.close()
             serial_a = (DEVICE_INFO.get("A") or {}).get("seriennummer")
@@ -3631,6 +3755,10 @@ def main() -> int:
                    help="Geraeteidentifikation (Hauptmenue -> Information) zu Beginn nicht ausfuehren")
     p.add_argument("--expect-fw", default=None,
                    help="erwartete Firmware-Version (z. B. 5.124); weicht die Info-Seite ab, gibt es eine Warnung")
+    p.add_argument("--expect-module-fw", default=None,
+                   help="erwartete Firmware des Bluetooth-Moduls (z. B. 1.4.12.12); Abweichung gibt eine Warnung")
+    p.add_argument("--no-bt-module-info", action="store_true",
+                   help="Bluetooth-Modul (Version, Adresse, Namen) nicht auslesen (spart ca. 10 s; nur RS232/USB moeglich)")
     p.add_argument("--rounds", type=int, default=20,
                    help="[interleave] Runden (je Runde ein Classic- und ein BLE-Zyklus)")
     p.add_argument("--max-failures", type=int, default=10,

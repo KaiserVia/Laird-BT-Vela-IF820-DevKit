@@ -5178,3 +5178,12 @@ mit dem Gerät abgeglichen** (Format aus dem Quelltext `infomenu()` abgeleitet):
 "Betriebsstunden: 108 h", "Aktiver Parametersatz: 1", "Schnittstellen: Bluetooth, USB", "3. Datum: 14.10.2026, Mittwoch", "4. Zeit: 17:35:25", "5. Zeitzone: 1", "Zeitquelle: ungestellt",
 "8. Automatische Zeit: ein". Der Parser liefert damit alle Felder fehlerfrei. **Befund:** Die Uhr dieses Boards ist ungestellt (Zeitquelle "ungestellt", Anzeige 14.10.2026 17:35:25,
 -136,5 h gegenüber dem PC) - die Warnung "Geräteuhr weicht ab" greift. Noch nicht am Gerät geprüft: Identifikation über USB (`--rs232-port COM13`) und über Bluetooth (`--via bt`).
+
+**Nachtrag 2026-10-20: Schnittstellen/Bluetooth-Modul in der Geräteidentifikation** (`ble_mainboard_test.py`). Die Schnittstellenliste der Info-Seite (z. B. "Bluetooth, USB") war schon enthalten.
+Neu: Ist Bluetooth installiert, liest die Identifikation über RS232/USB zusätzlich **Hauptmenü -> 5 Funkmodems -> 1 Bluetooth Modem -> 1 Information** (ca. 10 s, EZ-Serial-Befehle an das IF820)
+und wertet sie aus (`parse_bt_info()`): Modul, **Modul-Firmware** (`/QFV E=01040C0C` -> 1.4.12.12), Stack (3.1.0.0), Protokoll, Hardware (F1), Bluetooth-Adresse, BLE-/Classic-Name, UART-Baudrate,
+CYSPP-Modus, Classic-Supervision-Timeout (`GBTP T=7D00` = 20 s), Sniff-Modus. Ergebnis im Trace (`bt_module_info`), im JSON-Bericht (`device_info[...].bt_modul`, mit Rohtext) und in der HTML-Kopfzeile
+("BT-Modul A: IF820 FW 1.4.12.12 ..."). Optionen: `--expect-module-fw 1.4.12.12` (Warnung bei Abweichung), `--no-bt-module-info` (überspringen). **Grenzen:** Nur über RS232/USB möglich, denn das Bluetooth-Menü ist
+bei aktiver BT-Verbindung gesperrt (`sicom.c` Fall 0x0051, `T_noacc`) - über Bluetooth steht dann "nicht zugänglich". Das Mobilfunk-Modem hat im Gerät **kein** Informationsmenü (nur Zeitplan, PIN, Server,
+APN/SMS/SMTP), seine Version ist daher nicht lesbar. Fixture: `Doku/tools/testdata/bt_info_5.124_26SC9983.txt` (echte Ausgabe von Board B). Parser und Menüführung mit dieser echten Ausgabe und einer
+simulierten Menüführung getestet (inkl. gesperrtem BT-Menü); die Navigation selbst am Gerät noch nicht gelaufen.
