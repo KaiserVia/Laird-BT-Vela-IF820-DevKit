@@ -2809,7 +2809,7 @@ def parse_info_screen(text: str) -> dict:
             model = re.split(r"\s+-\s+", line, maxsplit=1)[0].strip()
             if model and not re.search(r"\d+\.\d{2,3}", model):
                 info["modell"] = model
-            hardware = re.search(r"\d+\.\d{2,3}\s*:\s*(\S+)", line)
+            hardware = re.search(r"\d+\.\d{2,3}\s*[,:]\s*(\S+)", line)       # echte Seite: "Version 5.124, J2"
             if hardware:
                 info["hardware"] = hardware.group(1)
             break
@@ -2831,6 +2831,7 @@ def parse_info_screen(text: str) -> dict:
                 info["zeitzone"] = int(number.group(1))
         elif re.match(r"Zeitquelle\s*:", line, re.I):
             info["zeitquelle"] = line.split(":", 1)[1].strip()
+            info["uhr_gestellt"] = info["zeitquelle"].lower() not in ("ungestellt", "unset", "")
         elif re.search(r"Automatische Zeit|Automatic time", line, re.I):
             info["automatische_zeit"] = line.split(":", 1)[1].strip() if ":" in line else None
     for index, line in enumerate(lines):                        # "Schnittstellen: Bluetooth, USB, GSM/GPRS-LTE, GPS"

@@ -5172,3 +5172,9 @@ ab (Hinweis auf unzuverlässige Zeitstempel); Info-Seite nicht lesbar.
 wird bei Bedarf getauscht); nur wenn das nicht eindeutig ist, greift das alte Banner-Verfahren.
 **Stand:** Parser und Ablauf mit nachgebildeten Info-Seiten (Deutsch/Englisch), stummem Gerät und simulierten Zwei-Geräte-Läufen getestet. **Der echte Text der Info-Seite ist noch nicht
 mit dem Gerät abgeglichen** (Format aus dem Quelltext `infomenu()` abgeleitet): einmal `--mode info` laufen lassen und die Ausgabe prüfen/schicken, dann werden die Muster nachgezogen.
+
+**Abgleich mit dem echten Gerät (2026-10-20, Board 99SC9923 über RS232 COM3, 5.124):** `--mode info` lief fehlerfrei (ca. 1 s). Die Info-Seite sieht so aus (Fixture:
+`Doku/tools/testdata/info_screen_5.124_99SC9923.txt`): "Viasis 3003M - Version 5.124, **J2**" (Hardware-Revision hinter einem **Komma**, nicht Doppelpunkt - Muster angepasst), "Seriennummer: 99SC9923",
+"Betriebsstunden: 108 h", "Aktiver Parametersatz: 1", "Schnittstellen: Bluetooth, USB", "3. Datum: 14.10.2026, Mittwoch", "4. Zeit: 17:35:25", "5. Zeitzone: 1", "Zeitquelle: ungestellt",
+"8. Automatische Zeit: ein". Der Parser liefert damit alle Felder fehlerfrei. **Befund:** Die Uhr dieses Boards ist ungestellt (Zeitquelle "ungestellt", Anzeige 14.10.2026 17:35:25,
+-136,5 h gegenüber dem PC) - die Warnung "Geräteuhr weicht ab" greift. Noch nicht am Gerät geprüft: Identifikation über USB (`--rs232-port COM13`) und über Bluetooth (`--via bt`).
