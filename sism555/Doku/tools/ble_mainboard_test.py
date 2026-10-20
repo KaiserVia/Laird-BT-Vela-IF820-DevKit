@@ -830,7 +830,31 @@ def write_report(kind: str, data: dict) -> tuple[Path, Path]:
 # Modus 1: Smoke-Test mit Debug-Timings (BLE)
 # ---------------------------------------------------------------------------
 
+SMOKE_LAST: dict = {}          # Ergebnis des letzten Smoke-Versuchs (fuer die Wiederholung bei bekanntem PC-Verhalten)
+SMOKE_SLOW_CONNECT_MS = 2000.0  # Verbindungsaufbau darueber: Windows fragt die GATT-Dienste neu ab, danach trennt das Geraet oft
+
+
 async def run_smoke_test(args) -> int:
+    """Smoke-Test mit einer Wiederholung: Scheitert der erste Versuch ohne PIN-Prompt nach langsamem Verbindungsaufbau
+    (> 2 s), ist das das bekannte intermittierende PC-/Windows-BLE-Verhalten (Messung 2026-10-20, project-status.md,
+    Diskriminierungstest) - dann einmal neu verbinden. Scheitert auch der zweite Versuch, gilt es als echter Fehler."""
+    code = await _run_smoke_once(args)
+    first = dict(SMOKE_LAST)
+    known_pc_issue = (code != 0 and first.get("result") == "unstable" and not first.get("pin_prompt_seen")
+                      and first.get("phases_ms", {}).get("connect", 0) > SMOKE_SLOW_CONNECT_MS)
+    if not known_pc_issue:
+        return code
+    log(f"Bekanntes PC-BLE-Verhalten (Verbindungsaufbau {first['phases_ms']['connect']:.0f} ms, kein PIN-Prompt, "
+        f"Geraet trennt) - wiederhole den Smoke-Test einmal.")
+    await asyncio.sleep(5.0)
+    code = await _run_smoke_once(args)
+    SMOKE_LAST["retry_of_pc_issue"] = True
+    log("Wiederholung: " + ("bestanden - Erstversuch war das bekannte PC-Verhalten." if code == 0
+                            else "ebenfalls fehlgeschlagen - echter Fehler."))
+    return code
+
+
+async def _run_smoke_once(args) -> int:
     result = {
         "mode": "smoke",
         "started_at": datetime.now().astimezone().isoformat(timespec="milliseconds"),
@@ -959,6 +983,8 @@ async def run_smoke_test(args) -> int:
 
 
 def _finish_smoke(result: dict, args) -> None:
+    SMOKE_LAST.clear()
+    SMOKE_LAST.update(result)
     print()
     print("=" * 70)
     print("  SMOKE-TEST ZUSAMMENFASSUNG")

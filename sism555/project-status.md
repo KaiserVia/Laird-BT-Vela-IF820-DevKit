@@ -5244,3 +5244,10 @@ Ziel: klaeren, ob der intermittierende BLE-Fehler ("verbunden + Subscribe ok, ke
 | 12:55 | A 99SC9923 | BLE smoke | bestanden (Banner, PIN, Hauptmenue) |
 
 Befund: Classic stabil; BLE fehlerhaft nur im smoke-Modus, und zwar auf beiden Boards intermittierend (A: 1 von 2). Der cycle-Modus lief direkt dazwischen 6/6. Fehler haengt damit weder an einem Board noch an der Identifikation noch an der Firmware-Version. Verdacht: PC-BLE-Stack / Verbindungsaufbau im smoke-Modus (jeweils neuer 15-s-Scan und neuer BleakClient, gegenueber cycle mit wiederverwendeter Adresse). Offen: Bluetooth-Funk am PC aus/ein (Systemeinstellung, muss der Anwender machen); smoke mehrfach wiederholen und mit cycle vergleichen.
+
+### Nachtrag: Bluetooth-Funk aus/ein und Smoke-Wiederholung (2026-10-20, 14:14-14:32)
+
+- Bluetooth-Funk am PC aus/ein (durch den Anwender) behebt den Fehler nicht: danach smoke an Board A 1x unstable (Verbindungsaufbau 2261 ms), 2x bestanden (1179/1430 ms).
+- `ble_mainboard_test.py --mode smoke` wiederholt jetzt einmal, wenn der Erstversuch ohne PIN-Prompt scheitert und der Verbindungsaufbau > 2 s dauerte (`SMOKE_SLOW_CONNECT_MS`, Meldung "Bekanntes PC-BLE-Verhalten"). Scheitert auch die Wiederholung, gilt es als echter Fehler.
+- Kontrolllaeufe mit Wiederholung (4 Laeufe): Lauf 1 Erstversuch 3583 ms unstable, Wiederholung (1711 ms) ebenfalls unstable; Lauf 2 Erstversuch 2315 ms unstable, Wiederholung (4172 ms) bestanden; Lauf 3 und 4 sofort bestanden (2136/1591 ms).
+- **Korrektur der Hypothese:** Der Zusammenhang "langsamer Aufbau = Fehlschlag" ist nur eine Tendenz, kein Beweis (Wiederholung scheiterte bei 1711 ms, ein Lauf mit 4172 ms bestand). Die Fehlerrate im smoke-Modus liegt bei ca. 40-50 %, im cycle-Modus bei 0/6. Ursache weiter offen; die Wiederholung ist ein Workaround im Test, keine Erklaerung. Naechster Schritt: Windows-Eintrag des Geraets entfernen und neu koppeln; ggf. smoke mit wiederverwendeter Adresse (`--address`) gegen smoke mit Scan vergleichen.
