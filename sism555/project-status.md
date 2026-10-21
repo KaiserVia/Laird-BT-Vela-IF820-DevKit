@@ -5259,3 +5259,11 @@ Befund: Classic stabil; BLE fehlerhaft nur im smoke-Modus, und zwar auf beiden B
 - Testskript: Bildschirm-Anforderung zusaetzlich (`ES_DISPLAY_REQUIRED`), Hintergrundwaechter fuer Zeitspruenge > 8 s (PC stand), verlorener RS232-/USB-Port meldet `env_disturbance`; Phasen, die waehrend einer Stoerung scheitern, erhalten den Status `environment` (orange, Gesamtergebnis `environment` statt `failed`, wenn nur solche Phasen fehlen).
 - Anleitung fuer die PC-Einstellungen (Win11): `Doku/Win11_PC_Einstellungen_Dauertest.md`.
 - Offen: Lauf wiederholen nach Umstellung; die smoke-Fehler vom 2026-10-20 (Tageszeit, PC aktiv) sind damit nicht erklaert.
+
+### Lauf 2026-10-21 12:01-14:25 (module-suite, 26SC9983, Wachhalten aktiv): komplett bestanden, BLE langsam
+
+- Gesamtergebnis passed (alle Phasen, 8685 s). `powercfg /requests` zeigte waehrend des Tests `python.exe` unter DISPLAY und SYSTEM (Wachhalten wirkt). Keine Standby-Phasen, kein verlorener Port, 0 Umgebungsstoerungen. (Der Lauf 11:29 ohne `--name` fand kein Classic-Geraet, weil mehrere VIASIS-Geraete gekoppelt sind: `--name` immer angeben.)
+- Classic-Downloads 3x ohne Retries (ca. 550-560 s je 4,2 MB, ca. 7,5 KB/s).
+- BLE-Downloads 3x bestanden, aber langsam: ca. 3,0-3,1 KB/s, je ~1550 s. Die Langsam-Erkennung brach jeweils nach 61 s ab und wiederholte (3100 B/s < Schwelle 4500).
+- Ursache wie am 2026-10-20: In allen 14 `[BT-Event]` C-Ereignissen steht `I=48` (60 ms Verbindungsintervall), `L=0`, `O=960` (9,6 s). Windows waehlt fuer Board B immer 60 ms; Board A bekam 7,5 ms (6,6 KB/s). Das Modul bremst dann per CTS.
+- Naechster Schritt: Windows-Eintrag `VIASIS_26SC9983_BLE` entfernen und neu koppeln (Gegenprobe); falls es bei 60 ms bleibt, Modul/Firmware sollte die Verbindungsparameter selbst anfordern (EZ-Serial-Guide: Befehl zum Aktualisieren der Verbindungsparameter pruefen).
