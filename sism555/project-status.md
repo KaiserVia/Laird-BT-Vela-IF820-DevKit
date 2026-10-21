@@ -5267,3 +5267,9 @@ Befund: Classic stabil; BLE fehlerhaft nur im smoke-Modus, und zwar auf beiden B
 - BLE-Downloads 3x bestanden, aber langsam: ca. 3,0-3,1 KB/s, je ~1550 s. Die Langsam-Erkennung brach jeweils nach 61 s ab und wiederholte (3100 B/s < Schwelle 4500).
 - Ursache wie am 2026-10-20: In allen 14 `[BT-Event]` C-Ereignissen steht `I=48` (60 ms Verbindungsintervall), `L=0`, `O=960` (9,6 s). Windows waehlt fuer Board B immer 60 ms; Board A bekam 7,5 ms (6,6 KB/s). Das Modul bremst dann per CTS.
 - Naechster Schritt: Windows-Eintrag `VIASIS_26SC9983_BLE` entfernen und neu koppeln (Gegenprobe); falls es bei 60 ms bleibt, Modul/Firmware sollte die Verbindungsparameter selbst anfordern (EZ-Serial-Guide: Befehl zum Aktualisieren der Verbindungsparameter pruefen).
+
+### Gegenprobe Board B 2026-10-21 (14:37-14:40) und Loesung per /UCP (EZ-Serial-Guide)
+
+- Classic-Kopplung von 26SC9983 entfernt und neu gekoppelt (BLE ist bei uns nie gekoppelt, im Geraete-Manager steht kein BLE-Eintrag). Danach BLE-smoke 2x bestanden, aber `--mode receive` ble weiterhin 3,1-3,2 KB/s (Langsam-Erkennung nach 61 s). Das lange Intervall (60 ms) liegt also nicht an der Windows-Kopplung von B.
+- EZ-Serial-Guide (v2.2, Abschnitt BLE-Durchsatz, Beispiel 16): Als Peripheral bestimmt der Central das Anfangsintervall; der Peripheral kann nach dem Verbinden `/UCP,C=<handle>,I=6,L=0,O=64` (gap_update_conn_parameters) senden, der Central darf annehmen oder ablehnen; Erfolg zeigt das Event `CU` (`@E,...,CU,C=..,I=..`). Alternativ `SCP` (gap_set_conn_parameters) fuer Voreinstellung.
+- Naechster Schritt (Firmware, nicht umgesetzt): nach dem `@E,...,C,C=01...`-Event ein `/UCP` mit 7,5-15 ms senden und das CU-Event auswerten. Vorher klaeren: UART1 steht dann im Command-Mode-Zeitfenster (vor dem CCCD-Subscribe), das UCP darf den CYSPP-Pin nicht treiben (nur Kommando ueber UART).
