@@ -349,6 +349,7 @@ class Rs232Sniffer:
                     buf.clear()
         except (serial.SerialException, OSError) as exc:
             trace_event("rs232_error", level="error", error=str(exc))
+            env_disturbance("rs232_lost", f"RS232-/USB-Port {self.port} verloren: {exc}")
             log(f"RS232-Mitschnitt {self.port} unterbrochen: {exc}")
 
     def stop(self) -> None:
@@ -2650,7 +2651,7 @@ def render_suite_html(result: dict, title: str, subtitle: str, report_paths: dic
         "<style>body{font-family:Segoe UI,sans-serif;margin:36px;background:#f3f6f8;color:#17212b}"
         "h1{margin:0}h2{margin-top:34px}table{border-collapse:collapse;background:#fff;width:100%;max-width:1050px}"
         "th,td{padding:10px;border-bottom:1px solid #d9e1e6;text-align:left;vertical-align:top}.passed{color:#137333;font-weight:700}"
-        ".failed{color:#b3261e;font-weight:700}.skipped{color:#6b7280;font-weight:700}.bar{height:10px;background:#dfe7ec;width:220px}.bar span{display:block;height:100%;background:#167a9d}"
+        ".failed{color:#b3261e;font-weight:700}.skipped{color:#6b7280;font-weight:700}.environment{color:#b26a00;font-weight:700}.bar{height:10px;background:#dfe7ec;width:220px}.bar span{display:block;height:100%;background:#167a9d}"
         "code{white-space:pre-wrap;word-break:break-word}.run-header{max-width:1050px}.run-header th{width:140px}</style>"
         f"<h1>{title}</h1><p>{subtitle}</p><p>Ergebnis: <b class='{result['result']}'>{result['result']}</b></p>"
         "<h2>Laufdetails</h2><table class='run-header'><tbody>" + header_html + "</tbody></table>" +
@@ -2678,6 +2679,47 @@ SUITE_SUMMARY_FILES = ("module-suite.json", "fast-suite.json")
 PC_STATE: dict = {"start_wall": None, "exported": False, "awake": False}
 PC_EVENT_PROVIDERS = r"Kernel-Power|bth|bluetooth|usb|Kernel-PnP|Kernel-Boot|Kernel-Processor-Power"
 PC_FRESH_BOOT_S = 900.0     # PC juenger als 15 Minuten: Wartung/Treiberstart laeuft noch -> Warnung
+PC_SUSPEND_GAP_S = 8.0      # Zeitsprung der Uhr-Pruefung (1 s Takt) groesser: der PC stand (Standby/Ruhezustand/Einfrieren)
+ENV_EVENTS: list = []       # Stoerungen der Testumgebung (nicht des Geraets): (Wanduhr, Art, Text)
+
+
+def env_disturbance(kind: str, text: str) -> None:
+    """Stoerung der Testumgebung merken (Standby, verlorener COM-Port, ...). Eine Phase, die waehrend einer Stoerung
+    scheitert, wird als 'environment' statt als 'failed' gewertet (siehe classify_phase_status)."""
+    ENV_EVENTS.append((time.time(), kind, text))
+    trace_event("env_disturbance", level="warning", kind=kind, text=text)
+    log(f"TESTUMGEBUNG GESTOERT ({kind}): {text}")
+
+
+def classify_phase_status(status: str, started_wall: float) -> str:
+    """'failed' wird zu 'environment', wenn seit Phasenbeginn eine Stoerung der Testumgebung gemeldet wurde."""
+    if status != "failed":
+        return status
+    kinds = sorted({kind for when, kind, _ in ENV_EVENTS if when >= started_wall - 1.0})
+    if not kinds:
+        return status
+    trace_event("phase_environment", level="warning", kinds=kinds,
+                hinweis="Phase scheiterte waehrend einer Stoerung der Testumgebung - kein Fehler von Geraet/Modul belegt")
+    log(f"Phase gilt als 'Testumgebung gestoert' (nicht als Fehler): {', '.join(kinds)}")
+    return "environment"
+
+
+def suite_result(phases: list) -> str:
+    """passed = alle bestanden; environment = Rest nur durch gestoerte Umgebung; sonst failed."""
+    bad = [phase["result"] for phase in phases if phase["result"] not in ("passed", "skipped")]
+    if not bad:
+        return "passed" if all(phase["result"] == "passed" for phase in phases) else "failed"
+    return "environment" if all(result == "environment" for result in bad) else "failed"
+
+
+def _suspend_watch() -> None:
+    last = time.time()
+    while True:
+        time.sleep(1.0)
+        now = time.time()
+        if now - last > PC_SUSPEND_GAP_S:
+            env_disturbance("pc_suspend", f"PC stand ca. {now - last:.0f} s still (Standby/Ruhezustand)")
+        last = now
 
 
 class _SystemPowerStatus(ctypes.Structure):
@@ -2739,13 +2781,14 @@ def pc_logging_start(args) -> None:
     adapter = pc_bluetooth_adapter()
     if adapter:                                          # nice to know: nur im Trace, nicht im Testlog/-bericht
         trace_event("pc_bluetooth", **adapter)
-    try:   # ES_CONTINUOUS | ES_SYSTEM_REQUIRED: System bleibt wach (Anzeige darf ausgehen)
+    try:   # ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED: System und Bildschirm bleiben an
         fn = ctypes.windll.kernel32.SetThreadExecutionState
         fn.argtypes = [ctypes.c_uint]
         fn.restype = ctypes.c_uint
-        PC_STATE["awake"] = fn(0x80000001) != 0
+        PC_STATE["awake"] = fn(0x80000003) != 0     # + ES_DISPLAY_REQUIRED: Bildschirm bleibt an, sonst Standby nach Sperren
     except Exception:
         PC_STATE["awake"] = False
+    threading.Thread(target=_suspend_watch, name="suspend-watch", daemon=True).start()
     uptime = pc_uptime_s()
     power = pc_power_status()
     fresh = uptime is not None and uptime < PC_FRESH_BOOT_S
@@ -3365,6 +3408,7 @@ def make_phase_runner(args, result: dict, label: str):
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
+        status = classify_phase_status(status, started_wall)
         report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"),
                                  "result": status, "duration_s": round(time.perf_counter() - started, 3),
@@ -3734,6 +3778,7 @@ async def run_module_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
+        status = classify_phase_status(status, started_wall)
         report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"), "result": status,
                                  "duration_s": round(time.perf_counter() - started, 3), "report": report_data})
@@ -3783,7 +3828,7 @@ async def run_module_suite(args) -> int:
             skipped(f"BLE Download {index}/3", "ble", no_flash if not flash_ok else None)
 
     pc_events_export()   # PC-Ereignisse (Standby, Bluetooth/USB) vor dem Bericht ins Trace, damit sie im HTML erscheinen
-    result["result"] = "passed" if all(phase["result"] == "passed" for phase in result["phases"]) else "failed"
+    result["result"] = suite_result(result["phases"])
     json_path, html_path = write_report("module-suite", result)
     html_path = html_path.with_suffix(".html")
     html_path.write_text(render_suite_html(result, "VIASIS Modul-Test",
@@ -3827,6 +3872,7 @@ async def run_fast_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
+        status = classify_phase_status(status, started_wall)
         report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"), "result": status,
                                  "duration_s": round(time.perf_counter() - started, 3), "report": report_data})
@@ -3874,7 +3920,7 @@ async def run_fast_suite(args) -> int:
         skipped("BLE Download", "ble")
 
     pc_events_export()   # PC-Ereignisse (Standby, Bluetooth/USB) vor dem Bericht ins Trace, damit sie im HTML erscheinen
-    result["result"] = "passed" if all(phase["result"] == "passed" for phase in result["phases"]) else "failed"
+    result["result"] = suite_result(result["phases"])
     json_path, md_path = write_report("fast-suite", result)
     lines = ["# BT-Fast-Suite", "", f"- Ergebnis: **{result['result']}**", "",
              "| Phase | Transport | COM-Port | Ergebnis |", "| --- | --- | --- | --- |"]

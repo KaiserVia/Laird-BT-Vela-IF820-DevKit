@@ -5251,3 +5251,11 @@ Befund: Classic stabil; BLE fehlerhaft nur im smoke-Modus, und zwar auf beiden B
 - `ble_mainboard_test.py --mode smoke` wiederholt jetzt einmal, wenn der Erstversuch ohne PIN-Prompt scheitert und der Verbindungsaufbau > 2 s dauerte (`SMOKE_SLOW_CONNECT_MS`, Meldung "Bekanntes PC-BLE-Verhalten"). Scheitert auch die Wiederholung, gilt es als echter Fehler.
 - Kontrolllaeufe mit Wiederholung (4 Laeufe): Lauf 1 Erstversuch 3583 ms unstable, Wiederholung (1711 ms) ebenfalls unstable; Lauf 2 Erstversuch 2315 ms unstable, Wiederholung (4172 ms) bestanden; Lauf 3 und 4 sofort bestanden (2136/1591 ms).
 - **Korrektur der Hypothese:** Der Zusammenhang "langsamer Aufbau = Fehlschlag" ist nur eine Tendenz, kein Beweis (Wiederholung scheiterte bei 1711 ms, ein Lauf mit 4172 ms bestand). Die Fehlerrate im smoke-Modus liegt bei ca. 40-50 %, im cycle-Modus bei 0/6. Ursache weiter offen; die Wiederholung ist ein Workaround im Test, keine Erklaerung. Naechster Schritt: Windows-Eintrag des Geraets entfernen und neu koppeln; ggf. smoke mit wiederverwendeter Adresse (`--address`) gegen smoke mit Scan vergleichen.
+
+### Lauf 2026-10-21 (module-suite, 26SC9983): BLE Download 2/3 und 3/3 durch Standby/Dock gescheitert
+
+- Classic: 12 Zyklen + 3 Downloads bestanden (7,0-7,3 KB/s); BLE: 12 Zyklen + Flash + Download 1/3 bestanden (6,7 KB/s), Retries 0.
+- BLE Download 2/3 brach 10:52:30 ab: `rs232_error` (USB-RS232-Adapter an der Docking-Station verloren), 10:52:33-10:52:58 moderner Standby nach Win+L; Download 3/3 startete mitten im Standby (29 s, Timeout). Ursache Testumgebung (Dock-USB/Standby), kein Befund fuer Firmware oder Modul. Das bestehende Wachhalten (`ES_SYSTEM_REQUIRED`) verhinderte den modernen Standby nach dem Sperren nicht.
+- Testskript: Bildschirm-Anforderung zusaetzlich (`ES_DISPLAY_REQUIRED`), Hintergrundwaechter fuer Zeitspruenge > 8 s (PC stand), verlorener RS232-/USB-Port meldet `env_disturbance`; Phasen, die waehrend einer Stoerung scheitern, erhalten den Status `environment` (orange, Gesamtergebnis `environment` statt `failed`, wenn nur solche Phasen fehlen).
+- Anleitung fuer die PC-Einstellungen (Win11): `Doku/Win11_PC_Einstellungen_Dauertest.md`.
+- Offen: Lauf wiederholen nach Umstellung; die smoke-Fehler vom 2026-10-20 (Tageszeit, PC aktiv) sind damit nicht erklaert.
