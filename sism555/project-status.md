@@ -5281,3 +5281,11 @@ Befund: Classic stabil; BLE fehlerhaft nur im smoke-Modus, und zwar auf beiden B
 **Aenderung:** `btio.c`/`btio.h`: Im `C`-Event (gap_connected, Command-Mode, vor dem CCCD-Subscribe) wertet `ucp_check()` das Intervall `I=` aus; ist es laenger als `BT_UCP_I` (6 = 7,5 ms), merkt sie `/UCP` vor, und `bt_sniff_poll()` sendet nach der Drain-Schleife einmal `/UCP,C=<handle>,I=6,L=0,O=190` (4 s Supervision-Timeout, nicht 1 s wie im Guide-Beispiel, wegen der frueheren 1-s-Abbrueche). Schutz: nicht senden, wenn `bt_cyspp_out` oder `BT_LINK` gesetzt (Bruecke aktiv, der Befehl kaeme sonst als PIN-Eingabe an). CYSPP-Pin wird nicht angefasst. Weiche `BT_UCP_ENABLE` in `btio.h`. Diagnose: `[BT-Event] /UCP gesendet` und das `CU`-Event (neues Intervall) erscheinen zusaetzlich auf RS232 (temporaer, gehoert zum 5.119-Diagnosecode).
 
 **Pruefen (am Geraet, 26SC9983):** (1) RS232-Zeile `[BT-Event] @E,...,CU,C=..,I=0006` nach dem Verbinden = Windows hat angenommen; kommt kein `CU`, hat Windows abgelehnt. (2) `--mode receive --transport ble`: Durchsatz deutlich ueber 3,1 KB/s. (3) PIN-Eingabe ueber BLE unveraendert (kein `/UCP`-Text im Terminal). (4) Classic unveraendert. Build 0 Fehler, 0 Warnungen; noch nicht geflasht.
+
+## Update 5.126 (2026-10-21): /UCP wieder abgeschaltet (Rollback der Funktion aus 5.125)
+
+**Symptom:** Mit 5.125 auf Board 26SC9983 scheiterten alle 8 BLE-Versuche (14:50-15:02: smoke und cycle): Verbindung steht, kein PIN-Prompt, Geraet trennt nach ca. 5,5 s; im RS232-Mitschnitt keine Zeile `[BT-Event]` (kein C-Event, kein /UCP, kein CU). Classic-smoke bestanden (Modul und UART ok). Mit 5.124 liefen BLE-smoke (14:37/14:38) und module-suite (12:01-14:25) auf demselben Board. Board A war zur Pruefung nicht verfuegbar.
+
+**Aenderung:** `BT_UCP_ENABLE` in `btio.h` auf 0 (der /UCP-Code ist damit ausgeblendet; zusaetzlich bleibt nur die Anzeige des `CU`-Events im 5.119-Diagnosecode). Version 5.126, Build 0 Fehler/0 Warnungen.
+
+**Pruefen:** BLE-smoke/cycle auf B mit 5.126. Laeuft BLE: 5.125 war die Ursache (Code oder Timing durch /UCP) - dann gezielt weiter. Scheitert BLE weiter: Zustand von Board B (nach langem Ausschalten) oder PC, nicht 5.125.

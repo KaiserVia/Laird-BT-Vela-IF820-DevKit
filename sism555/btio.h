@@ -204,7 +204,9 @@ extern void bt_sniff_poll (void);         // nicht-blockierendes Nachlesen - 1x 
 // Firmware einmal /UCP mit dem Wunschintervall, falls das gelieferte Intervall laenger ist. Der Central darf ablehnen
 // (dann kommt kein "CU"-Event). Werte hexadezimal wie im EZ-Serial-Guide: I = Intervall in 1,25-ms-Schritten
 // (6 = 7,5 ms), L = Slave-Latenz, O = Supervision-Timeout in 10-ms-Schritten (190 hex = 4 s). 0 = abgeschaltet.
-#define BT_UCP_ENABLE   1
+// 5.126: AUS (0). Mit 5.125 (=1) scheiterte BLE auf Board 26SC9983 in allen 8 Versuchen (kein C-Event auf RS232, kein PIN-Prompt);
+// Ursache offen, mit 5.124 lief BLE. Erst mit 0 pruefen, ob BLE wieder laeuft, dann ggf. wieder auf 1 stellen.
+#define BT_UCP_ENABLE   0
 #define BT_UCP_I        6          // Wunschintervall, 1,25 ms je Schritt
 #define BT_UCP_CMD_TAIL ",I=6,L=0,O=190\r"
 extern void bt_transfer_echo (void);      // BLE-CYSPP-Transfer-Test: CRC/Seq-Frames empfangen+ACK - Testmenue
