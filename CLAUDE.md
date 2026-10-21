@@ -299,8 +299,11 @@ nicht gemacht, damit der Fix nicht mit den offenen BT-Themen vermischt wird.
    `## Update <Version>`-Kapitel mit Symptom / Ursache / Fix.
 3. **Git committen** — sicherste dauerhafte Sicherung, unabhängig von Cowork.
    **Konvention: JEDE Erhöhung von `T_version` wird als eigener Commit gesichert**
-   (nur die geänderten Quell-/Doku-Dateien unter `sism555/`, KEINE Binär-/Firmware-Dateien),
-   mit Log-Nachricht `BT <version>: <Kurzbeschreibung>`. Reine Doku-Commits ohne
+   (die geänderten Quell-/Doku-Dateien unter `sism555/` **plus `sism555/sism.bin` und `sism555/sism.hex`**
+   der frisch gebauten Version - nur diese beiden; sonst KEINE Binär-/Firmware-Dateien, auch nicht
+   `fw_*/`-Ordner, `Objects/` o. ä.; Anwenderentscheidung 2026-10-21, damit jede Version als Binary
+   wiederholbar ist), mit Log-Nachricht `BT <version>: <Kurzbeschreibung>`. Vor dem Commit prüfen,
+   dass die Version in `sism.bin` zu `T_version` passt (Build ohne Fehler/Warnungen). Reine Doku-Commits ohne
    Versionssprung: `BT Doku: <Kurzbeschreibung>`.
    **Wegen der Scheinänderungen (siehe oben) immer explizite Dateipfade angeben.**
 4. Diese `CLAUDE.md` aktuell halten (Branch, aktuelle Version, große offene Punkte).
