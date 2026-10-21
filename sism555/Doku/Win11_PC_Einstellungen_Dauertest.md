@@ -51,10 +51,10 @@ Standby aus. Das Zeitlimit ist in der Oberfläche versteckt und wird per Befehl 
 ## 4. Energiesparen für USB-Geräte und Bluetooth im Geräte-Manager ausschalten
 
 1. `Win+X` → **Geräte-Manager**.
-2. **Universeller Seriell-Bus-Controller** aufklappen. Für jeden Eintrag **USB-Root-Hub**, **USB Composite Device**,
-   **Generic USB Hub** und die Prolific-Einträge:
-   Doppelklick → Reiter **Energieverwaltung** → Haken bei **"Der Computer kann das Gerät ausschalten, um Energie zu
-   sparen"** **entfernen** → OK. (Reiter fehlt bei manchen Einträgen, die dann überspringen.)
+2. **USB-Controller** aufklappen. Bei diesen Einträgen: **Generischer USB-Hub**, **Generischer Hochgeschwindigkeits-USB-Hub
+   (SuperSpeed)** und **USB-Root-Hub (USB 3.0)**: Doppelklick → Reiter **Energieverwaltung** → Haken bei **"Der Computer
+   kann das Gerät ausschalten, um Energie zu sparen"** **entfernen** → OK. Host-Controller, USB4-Router und
+   UCM-UCSI nicht ändern. **USB-Verbundgerät** hat keinen Reiter Energieverwaltung und wird übersprungen.
 3. **Anschlüsse (COM & LPT)** aufklappen: bei **Prolific USB-to-Serial Comm Port** und den **LPC/USB-Seriell**-Einträgen
    (Mainboard-USB) ebenso den Haken entfernen.
 4. **Bluetooth** aufklappen: beim **Funkadapter** (z. B. "Intel Wireless Bluetooth") Doppelklick →
