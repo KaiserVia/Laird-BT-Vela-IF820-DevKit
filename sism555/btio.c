@@ -666,6 +666,49 @@ void bt_event_sniff (void)
 // ev_line/ev_n, bt_event_line() und der Aufruf im else-Zweig von bt_sniff_poll().
 static char ev_line[100];
 static uchar ev_n=0;
+static uchar ucp_pending=0;                    // 5.125: nach "C"-Event /UCP senden (nicht in der Drain-Schleife: bt_command() setzt bxi1)
+static char  ucp_handle[3];                    // Verbindungs-Handle aus dem "C"-Event (2 Hex-Zeichen)
+
+static uint hex_after (const char *line, const char *key)   // Hex-Zahl hinter "key" (z. B. "I=") oder 0xFFFF
+{
+ const char *p=strstr(line,key); uint v=0; uchar n=0;
+ if (!p) return 0xFFFF;
+ p+=strlen(key);
+ while (n<4)
+ {
+  char c=*p++;
+  if (c>='0' && c<='9') v=(v<<4)|(c-'0');
+  else if (c>='A' && c<='F') v=(v<<4)|(c-'A'+10);
+  else if (c>='a' && c<='f') v=(v<<4)|(c-'a'+10);
+  else break;
+  n++;
+ }
+ return n ? v : 0xFFFF;
+}
+
+// 5.125: Verbindungsintervall anfordern (siehe BT_UCP_ENABLE in btio.h). Nur im Command-Mode: laeuft bereits die
+// CYSPP-Bruecke (BT_LINK), wuerde der Befehl als Nutzdaten (PIN-Eingabe!) ankommen - dann wird er nicht gesendet.
+static void bt_conn_update (void)
+{
+ char cmd[40];
+ if (fp.btmodem!=IF820 || bt_cyspp_out || (connect&BT_LINK)) return;
+ strcpy(cmd,"/UCP,C="); strcat(cmd,ucp_handle); strcat(cmd,BT_UCP_CMD_TAIL);
+ concpy=connect;                                // bt_command() stellt am Ende connect=concpy her
+ bt_command(cmd,"/UCP,0000",-300);               // still senden; Antwort "@R,...,/UCP,0000" abwarten
+ { uchar cc=connect; connect=concpy & ~UART1; newline(); putstr("[BT-Event] /UCP gesendet: "); putstr(cmd); newline(); connect=cc; }
+}
+
+static void ucp_check (void)   // 5.125: "C"-Event mit zu langem Intervall -> /UCP vormerken
+{
+#if BT_UCP_ENABLE
+ const char *h;
+ if (ev_n>8 && ev_line[0]=='@' && ev_line[1]=='E' && strstr(ev_line,",C,C=") && hex_after(ev_line,",I=")>BT_UCP_I)
+ {
+  h=strstr(ev_line,",C,C=")+5;
+  if (h[0] && h[1]) { ucp_handle[0]=h[0]; ucp_handle[1]=h[1]; ucp_handle[2]=0; ucp_pending=1; }
+ }
+#endif
+}
 
 static void bt_event_line (char c)
 {
@@ -673,8 +716,9 @@ static void bt_event_line (char c)
  if (c=='\n')
  {
   ev_line[ev_n]=0;
+  ucp_check();
   if (ev_n>8 && ev_line[0]=='@' && ev_line[1]=='E' && ev_line[2]==',' &&
-      (strstr(ev_line,",C,") || strstr(ev_line,",DIS,")))
+      (strstr(ev_line,",C,") || strstr(ev_line,",DIS,") || strstr(ev_line,",CU,")))
   {
    uchar cc=connect; connect=concpy & ~UART1;   // nur ans Terminal, nie zurueck ans Modul
    newline(); putstr("[BT-Event] "); putstr(ev_line); newline();
@@ -710,6 +754,7 @@ void bt_sniff_poll (void)
    while (bxi1!=end) { c=rbuf1[++bxi1]; bt_event_line(c); }
   }
  }
+ if (ucp_pending) { ucp_pending=0; bt_conn_update(); }    // 5.125: ausserhalb der Drain-Schleife senden
  if (!sniff_active) return;
  if ((uint)(mstimer-sniff_t0)>=SNIFF_DURATION_MS)
  {

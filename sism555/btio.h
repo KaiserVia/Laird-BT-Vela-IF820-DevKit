@@ -197,6 +197,16 @@ extern void bt_monitor_poll (void);      // 5.115: Hintergrund-Monitor CYSPP/CON
 extern void bt_cyspp_monitor (void);      // Live-Anzeige CYSPP/BT_LINK (IC54 Bit7) - Testmenue
 extern void bt_event_sniff (void);        // Roher UART1-Event-Mitschnitt (Diagnose) - Testmenue, startet nur
 extern void bt_sniff_poll (void);         // nicht-blockierendes Nachlesen - 1x je Hauptschleifendurchlauf (measure.c)
+
+// 5.125: BLE-Verbindungsintervall beim Modul anfordern (EZ-Serial /UCP, gap_update_conn_parameters).
+// Der PC (Central) bestimmt das Anfangsintervall; Windows nahm fuer Board 26SC9983 immer 60 ms (3,1 KB/s), fuer Board
+// 99SC9923 7,5 ms (6,6 KB/s). Nach dem "C"-Event (gap_connected, noch im Command-Mode, vor dem CCCD-Subscribe) sendet die
+// Firmware einmal /UCP mit dem Wunschintervall, falls das gelieferte Intervall laenger ist. Der Central darf ablehnen
+// (dann kommt kein "CU"-Event). Werte hexadezimal wie im EZ-Serial-Guide: I = Intervall in 1,25-ms-Schritten
+// (6 = 7,5 ms), L = Slave-Latenz, O = Supervision-Timeout in 10-ms-Schritten (190 hex = 4 s). 0 = abgeschaltet.
+#define BT_UCP_ENABLE   1
+#define BT_UCP_I        6          // Wunschintervall, 1,25 ms je Schritt
+#define BT_UCP_CMD_TAIL ",I=6,L=0,O=190\r"
 extern void bt_transfer_echo (void);      // BLE-CYSPP-Transfer-Test: CRC/Seq-Frames empfangen+ACK - Testmenue
                                            // TEMPORAER (5.67) - wieder entfernen, wenn CYSPP-Diagnose fertig ist
 extern void bt_cyspp_contention_test (void); // IC54 Bit7 kurz aktiv LOW (Messprotokoll Schritt 6) - Testmenue
