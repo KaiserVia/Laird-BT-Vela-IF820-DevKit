@@ -669,6 +669,7 @@ static uchar ev_n=0;
 static uchar ucp_pending=0;                    // 5.125: nach "C"-Event /UCP senden (nicht in der Drain-Schleife: bt_command() setzt bxi1)
 static char  ucp_handle[3];                    // Verbindungs-Handle aus dem "C"-Event (2 Hex-Zeichen)
 
+#if BT_UCP_ENABLE
 static uint hex_after (const char *line, const char *key)   // Hex-Zahl hinter "key" (z. B. "I=") oder 0xFFFF
 {
  const char *p=strstr(line,key); uint v=0; uchar n=0;
@@ -685,6 +686,7 @@ static uint hex_after (const char *line, const char *key)   // Hex-Zahl hinter "
  }
  return n ? v : 0xFFFF;
 }
+#endif
 
 // 5.125: Verbindungsintervall anfordern (siehe BT_UCP_ENABLE in btio.h). Nur im Command-Mode: laeuft bereits die
 // CYSPP-Bruecke (BT_LINK), wuerde der Befehl als Nutzdaten (PIN-Eingabe!) ankommen - dann wird er nicht gesendet.
