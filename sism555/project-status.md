@@ -5289,3 +5289,11 @@ Befund: Classic stabil; BLE fehlerhaft nur im smoke-Modus, und zwar auf beiden B
 **Aenderung:** `BT_UCP_ENABLE` in `btio.h` auf 0 (der /UCP-Code ist damit ausgeblendet; zusaetzlich bleibt nur die Anzeige des `CU`-Events im 5.119-Diagnosecode). Version 5.126, Build 0 Fehler/0 Warnungen.
 
 **Pruefen:** BLE-smoke/cycle auf B mit 5.126. Laeuft BLE: 5.125 war die Ursache (Code oder Timing durch /UCP) - dann gezielt weiter. Scheitert BLE weiter: Zustand von Board B (nach langem Ausschalten) oder PC, nicht 5.125.
+
+### Vergleichslaeufe Board A (99SC9923), 2026-10-21 16:34-16:44: 5.118 und 5.126
+
+- Firmware 5.118 (`fw_5.118/`, aus Commit 4b213f1 neu gebaut): BLE-smoke 4/4 bestanden (Verbindung 1,1-2,3 s).
+- Firmware 5.126 (= 5.124-Verhalten, /UCP aus): BLE-smoke 3/3 bestanden (1,4-2,0 s). Im RS232-Mitschnitt jetzt sichtbar: `C`-Event mit `I=0006` (7,5 ms), kurz danach `CU` mit `I=000C` (15 ms, Windows aktualisiert selbst), Banner mit `Version 5.126`.
+- Damit 7/7 auf Board A, waehrend derselbe smoke-Test mit 5.124 am Vormittag/Mittag etwa jeden zweiten Lauf scheiterte. Firmware ist als Ursache des intermittierenden BLE-Fehlers entlastet; geaendert hat sich dazwischen die PC-Seite (Energieeinstellungen, USB-Suspend, Bluetooth-Funk aus/ein, Classic-Neukopplung von 26SC9983; Anleitung `Doku/Win11_PC_Einstellungen_Dauertest.md`). Welche dieser Massnahmen es war, ist nicht getrennt geprueft.
+- Board B (26SC9983) mit 5.125: 8/8 BLE-Versuche gescheitert, nie ein `C`-Event auf RS232 (Lauf 14:50-15:02) - mit 5.126 am 16:24 ebenfalls (Versionszeile im Mitschnitt fehlte, Version unbestaetigt). Ursache offen: Board-/Modulzustand oder Windows-Kopplung von B (Classic-Neukopplung 14:39); Gegenprobe Classic-Kopplung entfernen steht aus.
+- Naechster Schritt: Board B mit 5.126 flashen, Versionszeile pruefen, smoke 3x; dann ggf. Classic-Kopplung von B entfernen und wiederholen.
