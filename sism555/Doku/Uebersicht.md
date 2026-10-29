@@ -21,7 +21,10 @@
 - `Testplan_CONNECTION_P0-19.md`: Testplan CONNECTION-Pin.
 - Herstellerunterlagen: `../../Documentation/` (EZ-Serial-Guide, Abschnitt BLE-Durchsatz mit `/UCP`).
 
-## Stand der Untersuchung (2026-10-29)
+## NEU 2026-10-29 abends: 5.127 (TEST) behebt Board C
+- Ursache: Im Leerlauf schaltete `uart1_release()` UART1 ab, das IF820 sah CTS dauerhaft HIGH und hing beim CCCD-Write. 5.127 laesst UART1 beim IF820 im Leerlauf aktiv. Board C: BLE 4/4 und Classic 2/2 bestanden, Gegenprobe 5.126 wieder 2/2 gescheitert. C laeuft jetzt auf **5.127**. Details: `project-status.md`, Update 5.127. Offen: B und A mit 5.127 pruefen.
+
+## Stand der Untersuchung (2026-10-29, vor 5.127)
 - **Board A (99SC9923, umverdrahtet):** nach Power-Cycle läuft 5.126 stabil, module-suite komplett bestanden (BLE und Classic, 6 Downloads, 0 Retries). Der Ausfall vom 22.10. ist nicht reproduziert, Auslöser des "komischen Modulzustands" unbekannt.
 - **Boards B (26SC9983) und C (26SC9994), unverdrahtet:** BLE und Classic scheitern (kein PIN-Prompt, Trennung nach ca. 5 s, nie ein `[BT-Event]` auf RS232), auch mit 5.99 (Bisektion auf C), auch nach Werksreset, Neuprogrammierung, Stromzyklus. Sniffer auf C: Modul beantwortet den CYSPP-CCCD-Write (0x0012) nicht. Firmware-Regression ausgeschlossen. **Gerät C läuft derzeit auf 5.99** (nicht 5.126).
 - Offene Hypothesen: Windows-Bond veraltet (nicht geprüft), Hardwareunterschied zu A (IO5/CYSPP-Pegel; die IO5-Idee ist schwach begründet, kein Lötversuch), Modulzustand. Gegenproben: Windows-Geräte entfernen, nRF52840 als zweiter Central (Plan Phase 4), CYSPP-Pegel auf C im Testmenü messen.

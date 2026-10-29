@@ -5356,3 +5356,20 @@ Alle 104 Testreports (01.09.-22.10., 5,7 GB) maschinell ausgewertet (`Doku/tools
 - 26SC9994 scheitert **mit 5.126 und mit 5.99** (BLE und Classic: kein PIN-Prompt, Trennung nach ca. 5 s, kein `[BT-Event]`). Damit ist eine Firmware-Regression nach 5.99 ausgeschlossen. Stromzyklus (10 s) aendert nichts.
 - Sniffer bei 5.99/26SC9994: PC schreibt Service-Changed-CCCD (Antwort ok) und danach den CYSPP-CCCD 0x0012 (0100): **das Modul antwortet auf diesen Write nicht** (Antwort FEHLT), danach keine Daten, Trennung. Auf Board A (umverdrahtet, IO5 vom GND getrennt) laeuft BLE mit 5.126 stabil.
 - Offene Hypothesen: (1) Hardwareunterschied unverdrahtet/umverdrahtet (IO5 auf GND, CYSPP-Pegel), (2) veralteter Windows-Bond (noch nicht geprueft, Entfernen der Geraete in Windows steht aus). 26SC9994 laeuft nach dem Test auf 5.99.
+
+## Update 5.127 (TEST, 2026-10-29): UART1 im Leerlauf nicht mehr abschalten - Board 26SC9994 laeuft wieder
+
+**Symptom:** Boards B (26SC9983) und C (26SC9994) scheitern per BLE und Classic: kein PIN-Prompt, Trennung nach ca. 5 s, nie ein `[BT-Event]`; Sniffer: Modul beantwortet den CYSPP-CCCD-Write (0x0012) nicht. Die Firmware merkt die Verbindung gar nicht (bleibt im Hauptmenue), weil das Modul den Datenkanal nie oeffnet und CYSPP nie auf LOW zieht.
+
+**Ursache (Code-Review, am Geraet bestaetigt):** Nach `init_bluetooth()` (und nach jeder GSM-Sitzung) rief `uart1_release()` (hard.c) ohne bestehende BT-Verbindung `Init_UART1(0)` auf: UART1 aus, RXD1/TXD1/RTS1/CTS1 wieder GPIO-Eingaenge mit Pull-up. Damit sah das IF820 (Flow Control `F=01`) seinen CTS dauerhaft HIGH = "Host nicht bereit" und durfte nichts senden (EZ-Serial-Guide 3.1.5.4). Beim Verbinden/CCCD-Write gibt das Modul aber Events aus ("alle GATT-Events bis der CYSPP-Kanal offen ist", Guide 3.2.1.1); die stauen sich. Das Modul (FW 1.4.12.12; "lockup in heavy UART loading" erst in 1.4.18.18 behoben, PCN #2E-2026) haengt dann offenbar und beantwortet den CCCD-Write nicht. Warum Board A trotzdem lief, ist offen (vermutlich elektrischer Unterschied an CTS/RTS1 bzw. MUX IC55/IC56, nicht gemessen). Erklaert vermutlich auch B6 (nach "Flash schreiben" keine Events mehr) und den "komischen Modulzustand" auf A.
+
+**Fix:** `uart1_release()`: beim IF820 bleibt UART1 im Leerlauf auf BT aktiv (MUX BT, 460800, Auto-RTS LOW), Owner trotzdem `MUX_NONE`, `connect&UART1` geloescht. `UART1_IRQHandler`: die rbuf1-Weiche gilt jetzt auch fuer `MUX_NONE`, damit Leerlauf-Events nie im Menue-Puffer `rbuf` landen. Laird/RN4678 unveraendert (`Init_UART1(0)`). Der Minutentick (`bt_release()` bei `uart1_owner!=MUX_BT`) wirkt unveraendert, weil der Owner `MUX_NONE` bleibt.
+
+**Test am Geraet (Board 26SC9994, COM3, Flash per `flash_xmodem.py`, Stromzyklus 10 s):**
+- 5.127: BLE-Smoke 4/4 `passed` (jeder Lauf ein neuer Prozess, also Erstversuch), je Lauf `[BT-Event] C` und `CU` auf RS232 (vorher nie). Classic-Smoke 2/2 `passed` (Banner, PIN, Hauptmenue).
+- Gegenprobe 5.126 (zurueckgeflasht, Stromzyklus): BLE-Smoke 2/2 `unstable`, also wieder das alte Fehlerbild.
+- Danach 5.127 wieder geflasht: BLE-Smoke `passed`. **26SC9994 laeuft jetzt auf 5.127.**
+
+**Offen:** Board B und Board A mit 5.127 pruefen (A: keine Verschlechterung, module-suite inkl. Download); Wirkung bei LTE-Boards (GSM-Sitzung -> Rueckkehr in den aktiven Leerlauf); Doku `Doku/UART1_Owner_StateMachine.md` (Zustand NONE) nachgezogen. Status TEST: erst nach den Pruefungen als regulaere Version betrachten.
+
+**Geaenderte Dateien:** hard.c, sprachen/sictxt.c (-> 5.127).

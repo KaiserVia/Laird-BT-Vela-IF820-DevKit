@@ -80,13 +80,13 @@ flowchart TD
 | Function | Purpose |
 |----------|---------|
 | `uart1_request(requester, baud)` | Request UART1 ownership. Suspends BT output if switching away from BT. Returns TRUE if granted. |
-| `uart1_release(requester)` | Release UART1. Auto-restores BT if `BT_LINK` is still active, otherwise deinits UART1. |
+| `uart1_release(requester)` | Release UART1. Auto-restores BT if `BT_LINK` is still active, otherwise deinits UART1 (IF820 since 5.127: keeps UART1 active on BT, owner MUX_NONE). |
 
 ## States
 
 | State | uart1_owner | MUX | UART1 | connect & UART1 |
 |-------|-------------|-----|-------|-----------------|
-| NONE | MUX_NONE | BT (idle default) | disabled | 0 |
+| NONE | MUX_NONE | BT (idle default) | disabled; IF820 since 5.127: active at 460800 (RTS LOW, RX -> rbuf1) | 0 |
 | BT_ACTIVE | MUX_BT | BT | 115200 | 1 (if BT_LINK) |
 | GSM_ACTIVE | MUX_GSM | GSM | 115200 | 0 (BT suspended) |
 

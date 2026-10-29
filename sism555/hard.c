@@ -221,7 +221,8 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
 								// Erkennungsphase selbst am neuen Puffer vorbeilesen. Bei Laird/RN4678 ist
 								// die BT_LINK-Leitung ein reiner Status-Ausgang, kein bidirektionaler
 								// CYSPP-Datenpin - dort (und nur dort) bleibt alles unveraendert bei rbuf.
-								else if ((uart1_owner==MUX_BT) && (fp.btmodem!=Laird) && (fp.btmodem!=Roving) &&
+								// 5.127: MUX_NONE gehoert dazu - beim IF820 bleibt UART1 im Leerlauf auf BT aktiv (uart1_release())
+								else if ((uart1_owner==MUX_BT || uart1_owner==MUX_NONE) && (fp.btmodem!=Laird) && (fp.btmodem!=Roving) &&
 								         !((connect&BT_LINK) && !bt_cyspp_out && BT_CONN_ACTIVE))  /* 5.110: Bruecke nur bei echtem CONNECTION=LOW, siehe btio.h */
 								{
 								 if (bxi1!=(uchar)(rxi1+1)) { rbuf1[++rxi1]=U1->RBR; bt_time=BT_TIMEOUT; }
@@ -548,6 +549,23 @@ void uart1_release (uchar requester)		// Release UART1 resource
  
  if ((requester != MUX_BT) && (connect & BT_LINK))	// Non-BT releasing, BT still connected?
 	uart1_request(MUX_BT, BT_BAUD);				// Auto-restore BT terminal (sets owner atomically)
+ else if (fp.btmodem==IF820)
+ {
+	// 5.127 (TEST): IF820 - UART1 im Leerlauf NICHT abschalten. Mit Init_UART1(0) wurden RTS1/RXD1 zu
+	// GPIO-Eingaengen mit Pull-up -> das Modul (Flow Control F=01) sah CTS dauerhaft HIGH ("Host nicht
+	// bereit") und staute seine Events beim Verbinden/CCCD-Write (EZ-Serial-Guide 3.1.5.4). Verdacht: das
+	// Modul (FW 1.4.12.12, "lockup in heavy UART loading" erst in 1.4.18.18 behoben) haengt dann und
+	// beantwortet den CYSPP-CCCD-Write nicht (Board 26SC9994, Sniffer 2026-10-29). Jetzt: Owner MUX_NONE,
+	// aber UART1 bleibt auf BT aktiv (Auto-RTS LOW), Empfang landet per ISR-Weiche in rbuf1.
+	__disable_irq();											// Critical section: Owner zuerst -> ISR routet nach rbuf1
+	uart1_owner = MUX_NONE;								// No owner
+	__enable_irq();
+	MUX_BT_Select;												// MUX to BT (idle default state)
+	Init_UART1(IF820_BAUD);								// UART1 aktiv lassen: RTS LOW, Modul darf senden
+	connect&=~UART1;											// keine Terminal-Ausgabe ans Modul
+	if ((requester != MUX_BT) && bt_cyspp_out)
+	 bt_release();												// CYSPP wieder Eingang (siehe unten, 5.51)
+ }
  else
  {
 	Init_UART1(0);												// Deinitialize UART1 (clears connect&UART1 internally)
