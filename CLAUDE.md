@@ -59,6 +59,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-10-29:** Board A (99SC9923) mit 5.126 nach Power-Cycle stabil (module-suite bestanden). Boards B (26SC9983) und C (26SC9994) scheitern mit BLE und Classic (auch mit 5.99; Modul beantwortet CYSPP-CCCD nicht, nie ein `[BT-Event]`); Firmware-Regression ausgeschlossen, Ursache offen (Windows-Bond? Hardware?). C steht auf 5.99. Details: `sism555/project-status.md`, `sism555/Doku/Uebersicht.md`. Neue Werkzeuge: `Doku/tools/flash_xmodem.py`, `relay_power.py`, `--sniff`.
+
+
 - Phase 0 (Bring-up / `/PING`-Lebenszeichen) **erreicht**.
 - SPP-Datenmodus + Menü über Bluetooth Classic **funktioniert** (Meilenstein 5.92).
 - **2026-08-26: Umfassend end-to-end bestätigt** (`sism555/project-status.md`, Update

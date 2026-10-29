@@ -1,4 +1,4 @@
-# Übersicht: Wo steht was (Stand 2026-10-23, Firmware 5.126, Branch `connection-pin`)
+# Übersicht: Wo steht was (Stand 2026-10-29, Firmware 5.126, Branch `connection-pin`)
 
 ## Zuerst lesen
 - `../../CLAUDE.md`: Projektkontext, Regeln (Commits, Binaries), offene Punkte, Temporär-Code zum Aufräumen.
@@ -21,15 +21,18 @@
 - `Testplan_CONNECTION_P0-19.md`: Testplan CONNECTION-Pin.
 - Herstellerunterlagen: `../../Documentation/` (EZ-Serial-Guide, Abschnitt BLE-Durchsatz mit `/UCP`).
 
-## Stand der Untersuchung
-- Gut belegt: 5.118 lief am 15.10. auf Board A (99SC9923) zweimal komplett durch. Classic läuft überall stabil. Ymodem-CTS-Fehler seit 5.117 behoben, USB-Hänger seit 5.121 bis 5.124.
-- BLE intermittierend: "verbunden, kein PIN-Prompt, Gerät trennt nach ca. 5,5 s", auf beiden Boards, auch mit 5.124. Mit 5.118 und 5.126 auf A liefen die smoke-Läufe am 21.10. 7/7; am 22.10. riss in der module-suite der Link nach ca. 5 min im BLE-Download 1/3, danach war das Gerät für BLE nicht auffindbar. Firmware ist als Ursache nicht belegt.
-- BLE-Durchsatz hängt am vom PC gewählten Intervall: Board B 60 ms (3,1 KB/s), Board A 7,5 ms (6,6 KB/s). `/UCP`-Versuch (5.125) zurückgenommen (5.126).
-- Board B (26SC9983): mit 5.125 und 5.126 BLE nie durchgegangen (nie ein `C`-Event auf RS232); seit der Classic-Neukopplung vom 21.10. offen.
+## Stand der Untersuchung (2026-10-29)
+- **Board A (99SC9923, umverdrahtet):** nach Power-Cycle läuft 5.126 stabil, module-suite komplett bestanden (BLE und Classic, 6 Downloads, 0 Retries). Der Ausfall vom 22.10. ist nicht reproduziert, Auslöser des "komischen Modulzustands" unbekannt.
+- **Boards B (26SC9983) und C (26SC9994), unverdrahtet:** BLE und Classic scheitern (kein PIN-Prompt, Trennung nach ca. 5 s, nie ein `[BT-Event]` auf RS232), auch mit 5.99 (Bisektion auf C), auch nach Werksreset, Neuprogrammierung, Stromzyklus. Sniffer auf C: Modul beantwortet den CYSPP-CCCD-Write (0x0012) nicht. Firmware-Regression ausgeschlossen. **Gerät C läuft derzeit auf 5.99** (nicht 5.126).
+- Offene Hypothesen: Windows-Bond veraltet (nicht geprüft), Hardwareunterschied zu A (IO5/CYSPP-Pegel; die IO5-Idee ist schwach begründet, kein Lötversuch), Modulzustand. Gegenproben: Windows-Geräte entfernen, nRF52840 als zweiter Central (Plan Phase 4), CYSPP-Pegel auf C im Testmenü messen.
+- Die früher notierten "8/8 und 10/10 Fehler" auf A waren ein Messfehler (`--address` ohne `--pin`).
+
+## Werkzeuge neu (2026-10-29)
+- `tools/flash_xmodem.py --port COM3 --bin <datei>`: Flash per RS232/USB (3, Strg+U, XMODEM-1K, y). `tools/relay_power.py zyklus 10` (Relais COM7): Stromzyklus. `ble_mainboard_test.py --sniff`: nRF52840-Mitschnitt (Plan: `Plan_BLE_Sniffer_nRF52840.md`). Bei `--address` immer `--pin` angeben (Seriennummer ohne `SC`).
 
 ## Offene Entscheidungen
-1. 5.118 auf Board A flashen und dieselbe module-suite (ca. 75 min) laufen lassen: beantwortet die Firmware-Frage.
-2. Board B: 5.126 flashen, Versionszeile prüfen, Classic-Kopplung entfernen, smoke 3x.
-3. 5.127: Ymodem-Senden bei Linkverlust sofort abbrechen (jetzt sendet die Firmware minutenlang ins Leere).
-4. Aufräumen der temporären Diagnose (5.115/5.116 Monitor, 5.118 `bt_session_summary`, 5.119 Eventzeilen), sobald die Untersuchung abgeschlossen ist.
-5. Allgemeine Änderungen (5.104/5.105/5.111 bis 5.114/5.117/5.121 bis 5.124) auf `LTE-Update` übernehmen.
+1. Windows-Geräte B/C entfernen und neu koppeln (Gegenprobe) oder nRF-Central.
+2. Auf C wieder 5.126 flashen (derzeit 5.99).
+3. 5.127: Ymodem-Senden bei Linkverlust abbrechen.
+4. Aufräumen der temporären Diagnose (5.115/5.116, 5.118, 5.119), wenn die Untersuchung abgeschlossen ist.
+5. Allgemeine Änderungen auf `LTE-Update` übernehmen.

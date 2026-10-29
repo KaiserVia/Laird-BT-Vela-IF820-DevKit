@@ -10,7 +10,7 @@ Fragen, die der Plan beantworten soll:
 4. Durchsatz: Warum 60 ms Intervall bei B, 7,5 ms bei A? Wer bestimmt es, und nimmt Windows eine Änderung an?
 
 ## Was du hast
-- Board 26SC9983 (B, BLE-Adresse `FF:4F:7F:9E:EE:BA`) und Board 99SC9923 (A, BLE `CD:49:1B:93:00:5F`, Classic `9C:97:1B:E9:FA:3D`).
+- Board 26SC9983 (B, BLE-Adresse `FF:4F:7F:9E:EE:BA`) und Board 99SC9923 (A, BLE `CD:49:1B:93:00:5F`, Classic gleiche Adresse `CD:49:1B:93:00:5F`; `9C:97:1B:E9:FA:3D` ist der PC-Adapter).
 - PC (Windows 11, Intel Wireless Bluetooth), Testskript `Doku/tools/ble_mainboard_test.py`.
 - nRF52840 (Dongle oder DK; Variante bitte beim Start notieren), nRF Connect for Desktop installiert, Bluetooth Test Platform Pack 1.14.0 (MSI) vorhanden. Wozu das Pack gedacht ist, ist noch zu klären; es ist **nicht** Teil des Kernplans.
 
@@ -38,7 +38,7 @@ python ble_mainboard_test.py --mode module-suite --name VIASIS_99SC9923 --sniff
 - Weitere Optionen: `--sniff-port COMx`, `--sniff-follow <Adresse>`, `--sniff-keep-raw` (ungefilterter Mitschnitt aller Geräte, groß). Ohne `--sniff` ändert sich nichts. Fehlt Sniffer oder tshark, läuft der Test ohne Mitschnitt weiter.
 - **Voraussetzung:** Wireshark/nRF Connect dürfen den Sniffer-Port nicht gleichzeitig belegen. Der Sniffer-Dongle steht in Reichweite der Boards (am besten zwischen PC und Board).
 
-**Bekannte Grenze (erster Test 2026-10-29, Board A):** Der Sniffer erfasst das `CONNECT_IND`, die Service-Discovery und den CCCD-Write, **verliert aber nach 0,2 bis 2 s den Sync**, nachdem der PC `LL_CONNECTION_PARAM_REQ`/`LL_CONNECTION_UPDATE_IND` sendet (Wechsel 7,5 ms auf 15 ms, danach Anforderung 7,5 ms mit Timeout 1000 ms). Das spätere Trennen nach ca. 5,5 s sieht er deshalb bisher nicht. Der Befund meldet das als "Sync verloren". Gegenmaßnahmen siehe Ergebnisse der Phasen 1 und 2 (näher an die Boards, Intervall-Update beobachten).
+**Bekannte Grenze (erster Test 2026-10-29, Board A):** Der Sniffer erfasst das `CONNECT_IND`, die Service-Discovery und den CCCD-Write, **verliert aber in manchen Läufen nach 0,2 bis 2 s den Sync** (KORREKTUR 2026-10-29: Das liegt am Sniffer, nicht an PHY- oder Parameter-Update; eigenständige Mitschnitte im Hintergrund überstehen beides. Der Sniffer sieht das CONNECT_IND nur in etwa einem Drittel der Fälle, Details in project-status.md), nachdem der PC `LL_CONNECTION_PARAM_REQ`/`LL_CONNECTION_UPDATE_IND` sendet (Wechsel 7,5 ms auf 15 ms, danach Anforderung 7,5 ms mit Timeout 1000 ms). Das spätere Trennen nach ca. 5,5 s sieht er deshalb bisher nicht. Der Befund meldet das als "Sync verloren". Gegenmaßnahmen siehe Ergebnisse der Phasen 1 und 2 (näher an die Boards, Intervall-Update beobachten).
 
 ## Phase 1: Baseline mit funktionierendem Lauf (Board A)
 - Sniffer auf die Werbe-Adresse von A einstellen ("Follow"), dann `python ble_mainboard_test.py --mode smoke --name VIASIS_99SC9923 --no-identify --rs232-port COM3` laufen lassen (bestandener Lauf).
