@@ -87,6 +87,8 @@ import ctypes
 import html
 import json
 import re
+import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -484,6 +486,7 @@ async def scan_for_device(name_prefix: str):
     log(f"Gefunden nach {scan_ms:.0f} ms: {device.name}  ({device.address})"
         f"{f'  RSSI={rssi} dBm' if rssi is not None else ''}")
     trace_event("ble_device_selected", name=device.name, address=device.address, rssi=rssi)
+    sniff_target_known(device.address)   # --sniff: Funk-Mitschnitt jetzt auf dieses Geraet starten
     BLE_INFO["rssi"] = rssi   # fuer die Langsam-Warnung der Downloads
     return device, scan_ms
 
@@ -2880,7 +2883,7 @@ def collect_phase_report(phase_name: str, started_wall: float, index: int) -> di
     report_dir = RUN_REPORT_DIR or REPORT_DIR
     try:
         fresh = [path for path in report_dir.glob("*.json")
-                 if path.name not in SUITE_SUMMARY_FILES and not path.name.startswith("phase_")
+                 if path.name not in SUITE_SUMMARY_FILES and not path.name.startswith(("phase_", "sniffer_"))
                  and path.stat().st_mtime >= started_wall]   # streng: kein Spielraum, sonst wird der Bericht der
                                                              # Vorphase (z. B. cycle.json) einer Phase ohne eigenen
                                                              # Bericht (Flash schreiben) zugeschrieben
@@ -2897,6 +2900,395 @@ def collect_phase_report(phase_name: str, started_wall: float, index: int) -> di
     except OSError:
         pass
     return data
+
+
+# ---------------------------------------------------------------------------
+# BLE-Funk-Mitschnitt mit nRF52840 (optional, --sniff; Plan: Doku/Plan_BLE_Sniffer_nRF52840.md)
+#
+# Startet "nrfutil ble-sniffer sniff" (nRF Sniffer for Bluetooth LE auf COM-Port, wird automatisch gefunden) parallel
+# zum Test und wertet den Mitschnitt danach mit tshark aus: Verbindungsparameter, Parameter-Updates, ATT-Ablauf
+# (CCCD-Write/Antwort, Notifications), Trennen (wer, Grund) und Funkqualitaet. Ein Mitschnitt je BLE-Phase der Suiten,
+# bei Einzeltests einer fuer den ganzen Lauf. Ergebnis: sniffer_<label>.pcapng (nur Zielgeraet, oeffnet in Wireshark)
+# und sniffer_<label>.json im Report-Ordner, dazu das Trace-Ereignis "sniffer_summary" und eine Zeile im Phasenbericht.
+# Ohne --sniff aendert sich nichts.
+# ---------------------------------------------------------------------------
+
+SNIFF_ADV_ACCESS_ADDRESS = "0x8e89bed6"
+SNIFF_WARMUP_S = 4.0
+SNIFF_PER_PHASE_MODES = ("module-suite", "fast-suite", "interleave", "soak", "classic-suite")
+SNIFF_TMP_DIR = REPORT_DIR / "_sniffer_tmp"
+SNIFF_STATE: dict = {"proc": None, "follow": None, "label": None, "raw": None, "started": None, "log": None,
+                     "port": None, "failed": False}
+LL_CONTROL_NAMES = {0x00: "LL_CONNECTION_UPDATE_IND", 0x01: "LL_CHANNEL_MAP_IND", 0x02: "LL_TERMINATE_IND",
+                    0x03: "LL_ENC_REQ", 0x04: "LL_ENC_RSP", 0x05: "LL_START_ENC_REQ", 0x06: "LL_START_ENC_RSP",
+                    0x07: "LL_UNKNOWN_RSP", 0x08: "LL_FEATURE_REQ", 0x09: "LL_FEATURE_RSP",
+                    0x0A: "LL_PAUSE_ENC_REQ", 0x0B: "LL_PAUSE_ENC_RSP", 0x0C: "LL_VERSION_IND",
+                    0x0D: "LL_REJECT_IND", 0x0E: "LL_PERIPHERAL_FEATURE_REQ", 0x0F: "LL_CONNECTION_PARAM_REQ",
+                    0x10: "LL_CONNECTION_PARAM_RSP", 0x11: "LL_REJECT_EXT_IND", 0x12: "LL_PING_REQ",
+                    0x13: "LL_PING_RSP", 0x14: "LL_LENGTH_REQ", 0x15: "LL_LENGTH_RSP", 0x16: "LL_PHY_REQ",
+                    0x17: "LL_PHY_RSP", 0x18: "LL_PHY_UPDATE_IND"}
+LL_ERROR_NAMES = {0x08: "Verbindungs-Timeout (Supervision)", 0x13: "Gegenstelle hat getrennt",
+                  0x14: "Gegenstelle: wenig Ressourcen", 0x15: "Gegenstelle: Strom aus", 0x16: "lokal getrennt",
+                  0x1A: "nicht unterstuetzt", 0x28: "Zeitpunkt verpasst (Instant)", 0x3B: "Parameter nicht akzeptabel",
+                  0x3D: "MIC-Fehler (Verschluesselung)", 0x3E: "Verbindungsaufbau fehlgeschlagen"}
+
+
+def _sniff_tool(*candidates) -> str | None:
+    for name in candidates:
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+def sniff_tshark() -> str | None:
+    return _sniff_tool("tshark") or next((str(p) for p in (Path(r"C:\Program Files\Wireshark\tshark.exe"),) if p.exists()), None)
+
+
+def sniff_executable() -> list | None:
+    """Befehl fuer den nRF-Sniffer; bevorzugt die direkte Programmdatei (ein Prozess, sauber beendbar)."""
+    home = Path.home() / ".nrfutil" / "bin"
+    direct = home / "nrfutil-ble-sniffer.exe"
+    if direct.exists():
+        return [str(direct)]
+    wrapper = _sniff_tool("nrfutil") or (str(home / "nrfutil.exe") if (home / "nrfutil.exe").exists() else None)
+    return [wrapper, "ble-sniffer"] if wrapper else None
+
+
+def sniff_find_port(requested: str | None) -> str | None:
+    """COM-Port des nRF-Sniffers: --sniff-port, sonst 'nrfutil device list' (Produkt 'nRF Sniffer ...')."""
+    if requested:
+        return requested
+    home = Path.home() / ".nrfutil" / "bin" / "nrfutil.exe"
+    exe = _sniff_tool("nrfutil") or (str(home) if home.exists() else None)
+    if not exe:
+        return None
+    try:
+        text = subprocess.run([exe, "device", "list"], capture_output=True, timeout=30).stdout.decode("utf-8", "replace")
+    except Exception:
+        return None
+    for block in re.split(r"\r?\n\s*\r?\n", text):
+        if re.search(r"Product\s+.*sniffer", block, re.I):
+            match = re.search(r"Ports\s+(COM\d+)", block)
+            if match:
+                return match.group(1)
+    return None
+
+
+def sniff_start(args, label: str) -> bool:
+    """Startet den Mitschnitt fuer das Zielgeraet (args.address). Ohne bekannte Adresse wird bis scan_for_device() gewartet."""
+    if not getattr(args, "sniff", False) or SNIFF_STATE["failed"]:
+        return False
+    SNIFF_STATE["args"] = args
+    follow = getattr(args, "sniff_follow", None) or getattr(args, "address", None)
+    if SNIFF_STATE["proc"] is not None:
+        if follow and follow.upper() != (SNIFF_STATE["follow"] or "").upper():
+            sniff_stop(args, quiet=True)     # anderes Zielgeraet: neu starten
+        else:
+            return True
+    SNIFF_STATE["label"] = label
+    if not follow:
+        SNIFF_STATE["pending"] = True        # Adresse noch unbekannt, scan_for_device() holt den Start nach
+        return False
+    SNIFF_STATE["pending"] = False
+    exe, port = sniff_executable(), sniff_find_port(getattr(args, "sniff_port", None))
+    if not exe or not port:
+        log(f"Sniffer: {'nrfutil' if not exe else 'nRF-Sniffer-COM-Port'} nicht gefunden - Test laeuft ohne Funk-Mitschnitt.")
+        trace_event("sniffer_unavailable", level="warning", nrfutil=bool(exe), port=port)
+        SNIFF_STATE["failed"] = True
+        return False
+    SNIFF_TMP_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    raw = SNIFF_TMP_DIR / f"raw_{stamp}.pcap"
+    log_path = SNIFF_TMP_DIR / f"raw_{stamp}.log"
+    log_file = log_path.open("wb")
+    try:
+        proc = subprocess.Popen(exe + ["sniff", "--port", port, "--follow", follow, "--output-pcap-file", str(raw)],
+                                stdout=log_file, stderr=subprocess.STDOUT,
+                                creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    except OSError as exc:
+        log_file.close()
+        log(f"Sniffer: Start nicht moeglich ({exc}) - Test laeuft ohne Funk-Mitschnitt.")
+        SNIFF_STATE["failed"] = True
+        return False
+    time.sleep(SNIFF_WARMUP_S)       # Sniffer muss auf die Werbung des Ziels synchronisieren, sonst verpasst er das CONNECT_IND
+    if proc.poll() is not None:
+        log_file.close()
+        tail = log_path.read_text(errors="replace").strip()[-300:]
+        log(f"Sniffer: beendete sich sofort (Port {port} belegt? Wireshark offen?): {tail}")
+        trace_event("sniffer_unavailable", level="warning", port=port, output=tail)
+        SNIFF_STATE["failed"] = True
+        return False
+    SNIFF_STATE.update(proc=proc, follow=follow, raw=raw, started=time.time(), log=log_file, port=port, log_path=log_path)
+    log(f"Sniffer: Mitschnitt gestartet ({port}, Ziel {follow}, '{label}').")
+    trace_event("sniffer_started", port=port, follow=follow, label=label, raw=str(raw))
+    return True
+
+
+def sniff_target_known(address: str) -> None:
+    """Aus scan_for_device(): Zieladresse ist jetzt bekannt, ausstehenden Mitschnitt starten."""
+    args = SNIFF_STATE.get("args")
+    if args is not None and SNIFF_STATE["proc"] is None and SNIFF_STATE.get("pending"):
+        sniff_start_with(args, address)
+
+
+def sniff_start_with(args, address: str) -> bool:
+    saved = getattr(args, "sniff_follow", None)
+    args.sniff_follow = address
+    try:
+        return sniff_start(args, SNIFF_STATE["label"] or "run")
+    finally:
+        args.sniff_follow = saved
+
+
+def _sniff_stop_process() -> None:
+    proc = SNIFF_STATE["proc"]
+    if proc is None:
+        return
+    try:
+        if proc.poll() is None:
+            try:
+                proc.send_signal(signal.CTRL_BREAK_EVENT)    # sauber beenden, damit der letzte Puffer geschrieben wird
+                proc.wait(timeout=6)
+            except (subprocess.TimeoutExpired, OSError, ValueError):
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+    finally:
+        try:
+            SNIFF_STATE["log"].close()
+        except Exception:
+            pass
+        SNIFF_STATE["proc"] = None
+
+
+def sniff_stop(args, quiet: bool = False) -> dict | None:
+    """Beendet den Mitschnitt, wertet ihn aus und legt pcapng + JSON im Report-Ordner ab. Liefert die Kurzfassung."""
+    if SNIFF_STATE["proc"] is None:
+        return None
+    raw, follow, label, started = SNIFF_STATE["raw"], SNIFF_STATE["follow"], SNIFF_STATE["label"], SNIFF_STATE["started"]
+    crashed = SNIFF_STATE["proc"].poll() is not None
+    _sniff_stop_process()
+    ended = time.time()
+    if crashed:
+        log("Sniffer: Prozess war vorzeitig beendet - Mitschnitt unvollstaendig.")
+    try:
+        summary = sniff_analyze(args, raw, follow, label, started, ended, quiet)
+    except Exception as exc:     # Auswertung darf den Test nie stoeren
+        log(f"Sniffer: Auswertung fehlgeschlagen: {exc}")
+        trace_event("sniffer_error", level="warning", error=str(exc), raw=str(raw))
+        return None
+    return summary
+
+
+def _sniff_int(value: str) -> int | None:
+    value = (value or "").split(",")[0].strip()
+    if not value:
+        return None
+    try:
+        return int(value, 0)
+    except ValueError:
+        return None
+
+
+def sniff_analyze(args, raw: Path, follow: str, label: str, started: float, ended: float, quiet: bool) -> dict:
+    tshark = sniff_tshark()
+    report_dir = RUN_REPORT_DIR or REPORT_DIR
+    report_dir.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_") or "run"
+    summary: dict = {"label": label, "target": follow, "start": datetime.fromtimestamp(started).isoformat(timespec="seconds"),
+                     "duration_s": round(ended - started, 1), "befund": [], "ereignisse": []}
+    if not raw.exists() or raw.stat().st_size < 100:
+        summary["befund"].append("Mitschnitt leer (Sniffer lieferte keine Pakete).")
+    elif not tshark:
+        keep = report_dir / f"sniffer_{safe}.pcap"
+        shutil.move(str(raw), str(keep))
+        summary["pcap"] = keep.name
+        summary["befund"].append("tshark nicht gefunden - keine automatische Auswertung (pcap in Wireshark oeffnen).")
+    else:
+        reduced = report_dir / f"sniffer_{safe}.pcapng"
+        target = follow.lower()
+        keep_filter = f"btle.advertising_address == {target} || btle.access_address != {SNIFF_ADV_ACCESS_ADDRESS}"
+        done = subprocess.run([tshark, "-r", str(raw), "-Y", keep_filter, "-w", str(reduced)], capture_output=True, timeout=300)
+        if done.returncode == 0 and reduced.exists():
+            summary["pcap"] = reduced.name
+            if not getattr(args, "sniff_keep_raw", False):
+                raw.unlink(missing_ok=True)
+        else:
+            summary["befund"].append("tshark konnte den Mitschnitt nicht filtern; Rohdatei bleibt erhalten.")
+            reduced = raw
+        _sniff_extract(tshark, reduced, summary, started, ended)
+    for stale in SNIFF_TMP_DIR.glob("raw_*.log"):
+        stale.unlink(missing_ok=True)
+    try:
+        (report_dir / f"sniffer_{safe}.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        pass
+    short = {key: summary.get(key) for key in ("label", "target", "pcap", "connect", "terminate", "cccd", "notifications",
+                                              "crc_fehler", "befund")}
+    trace_event("sniffer_summary", **short)
+    if not quiet:
+        log(f"Sniffer '{label}': " + " | ".join(summary["befund"] or ["keine Auffaelligkeit"]))
+    return short
+
+
+SNIFF_FIELDS = ("frame.time_epoch", "btle.advertising_header.pdu_type", "btle.initiator_address",
+                "btle.link_layer_data.interval", "btle.link_layer_data.latency", "btle.link_layer_data.timeout",
+                "btle.access_address", "btle.data_header.llid", "btle.control_opcode", "btle.control.error_code",
+                "btle.control.interval", "btle.control.interval.min", "btle.control.interval.max",
+                "btle.data_header.length", "btle.control.latency", "btle.control.timeout", "btatt.opcode", "btatt.handle",
+                "btatt.value", "nordic_ble.rssi", "nordic_ble.crc.bad", "btle.crc.incorrect", "_ws.col.Source",
+                "nordic_ble.direction")
+
+
+def _sniff_sender(source: str, direction: str) -> str:
+    text = (source or "").lower()
+    if "central" in text or "master" in text:
+        return "PC (Central)"
+    if "periph" in text or "slave" in text:
+        return "Modul (Peripheral)"
+    if direction.strip() in ("True", "1"):        # nordic_ble.direction: True = Central -> Peripheral
+        return "PC (Central)"
+    if direction.strip() in ("False", "0"):
+        return "Modul (Peripheral)"
+    return "unklar"
+
+
+def _sniff_extract(tshark: str, pcap: Path, summary: dict, started: float, ended: float) -> None:
+    cmd = [tshark, "-r", str(pcap), "-Y", "btle.access_address != " + SNIFF_ADV_ACCESS_ADDRESS + " || btle.advertising_header.pdu_type == 0x05",
+           "-T", "fields", "-E", "separator=/t"]
+    for field in SNIFF_FIELDS:
+        cmd += ["-e", field]
+    done = subprocess.run(cmd, capture_output=True, timeout=300)
+    if done.returncode != 0:
+        summary["befund"].append("tshark-Auswertung fehlgeschlagen: " + done.stderr.decode("utf-8", "replace").strip()[:200])
+        return
+    rows = done.stdout.decode("utf-8", "replace").splitlines()
+    events = summary["ereignisse"]
+    befund = summary["befund"]
+    connect_t = last_data_t = first_t = None
+    data_packets = total = crc_bad = 0
+    notifications = writes_noresp = 0
+    rssis: list = []
+    cccd: list = []              # alle Writes auf ein CCCD, je mit Antwortzeit
+    terminate = None
+
+    for row in rows:
+        col = (row.split("\t") + [""] * len(SNIFF_FIELDS))[:len(SNIFF_FIELDS)]
+        rec = dict(zip(SNIFF_FIELDS, col))
+        try:
+            when = float(rec["frame.time_epoch"])
+        except ValueError:
+            continue
+        rel = (lambda t: round(t - connect_t, 3) if connect_t is not None else None)
+        if rec["btle.advertising_header.pdu_type"].split(",")[0].strip().lower() in ("0x05", "5"):
+            connect_t = when
+            interval, timeout = _sniff_int(rec["btle.link_layer_data.interval"]), _sniff_int(rec["btle.link_layer_data.timeout"])
+            summary["connect"] = {"zeit": datetime.fromtimestamp(when).isoformat(timespec="milliseconds"),
+                                  "initiator": rec["btle.initiator_address"],
+                                  "intervall_ms": interval * 1.25 if interval is not None else None,
+                                  "latenz": _sniff_int(rec["btle.link_layer_data.latency"]),
+                                  "timeout_ms": timeout * 10 if timeout is not None else None}
+            events.append({"t": 0.0, "was": "CONNECT_IND", **summary["connect"]})
+            continue
+        if connect_t is None:
+            continue
+        total += 1
+        first_t = first_t or when
+        if rec["nordic_ble.crc.bad"].strip() in ("1", "True") or rec["btle.crc.incorrect"].strip() in ("1", "True"):
+            crc_bad += 1
+        rssi = _sniff_int(rec["nordic_ble.rssi"])
+        if rssi is not None:
+            rssis.append(rssi)
+        llid = _sniff_int(rec["btle.data_header.llid"])
+        if llid == 2 or (llid == 1 and (_sniff_int(rec["btle.data_header.length"]) or 0) > 0):   # L2CAP-Nutzdaten
+            data_packets += 1
+        if llid is not None and not (llid == 1 and not (_sniff_int(rec["btle.data_header.length"]) or 0)):
+            last_data_t = when                                  # letztes Paket, das nicht leer war (Lebenszeichen)
+        opcode = _sniff_int(rec["btle.control_opcode"])
+        if opcode is not None:
+            name = LL_CONTROL_NAMES.get(opcode, f"LL_0x{opcode:02X}")
+            ev = {"t": rel(when), "was": name, "von": _sniff_sender(rec["_ws.col.Source"], rec["nordic_ble.direction"])}
+            if opcode == 0x02:
+                code = _sniff_int(rec["btle.control.error_code"])
+                ev["grund"] = f"0x{code:02X} {LL_ERROR_NAMES.get(code, '?')}" if code is not None else "?"
+                terminate = {"t": ev["t"], "von": ev["von"], "grund": ev["grund"]}
+            elif opcode in (0x00, 0x0F, 0x10):
+                interval = _sniff_int(rec["btle.control.interval"])
+                if interval is not None:
+                    ev["intervall_ms"] = interval * 1.25
+                lo, hi = _sniff_int(rec["btle.control.interval.min"]), _sniff_int(rec["btle.control.interval.max"])
+                if lo is not None and hi is not None:
+                    ev["intervall_ms"] = f"{lo * 1.25:g}-{hi * 1.25:g}"
+                ev["latenz"] = _sniff_int(rec["btle.control.latency"])
+                timeout = _sniff_int(rec["btle.control.timeout"])
+                ev["timeout_ms"] = timeout * 10 if timeout is not None else None
+            events.append(ev)
+        att = _sniff_int(rec["btatt.opcode"])
+        if att is not None:
+            handle, value = rec["btatt.handle"].split(",")[0], rec["btatt.value"].replace(":", "").lower()
+            if att == 0x12:        # Write Request
+                if value in ("0100", "0200", "0300", "0000") and len(value) == 4:
+                    cccd.append({"write_t": rel(when), "wert": value, "handle": handle,
+                                 "art": {"0100": "Notify", "0200": "Indicate", "0300": "Notify+Indicate"}.get(value, "aus")})
+                    events.append({"t": rel(when), "was": "ATT Write Request (CCCD)", "handle": handle, "wert": value})
+                elif len(events) < 400:
+                    events.append({"t": rel(when), "was": "ATT Write Request", "handle": handle, "bytes": len(value) // 2})
+            elif att == 0x13 and cccd and "antwort_t" not in cccd[-1]:
+                cccd[-1]["antwort_t"] = rel(when)
+                events.append({"t": rel(when), "was": "ATT Write Response"})
+            elif att == 0x1B:      # Handle Value Notification
+                notifications += 1
+                if notifications <= 3:
+                    events.append({"t": rel(when), "was": "ATT Notification", "handle": handle, "bytes": len(value) // 2})
+            elif att == 0x52:
+                writes_noresp += 1
+            elif att == 0x01:
+                events.append({"t": rel(when), "was": "ATT Error Response", "handle": handle})
+
+    connect = summary.get("connect")
+    summary.update(pakete=total, datenpakete=data_packets, crc_fehler=crc_bad, notifications=notifications,
+                   write_ohne_antwort=writes_noresp, cccd=cccd or None, terminate=terminate,
+                   rssi_mittel=round(sum(rssis) / len(rssis), 1) if rssis else None, rssi_min=min(rssis) if rssis else None)
+    if connect is None:
+        befund.append("Keine Verbindung im Mitschnitt (CONNECT_IND nicht gesehen: Adresse, Reichweite, Sniffer-Position?).")
+        return
+    befund.append(f"Verbindung: Intervall {connect['intervall_ms']} ms, Latenz {connect['latenz']}, "
+                  f"Timeout {connect['timeout_ms']} ms.")
+    for entry in cccd:
+        befund.append(f"CCCD-Write {entry['art']} ({entry['wert']}, Handle {entry['handle']}) bei {entry['write_t']} s, "
+                      f"Antwort {'bei ' + str(entry['antwort_t']) + ' s' if 'antwort_t' in entry else 'FEHLT'}.")
+    if not cccd:
+        befund.append("Kein CCCD-Write im Mitschnitt.")
+    befund.append(f"{notifications} Notifications, {writes_noresp} Write-ohne-Antwort, {data_packets} Datenpakete, "
+                  f"{crc_bad} CRC-Fehler.")
+    if terminate:
+        befund.append(f"TRENNEN durch {terminate['von']} nach {terminate['t']} s, Grund {terminate['grund']}.")
+    elif last_data_t is not None and ended - last_data_t > 2.0 and ended - connect_t > 5:
+        befund.append(f"Mitschnitt der Verbindung endet {last_data_t - connect_t:.1f} s nach CONNECT_IND ohne "
+                      "LL_TERMINATE_IND: Sniffer hat den Sync verloren (z. B. nach einem Parameter-Update) oder Funkverlust.")
+    elif last_data_t is None:
+        befund.append("Verbindung ohne jedes Datenpaket mitgeschnitten (Sniffer hat nach CONNECT_IND nichts mehr gehoert).")
+    else:
+        befund.append("Verbindung bis Mitschnittende aktiv.")
+
+
+def sniff_phase_begin(args, name: str, transport: str, index: int) -> bool:
+    """Phase einer Suite: je BLE-Phase ein eigener Mitschnitt (Classic kann der Sniffer nicht)."""
+    if not getattr(args, "sniff", False) or transport != "ble":
+        return False
+    sniff_start(args, f"phase_{index:02d}_{name}")
+    return True
+
+
+def sniff_phase_end(args, active: bool) -> dict | None:
+    if not active:
+        return None
+    summary = sniff_stop(args)
+    SNIFF_STATE["pending"] = False
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -3395,6 +3787,7 @@ def make_phase_runner(args, result: dict, label: str):
         if TRACE is not None:
             TRACE.set_context(phase=name, transport=transport, cycle=None)
         trace_event("phase_started", test=test.__name__)
+        sniff_on = sniff_phase_begin(args, name, transport, len(result["phases"]) + 1)
         args.transport = transport
         for key, value in overrides.items():
             setattr(args, key, value)
@@ -3408,11 +3801,12 @@ def make_phase_runner(args, result: dict, label: str):
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
+        sniffer = sniff_phase_end(args, sniff_on)
         status = classify_phase_status(status, started_wall)
         report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"),
                                  "result": status, "duration_s": round(time.perf_counter() - started, 3),
-                                 "report": report_data})
+                                 "report": report_data, "sniffer": sniffer})
         if TRACE is not None:
             TRACE.set_context(cycle=None)
         trace_event("phase_finished", status=status, duration_s=round(time.perf_counter() - started, 3))
@@ -3765,6 +4159,7 @@ async def run_module_suite(args) -> int:
         if TRACE is not None:
             TRACE.set_context(phase=name, transport=transport, cycle=None)
         trace_event("phase_started", test=test.__name__)
+        sniff_on = sniff_phase_begin(args, name, transport, len(result["phases"]) + 1)
         args.transport = transport
         for key, value in overrides.items():
             setattr(args, key, value)
@@ -3778,10 +4173,11 @@ async def run_module_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
+        sniffer = sniff_phase_end(args, sniff_on)
         status = classify_phase_status(status, started_wall)
         report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"), "result": status,
-                                 "duration_s": round(time.perf_counter() - started, 3), "report": report_data})
+                                 "duration_s": round(time.perf_counter() - started, 3), "report": report_data, "sniffer": sniffer})
         if TRACE is not None:
             TRACE.set_context(cycle=None)
         trace_event("phase_finished", status=status,
@@ -3859,6 +4255,7 @@ async def run_fast_suite(args) -> int:
         if TRACE is not None:
             TRACE.set_context(phase=name, transport=transport, cycle=None)
         trace_event("phase_started", test=test.__name__)
+        sniff_on = sniff_phase_begin(args, name, transport, len(result["phases"]) + 1)
         args.transport = transport
         for key, value in overrides.items():
             setattr(args, key, value)
@@ -3872,10 +4269,11 @@ async def run_fast_suite(args) -> int:
         finally:
             for key, value in old_values.items():
                 setattr(args, key, value)
+        sniffer = sniff_phase_end(args, sniff_on)
         status = classify_phase_status(status, started_wall)
         report_data = collect_phase_report(name, started_wall, len(result["phases"]) + 1)
         result["phases"].append({"name": name, "transport": transport, "port": (report_data or {}).get("port"), "result": status,
-                                 "duration_s": round(time.perf_counter() - started, 3), "report": report_data})
+                                 "duration_s": round(time.perf_counter() - started, 3), "report": report_data, "sniffer": sniffer})
         if TRACE is not None:
             TRACE.set_context(cycle=None)
         trace_event("phase_finished", status=status,
@@ -4054,6 +4452,14 @@ def main() -> int:
     p.add_argument("--ymodem-timeout", type=float, default=2.0,
                    help="[download/receive] Timeout je Ymodem-Block in Sekunden; muss unter dem "
                         "Firmware-ACK-Timeout von 6 s liegen")
+    p.add_argument("--sniff", action="store_true",
+                   help="BLE-Funk-Mitschnitt mit nRF52840-Sniffer (nrfutil ble-sniffer + tshark): Verbindungsparameter, "
+                        "ATT-Ablauf, Trennen mit Grund, Funkqualitaet; Ergebnis sniffer_*.pcapng/.json im Report-Ordner")
+    p.add_argument("--sniff-port", default=None, help="COM-Port des nRF-Sniffers (Default: automatisch finden)")
+    p.add_argument("--sniff-follow", default=None,
+                   help="BLE-Adresse des Zielgeraets fuer den Sniffer (Default: Adresse aus --address bzw. dem Scan)")
+    p.add_argument("--sniff-keep-raw", action="store_true",
+                   help="ungefilterten Mitschnitt (alle Geraete in Reichweite) zusaetzlich behalten (gross)")
     args = p.parse_args()
 
     if args.mode in ("smoke", "transfer"):
@@ -4080,6 +4486,9 @@ def main() -> int:
         asyncio.run(preflight_identify(args))
     if args.mode == "info":
         return report_device_info(args)
+    if args.sniff and args.mode not in SNIFF_PER_PHASE_MODES and args.mode != "classic-smoke" \
+            and args.mode != "idle-latency" and args.transport == "ble":
+        sniff_start(args, "run")           # Einzeltest: ein Mitschnitt fuer den ganzen Lauf (Suiten: je BLE-Phase)
 
     if args.mode == "smoke":
         return asyncio.run(run_smoke_test(args))
@@ -4116,6 +4525,7 @@ if __name__ == "__main__":
         print("\nAbgebrochen.")
         raise SystemExit(130)
     finally:
+        sniff_stop(SNIFF_STATE.get("args"))   # nur aktiv, wenn ein Mitschnitt noch laeuft (Einzeltest/Abbruch)
         pc_events_export()     # greift nur, falls die Suite es nicht schon getan hat
         log_used_ports()       # welche Ports hat der Test wofuer benutzt
         pc_logging_stop()

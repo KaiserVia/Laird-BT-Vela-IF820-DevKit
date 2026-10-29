@@ -24,6 +24,22 @@ Beide Boards auf **5.126** (Versionszeile `Viasis 3003M - Version 5.126` im RS23
 4. Zeitabgleich: Die Wireshark-Zeitstempel und `trace.ndjson` nutzen beide die PC-Uhr. Beim Start einer Aufnahme die Uhrzeit notieren.
 5. Ordner für Aufnahmen: `Doku/tools/Testreports/sniffer/<Datum>_<Board>_<Fall>/` (pcapng + kurze Notiz). pcapng nicht ins Git, wenn groß; Verweis in `project-status.md`.
 
+## Automatischer Mitschnitt im Testskript (`--sniff`, ab 2026-10-29)
+Statt Wireshark von Hand zu bedienen, startet `ble_mainboard_test.py` den Sniffer selbst und wertet ihn aus. Es braucht keinen Wireshark-Capture, nur den bereits geflashten nRF Sniffer (nrfutil `ble-sniffer`, Port wird automatisch gefunden) und `tshark` (liegt bei Wireshark) zum Auswerten.
+
+```
+python ble_mainboard_test.py --mode smoke --name VIASIS_99SC9923 --no-identify --rs232-port COM3 --sniff
+python ble_mainboard_test.py --mode module-suite --name VIASIS_99SC9923 --sniff
+```
+- **Einzeltests** (smoke, cycle, download, receive ...): ein Mitschnitt für den ganzen Lauf. **Suiten** (module-suite, fast-suite, interleave, soak): je BLE-Phase ein eigener Mitschnitt. Classic-Phasen werden nicht mitgeschnitten (kann der Sniffer nicht).
+- Der Sniffer startet, sobald die Zieladresse bekannt ist (aus `--address`, `--sniff-follow` oder dem Scan), und wartet 4 s auf den Sync. Wird er kürzer vor dem Verbinden gestartet, verpasst er das `CONNECT_IND`.
+- Ergebnis im Report-Ordner: `sniffer_<label>.pcapng` (nur Zielgerät, öffnet in Wireshark) und `sniffer_<label>.json`; dazu im Trace das Ereignis `sniffer_summary`, im Phasenbericht der Eintrag `sniffer` und eine Befundzeile im Log.
+- Befund enthält: Verbindungsparameter (`CONNECT_IND`), Parameter-Updates, alle CCCD-Writes (Notify/Indicate) mit Antwortzeit, Zahl der Notifications/Datenpakete/CRC-Fehler, `LL_TERMINATE_IND` mit Sender und Grund, RSSI.
+- Weitere Optionen: `--sniff-port COMx`, `--sniff-follow <Adresse>`, `--sniff-keep-raw` (ungefilterter Mitschnitt aller Geräte, groß). Ohne `--sniff` ändert sich nichts. Fehlt Sniffer oder tshark, läuft der Test ohne Mitschnitt weiter.
+- **Voraussetzung:** Wireshark/nRF Connect dürfen den Sniffer-Port nicht gleichzeitig belegen. Der Sniffer-Dongle steht in Reichweite der Boards (am besten zwischen PC und Board).
+
+**Bekannte Grenze (erster Test 2026-10-29, Board A):** Der Sniffer erfasst das `CONNECT_IND`, die Service-Discovery und den CCCD-Write, **verliert aber nach 0,2 bis 2 s den Sync**, nachdem der PC `LL_CONNECTION_PARAM_REQ`/`LL_CONNECTION_UPDATE_IND` sendet (Wechsel 7,5 ms auf 15 ms, danach Anforderung 7,5 ms mit Timeout 1000 ms). Das spätere Trennen nach ca. 5,5 s sieht er deshalb bisher nicht. Der Befund meldet das als "Sync verloren". Gegenmaßnahmen siehe Ergebnisse der Phasen 1 und 2 (näher an die Boards, Intervall-Update beobachten).
+
 ## Phase 1: Baseline mit funktionierendem Lauf (Board A)
 - Sniffer auf die Werbe-Adresse von A einstellen ("Follow"), dann `python ble_mainboard_test.py --mode smoke --name VIASIS_99SC9923 --no-identify --rs232-port COM3` laufen lassen (bestandener Lauf).
 - Im Mitschnitt notieren: `CONNECT_IND` (Intervall, Slave-Latenz, Timeout), Intervall-Updates (`LL_CONNECTION_UPDATE_IND`, ggf. auf 15 ms wie im `CU`-Event), ATT-Ablauf (Service-Discovery, **Write auf CCCD `...ca102`**, Write Response), erste Notifications (Banner, `PIN = `), Ende (`LL_TERMINATE_IND`, Richtung und Reason).
