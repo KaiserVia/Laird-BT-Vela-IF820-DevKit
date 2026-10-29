@@ -5341,3 +5341,11 @@ Alle 104 Testreports (01.09.-22.10., 5,7 GB) maschinell ausgewertet (`Doku/tools
 - Adressen Board A: BLE und Classic CD:49:1B:93:00:5F; 9C:97:1B:E9:FA:3D ist der PC-Adapter (Zeile in `Plan_BLE_Sniffer_nRF52840.md` noch zu korrigieren).
 
 **Schluss:** Mit gesundem Modul läuft 5.126 auf Board A durchgehend stabil. Der 22.10.-Abbruch (BLE-Download 1/3) ist nicht reproduziert; der Fehler hängt am Modulzustand, nicht an einer Firmware-Eigenschaft, die sich im normalen Ablauf zeigt. Nächster Schritt wäre, den Zustand zu provozieren (viele Zyklen nach Flash-Schreiben) oder Board B mit Sniffer zu prüfen.
+
+## Befund Board B (26SC9983), 2026-10-29 13:23-14:40 (Firmware 5.126)
+
+- BLE-Smoke mit `--pin 269983` und Sniffer: 5 Läufe (je 2 Versuche), 10 von 10 "unstable" (Gerät trennt nach ca. 5 s, kein PIN-Prompt). Das gilt auch nach Neuprogrammierung, Werksreset und Parameter-Neuprogrammierung durch den Anwender (danach meldet das Gerät HW `V2` mit Schnittstellen "Bluetooth, USB, Modem/Email-LTE, GPS" statt vorher `J2` "Bluetooth, USB").
+- **Auf B kommt nie ein `[BT-Event]` (C/CU) auf RS232**, obwohl der PC verbunden ist und GATT auflöst. Auf Board A erscheinen die Events bei jeder Verbindung.
+- **Classic-Smoke auf B scheitert ebenfalls** (kein PIN-Prompt). Der Fehler ist also nicht BLE- oder Windows-spezifisch: die Firmware empfängt nach dem Verbindungsaufbau nichts vom Modul.
+- Modulkonfiguration (Kommandoabfragen) von B und A sind bis auf Name und Adresse identisch; Kommandos im Command-Mode funktionieren auf B.
+- Offene Hypothesen: (1) UART1-Mux steht auf B auf LTE statt BT (HW V2 mit LTE/GPS), (2) Hardwarefehler im Pfad Modul-TX zu LPC-RX, (3) Modulzustand.
