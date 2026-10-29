@@ -5370,6 +5370,11 @@ Alle 104 Testreports (01.09.-22.10., 5,7 GB) maschinell ausgewertet (`Doku/tools
 - Gegenprobe 5.126 (zurueckgeflasht, Stromzyklus): BLE-Smoke 2/2 `unstable`, also wieder das alte Fehlerbild.
 - Danach 5.127 wieder geflasht: BLE-Smoke `passed`. **26SC9994 laeuft jetzt auf 5.127.**
 
+**Test Board B (26SC9983, HW V2, Schnittstellen Bluetooth, USB, LTE, GPS; RS232 an COM3), 2026-10-29 16:27-16:33:**
+- Ausgangslage 5.126: BLE-Smoke `unstable` (2 Versuche, altes Fehlerbild).
+- 5.127 (Flash + Stromzyklus 10 s): BLE-Smoke 4/4 `passed`, jeder Lauf mit `[BT-Event] C` und `CU` auf RS232 (auf B bisher nie). Intervall vom PC beim Verbinden meist 7,5 ms (`I=0006`), einmal 60 ms (`I=0030`), jeweils per `CU` angepasst.
+- Classic auf B nicht getestet: In Windows existiert kein Bluetooth-COM-Port mehr fuer B (FF:4F:7F:9E:EE:BA, frueher COM8), das Geraet muss neu gekoppelt werden. **26SC9983 laeuft jetzt auf 5.127.**
+
 **Offen:** Board B und Board A mit 5.127 pruefen (A: keine Verschlechterung, module-suite inkl. Download); Wirkung bei LTE-Boards (GSM-Sitzung -> Rueckkehr in den aktiven Leerlauf); Doku `Doku/UART1_Owner_StateMachine.md` (Zustand NONE) nachgezogen. Status TEST: erst nach den Pruefungen als regulaere Version betrachten.
 
 **Geaenderte Dateien:** hard.c, sprachen/sictxt.c (-> 5.127).

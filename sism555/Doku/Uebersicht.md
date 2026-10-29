@@ -22,7 +22,7 @@
 - Herstellerunterlagen: `../../Documentation/` (EZ-Serial-Guide, Abschnitt BLE-Durchsatz mit `/UCP`).
 
 ## NEU 2026-10-29 abends: 5.127 (TEST) behebt Board C
-- Ursache: Im Leerlauf schaltete `uart1_release()` UART1 ab, das IF820 sah CTS dauerhaft HIGH und hing beim CCCD-Write. 5.127 laesst UART1 beim IF820 im Leerlauf aktiv. Board C: BLE 4/4 und Classic 2/2 bestanden, Gegenprobe 5.126 wieder 2/2 gescheitert. C laeuft jetzt auf **5.127**. Details: `project-status.md`, Update 5.127. Offen: B und A mit 5.127 pruefen.
+- Ursache: Im Leerlauf schaltete `uart1_release()` UART1 ab, das IF820 sah CTS dauerhaft HIGH und hing beim CCCD-Write. 5.127 laesst UART1 beim IF820 im Leerlauf aktiv. Board C: BLE 4/4 und Classic 2/2 bestanden, Gegenprobe 5.126 wieder 2/2 gescheitert. C laeuft jetzt auf **5.127**. Board B: mit 5.127 BLE 4/4 bestanden (vorher mit 5.126 gescheitert), Classic offen (B in Windows nicht gekoppelt); B laeuft auf **5.127**. Details: `project-status.md`, Update 5.127. Offen: Classic auf B, Board A mit 5.127 (module-suite).
 
 ## Stand der Untersuchung (2026-10-29, vor 5.127)
 - **Board A (99SC9923, umverdrahtet):** nach Power-Cycle läuft 5.126 stabil, module-suite komplett bestanden (BLE und Classic, 6 Downloads, 0 Retries). Der Ausfall vom 22.10. ist nicht reproduziert, Auslöser des "komischen Modulzustands" unbekannt.
