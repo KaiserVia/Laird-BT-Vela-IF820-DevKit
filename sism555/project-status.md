@@ -5330,3 +5330,14 @@ Alle 104 Testreports (01.09.-22.10., 5,7 GB) maschinell ausgewertet (`Doku/tools
 - **Der Sniffer verliert in `--sniff`-Laeufen den Sync nicht wegen 2M-PHY** (Dauer-Mitschnitte ohne `--sniff` im Testskript lieferten ganze Verbindungen). Ursache des Sync-Verlusts im Skript-Lauf offen.
 - **Wichtig:** In denselben Minuten ist **Board A auf RS232 (COM3, 115200) stumm** (kein Banner, keine Antwort auf 'H'), und **auch Classic (COM12) liefert kein Banner/PIN-Prompt**. Das Modul wirbt und verbindet, aber die Firmware dahinter meldet sich weder ueber BLE noch Classic noch RS232. Verdacht: Board-MCU laeuft nicht (Reset-Schleife/haengt/RS232 nicht angeschlossen). Die Smoke-Fehler von heute sind damit nicht aussagekraeftig, solange das nicht geklaert ist.
 - Hinweis: Classic-Adresse von Board A = BLE-Adresse `CD:49:1B:93:00:5F`; `9C:97:1B:E9:FA:3D` ist der PC-Adapter (Plan-Zeile entsprechend zu korrigieren).
+
+## Befund Board A, module-suite mit Sniffer, 2026-10-29 (Firmware 5.126)
+
+**Ergebnis: module-suite komplett `passed`** (11:19 bis 13:00, ca. 100 min): Classic- und BLE-Smoke, Verbindungszyklen, 419430-Messwerte-Flash, je 3 Ymodem-Downloads (4,2 MB) per Classic und BLE, 0 Retries. BLE-Durchsatz 6602 B/s bei Intervall 7,5 ms. Sniffer je BLE-Phase: Verbindung bis Mitschnittende aktiv, keine Trennung durch das Modul.
+
+**Korrekturen zu den Zwischenergebnissen vom selben Tag:**
+- Die Serien "8/8 und 10/10 fehlgeschlagen" waren ein Messfehler: mit `--address` leitet das Skript keine PIN ab, `--pin` ist Pflicht (26SC9983 gibt 269983, 99SC9923 gibt 999923).
+- Der Ausfall um 10:31 (Modul verstummt nach ca. 4,9 s ohne LL_TERMINATE_IND) trat im "komischen Zustand" des Moduls auf. Der Kippschalter (Power-Cycle) behob ihn. Auslöser weiter unbekannt.
+- Adressen Board A: BLE und Classic CD:49:1B:93:00:5F; 9C:97:1B:E9:FA:3D ist der PC-Adapter (Zeile in `Plan_BLE_Sniffer_nRF52840.md` noch zu korrigieren).
+
+**Schluss:** Mit gesundem Modul läuft 5.126 auf Board A durchgehend stabil. Der 22.10.-Abbruch (BLE-Download 1/3) ist nicht reproduziert; der Fehler hängt am Modulzustand, nicht an einer Firmware-Eigenschaft, die sich im normalen Ablauf zeigt. Nächster Schritt wäre, den Zustand zu provozieren (viele Zyklen nach Flash-Schreiben) oder Board B mit Sniffer zu prüfen.
