@@ -5349,3 +5349,10 @@ Alle 104 Testreports (01.09.-22.10., 5,7 GB) maschinell ausgewertet (`Doku/tools
 - **Classic-Smoke auf B scheitert ebenfalls** (kein PIN-Prompt). Der Fehler ist also nicht BLE- oder Windows-spezifisch: die Firmware empfängt nach dem Verbindungsaufbau nichts vom Modul.
 - Modulkonfiguration (Kommandoabfragen) von B und A sind bis auf Name und Adresse identisch; Kommandos im Command-Mode funktionieren auf B.
 - Offene Hypothesen: (1) UART1-Mux steht auf B auf LTE statt BT (HW V2 mit LTE/GPS), (2) Hardwarefehler im Pfad Modul-TX zu LPC-RX, (3) Modulzustand.
+
+## Befund Board 26SC9994 (unveraendert, HW V2), Firmware-Bisektion, 2026-10-29 14:48-15:54
+
+- Neues Werkzeug `Doku/tools/flash_xmodem.py`: flasht per RS232/USB (Hauptmenue, 3, Strg+U, XMODEM-1K, y); Strom-Zyklus mit `relay_power.py zyklus 10` (Relais COM7). Beide funktionieren; die Version wurde nach Flash und Stromzyklus kontrolliert (5.126 und 5.99).
+- 26SC9994 scheitert **mit 5.126 und mit 5.99** (BLE und Classic: kein PIN-Prompt, Trennung nach ca. 5 s, kein `[BT-Event]`). Damit ist eine Firmware-Regression nach 5.99 ausgeschlossen. Stromzyklus (10 s) aendert nichts.
+- Sniffer bei 5.99/26SC9994: PC schreibt Service-Changed-CCCD (Antwort ok) und danach den CYSPP-CCCD 0x0012 (0100): **das Modul antwortet auf diesen Write nicht** (Antwort FEHLT), danach keine Daten, Trennung. Auf Board A (umverdrahtet, IO5 vom GND getrennt) laeuft BLE mit 5.126 stabil.
+- Offene Hypothesen: (1) Hardwareunterschied unverdrahtet/umverdrahtet (IO5 auf GND, CYSPP-Pegel), (2) veralteter Windows-Bond (noch nicht geprueft, Entfernen der Geraete in Windows steht aus). 26SC9994 laeuft nach dem Test auf 5.99.
