@@ -38,7 +38,8 @@
 2. Stand taggen (z. B. `bt-5.127`) als Referenz.
 3. Radar-Update des Kollegen mergen. Vorher klaeren: liegt es auf `LTE-Update` oder `main`, und wird `connection-pin` ganz zusammengefuehrt oder nur der 5.127-Fix uebernommen?
 4. Danach komplette BT-Testreihe auf dem Merge-Stand, alle drei Boards.
-5. Neue Testfaelle (Strom, Neustart, Grenzfaelle): `Testplan_BT_Erweiterung_Strom_Grenzfaelle.md`. **Vor dem Merge P1 pruefen** (Verdacht: nach Reboot/Watchdog bleibt UART1 aus, 5.127-Fix greift dann nicht).
+5. Neue Testmodi `nightly` (Neustart 3:15), `bt-update`, `gsm-mux`, `bt-timeout`, `reboot-check`, `power-sweep`, `boot-race`; Beschreibung und Aufrufe in `Testplan_BT_Erweiterung_Strom_Grenzfaelle.md` (Abschnitte 3 und 5). **Zuerst `nightly`**: Verdacht, dass BT nach dem taeglichen Neustart um 3:15 bis zum naechsten Stromzyklus ausfaellt.
+6. Neue Testfaelle (Strom, Neustart, Grenzfaelle): `Testplan_BT_Erweiterung_Strom_Grenzfaelle.md`. **Vor dem Merge P1 pruefen** (Verdacht: nach Reboot/Watchdog bleibt UART1 aus, 5.127-Fix greift dann nicht).
 
 ## Offene Entscheidungen
 1. ~~Windows-Geräte B/C entfernen und neu koppeln~~ (Ursache war 5.127-Fehler, siehe oben; B muss fuer Classic trotzdem neu gekoppelt werden).

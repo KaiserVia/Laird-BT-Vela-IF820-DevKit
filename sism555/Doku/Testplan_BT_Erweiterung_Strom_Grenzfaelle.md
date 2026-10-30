@@ -192,6 +192,44 @@ Protokoll, `[BT-Event]`-Zeilen). Bei einem Fehler zuerst einen Stromzyklus mit 3
 hängt" und "Modul hängt" zu unterscheiden. Bei Abbruch das Relais immer wieder auf "Strom an" setzen
 (das Relais rastet).
 
+## 5. Tests am Tisch ohne Handarbeit (umgesetzt 2026-10-30)
+
+Weitere Modi in `ble_mainboard_test.py`, offline mit nachgebildeter Firmware geprüft (XMODEM mit NAK, Uhr stellen,
+Protokoll lesen), **am Gerät noch nicht gelaufen**. Alle brauchen den RS232-Mitschnitt (externer Adapter, COM3).
+Nach jedem Schritt laufen `--checks` BLE-Smokes (Default 2) und ein Classic-Smoke.
+
+| Modus | Was er prüft | Ablauf | Bestanden, wenn |
+|---|---|---|---|
+| `nightly` | **Nächtlicher Neustart um 3:15** (`BOOTTASK`, `rtc.c`). Verdacht: Der Reboot-Zweig in `main.c` ist leer, UART1 bleibt aus, BT geht bis zum nächsten Stromzyklus nicht. Betrifft jedes Gerät im Feld täglich. | Uhr über RS232 auf `--nightly-set` (03:13:30), bis 03:15 + 45 s warten, Neustart im Geräteprotokoll nachweisen (`Reboot;..;03:15`), BT prüfen, Uhr auf PC-Zeit zurück | Neustart im Protokoll und alle Smokes bestanden |
+| `gsm-mux` | UART1-MUX auf GSM (LTE-Sitzung), ohne SIM und Zeitplan. Nur auf einem Board mit LTE-Modem (B). | Testmenü → Strg+W → 7 → 9600 → GSM, `--gsm-hold` 60 s offen (dabei ein BLE-Versuch, nur zur Information), Strg+Z, zurück | Smokes nach dem Schließen bestanden |
+| `bt-timeout` | Zeitlimit `BT_TIMEOUT` (6 min ohne Empfang, `measure.c`): Gerät trennt selbst über `bt_disconnect()`. | verbinden (`--transport ble` oder `classic`), PIN, dann nichts senden, bis zu `--timeout-wait` 480 s | Trennung nach 300 bis 440 s (Meldung "Bluetoothverbindung getrennt" oder Link weg) und danach wieder verbindbar |
+| `bt-update` | **Firmware-Update über Bluetooth Classic** wie ein Servicetechniker. Der LPC startet neu, das IF820 hält die Verbindung. | Classic verbinden, PIN, Testmenü, Strg+U, XMODEM-1K mit `--reboot-bin`, `y` | Übertragung ok, PIN-Prompt über dieselbe Verbindung nach dem Neustart, danach Smokes bestanden |
+
+```
+python ble_mainboard_test.py --mode nightly    --name VIASIS_26SC9994 --pin 269994 --rs232-port COM3 --repeat 2
+python ble_mainboard_test.py --mode gsm-mux    --name VIASIS_26SC9983 --pin 269983 --rs232-port COM3
+python ble_mainboard_test.py --mode bt-timeout --name VIASIS_26SC9994 --pin 269994 --rs232-port COM3 --repeat 1
+python ble_mainboard_test.py --mode bt-update  --name VIASIS_26SC9994 --pin 269994 --rs232-port COM3 --reboot-bin ..\..\sism.bin --repeat 1
+```
+
+**Achtung:** `bt-update` und `reboot-check` mit Methode `firmware` löschen im Gerät Protokoll und Messdaten. `nightly`
+liest das Protokoll; deshalb `nightly` vor diesen beiden laufen lassen. `nightly` setzt nur voraus, dass die Batterie-
+spannung über der Grenze liegt (sonst unterdrückt `Aufgabenzeit()` den Neustart).
+
+Bekannte Grenzen: Nach dem 3:15-Neustart gibt die Firmware auf RS232 vermutlich kein Banner aus (`connect` bleibt im
+Zweig `BOOT_RES` unverändert), deshalb der Nachweis über das Protokoll. `gsm-mux` auf einem Board ohne Modem öffnet
+kein Terminal (Fehlercode im Bericht) und sagt dann nichts aus.
+
+### Zurückgestellt: Handarbeit (später)
+
+- Handy (nRF Connect) als zweite Gegenstelle, Android und iOS.
+- Gerät in Windows entfernen und neu koppeln (Ablauf wie beim Neukunden).
+- RS232 bzw. USB abstecken, während BT verbunden ist (geht auch per Relais, braucht Verdrahtung).
+- Schwache Funkstrecke (Blechdose, Abstand) mit Sniffer.
+- "Online messen" und Anzeige-/Schaltersimulation bei bestehender BT-Verbindung (Ausgabe hängt an simulierten
+  Messwerten, noch nicht automatisiert).
+- Parameteränderung über BT im Einstellungsmenü.
+
 ## 4. Empfohlene Reihenfolge
 
 1. **P1** sofort von Hand prüfen (Reboot über das Menü, dann Smoke). Bestätigt sich der Verdacht, 5.128

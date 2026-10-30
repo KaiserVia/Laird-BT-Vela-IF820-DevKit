@@ -4672,6 +4672,361 @@ async def run_reboot_check(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Tests am Tisch ohne Handarbeit (nightly, gsm-mux, bt-timeout, bt-update), 2026-10-30
+# Plan: Doku/Testplan_BT_Erweiterung_Strom_Grenzfaelle.md, Abschnitt 5.
+# ---------------------------------------------------------------------------
+
+MARK_TIME_PROMPT = "hh:mm:ss"                 # T_ftime, Eingabe der Uhrzeit (Information -> 4)
+MARK_PROTO_ASK = "Daten ausgeben"             # T_daus, Abfrage vor der Protokollausgabe
+MARK_WERET = "Weiter mit Return"              # T_weret, Seitenende der Protokollausgabe
+MARK_RANGE_5 = "1...5?"                       # modem_com(): Baudrate
+MARK_RANGE_4 = "1...4?"                       # modem_com(): BT/GSM/GPS
+MARK_RANGE_8 = "1...8?"                       # werkmenue()
+BT_DISCONNECT_TEXTS = ("Bluetoothverbindung getrennt", "Bluetooth disconnected")   # T_btdis (measure.c, BT_TIMEOUT)
+XMODEM_SUB = 0x1A                             # Fuellbyte des letzten XMODEM-Blocks (uebrige XMODEM_* siehe oben)
+
+
+def need_rs232(mode: str) -> bool:
+    if SNIFFER is None:
+        log(f"FEHLER: {mode} braucht den RS232-Mitschnitt (--rs232-port, externer Adapter).")
+        return False
+    return True
+
+
+async def rs232_navigate(steps: list, timeout: float = 8.0) -> bool:
+    """Menuenavigation ueber RS232 (gleiche Schrittliste wie navigate())."""
+    channel = SnifferChannel(SNIFFER)
+    try:
+        return await navigate(channel, steps, timeout)
+    finally:
+        channel.close()
+
+
+async def rs232_set_time(hhmmss: str) -> bool:
+    """Hauptmenue -> 6 Information -> 4 Zeit -> hh:mm:ss -> 9 zurueck. Setzt timeupdate in der Firmware (neue Aufgaben)."""
+    log(f"Stelle Geraeteuhr ueber RS232 auf {hhmmss} ...")
+    ok = await rs232_navigate([(None, b"H"), (MARK_MAIN_RANGE, b"6"), (MARK_INFO_RANGE, b"4"),
+                               (MARK_TIME_PROMPT, hhmmss.encode("ascii") + b"\r"), (MARK_INFO_RANGE, b"9")])
+    trace_event("device_clock_set", level="info" if ok else "warning", time=hhmmss, ok=ok)
+    if not ok:
+        log("Uhr stellen fehlgeschlagen (Menue nicht wie erwartet).")
+    return ok
+
+
+async def rs232_read_protocol() -> str | None:
+    """Information -> 1 Protokoll -> j: erste Seite (neueste Eintraege zuerst, put_protocol()), dann abbrechen und zurueck."""
+    channel = SnifferChannel(SNIFFER)
+    try:
+        if not await navigate(channel, [(None, b"H"), (MARK_MAIN_RANGE, b"6"), (MARK_INFO_RANGE, b"1"),
+                                        (MARK_PROTO_ASK, b"j")], 8.0):
+            return None
+        await asyncio.sleep(0.5)
+        deadline = time.monotonic() + 8.0
+        while time.monotonic() < deadline and MARK_WERET.encode() not in channel.rx.buf \
+                and MARK_INFO_RANGE.encode() not in channel.rx.buf:
+            await asyncio.sleep(0.2)
+        text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
+        if MARK_WERET in text:
+            await channel.write(b"x")                     # keine weitere Seite
+        channel.rx.clear()
+        await channel.rx.wait_for_marker(MARK_INFO_RANGE, 8.0)
+        await channel.write(b"9")
+        await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
+        return text
+    finally:
+        channel.close()
+
+
+async def run_nightly(args) -> int:
+    """P1 im Originalweg: Uhr auf --nightly-set (Default 03:13:30) stellen, den Neustart um 3:15 (BOOTTASK, rtc.c) abwarten,
+    im Geraeteprotokoll nachweisen, danach --checks BLE-Smokes und ein Classic-Smoke; zum Schluss Uhr auf PC-Zeit zurueck.
+    Verdacht: Nach reboot() laeuft weder test_BT() noch init_bluetooth() (main.c, Zweig BOOT_RES leer), UART1 bleibt aus."""
+    if not need_rs232("nightly"):
+        return 2
+    result = {"mode": "nightly", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "repeat": args.repeat, "set_time": args.nightly_set, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("nightly", result)
+        return 2
+    phase = make_phase_runner(args, result, "NACHT-NEUSTART")
+    failures = 0
+    for rep in range(1, args.repeat + 1):
+        label = f"#{rep:02d} Neustart 3:15"
+        print(f"\n{'#' * 70}\n  NIGHTLY {label}\n{'#' * 70}")
+        step = {"label": label, "method": "nightly", "repeat": rep}
+        capture = rs232_capture_start()
+        step["clock_set"] = await rs232_set_time(args.nightly_set)
+        t_set = time.monotonic()
+        h, m, s = (int(x) for x in args.nightly_set.split(":"))
+        until_reboot = (3 * 3600 + 15 * 60) - (h * 3600 + m * 60 + s)
+        wait_s = max(0, until_reboot) + args.nightly_margin
+        log(f"Warte {wait_s:.0f} s auf den Neustart um 3:15 ...")
+        banner = await wait_capture(capture, BOOT_BANNER_RE, t_set, wait_s)
+        if banner is not None:
+            log(f"Banner {banner} s nach dem Uhrstellen gesehen.")
+        await asyncio.sleep(max(0.0, wait_s - (time.monotonic() - t_set)))
+        step["banner_after_s"] = banner
+        protocol = await rs232_read_protocol()
+        first = "\n".join((protocol or "").splitlines()[:12])
+        step["reboot_logged"] = bool(protocol) and re.search(r"Reboot.*03:1[56]", first) is not None
+        step["protocol_head"] = first
+        log(f"Geraeteprotokoll: Reboot um 3:15 {'gefunden' if step['reboot_logged'] else 'NICHT gefunden'}.")
+        ok = await bt_step_checks(args, phase, label, step, capture, classic=True, ble_count=args.checks)
+        if not step["reboot_logged"]:
+            step["result"] = "no_reboot"
+            ok = False
+        rs232_capture_stop()
+        await rs232_set_time(datetime.now().strftime("%H:%M:%S"))
+        result["steps"].append(step)
+        if not ok:
+            failures += 1
+    power_summary(result, "method")
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("nightly", result, "VIASIS BT nach dem naechtlichen Neustart (3:15)",
+                       f"Uhr auf {args.nightly_set}, {args.repeat} Mal; je {args.checks} BLE-Smoke und 1 Classic-Smoke.")
+    return 0 if failures == 0 else 1
+
+
+async def run_gsm_mux(args) -> int:
+    """P5 ohne SIM/Zeitplan (Board mit LTE-Modem): ueber RS232 Testmenue -> Strg+W -> 7 Modem-Kommunikation -> 9600 -> GSM.
+    Der UART1-MUX steht dann auf GSM. Waehrend --gsm-hold ein BLE-Versuch (nur Information, die Hauptschleife steht im
+    Modem-Terminal), dann Strg+Z, Werksmenue verlassen; danach --checks BLE-Smokes und ein Classic-Smoke."""
+    if not need_rs232("gsm-mux"):
+        return 2
+    result = {"mode": "gsm-mux", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "repeat": args.repeat, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("gsm-mux", result)
+        return 2
+    phase = make_phase_runner(args, result, "GSM-MUX")
+    failures = 0
+    for rep in range(1, args.repeat + 1):
+        label = f"#{rep:02d} Modem-Terminal GSM"
+        print(f"\n{'#' * 70}\n  GSM-MUX {label}\n{'#' * 70}")
+        step = {"label": label, "method": "gsm-mux", "repeat": rep}
+        capture = rs232_capture_start()
+        channel = SnifferChannel(SNIFFER)
+        try:
+            entered = await navigate(channel, [(None, b"H"), (MARK_MAIN_RANGE, b"3"), (MARK_TESTMENU, bytes([0x17])),
+                                               (MARK_RANGE_8, b"7"), (MARK_RANGE_5, b"1"), (MARK_RANGE_4, b"2")], 8.0)
+            await asyncio.sleep(args.gsm_settle)                  # Modem einschalten, Startmeldungen
+            text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
+            step["terminal_entered"] = entered
+            step["modem_text"] = text[-300:]
+            step["modem_error"] = bool(DTC_RE.search(text))
+            log(f"Modem-Terminal {'offen' if entered and not step['modem_error'] else 'NICHT sauber geoeffnet'}.")
+            step["during"] = await phase(f"{label} BLE waehrend GSM", "ble", run_smoke_single, hold=args.step_hold)
+            await asyncio.sleep(max(0.0, args.gsm_hold - args.gsm_settle))
+            channel.rx.clear()
+            await channel.write(bytes([0x1A]))                    # Strg+Z beendet modem_terminal()
+            step["left_terminal"] = await channel.rx.wait_for_marker(MARK_RANGE_8, 15.0)
+            await channel.write(b"8")                             # Werksmenue verlassen
+            await asyncio.sleep(1.0)
+            await channel.write(b"H")
+            step["main_menu_back"] = await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
+        finally:
+            channel.close()
+        await asyncio.sleep(3.0)
+        ok = await bt_step_checks(args, phase, label, step, capture, classic=True, ble_count=args.checks)
+        if not step.get("main_menu_back"):
+            log("WARNUNG: Hauptmenue nach dem Modem-Terminal nicht gesehen.")
+        rs232_capture_stop()
+        result["steps"].append(step)
+        if not ok:
+            failures += 1
+    power_summary(result, "method")
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("gsm-mux", result, "VIASIS BT nach UART1-MUX auf GSM",
+                       f"Modem-Terminal (GSM) {args.gsm_hold:g} s offen, {args.repeat} Mal.")
+    return 0 if failures == 0 else 1
+
+
+async def run_bt_timeout(args) -> int:
+    """BT_TIMEOUT (6 min ohne Empfang, measure.c): verbinden, PIN, dann nichts mehr senden. Erwartet: die Firmware trennt
+    nach 360 bis 420 s selbst (bt_disconnect(), Meldung 'Bluetoothverbindung getrennt'). Danach muss das Geraet wieder
+    verbindbar sein (BLE- und Classic-Smoke)."""
+    result = {"mode": "bt-timeout", "transport": args.transport,
+              "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "repeat": args.repeat, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("bt-timeout", result)
+        return 2
+    phase = make_phase_runner(args, result, "BT-TIMEOUT")
+    failures = 0
+    for rep in range(1, args.repeat + 1):
+        label = f"#{rep:02d} {args.transport} ohne Eingabe"
+        print(f"\n{'#' * 70}\n  BT-TIMEOUT {label}\n{'#' * 70}")
+        step = {"label": label, "method": f"timeout-{args.transport}", "repeat": rep}
+        capture = rs232_capture_start()
+        transport = await make_transport(args)
+        disconnected_s = None
+        try:
+            await transport.connect(args.connect_timeout)
+            await authenticate_or_sync_main_menu(transport, args, "bt-timeout")
+            t0 = time.monotonic()
+            log(f"Verbunden, Hauptmenue erreicht. Warte bis zu {args.timeout_wait:.0f} s ohne Eingabe ...")
+            while time.monotonic() - t0 < args.timeout_wait:
+                await asyncio.sleep(1.0)
+                texts = [text for _, text in (capture or [])]
+                if not transport.is_connected or any(m in t for t in texts for m in BT_DISCONNECT_TEXTS):
+                    disconnected_s = round(time.monotonic() - t0, 1)
+                    break
+        except Exception as exc:
+            log(f"FEHLER beim Verbinden: {exc}")
+            step["error"] = str(exc)
+        finally:
+            await transport.disconnect()
+            if hasattr(transport, "close"):
+                transport.close()
+        step["disconnected_after_s"] = disconnected_s
+        in_window = disconnected_s is not None and 300 <= disconnected_s <= 440
+        log(f"Trennung durch das Geraet: {'nach ' + str(disconnected_s) + ' s' if disconnected_s else 'KEINE'}"
+            f" ({'im erwarteten Fenster 360-420 s' if in_window else 'ausserhalb des Fensters'}).")
+        await asyncio.sleep(5.0)
+        ok = await bt_step_checks(args, phase, label, step, capture, classic=True, ble_count=1)
+        if not in_window:
+            step["result"] = "timeout_not_seen"
+            ok = False
+        rs232_capture_stop()
+        result["steps"].append(step)
+        if not ok:
+            failures += 1
+    power_summary(result, "method")
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("bt-timeout", result, "VIASIS BT-Zeitlimit (6 min ohne Eingabe)",
+                       f"Transport {args.transport}, {args.repeat} Mal, Wartezeit bis {args.timeout_wait:g} s.")
+    return 0 if failures == 0 else 1
+
+
+async def xmodem_send(transport, data: bytes) -> bool:
+    """XMODEM-1K (CRC) ueber einen Transport (ByteStream rx). Gegenstelle: firmware() im Testmenue (Strg+U)."""
+    def crc16(chunk: bytes) -> int:
+        crc = 0
+        for byte in chunk:
+            crc ^= byte << 8
+            for _ in range(8):
+                crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+        return crc
+
+    async def reply(timeout: float) -> int | None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            for index, byte in enumerate(transport.rx.buf):
+                if byte in (XMODEM_ACK, XMODEM_NAK, XMODEM_CAN):
+                    del transport.rx.buf[:index + 1]
+                    return byte
+            await asyncio.sleep(0.01)
+        return None
+
+    total = (len(data) + 1023) // 1024
+    for number in range(1, total + 1):
+        chunk = data[(number - 1) * 1024:number * 1024].ljust(1024, bytes([XMODEM_SUB]))
+        packet = bytes([XMODEM_STX, number & 0xFF, 0xFF - (number & 0xFF)]) + chunk + crc16(chunk).to_bytes(2, "big")
+        for attempt in range(10):
+            transport.rx.clear()
+            await transport.write(packet)
+            answer = await reply(10.0)
+            if answer == XMODEM_ACK:
+                break
+            if answer == XMODEM_CAN:
+                log(f"XMODEM: Abbruch durch das Geraet bei Block {number}.")
+                return False
+            log(f"XMODEM: Block {number} Antwort {answer!r}, Wiederholung {attempt + 1}.")
+        else:
+            await transport.write(bytes([XMODEM_CAN, XMODEM_CAN]))
+            return False
+        if number % 20 == 0 or number == total:
+            log(f"XMODEM: Block {number}/{total}")
+    for _ in range(2):
+        transport.rx.clear()
+        await transport.write(bytes([XMODEM_EOT]))
+        if await reply(10.0) == XMODEM_ACK:
+            return True
+    return False
+
+
+async def run_bt_update(args) -> int:
+    """Firmware-Update ueber Bluetooth Classic (wie ein Servicetechniker): verbinden, PIN, Testmenue, Strg+U, XMODEM-1K,
+    'y'. Der LPC startet neu, das IF820 haelt die Verbindung (RST nicht angeschlossen). Geprueft: Meldet sich das Geraet
+    danach ueber dieselbe Verbindung (PIN-Prompt/Banner), Version auf RS232, danach BLE- und Classic-Smoke.
+    ACHTUNG: loescht im Geraet Protokoll und Messdaten."""
+    if not args.reboot_bin:
+        log("bt-update braucht --reboot-bin (z. B. ..\\..\\sism.bin, gleiche oder neue Version).")
+        return 2
+    image = Path(args.reboot_bin).read_bytes()
+    result = {"mode": "bt-update", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "bin": args.reboot_bin, "bin_bytes": len(image), "repeat": args.repeat, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("bt-update", result)
+        return 2
+    phase = make_phase_runner(args, result, "BT-UPDATE")
+    failures = 0
+    for rep in range(1, args.repeat + 1):
+        label = f"#{rep:02d} Update ueber Classic"
+        print(f"\n{'#' * 70}\n  BT-UPDATE {label}\n{'#' * 70}")
+        step = {"label": label, "method": "bt-update", "repeat": rep}
+        capture = rs232_capture_start()
+        args.transport = "classic"
+        transport = await make_transport(args)
+        try:
+            await transport.connect(args.connect_timeout)
+            await authenticate_or_sync_main_menu(transport, args, "bt-update")
+            started = time.monotonic()
+            step["menu_ok"] = await navigate(transport, [(None, b"H"), (MARK_HAUPTMENU, b"3"),
+                                                        (MARK_TESTMENU, bytes([0x15]))], args.menu_timeout)
+            step["xmodem_ready"] = step["menu_ok"] and await transport.rx.wait_for_marker("XModem", 10.0)
+            if step["xmodem_ready"]:                               # erst nach dem Hinweistext auf das 'C' warten
+                transport.rx.clear()
+                step["xmodem_ready"] = await transport.rx.wait_for_marker("C", 30.0)
+            step["xmodem_ok"] = step["xmodem_ready"] and await xmodem_send(transport, image)
+            step["transfer_s"] = round(time.monotonic() - started, 1)
+            if step["xmodem_ok"]:
+                step["verify_ok"] = await transport.rx.wait_for_marker("?", 60.0)
+                text = bytes(transport.rx.buf).decode("cp1252", errors="replace")
+                step["verify_text"] = text[-200:]
+                if step["verify_ok"] and "ok" in text.lower():
+                    transport.rx.clear()
+                    await transport.write(b"y")
+                    t_reboot = time.monotonic()
+                    seen = await transport.rx.wait_for_marker(MARK_PIN_PROMPT, 60.0)
+                    step["prompt_after_reboot_s"] = round(time.monotonic() - t_reboot, 1) if seen else None
+                    log(f"Nach dem Neustart: {'PIN-Prompt ueber dieselbe Classic-Verbindung' if seen else 'KEIN PIN-Prompt ueber Classic'}.")
+                else:
+                    log("Pruefung des Images nicht 'ok' - kein 'y' gesendet.")
+            version = next((m.group(0) for _, t in (capture or []) if (m := BOOT_BANNER_RE.search(t))), None)
+            step["version_rs232"] = version
+        except Exception as exc:
+            log(f"FEHLER: {exc}")
+            step["error"] = str(exc)
+        finally:
+            await transport.disconnect()
+            if hasattr(transport, "close"):
+                transport.close()
+        await asyncio.sleep(5.0)
+        ok = await bt_step_checks(args, phase, label, step, capture, classic=True, ble_count=args.checks)
+        if not step.get("xmodem_ok") or step.get("prompt_after_reboot_s") is None:
+            step["result"] = "update_failed" if not step.get("xmodem_ok") else "no_prompt_after_reboot"
+            ok = False
+        rs232_capture_stop()
+        result["steps"].append(step)
+        if not ok:
+            failures += 1
+    power_summary(result, "method")
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("bt-update", result, "VIASIS Firmware-Update ueber Bluetooth",
+                       f"{Path(args.reboot_bin).name} ({len(image)} Byte) ueber Classic, {args.repeat} Mal.")
+    return 0 if failures == 0 else 1
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -4680,7 +5035,8 @@ def main() -> int:
     p = argparse.ArgumentParser(description="BLE/BT-Classic-Test fuer das VIASIS-Mainboard.")
     p.add_argument("--mode", choices=("smoke", "transfer", "classic-smoke", "cycle", "download", "receive",
                                       "classic-suite", "module-suite", "fast-suite", "idle-latency",
-                                      "interleave", "soak", "info", "power-sweep", "boot-race", "reboot-check"),
+                                      "interleave", "soak", "info", "power-sweep", "boot-race", "reboot-check",
+                                      "nightly", "gsm-mux", "bt-timeout", "bt-update"),
                    default="smoke")
     p.add_argument("--transport", choices=("ble", "classic"), default="ble",
                    help="Uebertragungsweg fuer --mode cycle/download/receive (classic-smoke/classic-suite/smoke/"
@@ -4818,7 +5174,15 @@ def main() -> int:
     p.add_argument("--reboot-bin", default=None, help="[reboot-check] .bin fuer die Methode firmware (gleiche Version)")
     p.add_argument("--dropout", type=float, default=0.1, help="[reboot-check] Dauer der kurzen Unterbrechung in s")
     p.add_argument("--power-off", type=float, default=10.0, help="[reboot-check] Stromlos-Zeit der Methode power")
-    p.add_argument("--checks", type=int, default=2, help="[reboot-check] BLE-Smokes je Neustart")
+    p.add_argument("--checks", type=int, default=2, help="[reboot-check/nightly/gsm-mux/bt-update] BLE-Smokes je Schritt")
+    p.add_argument("--nightly-set", default="03:13:30",
+                   help="[nightly] Uhrzeit, auf die die Geraeteuhr gestellt wird (Neustart um 03:15, rtc.c)")
+    p.add_argument("--nightly-margin", type=float, default=45.0,
+                   help="[nightly] Sekunden nach 03:15, bis der Neustart als erfolgt gilt und geprueft wird")
+    p.add_argument("--gsm-settle", type=float, default=20.0, help="[gsm-mux] Wartezeit nach dem Oeffnen des Modem-Terminals")
+    p.add_argument("--gsm-hold", type=float, default=60.0, help="[gsm-mux] Sekunden im Modem-Terminal (MUX auf GSM)")
+    p.add_argument("--timeout-wait", type=float, default=480.0,
+                   help="[bt-timeout] max. Wartezeit ohne Eingabe; erwartet wird die Trennung nach 360-420 s")
     args = p.parse_args()
 
     if args.mode in ("smoke", "transfer"):
@@ -4886,6 +5250,10 @@ def main() -> int:
         if SNIFFER is None:
             log("WARNUNG: kein RS232-Mitschnitt - Hochlauf wird nur ueber feste Wartezeiten erkannt.")
         test = {"power-sweep": run_power_sweep, "boot-race": run_boot_race, "reboot-check": run_reboot_check}[args.mode]
+        return asyncio.run(test(args))
+    if args.mode in ("nightly", "gsm-mux", "bt-timeout", "bt-update"):
+        test = {"nightly": run_nightly, "gsm-mux": run_gsm_mux, "bt-timeout": run_bt_timeout,
+                "bt-update": run_bt_update}[args.mode]
         return asyncio.run(test(args))
     return asyncio.run(run_download_test(args))
 
