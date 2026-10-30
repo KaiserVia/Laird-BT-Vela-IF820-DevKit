@@ -33,9 +33,16 @@
 ## Werkzeuge neu (2026-10-29)
 - `tools/flash_xmodem.py --port COM3 --bin <datei>`: Flash per RS232/USB (3, Strg+U, XMODEM-1K, y). `tools/relay_power.py zyklus 10` (Relais COM7): Stromzyklus. `ble_mainboard_test.py --sniff`: nRF52840-Mitschnitt (Plan: `Plan_BLE_Sniffer_nRF52840.md`). Bei `--address` immer `--pin` angeben (Seriennummer ohne `SC`).
 
+## Plan fuer Montag (vereinbart 2026-10-30)
+1. **Abnahme 5.127:** module-suite auf Board A (inkl. Download BLE+Classic); B in Windows neu koppeln, Classic-Smoke auf B; optional LTE-Sitzung auf B ausloesen, danach BLE verbinden.
+2. Stand taggen (z. B. `bt-5.127`) als Referenz.
+3. Radar-Update des Kollegen mergen. Vorher klaeren: liegt es auf `LTE-Update` oder `main`, und wird `connection-pin` ganz zusammengefuehrt oder nur der 5.127-Fix uebernommen?
+4. Danach komplette BT-Testreihe auf dem Merge-Stand, alle drei Boards.
+5. Neue Testfaelle (Strom, Neustart, Grenzfaelle): `Testplan_BT_Erweiterung_Strom_Grenzfaelle.md`. **Vor dem Merge P1 pruefen** (Verdacht: nach Reboot/Watchdog bleibt UART1 aus, 5.127-Fix greift dann nicht).
+
 ## Offene Entscheidungen
-1. Windows-Geräte B/C entfernen und neu koppeln (Gegenprobe) oder nRF-Central.
-2. Auf C wieder 5.126 flashen (derzeit 5.99).
-3. 5.127: Ymodem-Senden bei Linkverlust abbrechen.
+1. ~~Windows-Geräte B/C entfernen und neu koppeln~~ (Ursache war 5.127-Fehler, siehe oben; B muss fuer Classic trotzdem neu gekoppelt werden).
+2. ~~Auf C wieder 5.126 flashen~~ (C laeuft auf 5.127).
+3. Ymodem-Senden bei Linkverlust abbrechen (war als 5.127 geplant, kommt in eine spaetere Version).
 4. Aufräumen der temporären Diagnose (5.115/5.116, 5.118, 5.119), wenn die Untersuchung abgeschlossen ist.
 5. Allgemeine Änderungen auf `LTE-Update` übernehmen.

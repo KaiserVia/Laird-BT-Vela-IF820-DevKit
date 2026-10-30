@@ -271,6 +271,7 @@ class Rs232Sniffer:
         self.stop_event = threading.Event()
         self.pending = bytearray()    # im Preflight gelesene Bytes, gehen nicht verloren
         self.recent = []              # letzte Zeilen fuer rs232_tail
+        self.capture = None           # optional: Liste (monotonic, Zeile) fuer die Strom-/Neustart-Tests
         self.lines = 0
         self.bytes = 0
         self.lock = threading.Lock()
@@ -324,6 +325,8 @@ class Rs232Sniffer:
             self.lines += 1
             self.recent.append(text)
             del self.recent[:-50]
+            if self.capture is not None:
+                self.capture.append((time.monotonic(), text))
         extra = {"dev": self.label} if self.label else {}
         trace_event("rs232_line", source="rs232", text=text, partial=partial or None, **extra)
 
@@ -4336,6 +4339,339 @@ async def run_fast_suite(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Strom-/Neustart-Tests mit USB-Relais (power-sweep, boot-race, reboot-check), 2026-10-30
+# Plan: Doku/Testplan_BT_Erweiterung_Strom_Grenzfaelle.md (P1, P2, P4). Relais: Doku/tools/relay_power_Anleitung.md.
+# Der RS232-Mitschnitt muss ueber einen externen Adapter laufen (nicht den USB-Port des Boards), sonst verschwindet
+# der Port beim Stromlos-Schalten.
+# ---------------------------------------------------------------------------
+
+RELAY = None                          # PowerRelay; wird bei Programmende immer auf "Strom an" gesetzt
+BOOT_BANNER_RE = re.compile(r"Version \d+\.\d+")
+DTC_RE = re.compile(r"\b[FWI]1\d{4}\b")
+
+
+class PowerRelay:
+    """Devantech USB-RLY16L: Relais angezogen = Geraet stromlos (NC-Kontakt), siehe relay_power.py."""
+
+    def __init__(self, port: str, relay: int):
+        self.port = port
+        self.relay = relay
+        self.ser = serial.Serial(port, 19200, timeout=1)
+
+    def _set(self, energized: bool) -> None:
+        self.ser.write(bytes([(101 if energized else 111) + self.relay - 1]))
+        self.ser.flush()
+
+    def powered(self) -> bool | None:
+        self.ser.reset_input_buffer()
+        self.ser.write(bytes([0x5B]))
+        reply = self.ser.read(1)
+        return None if not reply else not (reply[0] & (1 << (self.relay - 1)))
+
+    def cycle(self, off_s: float) -> float:
+        """Strom off_s Sekunden weg; liefert die tatsaechliche Stromlos-Zeit (Befehl aus bis Befehl ein)."""
+        started = time.perf_counter()
+        self._set(True)
+        try:
+            while (remaining := off_s - (time.perf_counter() - started)) > 0:
+                time.sleep(min(remaining, 0.01))
+        finally:
+            self._set(False)
+        return time.perf_counter() - started
+
+    def close(self) -> None:
+        try:
+            self._set(False)
+            self.ser.close()
+        except (serial.SerialException, OSError):
+            pass
+
+
+def rs232_capture_start() -> list | None:
+    if SNIFFER is None:
+        return None
+    with SNIFFER.lock:
+        SNIFFER.capture = []
+        return SNIFFER.capture
+
+
+def rs232_capture_stop() -> None:
+    if SNIFFER is not None:
+        with SNIFFER.lock:
+            SNIFFER.capture = None
+
+
+async def wait_capture(capture: list | None, pattern: re.Pattern, t0: float, timeout: float) -> float | None:
+    """Sekunden ab t0 bis zur ersten RS232-Zeile mit pattern (None = nicht gesehen)."""
+    if capture is None:
+        return None
+    deadline = t0 + timeout
+    seen = 0
+    while time.monotonic() < deadline:
+        for when, text in capture[seen:]:
+            if pattern.search(text):
+                return round(when - t0, 2)
+        seen = len(capture)
+        await asyncio.sleep(0.1)
+    return None
+
+
+async def wait_boot(args, capture: list | None, t_on: float) -> dict:
+    """Nach dem Einschalten: Banner abwarten, dann bis die RS232-Ausgabe boot_quiet s ruhig ist (BT-Init fertig)."""
+    banner = await wait_capture(capture, BOOT_BANNER_RE, t_on, args.boot_timeout)
+    if capture is None or banner is None:
+        await asyncio.sleep(max(0.0, args.boot_timeout - (time.monotonic() - t_on)))
+    else:
+        last = len(capture)
+        quiet_since = time.monotonic()
+        while time.monotonic() - t_on < args.boot_timeout:
+            await asyncio.sleep(0.2)
+            if len(capture) != last:
+                last = len(capture)
+                quiet_since = time.monotonic()
+            elif time.monotonic() - quiet_since >= args.boot_quiet:
+                break
+    lines = [text for _, text in (capture or [])]
+    joined = "\n".join(lines)
+    done = next((round(when - t_on, 2) for when, text in (capture or []) if "BT init done" in text), None)
+    info = {"banner_s": banner, "boot_s": round(time.monotonic() - t_on, 2),
+            "bt_init_seen": "BT init" in joined, "bt_init_done_s": done,
+            "dtc": sorted(set(DTC_RE.findall(joined))), "rs232_lines": len(lines)}
+    log(f"Hochlauf: Banner {'nach ' + str(banner) + ' s' if banner is not None else 'NICHT gesehen'}, "
+        f"BT-Init {'fertig nach ' + str(done) + ' s' if done is not None else ('gesehen' if info['bt_init_seen'] else 'nicht gesehen')}"
+        f"{', Codes ' + ', '.join(info['dtc']) if info['dtc'] else ''}.")
+    return info
+
+
+def count_bt_events(capture: list | None, since: float) -> int | None:
+    if capture is None:
+        return None
+    return sum(1 for when, text in capture if when >= since and "[BT-Event]" in text)
+
+
+async def resolve_power_target(args) -> bool:
+    """BLE-Adresse einmal per Scan bestimmen (die Schritte verbinden danach direkt, ohne 15-s-Scan); Classic-Name
+    = BLE-Name ohne '_BLE'."""
+    if not args.address:
+        device, _ = await scan_for_device(args.name)
+        if device is None:
+            return False
+        args.address = device.address
+        args.ble_device_name = device.name
+        args.name = re.sub(r"_BLE$", "", device.name, flags=re.IGNORECASE)
+    log(f"Zielgeraet: {getattr(args, 'ble_device_name', None) or args.name} ({args.address}), Classic-Name '{args.name}'.")
+    return True
+
+
+async def run_smoke_single(args) -> int:
+    """Ein Smoke-Versuch ohne die automatische Wiederholung (fuer boot-race: der Erstversuch zaehlt)."""
+    return await _run_smoke_once(args)
+
+
+async def bt_step_checks(args, phase, label: str, step: dict, capture, classic: bool, ble_count: int = 1) -> bool:
+    """BLE-Smoke (ble_count Mal) und optional Classic-Smoke; Ergebnisse und [BT-Event]-Zahl in step. True = alles bestanden."""
+    since = time.monotonic()
+    step["ble"] = [await phase(f"{label} BLE {n}", "ble", run_smoke_test, hold=args.step_hold)
+                   for n in range(1, ble_count + 1)]
+    if classic:
+        step["classic"] = await phase(f"{label} Classic", "classic", run_classic_smoke_test, hold=args.step_hold)
+    step["bt_events"] = count_bt_events(capture, since)
+    ok = all(status == "passed" for status in step["ble"]) and step.get("classic", "passed") == "passed"
+    step["result"] = "passed" if ok else "failed"
+    trace_event("power_step", level="info" if ok else "warning", **{k: v for k, v in step.items() if k != "label"},
+                label=label)
+    return ok
+
+
+def power_summary(result: dict, key: str) -> None:
+    """Erfolg je Wert von key (z. B. Stromlos-Zeit) ins Log und nach result['summary']."""
+    summary = {}
+    for step in result["steps"]:
+        entry = summary.setdefault(str(step[key]), {"ok": 0, "fehler": 0})
+        entry["ok" if step["result"] == "passed" else "fehler"] += 1
+    result["summary"] = summary
+    log(f"Erfolg je {key}:")
+    for value, entry in summary.items():
+        log(f"  {value:>10}   ok {entry['ok']:3}   Fehler {entry['fehler']:3}")
+
+
+async def run_power_sweep(args) -> int:
+    """P2: Strom fuer verschiedene Zeiten wegschalten (je --repeat Mal), nach jedem Hochlauf BLE-Smoke und jedes
+    --classic-every-te Mal Classic-Smoke. Zeigt, bei welchen Stromlos-Zeiten LPC und IF820 nicht sauber gemeinsam
+    starten (kurze Unterbrechungen enden ueber EINT0 -> while(1) evtl. im Watchdog-Reset ohne Modul-Reset)."""
+    off_times = args.off_times or [0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0]
+    result = {"mode": "power-sweep", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "off_times_s": off_times, "repeat": args.repeat, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("power-sweep", result)
+        return 2
+    phase = make_phase_runner(args, result, "STROM")
+    failures = 0
+    number = 0
+    for off_s in off_times:
+        for rep in range(1, args.repeat + 1):
+            number += 1
+            label = f"#{number:03d} aus {off_s:g} s ({rep}/{args.repeat})"
+            print(f"\n{'#' * 70}\n  POWER-SWEEP {label}\n{'#' * 70}")
+            capture = rs232_capture_start()
+            actual = await asyncio.to_thread(RELAY.cycle, off_s)
+            t_on = time.monotonic()
+            log(f"Strom {actual:.3f} s weg, wieder an.")
+            step = {"label": label, "off_s": off_s, "off_actual_s": round(actual, 3), "repeat": rep}
+            step.update(await wait_boot(args, capture, t_on))
+            classic = bool(args.classic_every) and number % args.classic_every == 0
+            if not await bt_step_checks(args, phase, label, step, capture, classic):
+                failures += 1
+            rs232_capture_stop()
+            result["steps"].append(step)
+            if args.max_failures and failures >= args.max_failures:
+                log(f"Abbruch: {failures} fehlgeschlagene Schritte (--max-failures).")
+                break
+        else:
+            continue
+        break
+    power_summary(result, "off_s")
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("power-sweep", result, "VIASIS Stromunterbrechungs-Test",
+                       f"Stromlos-Zeiten {', '.join(f'{t:g}' for t in off_times)} s, je {args.repeat} Mal.")
+    return 0 if failures == 0 else 1
+
+
+async def run_boot_race(args) -> int:
+    """P4: Stromzyklus, dann nach --race-delays Sekunden ab Einschalten per BLE verbinden (feste Adresse, ein Versuch).
+    Scheitert der Erstversuch, nach --race-retry-wait ein Folgeversuch. Fehler ist nur, wenn auch der scheitert
+    (Geraet bleibt unerreichbar)."""
+    delays = args.race_delays or [1.0, 2.0, 3.0, 5.0, 8.0, 12.0]
+    result = {"mode": "boot-race", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "delays_s": delays, "repeat": args.repeat, "off_s": args.race_off, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("boot-race", result)
+        return 2
+    phase = make_phase_runner(args, result, "BOOT-RACE")
+    failures = 0
+    number = 0
+    for delay in delays:
+        for rep in range(1, args.repeat + 1):
+            number += 1
+            label = f"#{number:03d} verbinden {delay:g} s nach Ein ({rep}/{args.repeat})"
+            print(f"\n{'#' * 70}\n  BOOT-RACE {label}\n{'#' * 70}")
+            capture = rs232_capture_start()
+            await asyncio.to_thread(RELAY.cycle, args.race_off)
+            t_on = time.monotonic()
+            await asyncio.sleep(max(0.0, delay - (time.monotonic() - t_on)))
+            step = {"label": label, "delay_s": delay, "repeat": rep}
+            first = await phase(f"{label} Erstversuch", "ble", run_smoke_single, hold=args.step_hold)
+            step["first"] = first
+            step["first_started_s"] = delay
+            if first != "passed":
+                await asyncio.sleep(args.race_retry_wait)
+                step["second"] = await phase(f"{label} Folgeversuch", "ble", run_smoke_single, hold=args.step_hold)
+            banner = await wait_capture(capture, BOOT_BANNER_RE, t_on, 0.1)
+            step["banner_s"] = banner
+            step["bt_init_done_s"] = next((round(w - t_on, 2) for w, t in (capture or []) if "BT init done" in t), None)
+            step["dtc"] = sorted(set(DTC_RE.findall("\n".join(t for _, t in (capture or [])))))
+            step["bt_events"] = count_bt_events(capture, t_on)
+            ok = first == "passed" or step.get("second") == "passed"
+            step["result"] = "passed" if ok else "failed"
+            step["first_attempt_ok"] = first == "passed"
+            trace_event("boot_race_step", level="info" if ok else "warning",
+                        **{k: v for k, v in step.items() if k != "label"}, label=label)
+            log(f"Ergebnis: Erstversuch {first}, Folgeversuch {step.get('second', '-')}, "
+                f"Banner {banner} s, BT-Init fertig {step['bt_init_done_s']} s.")
+            rs232_capture_stop()
+            result["steps"].append(step)
+            if not ok:
+                failures += 1
+            if args.max_failures and failures >= args.max_failures:
+                break
+        else:
+            continue
+        break
+    power_summary(result, "delay_s")
+    first_ok = {}
+    for step in result["steps"]:
+        entry = first_ok.setdefault(str(step["delay_s"]), [0, 0])
+        entry[0] += step["first_attempt_ok"]
+        entry[1] += 1
+    result["first_attempt"] = {key: f"{ok}/{total}" for key, (ok, total) in first_ok.items()}
+    log("Erstversuch erfolgreich je Verzoegerung: " + ", ".join(f"{k} s: {v}" for k, v in result["first_attempt"].items()))
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("boot-race", result, "VIASIS Verbinden waehrend des Hochlaufs",
+                       f"Verzoegerungen {', '.join(f'{d:g}' for d in delays)} s nach Einschalten, je {args.repeat} Mal, "
+                       f"vorher {args.race_off:g} s stromlos.")
+    return 0 if failures == 0 else 1
+
+
+async def firmware_reboot(args) -> dict:
+    """Neustart ohne Stromzyklus: dieselbe Firmware per flash_xmodem.py neu flashen (Weg FIRM_UP_RES in main.c).
+    Der RS232-Mitschnitt gibt den Port dafuer kurz frei. ACHTUNG: das Geraet loescht dabei Protokoll und Messdaten."""
+    if SNIFFER is not None:
+        SNIFFER.stop()
+    globals()["SNIFFER"] = None
+    cmd = [sys.executable, str(Path(__file__).with_name("flash_xmodem.py")), "--port", args.rs232_port,
+           "--bin", args.reboot_bin]
+    log("Neustart per Firmware-Update: " + " ".join(cmd[1:]))
+    completed = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=600)
+    tail = (completed.stdout or "").strip().splitlines()[-3:]
+    for line in tail:
+        log("  flash: " + line)
+    version = re.search(r"Version (\d+\.\d+)", completed.stdout or "")
+    await asyncio.to_thread(setup_rs232_sniffer, args)
+    return {"flash_rc": completed.returncode, "version": version.group(1) if version else None, "flash_tail": tail}
+
+
+async def run_reboot_check(args) -> int:
+    """P1: Neustart auf verschiedenen Wegen, danach --checks BLE-Smokes und ein Classic-Smoke. Methoden (--reboot-methods):
+    firmware = Firmware-Update ohne Stromzyklus (braucht --reboot-bin), dropout = sehr kurze Stromunterbrechung
+    (--dropout, endet evtl. im Watchdog-Reset), power = normaler Stromzyklus (--power-off, Kontrolle)."""
+    methods = [m.strip() for m in args.reboot_methods.split(",") if m.strip()]
+    if "firmware" in methods and not args.reboot_bin:
+        log("Methode 'firmware' braucht --reboot-bin (z. B. ..\\..\\sism.bin).")
+        return 2
+    result = {"mode": "reboot-check", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "methods": methods, "repeat": args.repeat, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("reboot-check", result)
+        return 2
+    phase = make_phase_runner(args, result, "NEUSTART")
+    failures = 0
+    number = 0
+    for rep in range(1, args.repeat + 1):
+        for method in methods:
+            number += 1
+            label = f"#{number:03d} {method} ({rep}/{args.repeat})"
+            print(f"\n{'#' * 70}\n  REBOOT-CHECK {label}\n{'#' * 70}")
+            step = {"label": label, "method": method, "repeat": rep}
+            if method == "firmware":
+                step.update(await firmware_reboot(args))
+                capture = rs232_capture_start()
+                await asyncio.sleep(args.boot_quiet)
+            elif method in ("dropout", "power"):
+                capture = rs232_capture_start()
+                off_s = args.dropout if method == "dropout" else args.power_off
+                step["off_actual_s"] = round(await asyncio.to_thread(RELAY.cycle, off_s), 3)
+                step.update(await wait_boot(args, capture, time.monotonic()))
+            else:
+                log(f"Unbekannte Methode '{method}' - uebersprungen.")
+                continue
+            if not await bt_step_checks(args, phase, label, step, capture, classic=True, ble_count=args.checks):
+                failures += 1
+            rs232_capture_stop()
+            result["steps"].append(step)
+    power_summary(result, "method")
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("reboot-check", result, "VIASIS BT nach Neustart",
+                       f"Methoden {', '.join(methods)}, je {args.repeat} Mal; je {args.checks} BLE-Smoke und 1 Classic-Smoke.")
+    return 0 if failures == 0 else 1
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -4344,7 +4680,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description="BLE/BT-Classic-Test fuer das VIASIS-Mainboard.")
     p.add_argument("--mode", choices=("smoke", "transfer", "classic-smoke", "cycle", "download", "receive",
                                       "classic-suite", "module-suite", "fast-suite", "idle-latency",
-                                      "interleave", "soak", "info"),
+                                      "interleave", "soak", "info", "power-sweep", "boot-race", "reboot-check"),
                    default="smoke")
     p.add_argument("--transport", choices=("ble", "classic"), default="ble",
                    help="Uebertragungsweg fuer --mode cycle/download/receive (classic-smoke/classic-suite/smoke/"
@@ -4460,6 +4796,29 @@ def main() -> int:
                    help="BLE-Adresse des Zielgeraets fuer den Sniffer (Default: Adresse aus --address bzw. dem Scan)")
     p.add_argument("--sniff-keep-raw", action="store_true",
                    help="ungefilterten Mitschnitt (alle Geraete in Reichweite) zusaetzlich behalten (gross)")
+    floats = lambda value: [float(item) for item in value.split(",")]   # noqa: E731
+    p.add_argument("--relay-port", default="COM7", help="[power-sweep/boot-race/reboot-check] COM-Port des USB-Relais")
+    p.add_argument("--relay", type=int, default=2, help="Relais-Nummer, die die Geraeteversorgung schaltet (Default 2)")
+    p.add_argument("--repeat", type=int, default=3, help="[power-sweep/boot-race/reboot-check] Wiederholungen je Wert")
+    p.add_argument("--off-times", type=floats, default=None,
+                   help="[power-sweep] Stromlos-Zeiten in s (Default 0.05,0.1,0.2,0.5,1,2,5,10,30)")
+    p.add_argument("--classic-every", type=int, default=3,
+                   help="[power-sweep] jeden n-ten Schritt zusaetzlich Classic-Smoke (0 = nie)")
+    p.add_argument("--boot-timeout", type=float, default=45.0, help="max. Wartezeit auf den Hochlauf nach dem Einschalten")
+    p.add_argument("--boot-quiet", type=float, default=3.0,
+                   help="Hochlauf gilt als fertig, wenn RS232 so viele Sekunden ruhig ist")
+    p.add_argument("--step-hold", type=float, default=3.0, help="Haltezeit der Smoke-Tests in den Strom-/Neustart-Modi")
+    p.add_argument("--race-delays", type=floats, default=None,
+                   help="[boot-race] Verbinden so viele s nach dem Einschalten (Default 1,2,3,5,8,12)")
+    p.add_argument("--race-off", type=float, default=10.0, help="[boot-race] Stromlos-Zeit vor jedem Versuch")
+    p.add_argument("--race-retry-wait", type=float, default=10.0,
+                   help="[boot-race] Pause vor dem Folgeversuch, wenn der Erstversuch scheitert")
+    p.add_argument("--reboot-methods", default="firmware,dropout,power",
+                   help="[reboot-check] firmware (Neu-Flashen, loescht Protokoll+Messdaten), dropout, power")
+    p.add_argument("--reboot-bin", default=None, help="[reboot-check] .bin fuer die Methode firmware (gleiche Version)")
+    p.add_argument("--dropout", type=float, default=0.1, help="[reboot-check] Dauer der kurzen Unterbrechung in s")
+    p.add_argument("--power-off", type=float, default=10.0, help="[reboot-check] Stromlos-Zeit der Methode power")
+    p.add_argument("--checks", type=int, default=2, help="[reboot-check] BLE-Smokes je Neustart")
     args = p.parse_args()
 
     if args.mode in ("smoke", "transfer"):
@@ -4513,6 +4872,21 @@ def main() -> int:
         return asyncio.run(run_idle_latency_test(args))
     if args.mode == "receive":
         return asyncio.run(run_receive_test(args))
+    if args.mode in ("power-sweep", "boot-race", "reboot-check"):
+        global RELAY
+        needs_relay = args.mode != "reboot-check" or any(m in args.reboot_methods for m in ("dropout", "power"))
+        if needs_relay:
+            try:
+                RELAY = PowerRelay(args.relay_port, args.relay)
+            except (serial.SerialException, OSError) as exc:
+                log(f"FEHLER: USB-Relais an {args.relay_port} nicht erreichbar ({exc}). Angeschlossen? --relay-port?")
+                return 2
+            log(f"Relais {args.relay} an {args.relay_port}: Geraet {'unter Strom' if RELAY.powered() else 'STROMLOS'}.")
+            register_port(args.relay_port, f"USB-Relais, Relais {args.relay} schaltet die Geraeteversorgung")
+        if SNIFFER is None:
+            log("WARNUNG: kein RS232-Mitschnitt - Hochlauf wird nur ueber feste Wartezeiten erkannt.")
+        test = {"power-sweep": run_power_sweep, "boot-race": run_boot_race, "reboot-check": run_reboot_check}[args.mode]
+        return asyncio.run(test(args))
     return asyncio.run(run_download_test(args))
 
 
@@ -4525,6 +4899,8 @@ if __name__ == "__main__":
         print("\nAbgebrochen.")
         raise SystemExit(130)
     finally:
+        if RELAY is not None:
+            RELAY.close()      # Relais rastet: Geraet bei Ende/Abbruch immer wieder unter Strom setzen
         sniff_stop(SNIFF_STATE.get("args"))   # nur aktiv, wenn ein Mitschnitt noch laeuft (Einzeltest/Abbruch)
         pc_events_export()     # greift nur, falls die Suite es nicht schon getan hat
         log_used_ports()       # welche Ports hat der Test wofuer benutzt
