@@ -5462,3 +5462,27 @@ auf einem gekoppelten Board (A oder C); Board ohne LTE (Watchdog-Weg ohne GSM).
 sofort. Ein Kunde, der in dieser Zeit verbindet, bekommt keinen PIN-Prompt und muss neu verbinden.
 
 **Geaenderte Dateien:** main.c, btio.c, btio.h, sprachen/sictxt.c (-> 5.128).
+
+## Update 5.129 (TEST, 2026-11-02): Phase 0 der CYSPP-Zustandsmaschine - Testmenuepunkt "Modulbefehl senden"
+
+**Zweck:** Werkzeug fuer Phase 0 aus `Doku/Konzept_CYSPP_Zustandsmaschine.md` (Abschnitt 6: wirbt das Modul mit
+`.CYSPPSP E=1` im RAM noch, wird der Kanal nach `.CYSPPSTART` transparent, welche Ereignisse kommen vorher, ...).
+Keine Aenderung am normalen BT-Ablauf.
+
+**Neu (TEMPORAER, nach Abschluss der Zustandsmaschine wieder entfernen):** Testmenue -> 8 (BT-Diagnose) -> 7
+"Modulbefehl senden", `bt_module_cmd()` in btio.c. Eingabe ueber RS232: Zeile + Enter = EZ-Serial-Befehl (CR wird
+angehaengt), `"text` = roh ohne CR (im transparenten Modus Nutzdaten an die Gegenstelle), `!` = Pinzustand, leere Zeile
+= Ende. Angezeigt werden jede Modulzeile aus `rbuf1` als `  < [+ms] ...` (unvollstaendige Zeilen nach 200 ms mit
+"(ohne LF)") und jeder Pegelwechsel des CYSPP-Pins als `  [CYSPP] LOW/HIGH [+ms]` (IC54 Bit7, alle 100 ms, nicht neben
+einem GSM-Thread). Waehrend der Schleife bewusst kein `communication_change()`: BT_LINK bleibt aus, transparente
+Daten vom PC landen in `rbuf1` und werden sichtbar (sonst als Menueeingabe in `rbuf`); `comchange` bleibt gesetzt und
+wird nach dem Verlassen normal verarbeitet. Der CYSPP-Pin wird nie getrieben. Ende nach 10 min ohne Eingabe.
+
+**Gegenstueck PC:** `Doku/tools/cyspp_phase0.py` arbeitet die Fragen 1-6 automatisch ab (RS232 COM3 fuer die
+Befehle, BLE per Bleak und Classic per SPP-COM-Port vom PC). Alle Modul-Aenderungen nur im RAM (Set-Befehle aus den
+Get-Antworten, nur das betroffene Feld geaendert), am Ende `/RBT` (Flash-Stand = Autostart) und ein BLE-Smoke mit PIN
+als Gegenprobe. Bericht `phase0.md`/`phase0.json` im Report-Ordner unter `Doku/tools/Testreports/`.
+
+Build 0 Fehler, 0 Warnungen. Am Geraet noch nicht gelaufen (Hardware belegt).
+
+**Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.129); neu `Doku/tools/cyspp_phase0.py`.

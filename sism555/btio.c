@@ -1018,6 +1018,93 @@ void bt_cyspp_manual_control (void)
  }
 }
 
+// TEMPORAER (5.129, Phase 0 der CYSPP-Zustandsmaschine, Doku/Konzept_CYSPP_Zustandsmaschine.md Abschnitt 6):
+// beliebige EZ-Serial-Befehle von RS232 an das IF820 senden, Antworten/Ereignisse (rbuf1) und Pegelwechsel des
+// CYSPP-Pins (IC54 Bit7) mit Zeitstempel live anzeigen. Gegenstueck: Doku/tools/cyspp_phase0.py.
+// Eingabe: Zeile + Enter -> Befehl + CR ans Modul; '"text' -> text roh ohne CR (im transparenten Modus Nutzdaten
+// an die Gegenstelle); '!' -> Pinzustand; leere Zeile -> Ende. Der CYSPP-Pin wird nicht angefasst.
+// Bewusst KEIN communication_change() waehrend der Schleife: BT_LINK bleibt aus, damit transparente Daten vom PC
+// in rbuf1 landen und hier sichtbar werden (statt als Menueeingabe in rbuf); comchange bleibt gesetzt und wird
+// nach dem Verlassen von measure.c normal verarbeitet. rbuf/bxi werden direkt gelesen (getc() verwirft Puffer).
+#define MCMD_IDLE_MS  600000UL                // 10 min ohne Eingabe -> Ende
+void bt_module_cmd (void)
+{
+ char in[80], rx[100]; uchar n_in=0, n_rx=0, cc, now7, last7=0xFF, run=1;
+ uint t0, t_in, t_rx=0, t_pin=0; int st; char c;
+ if (fp.btmodem!=IF820) { putln("  nur IF820"); return; }
+ Init_BT_ch(BT_BAUD);                         // UART1 auf BT (wie bt_event_sniff)
+ putln("Modulbefehl senden:");
+ putln("  Zeile + Enter = Befehl an das Modul (CR wird angehaengt).");
+ putln("  \"text = roh ohne CR, ! = Pinzustand, leere Zeile = Ende.");
+ bxi1=rxi1; bxi=rxi;                          // alte Reste verwerfen
+ t0=mstimer; t_in=mstimer;
+ putstr("BT> ");
+ while (run)
+ {
+  ResetWDT();
+  while (bxi1!=rxi1)                           // Modulausgabe zeilenweise mit Zeitstempel
+  {
+   c=rbuf1[++bxi1]; t_rx=mstimer;
+   if (c=='\r') continue;
+   if (c!='\n' && n_rx<sizeof(rx)-1) { rx[n_rx++]=(c>=32 && c<127) ? c : '.'; continue; }
+   rx[n_rx]=0;                                 // Zeilenende oder Zeile voll (Rest folgt als neue Zeile)
+   cc=connect; connect=concpy & ~UART1;
+   newline(); putstr("  < [+"); putnumber(mstimer-t0,0); putstr("ms] "); putstr(rx); newline(); putstr("BT> ");
+   connect=cc; n_rx=0;
+  }
+  if (n_rx && (uint)(mstimer-t_rx)>200)        // Rest ohne Zeilenende (z. B. transparente Daten) nach 200 ms zeigen
+  {
+   rx[n_rx]=0;
+   cc=connect; connect=concpy & ~UART1;
+   newline(); putstr("  < [+"); putnumber(mstimer-t0,0); putstr("ms] "); putstr(rx); putstr(" (ohne LF)"); newline(); putstr("BT> ");
+   connect=cc; n_rx=0;
+  }
+  if (rbuf1_full && bxi1==rxi1) { rbuf1_full=0; NVIC_EnableIRQ(UART1_IRQn); }   // wie measure.c
+  if (!osActiveThread && (uint)(mstimer-t_pin)>=100)   // CYSPP-Pin alle 100 ms (I2C nicht neben GSM-Thread)
+  {
+   t_pin=mstimer;
+   st=read_i2cdev(IC54, 0, 1);
+   if (st>=0 && (now7=(uchar)((st>>7)&1))!=last7)
+   {
+    cc=connect; connect=concpy & ~UART1;
+    newline(); putstr("  [CYSPP] "); putstr(now7 ? "HIGH" : "LOW"); putstr(" [+"); putnumber(mstimer-t0,0); putstr("ms]");
+    newline(); putstr("BT> ");
+    connect=cc; last7=now7;
+   }
+  }
+  while (bxi!=rxi && run)                      // Eingabe von RS232
+  {
+   c=rbuf[++bxi]; t_in=mstimer;
+   cc=connect; connect=concpy & ~UART1;
+   if (c=='\r' || c=='\n')
+   {
+    if (c=='\n' && n_in==0) { connect=cc; continue; }   // LF nach CR ignorieren
+    in[n_in]=0; newline();
+    if (n_in==0) run=0;
+    else if (in[0]=='!') { bt_pin_state(); }
+    else
+    {
+     putstr("  > [+"); putnumber(mstimer-t0,0); putstr("ms] "); putstr(in); newline();
+     connect=UART1;
+     if (in[0]=='"') putstr(in+1);
+     else { putstr(in); putstr("\r"); }
+    }
+    connect=concpy & ~UART1;
+    if (run) putstr("BT> ");
+    n_in=0;
+   }
+   else if (c==BS || c==DEL) { if (n_in) { n_in--; putc(BS); putc(' '); putc(BS); } }
+   else if (c>=32 && c<127 && n_in<sizeof(in)-1) { in[n_in++]=c; putc(c); }
+   connect=cc;
+  }
+  if ((uint)(mstimer-t_in)>=MCMD_IDLE_MS) { newline(); putln("  -> 10 min ohne Eingabe."); run=0; }
+  if (run) osDelay(5);
+ }
+ bxi=rxi;                                     // nichts ans Menue durchreichen
+ putln("Modulbefehl beendet.");
+ uart1_release(MUX_BT);
+}
+
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
@@ -1028,16 +1115,17 @@ void bt_diag_menu (void)
  put_menuitem("Factory-Reset (/RFAC, Alt-FW-Vergleich!)",'4');
  put_menuitem("Force-Disconnect (/DIS)",'5');
  put_menuitem("CYSPP manuell HIGH/Freigeben",'6');
+ put_menuitem("Modulbefehl senden (Phase 0)",'7');  // TEMPORAER (5.129), siehe bt_module_cmd()
  select('9',1);                                    // "9. zurueck" + "Ihre Auswahl 1...9?" wie in allen Menues
  for (tries=0; tries<20; tries++)
  {
   if (comchange)                            // echten Schnittstellenwechsel richtig verarbeiten
   { if (!osActiveThread) communication_change(); else clear_comchange(); }
   c = getc(TERMINAL_CHAR_TIMEOUT);
-  if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') break;
+  if ((c>='1' && c<='7') || c=='9') break;
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
- if (c=='1' || c=='2' || c=='3' || c=='4' || c=='5' || c=='6' || c=='9') { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
+ if ((c>='1' && c<='7') || c=='9') { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
  else { newline(); putln("  -> keine gueltige Eingabe (staendiger Schnittstellenwechsel?), abgebrochen."); }
  if (tries>0 || comchange_count!=cc0)              // TEMPORAER (5.69): comchange-Diagnose nur noch bei Auffaelligkeit
  { bt_key("comchange_count"); putnumber(comchange_count,0); putstr(" (Delta="); putnumber(comchange_count-cc0,0);
@@ -1048,6 +1136,7 @@ void bt_diag_menu (void)
  else if (c=='4') bt_factory_reset();
  else if (c=='5') bt_force_disconnect_test();
  else if (c=='6') bt_cyspp_manual_control();
+ else if (c=='7') bt_module_cmd();
  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
  // HINWEIS (5.89): Der fruehere Flush hier (5.88, "bxi=rxi vor mainmenu()") ist nicht mehr
  // noetig - Command-Mode-/Protokollbytes (Event-Sniff, Factory-Reset, Contention-Test) landen

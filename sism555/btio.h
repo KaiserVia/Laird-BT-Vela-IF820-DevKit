@@ -218,6 +218,7 @@ extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Te
 extern void bt_factory_reset (void);      // TEMPORAER: /RFAC - Modul-Werksreset fuer Alt-FW-Vergleichstest
 extern void bt_force_disconnect_test (void); // TEMPORAER: manuelles /DIS zum Testen des Split-Brain-Zustands
 extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH treiben oder freigeben (floatend)
+extern void bt_module_cmd (void);            // TEMPORAER (5.129, Phase 0 Zustandsmaschine): EZ-Serial-Befehle von RS232 senden
 
 // 5.110: UART1-ISR-Weiche (hard.c) zusaetzlich am ECHTEN Hardware-Pegel von CONNECTION (P0.19, low aktiv)
 // festmachen. Bisher entschied nur connect&BT_LINK (Software-Zustand, hinkt dem Pegel um EINT1 ->
