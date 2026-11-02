@@ -5454,5 +5454,11 @@ sofort ab ("BT init skipped: connection active") - nie mehr Laird/RN4678-Befehle
 8 s je Folgeversuch bestanden (vorher F11010). Der Erstversuch in den ersten ca. 30 s scheitert weiterhin (die
 Firmware ist dann noch im Hochlauf); entscheidend ist, dass BT danach nicht mehr dauerhaft ausfaellt.
 `gsm-mux` uebersprungen (Modem antwortet nicht). Bericht: `Doku/tools/Testreports/2026-11-02_07-51-21_26SC9983_testlauf/`.
+**Bestaetigungsrunde (08:04-08:28, je 3 Wiederholungen, nur BLE):** `nightly` 3/3, `power-sweep` 0,1 / 1 / 10 s je
+3/3, `boot-race` 2 s und 8 s je 3/3 (Folgeversuch; Erstversuch 0/6, Banner jeweils nach 30-32 s). Bericht:
+`Doku/tools/Testreports/2026-11-02_08-04-58_26SC9983_testlauf/`. Offen: Classic, `bt-timeout` Classic und `bt-update`
+auf einem gekoppelten Board (A oder C); Board ohne LTE (Watchdog-Weg ohne GSM).
+**Nicht behoben, Beobachtung:** Das Geraet braucht nach dem Einschalten ca. 30 s bis zum Banner; das IF820 wirbt aber
+sofort. Ein Kunde, der in dieser Zeit verbindet, bekommt keinen PIN-Prompt und muss neu verbinden.
 
 **Geaenderte Dateien:** main.c, btio.c, btio.h, sprachen/sictxt.c (-> 5.128).
