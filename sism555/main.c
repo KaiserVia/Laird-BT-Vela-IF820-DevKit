@@ -251,6 +251,7 @@ int main (void)
  // Bisher nur ueber test_BT()/init_bluetooth() im POR-Zweig: nach Reboot (BOOTTASK 3:15), Watchdog ohne GSM und
  // Brown-out blieb UART1 aus -> IF820 sah CTS HIGH, BT tot bis zum Stromzyklus (Testlauf 2026-11-02).
  if ((fp.btmodem==IF820) && (uart1_owner==MUX_NONE)) uart1_release(MUX_NONE);
+ bt_sm_boot_done();				// 5.130: Zustand BEREIT (Modul wirbt per Autostart; nur Anzeige)
 
  if (!(RSID&(POR|WDTR|EXTR))) protocol(BROWNOUT_ERROR);	// Brownout reset
   

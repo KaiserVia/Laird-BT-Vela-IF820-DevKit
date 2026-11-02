@@ -24,6 +24,7 @@
 #include "libtool.h"
 #include "xmodem.h"
 #include "sictxt.h"
+#include "btio.h"		// 5.130: bt_link_gone() (Abbruch bei BT-Linkverlust)
 #include <string.h>
 
 void xmodemInFlush(int timeout)	// Warte bis alle Zeichen empfangen
@@ -190,6 +191,7 @@ int sendblock (uchar typ, uchar blno, uchar get_C)	// Datenblock in cbuf ausgebe
   for (i=0;i<blen+2;i++) 
 	{ 
 	 putb(cbuf[i]);												// Block + CRC senden
+	 if (bt_link_gone()) return(XMODEM_ERROR_REMOTECANCEL);	// 5.130: BT-Link weg (CYSPP HIGH) -> sofort abbrechen
 	 if (connect&UART1)										// Modem angeschlossen?
     if ((FIO0PIN&(CSAF|CSBF))==0)				// BT selected	
      if (i%260==256)	osDelay(3);				// 3 ms Pause wg. Laird BT Modul	 

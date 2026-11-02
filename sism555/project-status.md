@@ -5504,6 +5504,78 @@ Befehle, BLE per Bleak und Classic per SPP-COM-Port vom PC). Alle Modul-Aenderun
 Get-Antworten, nur das betroffene Feld geaendert), am Ende `/RBT` (Flash-Stand = Autostart) und ein BLE-Smoke mit PIN
 als Gegenprobe. Bericht `phase0.md`/`phase0.json` im Report-Ordner unter `Doku/tools/Testreports/`.
 
-Build 0 Fehler, 0 Warnungen. Am Geraet noch nicht gelaufen (Hardware belegt).
+Build 0 Fehler, 0 Warnungen.
 
 **Geaenderte Dateien:** btio.c, btio.h, sprachen/sictxt.c (-> 5.129); neu `Doku/tools/cyspp_phase0.py`.
+
+### Phase-0-Laeufe am Geraet (Board B 26SC9983, 5.129, 2026-11-02 09:58-10:20)
+
+Laeufe: `cyspp_phase0.py --stromzyklus` (09:58), `--start ".CYSPPSTART"` / `"/A"` / `".CYSPPSTART;/SX"` mit und ohne
+`SAP F=00` (10:02-10:18), dazu ein Erkundungslauf mit vier Befehlsfolgen (10:06). Berichte:
+`Doku/tools/Testreports/2026-11-02_09-58-50_*`, `..._10-02-54_*`, `..._10-06-34_*explore`, `..._10-13-31_*`,
+`..._10-16-23_*` (dort die vollstaendigen Antworten zu Frage 2, 3, 5, 6).
+
+| Frage | Ergebnis |
+|---|---|
+| 1 `E=1` (+`SAP F=00`) nur im RAM | Das Modul wirbt **weiter**, erst `/AX` beendet das Werben sofort. Classic bleibt verbindbar und wird auch mit `E=1` transparent (beide Richtungen); vorher kommen `ENC` und `BTCON,...,T=01`, beim Trennen `BTDIS,R=0000`. |
+| 2 Start des Werbens | **`.CYSPPSTART` startet mit `E=1` kein Werben, sondern einen Central-Scan** (`SSC,S=02`, rund 60-70 Scan-Ergebnisse `@E,...,S,...` pro Sekunde auf dem UART; CP_ROLE ist unbeschaltet, `G=00`). `/A` startet das Werben, aber **nur ohne `SAP F=00`** (mit `F=00` antwortet `/A` mit `0107` = ungueltiger Zustand). Mit `E=1`, Werben per `/A`: Verbinden, `C`, Service-Discovery (`DR`, `RPC`), `W` (CCCD), `CU` kommen im Command-Mode, Pin bleibt HIGH; nach dem Abo `W` + `.CYSPP`, Pin LOW, Kanal transparent in beide Richtungen. |
+| 3 Nach dem Trennen | `DIS,R=0913` (Gegenstelle hat getrennt) kommt, danach `ASC` und `.CYSPP`: **das Modul wirbt mit `E=1` von selbst weiter** (`SAP F=01`). Nicht still. |
+| 4 Classic zur Laufzeit | `SBTP C=0` (RAM): sofort nicht verbindbar (Windows: Semaphore-Timeout), `C=1`: wieder verbindbar und transparent, mit und ohne `.CYSPPSTART`. |
+| 5 `/UCP` vor dem Abo | `/UCP,C=01,I=C,L=0,O=190` -> `@R,...,/UCP,0000`, `CU,I=000C` kommt **vor** dem Abo; danach transparent. Die 5.125-Idee funktioniert also, wenn der Befehl im Zustand VERBUNDEN gesendet wird. |
+| 6 Sperren in BEREIT | `/AX` + `SBTP C=0`: BLE sofort unsichtbar, Classic nicht verbindbar. Eine laufende BLE-Verbindung (noch ohne Abo) **bleibt nach `/AX` bestehen**, das spaetere Abo macht den Kanal transparent. |
+| Rueckweg | `/RBT` -> `BOOT`, `.CYSPPGP` wieder `E=02`; BLE-Smoke mit PIN danach jedes Mal bestanden. Einmal (10:18) kam `/RBT` nicht an (kein `BOOT`, `E=01` blieb im RAM, Smoke trotzdem bestanden); nach dem Stromzyklus `E=02`, `F=01`: **der Modul-Flash wurde nie veraendert**, die RAM-Umschaltung ist fail-safe. |
+
+**Schluss:**
+- **Phase 1 machbar:** Alle fuer Zustand/Transport/Trenngrund noetigen Ereignisse (`C`, `CU`, `BTCON`, `.CYSPP`,
+  `DIS` mit Grund, `BTDIS` ohne Grund) kommen im Command-Mode vor dem Oeffnen des Datenkanals.
+- **Phase 2 nur mit geaendertem Konzept:** `.CYSPPSTART` ist zum Werben unbrauchbar (Central-Scan, UART-Flut). Tragfaehig
+  ist stattdessen: beim Start `/AX` (und `SBTP C=0`), wenn die Firmware bereit ist `/A` (und `SBTP C=1`); `SAP F=01`
+  lassen, dann wirbt das Modul nach jedem Trennen selbst weiter (kein "unsichtbar nach Trennen"-Risiko). Ob dafuer
+  `E=1` ueberhaupt noetig ist oder `E=2` mit `/AX`/`/A` reicht, ist offen (naechster Phase-0-Lauf).
+- Werkzeug-Hinweis: In Git Bash `MSYS_NO_PATHCONV=1` setzen, sonst wird `--start "/A"` zu einem Windows-Pfad.
+
+## Update 5.130 (TEST, 2026-11-02): Phase 1 der CYSPP-Zustandsmaschine (nur Beobachtung) + Fehler 4
+
+**Phase 1 (btio.c, libtool.c, main.c, measure.c, xmodem.c):** Ereignis-Parser auf `rbuf1` (`bt_sm_event()`, aufgerufen
+aus `bt_event_line()` fuer jede vollstaendige `@E`-Zeile). Zustand `bt_state` (AUS/BEREIT/VERBUNDEN/DATEN), Transport
+`bt_transport` (BLE aus `C`, Classic aus `BTCON`), BLE-Intervall (`C`/`CU`), Trenngrund `bt_dis_reason` (`DIS` R=;
+`BTDIS` meldet laut Guide immer 0). Quellen ausser den Events: `communication_change()` (Pin LOW -> DATEN, Pin HIGH ->
+BEREIT), `main.c` Ende des Hochlaufs (BEREIT), `measure.c` BT_TIMEOUT-Abschaltung (AUS, zurueck mit `BOOT`). Jede
+Aenderung als Zeile `[BT-Zustand] <Zustand> <Transport> I=<n> (<Ausloeser>, Grund <R>)` auf dem Terminal, die BT-Info
+zeigt Zustand/Transport/Intervall/letzten Trenngrund. **Keine Verhaltensaenderung:** `E` bleibt 2, keine Befehle ans
+Modul, der Ablauf haengt weiter am CYSPP-Pin.
+- Im Datenmodus unterdrueckt das Modul alle Events (Guide 7.3.7.1). Beim Trennen steht das `DIS` deshalb oft noch in
+  `rbuf` (BT_LINK war noch gesetzt); `bt_sm_scan_rbuf()` liest es dort, bevor `communication_change()` den Puffer wie
+  bisher verwirft (nur lesen, `bxi` unveraendert).
+- **Ymodem-Abbruch bei Linkverlust:** `sendblock()` fragt je Byte `bt_link_gone()`: BT_LINK gesetzt, `comchange`
+  gesetzt (EINT1) und CYSPP-Pin HIGH (I2C hoechstens alle 100 ms, nicht neben einem GSM-Thread) -> Abbruch mit
+  `XMODEM_ERROR_REMOTECANCEL`. Bisher sendete die Firmware nach einem BLE-Abbruch weiter, jedes Byte bis zum
+  CTS-Limit (22.10.: Ausgabe bis F13010). Ein `DIS`-Event kann waehrend der Uebertragung nicht ankommen (Datenmodus),
+  deshalb ist der Pin das Signal.
+
+**Fehler 4 (Variante A, libtool.c):** `communication_change()` nimmt beim IF820 keine Verbindung an, solange das Modul
+nach dem BT-Zeitlimit stromlos ist (`BT_MODULE_ON` = `(PINMODE3&PULLDOWN)==PULLDOWN`, btio.h); `comchange` wird dann
+nur quittiert. Begruendung gegen Variante B (Modul beim Zeitlimit nicht abschalten): B aendert das bisherige
+Zeitlimit-Verhalten (Modul aus bis zum Minutentakt, wirkt auch gegen ein haengendes Modul) und gehoert eher zur
+spaeteren Zustandsmaschine (Phase 3, GESPERRT/STOERUNG); A beseitigt nur die falsche Annahme "Pin LOW = verbunden"
+fuer genau den Zustand, in dem sie nachweislich falsch ist. Ein `DIS` nach der Abschaltung aendert den Zustand AUS
+nicht (der Versorgungszustand wird direkt ueber `BT_MODULE_ON` abgefragt, kein Merker: das `BOOT` nach dem
+Wiedereinschalten kam im Test einmal nicht an). Laird/RN4678 unveraendert.
+
+Build 0 Fehler, 0 Warnungen.
+
+**Test am Geraet (Board B 26SC9983, Classic COM16, finale Fassung 11:29-12:02):**
+- `bt_testlauf.py --profil kurz`: nightly, reboot-check, power-sweep, boot-race, bt-update bestanden; gsm-mux
+  uebersprungen (Modem antwortet nicht). Bericht `Doku/tools/Testreports/2026-11-02_11-29-47_26SC9983_testlauf/`.
+- `bt_testlauf.py --nur bt-timeout` (BLE und Classic): Trennung nach 372,9 s bzw. 384,3 s, **danach kein Banner und
+  kein "PIN =" mehr bis zur naechsten echten Verbindung** (Fehler 4 behoben), Smokes nach 90 s bestanden. Bericht
+  `..._11-44-39_26SC9983_testlauf/`.
+- Zustandszeilen wie erwartet, z. B. `AUS (Modul abgeschaltet)` -> `AUS (DIS nach Abschaltung)` -> `BEREIT (Modul
+  gestartet, Grund 0913h)` -> `VERBUNDEN BLE I=6 (C)` -> `I=12 (CU)` -> `DATEN (Pin LOW)` -> `BEREIT (DIS, Grund
+  0913h)`; Classic: `DATEN (Pin LOW)` -> `DATEN Classic (BTCON)` -> `BEREIT Classic (BTDIS, Grund 0000h)`.
+- Zwei Zwischenfassungen (gleiche Versionsnummer, nicht committet) liefen ebenfalls komplett durch; korrigiert wurden
+  danach nur Anzeigefehler (BTCON nach Pin LOW setzte DATEN zurueck, Transport der Vorsitzung, DIS nach Abschaltung).
+- Nicht geprueft: Ymodem-Abbruch bei echtem Linkverlust waehrend eines Downloads (braucht einen provozierten Abbruch,
+  z. B. BLE-Adapter am PC waehrend `--mode download` abschalten).
+
+**Geaenderte Dateien:** btio.c, btio.h, libtool.c, main.c, measure.c, xmodem.c, sprachen/sictxt.c (-> 5.130).

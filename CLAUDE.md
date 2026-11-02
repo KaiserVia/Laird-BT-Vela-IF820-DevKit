@@ -59,6 +59,12 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-02 - 5.129/5.130 (TEST), CYSPP-Zustandsmaschine Phase 0+1:** Phase 0 am Geraet (Testmenue 8->7
+  "Modulbefehl senden", `Doku/tools/cyspp_phase0.py`): `.CYSPPSTART` startet mit `E=1` einen Central-Scan statt
+  Werben, `SAP F=00` sperrt `/A`; tragfaehig fuer Phase 2 ist `/AX`/`/A` + `SBTP C=0/1` im RAM (Konzept Abschnitt 6a).
+  5.130: Ereignis-Parser (Zustand/Transport/Trenngrund, `[BT-Zustand]`-Zeilen), Ymodem-Abbruch bei Linkverlust,
+  Fehler 4 behoben (keine Schein-Verbindung bei stromlosem Modul). Kurzprofil + bt-timeout auf Board B bestanden.
+  TEMPORAER: `bt_module_cmd()` (Testmenue 8->7) nach Abschluss der Zustandsmaschine entfernen.
 - **2026-11-02 - Testlauf am Tisch (Board B, 5.127), drei Fehler:** BT tot nach dem naechtlichen Neustart 3:15
   (`BOOTTASK`, Reboot-Zweig in main.c startet BT nicht), nach 1 s Stromunterbrechung (vermutlich Brown-out-Reset) und
   nach Verbinden waehrend der ersten ca. 30 s (Neuerkennung bei aktiver Verbindung -> F11010). Werkzeug:

@@ -120,13 +120,35 @@ Werkzeug dafür: ein Testmenüpunkt "Befehl an das Modul senden" (Eingabe über 
 anzeigen) plus ein Python-Skript, das die Schritte über RS232 und BLE/Classic vom PC aus automatisch abarbeitet.
 Alternativ das IF820-DVK direkt am PC (ohne Firmware-Änderung).
 
+### 6a. Ergebnisse Phase 0 (2026-11-02, Board B 26SC9983, Firmware 5.129, `Doku/tools/cyspp_phase0.py`)
+
+Details und Berichtsordner: `project-status.md`, "Phase-0-Läufe am Gerät".
+
+| Frage | Antwort |
+|---|---|
+| 1 | Mit `E=1` (+`F=00`) wirbt das Modul **weiter**; erst `/AX` beendet das Werben sofort. Classic bleibt verbindbar und transparent. |
+| 2 | **`.CYSPPSTART` startet mit `E=1` einen Central-Scan statt Werben** (`SSC,S=02`, 60-70 Scan-Events/s auf dem UART), obwohl CP_ROLE offen und `G=00`. Werben startet `/A`, aber nur **ohne** `SAP F=00` (sonst `0107`). Danach: `C`, Discovery, `W`, `CU` im Command-Mode, Pin HIGH; nach dem Abo `.CYSPP`, Pin LOW, transparent. |
+| 3 | `DIS,R=0913`; mit `F=01` wirbt das Modul danach **von selbst weiter** (nicht still). |
+| 4 | `SBTP C=0/1` im RAM schaltet Classic sofort aus/ein; `BTCON,...,T=01` vor den Daten, `BTDIS,R=0000`. |
+| 5 | `/UCP` zwischen `C` und Abo wirkt: `CU,I=000C` vor dem Abo, danach transparent. |
+| 6 | `/AX` + `SBTP C=0` macht sofort unsichtbar; eine laufende BLE-Verbindung (ohne Abo) bleibt und wird nach dem Abo transparent. |
+
+**Folgen für das Konzept:**
+- Phase 1 (Beobachtung) ist machbar und als 5.130 umgesetzt.
+- Für Phase 2 entfällt `.CYSPPSTART` (und `SAP F=00`). Tragfähiger Ablauf: beim Start `/AX` + `SBTP C=0` (RAM),
+  wenn bereit `/A` + `SBTP C=1`; `F=01` bleibt, das Modul wirbt nach jedem Trennen selbst weiter. Das entschärft das
+  Hauptrisiko "nach dem Trennen unsichtbar" (Abschnitt 5) und macht das Sicherheitsnetz einfacher. Offen: ob `E=1`
+  dafür überhaupt nötig ist oder `E=2` (Flash wie heute) mit `/AX`/`/A` genügt; ob Werben nach einem Modul-Neustart
+  (`BOOT`, Flash = Autostart) sofort wieder per `/AX` gestoppt werden muss.
+- `/UCP` vor dem Abo (Phase 3) funktioniert im Zustand VERBUNDEN.
+
 ## 7. Vorgehen in Phasen
 
 | Phase | Inhalt | Ergebnis | Risiko fürs Feld |
 |---|---|---|---|
-| 0 | Fragen aus Abschnitt 6 am Gerät klären (Testmenüpunkt + Skript) | Machbarkeit belegt oder verworfen | keins |
-| 1 | Ereignis-Parser und Zustandsanzeige, **ohne Verhaltensänderung** (E bleibt 2) | Firmware kennt Transport, Trenngrund; Ymodem-Abbruch bei `DIS` | gering |
-| 2 | Zustandsmaschine mit `E=1`, `F=00`, `.CYSPPSTART`, Sicherheitsnetz, hinter `BT_CYSPP_SM` | Sichtbar erst wenn bereit, nach jedem Trennen neu gestartet | hoch, deshalb Schalter und volle Testreihe |
+| 0 | Fragen aus Abschnitt 6 am Gerät klären (Testmenüpunkt + Skript) | **erledigt (5.129), Ergebnisse 6a** | keins |
+| 1 | Ereignis-Parser und Zustandsanzeige, **ohne Verhaltensänderung** (E bleibt 2) | **umgesetzt (5.130)**: Zustand, Transport, Trenngrund; Ymodem-Abbruch bei Linkverlust (Pin, da `DIS` im Datenmodus nicht ankommt) | gering |
+| 2 | Zustandsmaschine mit `/AX`/`/A` und `SBTP C` im RAM (nicht `.CYSPPSTART`/`F=00`, siehe 6a), Sicherheitsnetz, hinter `BT_CYSPP_SM` | Sichtbar erst wenn bereit | hoch, deshalb Schalter und volle Testreihe |
 | 3 | `GESPERRT` (LTE, Update, Flash), `/UCP` vor dem Abo | unsichtbar während Sperrzeiten, kürzeres BLE-Intervall | mittel |
 | 4 | Konfigurations-Umstellung im Feld, Rückweg, Service-Anleitung | ausrollbar | - |
 

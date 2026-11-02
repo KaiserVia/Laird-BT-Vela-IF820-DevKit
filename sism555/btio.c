@@ -669,7 +669,6 @@ static uchar ev_n=0;
 static uchar ucp_pending=0;                    // 5.125: nach "C"-Event /UCP senden (nicht in der Drain-Schleife: bt_command() setzt bxi1)
 static char  ucp_handle[3];                    // Verbindungs-Handle aus dem "C"-Event (2 Hex-Zeichen)
 
-#if BT_UCP_ENABLE
 static uint hex_after (const char *line, const char *key)   // Hex-Zahl hinter "key" (z. B. "I=") oder 0xFFFF
 {
  const char *p=strstr(line,key); uint v=0; uchar n=0;
@@ -686,7 +685,136 @@ static uint hex_after (const char *line, const char *key)   // Hex-Zahl hinter "
  }
  return n ? v : 0xFFFF;
 }
-#endif
+
+// 5.130 - Phase 1 der CYSPP-Zustandsmaschine (Doku/Konzept_CYSPP_Zustandsmaschine.md): Ereignis-Parser auf rbuf1,
+// NUR BEOBACHTUNG. Das Modul bleibt auf Autostart (.CYSPPSP E=2), es werden keine Befehle gesendet, der Ablauf haengt
+// weiter allein am CYSPP-Pin (communication_change()). Die Firmware kennt damit Zustand, Transport (BLE/Classic),
+// Verbindungsintervall und Trenngrund; jede Aenderung erscheint als Zeile "[BT-Zustand] ..." auf dem Terminal.
+// Quellen: Modul-Events (BOOT, C, CU, BTCON, .CYSPP, DIS, BTDIS; EZ-Serial-Guide 7.3.x), Pin-Wechsel aus
+// communication_change() (bt_sm_link) und die BT_TIMEOUT-Abschaltung (bt_sm_off). Waehrend des Datenmodus
+// unterdrueckt das Modul alle Events (Guide 7.3.7.1); das Trennen sieht die Firmware deshalb zuerst am Pin, das
+// DIS-Event kommt kurz danach - ggf. noch in rbuf, bevor BT_LINK geloescht ist (bt_sm_scan_rbuf()).
+uchar bt_state=BT_ST_AUS;                      // BT_ST_*
+uchar bt_transport=BT_TR_KEIN;                 // BT_TR_* der laufenden bzw. letzten Verbindung
+uint  bt_conn_interval=0;                      // BLE-Intervall (1,25 ms je Schritt), 0 = unbekannt
+uint  bt_dis_reason=0xFFFF;                    // R= des letzten DIS/BTDIS, 0xFFFF = keiner gesehen
+static uchar bt_tr_stale=0;                    // Transport stammt aus der vorigen Sitzung (nach Trennen bis C/BTCON)
+static const char * const bt_st_txt[]={"AUS","BEREIT","VERBUNDEN","DATEN"};
+static const char * const bt_tr_txt[]={"-","BLE","Classic"};
+
+static void bt_sm_show (const char *why)       // eine Zeile ans Terminal, nie ans Modul
+{
+ uchar cc=connect; connect=concpy & ~UART1;
+ newline(); putstr("[BT-Zustand] "); putstr((char *)bt_st_txt[bt_state]);
+ if (bt_transport!=BT_TR_KEIN) { putstr(" "); putstr((char *)bt_tr_txt[bt_transport]); }
+ if (bt_transport==BT_TR_BLE && bt_conn_interval) { putstr(" I="); putnumber(bt_conn_interval,0); }
+ putstr(" ("); putstr((char *)why);
+ if (bt_state==BT_ST_BEREIT && bt_dis_reason!=0xFFFF) { putstr(", Grund "); putnumber(bt_dis_reason,0x84); }
+ putstr(")"); newline();
+ connect=cc;
+}
+
+static void bt_sm_set (uchar st, const char *why)
+{
+ if (st==bt_state) return;
+ bt_state=st;
+ bt_sm_show(why);
+}
+
+// C/BTCON: Bei Classic kommt BTCON oft erst NACH dem Pin-LOW (communication_change() laeuft vor bt_sniff_poll()) -
+// DATEN dann behalten, nur den Transport nachtragen.
+static void bt_sm_connected (const char *why)
+{
+ bt_tr_stale=0;
+ if (bt_state==BT_ST_DATEN) bt_sm_show(why);
+ else { bt_state=BT_ST_AUS; bt_sm_set(BT_ST_VERBUNDEN,why); }
+}
+
+static void bt_sm_event (const char *line)    // eine vollstaendige Zeile "@E,<len>,<name>,..." auswerten
+{
+ const char *p;
+ if (line[0]!='@' || line[1]!='E' || line[2]!=',' || strlen(line)<9) return;
+ p=line+8;                                     // "@E,xxxx," -> Name
+ if (!strncmp(p,"BOOT,",5) || !strcmp(p,"BOOT"))
+ { bt_transport=BT_TR_KEIN; bt_conn_interval=0; bt_sm_set(BT_ST_BEREIT,"Modul gestartet"); }
+ else if (!strncmp(p,"C,",2))                  // gap_connected: BLE verbunden, Datenkanal noch zu
+ { bt_transport=BT_TR_BLE; bt_conn_interval=hex_after(line,",I="); if (bt_conn_interval==0xFFFF) bt_conn_interval=0;
+   bt_dis_reason=0xFFFF; bt_sm_connected("C"); }
+ else if (!strncmp(p,"CU,",3))                 // Verbindungsparameter geaendert
+ { uint i=hex_after(line,",I="); if (i!=0xFFFF && i!=bt_conn_interval) { bt_conn_interval=i; bt_sm_show("CU"); } }
+ else if (!strncmp(p,"BTCON,",6))              // Classic (SPP) verbunden
+ { bt_transport=BT_TR_CLASSIC; bt_conn_interval=0; bt_dis_reason=0xFFFF; bt_sm_connected("BTCON"); }
+ else if (!strncmp(p,".CYSPP,",7))             // Bit 0/1: Datenkanal abonniert
+ { uint s=hex_after(line,",S="); if (s!=0xFFFF && (s&3)) bt_sm_set(BT_ST_DATEN,".CYSPP"); }
+ else if (!strncmp(p,"DIS,",4) || !strncmp(p,"BTDIS,",6))
+ {
+  bt_dis_reason=hex_after(line,",R="); bt_tr_stale=1;
+  if (!BT_MODULE_ON) bt_sm_show((p[0]=='D') ? "DIS nach Abschaltung" : "BTDIS nach Abschaltung");   // stromlos: AUS bleibt
+  else { bt_state=BT_ST_AUS; bt_sm_set(BT_ST_BEREIT,(p[0]=='D') ? "DIS" : "BTDIS"); }
+ }
+}
+
+// Fehler 4 (5.130): Bei stromlosem Modul (BT_MODULE_ON, nach dem BT-Zeitlimit) ruft communication_change() diese
+// Funktion fuer Pin LOW gar nicht erst auf; der Versorgungszustand wird direkt am Pin abgefragt (kein Merker, das
+// BOOT-Event nach dem Wiedereinschalten kam im Test nicht immer an).
+void bt_sm_link (uchar up)                     // aus communication_change(): CYSPP-Pin LOW (Datenkanal) / HIGH
+{
+ if (fp.btmodem!=IF820) return;
+ if (up) { if (bt_tr_stale) { bt_transport=BT_TR_KEIN; bt_conn_interval=0; } bt_sm_set(BT_ST_DATEN,"Pin LOW"); }
+ else
+ {
+  bt_tr_stale=1;
+  if (bt_state==BT_ST_DATEN || bt_state==BT_ST_VERBUNDEN) bt_sm_set(BT_ST_BEREIT,"Pin HIGH");
+ }
+}
+
+void bt_sm_off (void) { if (fp.btmodem==IF820) { bt_sm_set(BT_ST_AUS,"Modul abgeschaltet (BT_TIMEOUT)"); } }
+
+void bt_sm_boot_done (void)                    // main.c, Ende des Hochlaufs: Modul wirbt (Autostart)
+{ if (fp.btmodem==IF820 && bt_state==BT_ST_AUS) bt_sm_set(BT_ST_BEREIT,"Hochlauf fertig"); }
+
+// Aus communication_change(), Trennen-Zweig, VOR dem Verwerfen von rbuf: Solange BT_LINK noch gesetzt war, leitete
+// die ISR-Weiche Modulausgabe nach rbuf - dort steht dann ggf. schon das DIS-/BTDIS-Event mit dem Trenngrund. Nur
+// lesen (bxi bleibt unveraendert), danach verwirft der Aufrufer den Puffer wie bisher.
+void bt_sm_scan_rbuf (void)
+{
+ char line[48]; uchar n=0, i=bxi;
+ if (fp.btmodem!=IF820) return;
+ while (i!=rxi)
+ {
+  char c=rbuf[++i];
+  if (c=='\r') continue;
+  if (c=='\n') { line[n]=0; if (n>8) bt_sm_event(line); n=0; continue; }
+  if (c=='@') n=0;                             // Zeilenanfang auch mitten im Binaerstrom erkennen
+  if (n<sizeof(line)-1) line[n++]=c;
+ }
+}
+
+// Ymodem/Xmodem ueber BT bei Linkverlust sofort abbrechen (Aufruf je Byte aus sendblock(), xmodem.c). Bisher sendete
+// die Firmware nach einem BLE-Abbruch noch minutenlang weiter (jedes Byte wartet auf CTS, project-status.md 22.10.).
+// Signal: comchange (EINT1, IC54 hat sich geaendert) und CYSPP-Pin HIGH = Modul hat den Datenkanal verlassen. I2C
+// hoechstens alle 100 ms und nicht neben einem GSM-/MQTT-Thread; ohne comchange kostet der Aufruf nichts.
+bool bt_link_gone (void)
+{
+ static uint t_chk=0; int st;
+ if (fp.btmodem!=IF820 || !(connect&BT_LINK) || !comchange || bt_cyspp_out) return(FALSE);
+ if (osActiveThread || (uint)(mstimer-t_chk)<100) return(FALSE);
+ t_chk=mstimer;
+ st=get_com_status();
+ if (st<0 || !(st&BT_LINK)) return(FALSE);    // BT_LINK low aktiv: LOW = Verbindung steht noch
+ { uchar cc=connect; connect=concpy & ~UART1; newline(); putln("[BT-Zustand] Linkverlust - Uebertragung abgebrochen"); connect=cc; }
+ return(TRUE);
+}
+
+void bt_sm_info (void)                         // Zeilen fuer bt_show_counters()
+{
+ bt_kv("Zustand", (char *)bt_st_txt[bt_state]);
+ bt_kv("Transport", (char *)bt_tr_txt[bt_transport]);
+ if (bt_conn_interval) bt_kvn("BLE-Intervall", bt_conn_interval);
+ bt_key("Letzter Trenngrund");
+ if (bt_dis_reason==0xFFFF) putstr("-"); else putnumber(bt_dis_reason,0x84);
+ newline();
+}
 
 // 5.125: Verbindungsintervall anfordern (siehe BT_UCP_ENABLE in btio.h). Nur im Command-Mode: laeuft bereits die
 // CYSPP-Bruecke (BT_LINK), wuerde der Befehl als Nutzdaten (PIN-Eingabe!) ankommen - dann wird er nicht gesendet.
@@ -726,6 +854,7 @@ static void bt_event_line (char c)
    newline(); putstr("[BT-Event] "); putstr(ev_line); newline();
    connect=cc;
   }
+  bt_sm_event(ev_line);                        // 5.130: Zustand/Transport/Trenngrund nachfuehren
   ev_n=0;
   return;
  }
@@ -1666,6 +1795,7 @@ void send_bt_info (void)							// Bluetooth Informationen ausgeben
    bt_query_show(T_gsbp);                                         // Security (5.57): M=00 = Just Works
    bt_query_show(T_rlh_ppcp);                                     // Verbindungsparameter-Praeferenz (5.6x): D=0C00180000005802
    bt_show_counters();                                            // Durchsatz-Diagnose der laufenden BT-Sitzung
+   { uchar cc=connect; connect=concpy & ~UART1; bt_sm_info(); connect=cc; }   // 5.130: Zustand, Transport, Trenngrund
   }
   osDelay(50); bxi1=rxi1;                                         // finaler Flush (rbuf1, 5.89)
   uart1_release(MUX_BT);

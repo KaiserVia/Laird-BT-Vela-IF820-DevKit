@@ -218,6 +218,23 @@ extern void bt_diag_menu (void);          // Auswahl Event-Sniff / Contention-Te
 extern void bt_factory_reset (void);      // TEMPORAER: /RFAC - Modul-Werksreset fuer Alt-FW-Vergleichstest
 extern void bt_force_disconnect_test (void); // TEMPORAER: manuelles /DIS zum Testen des Split-Brain-Zustands
 extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH treiben oder freigeben (floatend)
+// 5.130 Phase 1 CYSPP-Zustandsmaschine (nur Beobachtung, Modul bleibt auf Autostart), siehe btio.c bt_sm_event()
+#define BT_ST_AUS        0          // Modul aus (BT_TIMEOUT) oder Hochlauf nicht fertig
+#define BT_ST_BEREIT     1          // wirbt / verbindbar
+#define BT_ST_VERBUNDEN  2          // C (BLE) oder BTCON (Classic), Datenkanal noch zu
+#define BT_ST_DATEN      3          // Datenkanal offen (CYSPP-Pin LOW bzw. .CYSPP Bit 0/1)
+#define BT_TR_KEIN       0
+#define BT_TR_BLE        1
+#define BT_TR_CLASSIC    2
+#define BT_MODULE_ON     ((PINMODE3&PULLDOWN)==PULLDOWN)   // 5.130: Modul versorgt (measure.c schaltet es nach BT_TIMEOUT per Pull-up ab)
+extern uchar bt_state, bt_transport;
+extern uint  bt_conn_interval, bt_dis_reason;
+extern void bt_sm_link (uchar up);        // communication_change(): Pin LOW (1) / HIGH (0)
+extern void bt_sm_off (void);             // measure.c: Modul per BT_TIMEOUT abgeschaltet
+extern void bt_sm_boot_done (void);       // main.c: Ende des Hochlaufs
+extern void bt_sm_scan_rbuf (void);       // communication_change(): DIS aus rbuf lesen, bevor er verworfen wird
+extern bool bt_link_gone (void);          // xmodem.c sendblock(): Linkverlust -> Uebertragung abbrechen
+extern void bt_sm_info (void);            // Zustandszeilen fuer die BT-Info
 extern void bt_module_cmd (void);            // TEMPORAER (5.129, Phase 0 Zustandsmaschine): EZ-Serial-Befehle von RS232 senden
 
 // 5.110: UART1-ISR-Weiche (hard.c) zusaetzlich am ECHTEN Hardware-Pegel von CONNECTION (P0.19, low aktiv)

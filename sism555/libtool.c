@@ -1023,7 +1023,11 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
 	
 	if ((interfaces&BT_LINK) && !bt_cyspp_out)          // Bluetooth registriert, Leitung wird nicht gerade selbst getrieben (bt_cmdmode())
   {
-   if (((comstate_neu&BT_LINK)==0) && !(connect&BT_LINK))   // HW verbunden, Software weiss es noch nicht - BT_LINK ist low aktiv
+   // 5.130 (Fehler 4): IF820 nach BT_TIMEOUT stromlos (measure.c, P1.16 Pull-up) -> CYSPP liest LOW ohne Verbindung.
+   // Dann keine Verbindung annehmen (sonst Banner/"PIN =" ins Leere, beim Wiedereinschalten PIN-Endlosschleife).
+   if ((fp.btmodem==IF820) && !BT_MODULE_ON && ((comstate_neu&BT_LINK)==0) && !(connect&BT_LINK))
+   { comchange=0; thread_comchange=0; }
+   else if (((comstate_neu&BT_LINK)==0) && !(connect&BT_LINK))   // HW verbunden, Software weiss es noch nicht - BT_LINK ist low aktiv
    {      	 
 		if (connect&MQTT_LINK) 					// Besteht MQTT Verbindung?
 		{	
@@ -1042,6 +1046,7 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
 		 bt_reset_counters();									// 5.53: Durchsatz-Diagnose je BT-Sitzung von vorn zaehlen
      bt_time=BT_TIMEOUT;					  				// Max. Bluetooth Verbindungszeit	ohne Empfang	
 		 if (fp.btmodem==Roving || fp.btmodem==IF820) bt_pininit=1;	// Pinabfrage erforderlich (RN4678 + IF820)
+		 bt_sm_link(1);													// 5.130: Zustand DATEN (nur Anzeige)
 		 
 #if (VSPCAM) 				 
 		 if (fp.vspcam) online=0;				// Online Messmodus reset		
@@ -1055,6 +1060,8 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
 		connect&=~(UART1|BT_LINK);			// Daten nicht mehr an UART1 senden
 		bt_session_summary();						// TEMPORAER (5.118, nur Debug): Sitzungszaehler als Zeile ans Terminal - spaeter wieder entfernen, siehe CLAUDE.md
 		bt_pininit=0;										// Reset Bluetooth Pin Initialisierung falls aktiv
+		bt_sm_scan_rbuf();							// 5.130: DIS-Event (Trenngrund) aus dem gleich verworfenen Rest lesen
+		bt_sm_link(0);									// 5.130: Zustand BEREIT (nur Anzeige)
 		bxi=rxi;							// FIX (5.82): Rest im gemeinsamen Ringpuffer verwerfen - beim
 											// (fremdinitiierten) Trennen sendet das Modul noch rohen Event-/
 											// Protokolltext (@E,...DIS...) ueber UART1, der sonst unveraendert

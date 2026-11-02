@@ -275,6 +275,14 @@ class Phase0:
         self.con = con
         self.base = {}          # Get-Antworten (Felder) vor den Aenderungen
 
+    async def start(self) -> bool:
+        """BEREIT herstellen mit der Befehlsfolge aus --start (Default .CYSPPSTART). Lauf 2026-11-02: .CYSPPSTART allein
+        startet mit E=1 einen Scan statt Werben; .CYSPPSTART,/SX oder /A (ohne .CYSPPSTART) werben."""
+        ok = True
+        for cmd in self.args.start.split(";"):
+            ok = (await self.con.cmd(cmd))["ok"] and ok
+        return ok
+
     async def read_base(self) -> None:
         log("Ausgangszustand des Moduls lesen ...")
         await self.con.cmd("/PING")
@@ -314,7 +322,9 @@ class Phase0:
     # --- Frage 1 -----------------------------------------------------------
     async def q1(self) -> dict:
         log("Frage 1: E=1 + F=00 nur im RAM - wirbt das Modul noch? Classic verbindbar?")
-        r = {"cyspp_e1": (await self.set_cyspp("01"))["ok"], "sap_f00": (await self.set_adv_flags("00"))["ok"]}
+        r = {"cyspp_e1": (await self.set_cyspp("01"))["ok"]}
+        if not self.args.ohne_sap:   # Lauf 2026-11-02: mit SAP F=00 lehnt das Modul /A ab (0107)
+            r["sap_f00"] = (await self.set_adv_flags("00"))["ok"]
         await asyncio.sleep(1.0)
         r["scan_nach_e1_f00"] = await ble_visible(self.args.address, self.args.scan)
         r["ax"] = (await self.con.cmd("/AX"))["ok"]
@@ -345,13 +355,14 @@ class Phase0:
     # --- Frage 2 + 3 -------------------------------------------------------
     async def q2(self) -> dict:
         log("Frage 2: nach .CYSPPSTART - Werben, Verbinden, Abo; Ereignisse vorher, Pin LOW, transparent?")
-        r = {"cysppstart": (await self.con.cmd(".CYSPPSTART"))["ok"]}
+        r = {"cysppstart": await self.start()}
         await asyncio.sleep(1.0)
         r["scan"] = await ble_visible(self.args.address, self.args.scan)
         since = self.con.mark()
         link = BleLink(self.args.address)
         r["connected"] = await link.connect(self.args.connect_timeout)
         if not r["connected"]:
+            r["antwort"] = f"keine BLE-Verbindung (Scan nach Start: {'sichtbar' if r['scan']['visible'] else 'nicht sichtbar'})"
             return r
         await asyncio.sleep(2.0)
         r["events_vor_abo"] = events(self.con.module_lines(since))
@@ -374,7 +385,7 @@ class Phase0:
         since = self.con.mark()
         if link is None or not link.connected:
             link = BleLink(self.args.address)
-            await self.con.cmd(".CYSPPSTART")
+            await self.start()
             if not await link.connect(self.args.connect_timeout) or not await link.subscribe():
                 return {"fehler": "keine Verbindung fuer Frage 3"}
             await asyncio.sleep(2.0)
@@ -413,11 +424,12 @@ class Phase0:
     # --- Frage 5 -----------------------------------------------------------
     async def q5(self) -> dict:
         log("Frage 5: /UCP zwischen C und Abo - kommt CU vor dem Oeffnen des Datenkanals?")
-        await self.con.cmd(".CYSPPSTART")
+        await self.start()
         since = self.con.mark()
         link = BleLink(self.args.address)
         r = {"connected": await link.connect(self.args.connect_timeout)}
         if not r["connected"]:
+            r["antwort"] = "keine BLE-Verbindung"
             return r
         c_line = await self.con.wait_line(r"@E,[0-9A-Fa-f]{4},C,", since, 5.0)
         r["c_event"] = c_line
@@ -447,7 +459,7 @@ class Phase0:
     # --- Frage 6 -----------------------------------------------------------
     async def q6(self) -> dict:
         log("Frage 6: /AX + SBTP C=0 in BEREIT - sofort unsichtbar? Laufende Verbindung?")
-        r = {"cysppstart": (await self.con.cmd(".CYSPPSTART"))["ok"], "sbtp_c1": (await self.set_classic("01"))["ok"]}
+        r = {"cysppstart": await self.start(), "sbtp_c1": (await self.set_classic("01"))["ok"]}
         await asyncio.sleep(1.0)
         r["scan_bereit"] = await ble_visible(self.args.address, self.args.scan)
         r["ax"] = (await self.con.cmd("/AX"))["ok"]
@@ -457,7 +469,7 @@ class Phase0:
         r["classic_gesperrt"] = await self.classic_probe("gesperrt (SBTP C=0)")
         # laufende Verbindung (verbunden, Datenkanal noch zu) und dann /AX
         await self.set_classic("01")
-        await self.con.cmd(".CYSPPSTART")
+        await self.start()
         link = BleLink(self.args.address)
         r["connected"] = await link.connect(self.args.connect_timeout)
         if r["connected"]:
@@ -526,16 +538,21 @@ def write_summary(result: dict) -> None:
 
 
 async def run(args) -> int:
+    if not args.no_classic:
+        from serial.tools import list_ports
+        if args.classic_port.upper() not in {p.device.upper() for p in list_ports.comports()}:
+            log(f"Classic-Port {args.classic_port} existiert in Windows nicht (Board nicht gekoppelt?) - "
+                "Classic-Proben werden uebersprungen.")
+            args.no_classic = True
+    bmt.TRACE = bmt.TraceLogger(args)
+    if not bmt.setup_rs232_sniffer(args) or bmt.SNIFFER is None:   # vor dem Stromzyklus: im Hochlauf schweigt RS232
+        log("RS232 nicht verfuegbar - Abbruch.")
+        return 2
     if args.stromzyklus:
         relay = bmt.PowerRelay(args.relais_port, args.relais)
         log(f"Stromzyklus {args.stromlos:.0f} s (Relais {args.relais} an {args.relais_port}) ...")
         relay.cycle(args.stromlos)
         relay.close()
-    bmt.TRACE = bmt.TraceLogger(args)
-    if not bmt.setup_rs232_sniffer(args) or bmt.SNIFFER is None:
-        log("RS232 nicht verfuegbar - Abbruch.")
-        return 2
-    if args.stromzyklus:
         log(f"Hochlauf abwarten ({args.boot_wait:.0f} s) ...")
         await asyncio.sleep(args.boot_wait)
     con = ModuleConsole(bmt.SNIFFER)
@@ -581,6 +598,8 @@ def main() -> int:
     p.add_argument("--scan", type=float, default=8.0, help="Dauer je BLE-Sichtbarkeits-Scan (s)")
     p.add_argument("--connect-timeout", type=float, default=20.0)
     p.add_argument("--classic-timeout", type=float, default=25.0)
+    p.add_argument("--ohne-sap", action="store_true", help="Frage 1 ohne SAP F=00 (nur E=1 + /AX)")
+    p.add_argument("--start", default=".CYSPPSTART", help="Befehlsfolge fuer BEREIT, mit ; getrennt (z. B. '.CYSPPSTART;/SX' oder '/A')")
     p.add_argument("--stromzyklus", action="store_true", help="vorher Stromzyklus ueber das Relais")
     p.add_argument("--relais-port", default="COM7")
     p.add_argument("--relais", type=int, default=2)
