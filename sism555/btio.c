@@ -818,13 +818,70 @@ static void bt_sm_unhide (const char *why)
 }
 
 void bt_sm_minute (void)                       // measure.c, Minutentakt: Sicherheitsnetz fuer bt_sm_unhide()
-{ if (bt_sm_hidden && fp.btmodem==IF820) bt_sm_unhide("sichtbar (Minutentakt)"); }
+{ if (bt_sm_hidden==1 && fp.btmodem==IF820) bt_sm_unhide("sichtbar (Minutentakt)"); }
 
 void bt_sm_boot_done (void)                    // main.c, Ende des Hochlaufs
 {
  if (fp.btmodem!=IF820) return;
+#if BT_CYSPP_SM
+ // 5.132: Nach einem Firmware-Update ueber RS232/USB ist das Modul noch von bt_sm_lock() verborgen (es startet beim
+ // LPC-Neustart nicht mit) -> immer sichtbar machen; laeuft eine Verbindung (Update ueber BT), spaeter per Minutentakt.
+ if (i_reset==FIRM_UP_RES) bt_sm_hidden=1;
+#endif
  if (bt_sm_hidden) { bt_sm_unhide("Hochlauf fertig, sichtbar"); return; }
  if (bt_state==BT_ST_AUS) bt_sm_set(BT_ST_BEREIT,"Hochlauf fertig");
+}
+
+// 5.132 - Phase 3, GESPERRT: unsichtbar, solange die Firmware einen BT-Kunden nicht bedienen kann.
+// (a) Firmware-Update ueber RS232/USB (firmware(), sicom.c, Haupt-Thread): bt_sm_lock()/bt_sm_unlock() mit bt_command().
+//     Bei Erfolg folgt der Neustart, bt_sm_boot_done() macht das Modul wieder sichtbar.
+// (b) GSM/LTE haelt UART1 (uart1_request(MUX_GSM), auch aus dem GSM-/MQTT-Thread): dort ist bt_command() nicht erlaubt
+//     (aendert connect, liest rbuf1 parallel zu bt_sniff_poll()). Deshalb schreibt bt_sm_gsm_lock() /AX und SBTP direkt
+//     auf UART1, solange der Owner noch MUX_NONE ist (Antworten landen per ISR-Weiche in rbuf1, bt_sniff_poll() leert);
+//     bt_sm_gsm_unlock() aus uart1_release() nach der Rueckkehr in den Leerlauf. Anzeige ueber bt_sm_note (Haupt-Thread).
+// Nie bei laufender BT-Verbindung. bt_sm_hidden: 1 = Hochlauf/Update (Minutentakt wiederholt), 2 = GSM.
+void bt_sm_lock (void)
+{
+#if BT_CYSPP_SM
+ if (fp.btmodem!=IF820 || (connect&BT_LINK) || bt_sm_hidden) return;
+ if (!bt_sm_cmd(T_ax, T_axok)) return;
+ bt_sm_cmd(T_sbtp_hide, T_sbtpok);
+ bt_sm_hidden=1;
+ bt_state=BT_ST_AUS; bt_sm_show("gesperrt: Firmware-Update");
+#endif
+}
+
+void bt_sm_unlock (void)                       // firmware() ohne Neustart beendet (Abbruch, Fehler)
+{ if (bt_sm_hidden==1 && fp.btmodem==IF820) bt_sm_unhide("Update beendet, sichtbar"); }
+
+static const char * volatile bt_sm_note=0;      // Meldung aus dem GSM-Pfad, ausgegeben von bt_sniff_poll()
+
+static void bt_raw (const char *s)             // direkt auf UART1, ohne connect/putb (thread-tauglich)
+{
+ uint t;
+ while (*s)
+ {
+  t=mstimer; while ((FIO2PIN & CTS) && (uint)(mstimer-t)<20) {}   // Flow Control: kurz auf CTS warten
+  t=mstimer; while (!(U1->LSR & THRE) && (uint)(mstimer-t)<20) {}
+  U1->THR=*s++;
+ }
+}
+
+void bt_sm_gsm_lock (void)                     // uart1_request(MUX_GSM), VOR dem Owner-Wechsel
+{
+#if BT_CYSPP_SM
+ if (fp.btmodem!=IF820 || uart1_owner!=MUX_NONE || bt_sm_hidden || (connect&BT_LINK) || bt_cyspp_out) return;
+ bt_raw(T_ax); bt_raw(T_sbtp_hide);
+ osDelay(20);                                  // Antworten (ca. 30 Byte bei 460800 Baud) noch in den Leerlauf-Puffer
+ bt_sm_hidden=2; bt_state=BT_ST_AUS; bt_sm_note="gesperrt: GSM haelt UART1";
+#endif
+}
+
+void bt_sm_gsm_unlock (void)                   // uart1_release(MUX_GSM), nach der Rueckkehr in den Leerlauf
+{
+ if (bt_sm_hidden!=2) return;
+ bt_raw(T_sbtp_ns); bt_raw(T_a);
+ bt_sm_hidden=0; bt_state=BT_ST_BEREIT; bt_sm_note="GSM beendet, sichtbar";
 }
 
 // Aus communication_change(), Trennen-Zweig, VOR dem Verwerfen von rbuf: Solange BT_LINK noch gesetzt war, leitete
@@ -876,6 +933,7 @@ static void bt_conn_update (void)
 {
  char cmd[40];
  if (fp.btmodem!=IF820 || bt_cyspp_out || (connect&BT_LINK)) return;
+ if (osActiveThread || bt_link_busy()) return;   // 5.132: Pin schon LOW (Kanal offen, communication_change() noch nicht gelaufen)
  strcpy(cmd,"/UCP,C="); strcat(cmd,ucp_handle); strcat(cmd,BT_UCP_CMD_TAIL);
  concpy=connect;                                // bt_command() stellt am Ende connect=concpy her
  bt_command(cmd,"/UCP,0000",-300);               // still senden; Antwort "@R,...,/UCP,0000" abwarten
@@ -940,6 +998,7 @@ void bt_sniff_poll (void)
   }
  }
  if (ucp_pending) { ucp_pending=0; bt_conn_update(); }    // 5.125: ausserhalb der Drain-Schleife senden
+ if (bt_sm_note) { const char *m=(const char *)bt_sm_note; bt_sm_note=0; bt_sm_show(m); }   // 5.132: Meldung aus dem GSM-Pfad
  if (!sniff_active) return;
  if ((uint)(mstimer-sniff_t0)>=SNIFF_DURATION_MS)
  {

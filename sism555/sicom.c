@@ -49,8 +49,9 @@ void firmware (void)		// Firmware Empfang, Pr�fung und IAP Programmierung
 	
  putln (T_fsend);											// Text "Send file with Xmodem (1k)...
  delete_protocol();										// Protokollzeiger im Parametersatz l�schen
- delete_data();												// Messdatenzeiger im Parametersatz l�schen	
-	
+ delete_data();												// Messdatenzeiger im Parametersatz l�schen
+ bt_sm_lock();												// 5.132: IF820 unsichtbar waehrend des Updates (nicht bei Update ueber BT)
+
  if ((blno=xmodem_receive(FIRMWARE_MAX_FILESIZE,0))< 0)		// Empfang 1k Xmodem Daten
   puterror (DTC_SI_XMODEM_ERR, blno);								// Xmodem Fehlernummer als Detail ausgeben
  else  
@@ -80,7 +81,8 @@ void firmware (void)		// Firmware Empfang, Pr�fung und IAP Programmierung
    else puterror (DTC_SI_CRC_ERR, -1);							// CRC Fehler ausgeben
   } // end if Firmware ist ok
   else  puterror (DTC_SI_NO_FIRMWARE, -1);	// Keine Firmware Fehler ausgeben
- }   
+ }
+ bt_sm_unlock();											// 5.132: kein Neustart (Abbruch/Fehler/nein) -> wieder sichtbar
 }
 
 void identify (void)		// Ausgabe Ger�teidentifikation

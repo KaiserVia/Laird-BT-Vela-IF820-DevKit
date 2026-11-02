@@ -152,7 +152,7 @@ Details und Berichtsordner: `project-status.md`, "Phase-0-Läufe am Gerät".
 | 0 | Fragen aus Abschnitt 6 am Gerät klären (Testmenüpunkt + Skript) | **erledigt (5.129), Ergebnisse 6a** | keins |
 | 1 | Ereignis-Parser und Zustandsanzeige, **ohne Verhaltensänderung** (E bleibt 2) | **umgesetzt (5.130)**: Zustand, Transport, Trenngrund; Ymodem-Abbruch bei Linkverlust (Pin, da `DIS` im Datenmodus nicht ankommt) | gering |
 | 2 | `/AX` + `SBTP C=0` früh im Hochlauf, `/A` + `SBTP C=1` am Ende, alles im RAM bei `E=2` (siehe 6a), Minutentakt als Sicherheitsnetz, Schalter `BT_CYSPP_SM` | **umgesetzt (5.131)**: unsichtbar ab ca. 3,7 s bis zum Ende des Hochlaufs | mittel (fail-safe: Modul-Neustart = Werben wie bisher) |
-| 3 | `GESPERRT` (LTE, Update, Flash), `/UCP` vor dem Abo | unsichtbar während Sperrzeiten, kürzeres BLE-Intervall | mittel |
+| 3 | `GESPERRT` (LTE, Update, Flash), `/UCP` vor dem Abo | **umgesetzt (5.132)** für Update über RS232/USB und GSM-Sitzung (GSM-Pfad thread-tauglich per direktem UART-Schreiben); `/UCP` wieder an. Offen: lange Flash-Schreibvorgänge | mittel |
 | 4 | Konfigurations-Umstellung im Feld, Rückweg, Service-Anleitung | ausrollbar | - |
 
 Phase 1 lohnt sich auch allein (Trenngrund, Ymodem-Abbruch) und ist die Grundlage für alles Weitere.

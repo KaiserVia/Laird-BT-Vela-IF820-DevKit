@@ -213,7 +213,10 @@ extern void bt_sniff_poll (void);         // nicht-blockierendes Nachlesen - 1x 
 // (6 = 7,5 ms), L = Slave-Latenz, O = Supervision-Timeout in 10-ms-Schritten (190 hex = 4 s). 0 = abgeschaltet.
 // 5.126: AUS (0). Mit 5.125 (=1) scheiterte BLE auf Board 26SC9983 in allen 8 Versuchen (kein C-Event auf RS232, kein PIN-Prompt);
 // Ursache offen, mit 5.124 lief BLE. Erst mit 0 pruefen, ob BLE wieder laeuft, dann ggf. wieder auf 1 stellen.
-#define BT_UCP_ENABLE   0
+// 5.132: wieder AN (1). Das Scheitern von 5.125 auf 26SC9983 lag am 5.127-Fehler (UART1 im Leerlauf aus, BLE auf B auch
+// mit 5.126 ohne /UCP tot); Phase 0 (Frage 5, 2026-11-02) zeigte: /UCP zwischen C und Abo wirkt (CU vor dem Abo).
+// Zusaetzlich sendet bt_conn_update() nicht mehr, wenn der CYSPP-Pin schon LOW ist.
+#define BT_UCP_ENABLE   1
 #define BT_UCP_I        6          // Wunschintervall, 1,25 ms je Schritt
 #define BT_UCP_CMD_TAIL ",I=6,L=0,O=190\r"
 extern void bt_transfer_echo (void);      // BLE-CYSPP-Transfer-Test: CRC/Seq-Frames empfangen+ACK - Testmenue
@@ -236,6 +239,10 @@ extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH t
 #define BT_CYSPP_SM      1
 extern void bt_sm_hide (void);            // main.c: frueh im Hochlauf
 extern void bt_sm_minute (void);          // measure.c: Minutentakt (Sicherheitsnetz)
+extern void bt_sm_lock (void);            // 5.132: sicom.c firmware(): unsichtbar waehrend des Updates (Haupt-Thread)
+extern void bt_sm_unlock (void);          // 5.132: firmware() ohne Neustart beendet
+extern void bt_sm_gsm_lock (void);        // 5.132: hard.c uart1_request(MUX_GSM), thread-tauglich
+extern void bt_sm_gsm_unlock (void);      // 5.132: hard.c uart1_release(), Rueckkehr in den Leerlauf
 #define BT_MODULE_ON     ((PINMODE3&PULLDOWN)==PULLDOWN)   // 5.130: Modul versorgt (measure.c schaltet es nach BT_TIMEOUT per Pull-up ab)
 extern uchar bt_state, bt_transport;
 extern uint  bt_conn_interval, bt_dis_reason;

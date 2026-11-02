@@ -5623,3 +5623,39 @@ greift weiter. Phase 3 (GESPERRT waehrend LTE/Update/Flash, `/UCP` vor dem Abo) 
 
 **Geaenderte Dateien:** btio.c, btio.h, main.c, measure.c, sprachen/sictxt.c (-> 5.131); `Doku/tools/cyspp_phase0.py`
 (Frage 7, Option `--start`, `--ohne-sap`).
+
+## Update 5.132 (TEST, 2026-11-02): Phase 3 der CYSPP-Zustandsmaschine - GESPERRT bei Update und GSM, /UCP wieder an
+
+**Ziel:** Das Geraet ist unsichtbar, solange die Firmware einen BT-Kunden nicht bedienen kann (bisher: verbindbar, aber
+taub), und fordert vor dem Oeffnen des BLE-Datenkanals ein kurzes Verbindungsintervall an.
+
+**Aenderung:**
+- **Firmware-Update ueber RS232/USB** (`firmware()`, sicom.c, Haupt-Thread): `bt_sm_lock()` vor `xmodem_receive()`
+  (`/AX`, `SBTP C=0` per `bt_command()`), `bt_sm_unlock()` am Ende, falls kein Neustart folgt (Abbruch, Fehler, "n").
+  Nach erfolgreichem Update startet nur der LPC neu, das Modul bleibt verborgen -> `bt_sm_boot_done()` macht es bei
+  `FIRM_UP_RES` immer sichtbar (bei laufender BT-Verbindung, also Update ueber BT, spaeter per Minutentakt). Nicht
+  gesperrt wird bei einem Update ueber BT (`BT_LINK`), die Verbindung bleibt wie bisher.
+- **GSM/LTE haelt UART1** (`uart1_request(MUX_GSM)`, hard.c, auch aus dem GSM-/MQTT-Thread): `bt_sm_gsm_lock()` schreibt
+  `/AX` und `SBTP C=0` direkt auf UART1 (`bt_raw()`, ohne `connect`/`putb()`/`bt_command()`, die nicht thread-sicher
+  sind), solange der Owner noch `MUX_NONE` ist - die Antworten landen per ISR-Weiche in `rbuf1` und werden von
+  `bt_sniff_poll()` geleert. `uart1_release()` ruft nach der Rueckkehr in den Leerlauf `bt_sm_gsm_unlock()` (`SBTP C=1`,
+  `/A`). Nur aus dem Leerlauf: Ist BT verbunden, wird BT wie bisher verdraengt, nicht gesperrt. Die Zustandszeile kommt
+  ueber `bt_sm_note` aus dem Haupt-Thread.
+- **`/UCP` vor dem Abo** (5.125-Code): `BT_UCP_ENABLE` wieder 1. Das Scheitern von 5.125 auf Board B lag am 5.127-Fehler
+  (BLE auf B damals auch ohne /UCP tot); Phase 0 Frage 5 zeigte, dass `/UCP` zwischen `C` und Abo wirkt. Neu:
+  `bt_conn_update()` sendet nicht, wenn der CYSPP-Pin schon LOW ist (Kanal offen, `communication_change()` noch nicht
+  gelaufen - sonst kaeme `/UCP` als Nutzdaten an) und nicht neben einem GSM-Thread.
+- Nicht umgesetzt: Sperre waehrend langer Flash-Schreibvorgaenge (Werks-/Testfunktionen, selten).
+
+**Test am Geraet (Board B 26SC9983, 13:05-13:07, gezielt):**
+- Update ueber RS232 (`flash_xmodem.py`) mit BLE-Scan: vorher sichtbar, **waehrend der Uebertragung unsichtbar**,
+  nach dem Neustart sichtbar.
+- Modem-Terminal (Testmenue, Strg+W, 7, 1, 2; Modem antwortet nicht, F18001 nach ca. 18 s): `[BT-Zustand] AUS (gesperrt:
+  GSM haelt UART1)`, BLE-Scan **unsichtbar**, danach `BEREIT (GSM beendet, sichtbar)`, Scan sichtbar.
+- `/UCP`: am Testplatz nicht ausloesbar (Windows verbindet immer mit 7,5 ms, `I=0006`, dann waere /UCP unnoetig).
+- Kurzprofil (13:07-13:23, Bericht `Doku/tools/Testreports/2026-11-02_13-07-26_26SC9983_testlauf/`): nightly,
+  reboot-check, power-sweep, boot-race, bt-update bestanden, gsm-mux uebersprungen. boot-race: **beide Erstversuche
+  (2 s und 8 s) bestanden** (mit 5.128: 0 von 12). bt-update ueber Classic: Verbindung ueberlebt den Neustart, danach
+  BLE normal verbindbar.
+
+**Geaenderte Dateien:** btio.c, btio.h, hard.c, sicom.c, sprachen/sictxt.c (-> 5.132).

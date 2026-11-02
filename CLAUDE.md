@@ -59,6 +59,8 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-02 - 5.132 (TEST), Phase 3:** unsichtbar auch waehrend Firmware-Update ueber RS232/USB und solange GSM
+  UART1 haelt; `/UCP` vor dem Abo wieder an (`BT_UCP_ENABLE` 1). Details `sism555/project-status.md`, Update 5.132.
 - **2026-11-02 - 5.131 (TEST), Phase 2:** IF820 im Hochlauf unsichtbar (`/AX` + `SBTP C=0` ca. 3,7 s nach dem
   Einschalten, `/A` + `SBTP C=1` am Ende, nur RAM, Flash bleibt `E=2`), Schalter `BT_CYSPP_SM` in btio.h. Phase 3
   (GESPERRT bei LTE/Update/Flash, `/UCP` vor dem Abo) offen. Details `sism555/project-status.md`, Update 5.131.
