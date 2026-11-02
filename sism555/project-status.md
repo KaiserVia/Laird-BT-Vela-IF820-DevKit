@@ -5378,3 +5378,81 @@ Alle 104 Testreports (01.09.-22.10., 5,7 GB) maschinell ausgewertet (`Doku/tools
 **Offen:** Board B und Board A mit 5.127 pruefen (A: keine Verschlechterung, module-suite inkl. Download); Wirkung bei LTE-Boards (GSM-Sitzung -> Rueckkehr in den aktiven Leerlauf); Doku `Doku/UART1_Owner_StateMachine.md` (Zustand NONE) nachgezogen. Status TEST: erst nach den Pruefungen als regulaere Version betrachten.
 
 **Geaenderte Dateien:** hard.c, sprachen/sictxt.c (-> 5.127).
+
+## Testlauf am Tisch 2026-11-02 (Board B 26SC9983, Firmware 5.127): zwei neue Fehler mit derselben Ursache
+
+Neue automatische Tests (`Doku/tools/ble_mainboard_test.py`, Modi `nightly`, `reboot-check`, `power-sweep`, ...;
+Gesamtablauf `Doku/tools/bt_testlauf.py`, Anleitung `Doku/tools/bt_testlauf_Anleitung.md`). Board B an RS232 (COM3),
+Versorgung ueber Relais 2 (COM7), nur BLE (B ist in Windows nicht fuer Classic gekoppelt).
+
+**Fehler 1 - BT tot nach dem naechtlichen Neustart um 3:15 (BEWIESEN):** `nightly` stellt die Uhr auf 03:13:30, die
+Firmware startet um 03:15 neu (`BOOTTASK`, rtc.c, Protokolleintrag `I7 Reboot;..;03:15:00`). Danach 3 von 3 Mal BLE
+tot: verbunden, kein PIN-Prompt, Trennung, **kein einziges `[BT-Event]`** (das Modul kann nichts an den LPC senden).
+Gegenprobe nach Stromzyklus 3 von 3 bestanden. Ursache: Der Zweig `i_reset==BOOT_RES` in main.c ist leer; weder
+`test_BT()` noch `init_bluetooth()` laufen, also auch kein `uart1_release()`, das seit 5.127 den BT-UART im
+Leerlauf aktiv laesst. UART1 bleibt aus, das IF820 sieht CTS dauerhaft HIGH (wie vor 5.127 auf B und C).
+**Folge im Feld: jedes Geraet verliert jede Nacht um 3:15 Bluetooth bis zum naechsten Stromzyklus** (LTE-Geraete
+eventuell bis zur naechsten GSM-Sitzung, die UART1 wieder freigibt). Nach dem Reboot kommt auf RS232 kein Banner.
+
+**Fehler 2 - BT tot nach 1 s Stromunterbrechung:** `power-sweep` (je 2 Mal): 0,05 / 0,1 / 0,2 / 0,5 s bestanden
+(Geraet ueberbrueckt die Luecke, kein Neustart sichtbar), **1 s 0 von 2** (kein Banner, kein `[BT-Event]`),
+2 / 5 / 10 / 30 s bestanden (sauberer Neustart mit Banner nach ca. 29 s). Bei 1 s startet der LPC neu (RS232
+antwortet nach 20 s wieder), aber ohne Einschalt-Banner. Wahrscheinlich ein Brown-out-Reset: In `RSID` ist weder
+POR noch WDTR gesetzt, main.c behandelt diesen Fall nicht -> wie Fehler 1 kein BT-Start. (Brown-out nicht direkt
+nachgewiesen; das Geraeteprotokoll ist nicht eindeutig, weil die Uhr ohne Strom stehenbleibt.)
+
+**Fehler 3 - Verbinden waehrend des Hochlaufs legt BT bis zum naechsten Stromzyklus lahm (BEWIESEN, kundenrelevant):**
+`boot-race` (Stromzyklus 10 s, dann ein BLE-Versuch 1/2/3/5/8/12 s nach dem Einschalten, bei Fehlschlag Folgeversuch
+10 s spaeter; je 2 Mal): Erstversuch 0 von 12 (erwartbar, das Banner kommt erst nach ca. 29 s), **Folgeversuch 7 von
+12 gescheitert**. RS232-Mitschnitt (z. B. Schritt 5 s): Das IF820 wirbt sofort nach dem Einschalten, der PC verbindet,
+das Modul geht in den Datenmodus. Der Hochlauf (`main.c`, POR-Zweig) ruft `test_BT()` -> `/PING` bleibt im Datenmodus
+unbeantwortet -> `fp.btmodem=0; init_bluetooth()` -> Baud-Scan ohne Antwort ("no IF820 found") -> Fallback-Erkennung
+Laird (`AT&F1`) und RN4678 (`$$$`), **diese Befehle gehen als Nutzdaten an die verbundene Gegenstelle** -> `I11016`,
+`I11017`, **`F11010 BT Modul nicht konfiguriert`**. Danach meldet die Firmware keine Verbindung mehr (kein PIN-Prompt,
+kein `[BT-Event]`). Erst der naechste normale Hochlauf erkennt das Modul wieder (`fp.btmodem==0` -> `init_bluetooth()`).
+Folge im Feld: Wer die App sofort nach dem Einschalten verbindet (Techniker beim Aufbau), hat bis zum naechsten
+Stromzyklus kein Bluetooth. Gelang der Folgeversuch, lag der Erstversuch offenbar nach `test_BT()`.
+**Vorschlag:** Beim Hochlauf mit bekanntem IF820 (`fp.btmodem==IF820` aus dem Flash) bei aktiver Verbindung (CYSPP/
+`BT_LINK` LOW, `comstate`) KEINE Neuerkennung, `fp.btmodem` behalten; Laird/RN4678-Fallback nie bei aktiver Verbindung.
+
+**`gsm-mux` auf B nicht aussagekraeftig:** Das LTE-Modem antwortet nicht (`F18001 GSM-Fehler in libtool` nach 18 s),
+das Modem-Terminal oeffnet sich nie. Ob Modem, Antenne oder SIM fehlen, ist offen. Der Test meldet den Fall jetzt
+als "uebersprungen".
+
+**Bestanden:** `reboot-check` mit 0,1 s Unterbrechung und 10 s Stromzyklus je 3 Mal, danach je 2 BLE-Smokes.
+`bt-timeout` (BLE): Das Geraet trennt nach 415,8 s ohne Eingabe (erwartet 360-420 s). **Danach ist es bis zu 1 min
+nicht auffindbar:** measure.c schaltet das Modul nach dem Zeitlimit ab (`PINMODE3` Pull-up) und erst beim naechsten
+Minutentakt wieder ein. 35 s nach der Trennung "nicht gefunden", nach ca. 1,5 min wieder Smoke bestanden. Gewolltes
+Verhalten, fuer Kunden aber spuerbar (App nach 6 min Leerlauf getrennt, Wiederverbinden erst nach bis zu 1 min).
+Der Test wartet jetzt 90 s (`--timeout-recover`) vor der Pruefung.
+
+**Vorschlag 5.128:** Am Ende des Hochlaufs in main.c fuer alle Reset-Arten bei `fp.btmodem==IF820` den BT-UART in den
+Leerlauf-Zustand bringen (`uart1_release()` mit Owner `MUX_NONE` bzw. `test_BT()`). Behebt beide Fehler.
+
+**Nebenbefund Testwerkzeug (behoben):** Nach der Protokollausgabe fragt die Firmware "Daten loeschen (j/n)?"; das
+Skript antwortet jetzt ausdruecklich mit `n` (vorher nicht beantwortet, geloescht wurde nichts).
+
+## Update 5.128 (TEST, 2026-11-02): BT nach jedem Reset starten, keine BT-Neuerkennung bei aktiver Verbindung
+
+**Symptom:** Fehler 1 bis 3 aus "Testlauf am Tisch 2026-11-02" (BT tot nach 3:15-Reboot, nach 1 s Stromunterbrechung,
+nach Verbinden waehrend des Hochlaufs).
+
+**Fix 1+2 (main.c, Ende des Hochlaufs):** `if ((fp.btmodem==IF820) && (uart1_owner==MUX_NONE)) uart1_release(MUX_NONE);`
+fuer jede Reset-Art. `uart1_release()` laesst seit 5.127 den BT-UART im Leerlauf aktiv (RTS LOW). Bisher erreichten
+nur der POR-Zweig (`test_BT()`) und ein Watchdog-Reset mit GSM diesen Zustand; Reboot (`BOOTTASK`), Brown-out (in
+main.c nur protokolliert) und Watchdog ohne GSM liessen UART1 aus. Greift nur, wenn UART1 niemandem gehoert (nach
+Firmware-Update gehoert er BT, GSM wird nicht verdraengt).
+
+**Fix 3 (btio.c, main.c):** Neu `bt_link_busy()` (CYSPP/IC54 Bit7 LOW und nicht selbst getrieben = Modul im
+Datenmodus) und `bt_link_busy_wait(ms)`. Hochlauf (POR-Zweig): antwortet ein gespeichertes IF820 nicht auf `/PING`,
+wird bis zu 3 s auf eine aktive Verbindung geprueft; ist sie da, bleibt `fp.btmodem=IF820`, keine Neuerkennung, die
+Verbindung wird ueber `comchange` normal angenommen (PIN-Prompt). `init_bluetooth()` bricht bei aktiver Verbindung
+sofort ab ("BT init skipped: connection active") - nie mehr Laird/RN4678-Befehle in eine laufende Verbindung.
+
+**Test (Board B, `bt_testlauf.py --profil kurz`, 2026-11-02 07:51-08:04, nur BLE):** `nightly` 1/1 (vorher 0/3),
+`reboot-check` dropout 1/1 und power 1/1, `power-sweep` 0,1 / 1 / 10 s je 1/1 (1 s vorher 0/2), `boot-race` 2 s und
+8 s je Folgeversuch bestanden (vorher F11010). Der Erstversuch in den ersten ca. 30 s scheitert weiterhin (die
+Firmware ist dann noch im Hochlauf); entscheidend ist, dass BT danach nicht mehr dauerhaft ausfaellt.
+`gsm-mux` uebersprungen (Modem antwortet nicht). Bericht: `Doku/tools/Testreports/2026-11-02_07-51-21_26SC9983_testlauf/`.
+
+**Geaenderte Dateien:** main.c, btio.c, btio.h, sprachen/sictxt.c (-> 5.128).

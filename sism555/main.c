@@ -165,6 +165,8 @@ int main (void)
 		 if (fp.btmodem==IF820) bt_release();	// CYSPP (IC54 Bit7) auf Eingang -> Modul kann Leitung fuer SPP-Connect treiben
 		 									// (PCA9554 haelt sein Register ueber Reflash; sonst bleibt CYSPP evtl. als Ausgang HIGH haengen)
 		 if (test_BT())	interfaces|=BT_LINK;		// Modem antwortet?
+		 else if ((fp.btmodem==IF820) && bt_link_busy_wait(3000))	// 5.128: antwortet nicht, weil schon verbunden
+		  interfaces|=BT_LINK;                    // (Datenmodus) -> IF820 behalten, KEINE Neuerkennung (siehe btio.c)
 		 else {                                     // BT antwortet nicht (z. B. geaenderte Zielbaud)
 		   fp.btmodem=0; init_bluetooth();         // -> neu erkennen (Zwei-Baud) + ggf. auf IF820_BAUD umstellen
 		   if (fp.btmodem) interfaces|=BT_LINK; else syserror++; } }	
@@ -245,6 +247,11 @@ int main (void)
 	else t_amp_en=20;
  } // end if kein deep sleep reset			
  
+ // 5.128: IF820 - BT-UART nach JEDER Reset-Art in den Leerlauf-Zustand (aktiv, RTS LOW, siehe uart1_release()).
+ // Bisher nur ueber test_BT()/init_bluetooth() im POR-Zweig: nach Reboot (BOOTTASK 3:15), Watchdog ohne GSM und
+ // Brown-out blieb UART1 aus -> IF820 sah CTS HIGH, BT tot bis zum Stromzyklus (Testlauf 2026-11-02).
+ if ((fp.btmodem==IF820) && (uart1_owner==MUX_NONE)) uart1_release(MUX_NONE);
+
  if (!(RSID&(POR|WDTR|EXTR))) protocol(BROWNOUT_ERROR);	// Brownout reset
   
  RSID|=RSID;									// Reset Identifikationsregister zur�ck setzen

@@ -1098,14 +1098,37 @@ static int bt_scan_ping (uint32_t baud)   // 1 = "/PING,0000" gesehen, sonst 0
  return (strstr(buf,"/PING,0000")!=0) ? 1 : 0;
 }
 
+// 5.128: Laeuft eine BT-Verbindung (CYSPP/IC54 Bit7 LOW = Modul im Datenmodus, die Leitung zieht das Modul selbst)?
+// Dann beantwortet das IF820 keine Befehle. Testlauf 2026-11-02 (boot-race): Verbinden in den ersten ~30 s nach dem
+// Einschalten -> /PING beim Hochlauf scheitert -> Neuerkennung scheitert -> Laird/RN4678-Fallback sendet AT&F1/$$$ als
+// Nutzdaten an die Gegenstelle -> F11010, BT bis zum Stromzyklus tot.
+bool bt_link_busy (void)
+{
+ int st=get_com_status();
+ return ((st>=0) && !bt_cyspp_out && !(st&BT_LINK));   // BT_LINK ist low aktiv
+}
+
+bool bt_link_busy_wait (uint ms)   // wie bt_link_busy(), aber bis zu ms warten: der Central abonniert oft erst nach 1-2 s
+{
+ uint t;
+ for (t=0; t<=ms; t+=250)
+ {
+  if (bt_link_busy()) return(TRUE);
+  osDelay(250); ResetWDT();
+ }
+ return(FALSE);
+}
+
 void init_bluetooth (void)		// Bluetooth Modem initialisieren
-{ 		
- int32_t result=0;	
- uint32_t pin=0; uint32_t detbaud=0;	
+{
+ int32_t result=0;
+ uint32_t pin=0; uint32_t detbaud=0;
  uint8_t retry=4;
-	
- ResetWDT(); 
+
+ ResetWDT();
  if (uart1_owner==MUX_GSM) return;      // UART1 gerade von GSM belegt -> nicht stoeren (Konfliktschutz)
+ if (bt_link_busy())                    // 5.128: Verbindung aktiv -> Erkennung unmoeglich, Fallback wuerde in die Verbindung senden
+ { newline(); putln(" BT init skipped: connection active (disconnect first)"); return; }
  { uint sp=atoi(fp.serno+4);                // keine gueltige Seriennummer? -> BT-Name/PIN unmoeglich
    if (!isdigit((int)fp.serno[0]) || !sp)   // FRUEH erkennen, bevor das Modul angefasst wird
    { newline(); dtcerr(DTC_BT_NO_SERIAL); newline(); return; } }

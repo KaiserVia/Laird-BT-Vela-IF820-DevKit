@@ -165,6 +165,8 @@
 extern bool Init_BT_ch (uint baudrate);	// Konfiguriere uart1 und setze MUX Kanal auf BT modem
 extern bool bt_command (text * command, text * answer, int pause); // Bluetooth Kommando senden, Antwort empfangen
 extern void init_bluetooth (void);			// Bluetooth Modem initialisieren
+extern bool bt_link_busy (void);          // 5.128: CYSPP LOW -> Verbindung aktiv, Modul im Datenmodus (keine Befehle)
+extern bool bt_link_busy_wait (uint ms);  // 5.128: dto., bis zu ms warten
 extern bool test_BT	(void);							// Pr�fe ob BT Modul antwortet
 extern void send_bt_info (void);				// Bluetooth Informationen ausgeben
 extern void set_bt_name (void);					// Setze Bluetooth device (friendly) name

@@ -59,6 +59,10 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-02 - Testlauf am Tisch (Board B, 5.127), drei Fehler:** BT tot nach dem naechtlichen Neustart 3:15
+  (`BOOTTASK`, Reboot-Zweig in main.c startet BT nicht), nach 1 s Stromunterbrechung (vermutlich Brown-out-Reset) und
+  nach Verbinden waehrend der ersten ca. 30 s (Neuerkennung bei aktiver Verbindung -> F11010). Werkzeug:
+  `sism555/Doku/tools/bt_testlauf.py` + Anleitung. Details: `sism555/project-status.md`, "Testlauf am Tisch 2026-11-02".
 - **2026-10-29 abends - 5.127 (TEST):** Ursache für B/C gefunden: `uart1_release()` schaltete UART1 im Leerlauf ab, das IF820 sah CTS dauerhaft HIGH und hing beim CYSPP-CCCD-Write. 5.127 lässt UART1 beim IF820 im Leerlauf aktiv. Board C (26SC9994): BLE 4/4, Classic 2/2 bestanden, Gegenprobe 5.126 gescheitert. Board B (26SC9983): BLE 4/4 bestanden. Offen: Classic auf B (neu koppeln), Board A mit 5.127 prüfen. Details: `sism555/project-status.md`, Update 5.127.
 - **2026-10-29:** Board A (99SC9923) mit 5.126 nach Power-Cycle stabil (module-suite bestanden). Boards B (26SC9983) und C (26SC9994) scheitern mit BLE und Classic (auch mit 5.99; Modul beantwortet CYSPP-CCCD nicht, nie ein `[BT-Event]`); Firmware-Regression ausgeschlossen, Ursache offen (Windows-Bond? Hardware?). C steht auf 5.99. Details: `sism555/project-status.md`, `sism555/Doku/Uebersicht.md`. Neue Werkzeuge: `Doku/tools/flash_xmodem.py`, `relay_power.py`, `--sniff`.
 

@@ -24,7 +24,7 @@ const char sense_tab[5]={6,4,2,0,1};			// Kanalauswahl MUX IC14 und IC19 Signalv
 // Nicht zu übersetzende Textarrays
 text T_nil[]							=	"";					// not in list Zeiger
 text T_viasis[]						= "VIASIS";		// als const char wg. USB Treiber Verzeichnisname etc.
-text T_version[8]					= "5.127";			// 5.127 (TEST): IF820-UART1 im Leerlauf aktiv lassen (RTS LOW) statt abschalten; 5.126: /UCP (BT_UCP_ENABLE) wieder aus, BLE scheiterte mit 5.125 auf 26SC9983; 5.125: BLE-Verbindungsintervall per /UCP anfordern; vorher: Programmvariante jetzt immer mit viaspeedcam parameter einstellbar, sc Varianten entfallen
+text T_version[8]					= "5.128";			// 5.128 (TEST): BT-UART nach jeder Reset-Art aktiv (3:15-Reboot, Brown-out), keine BT-Neuerkennung bei aktiver Verbindung; 5.127 (TEST): IF820-UART1 im Leerlauf aktiv lassen (RTS LOW) statt abschalten; 5.126: /UCP (BT_UCP_ENABLE) wieder aus, BLE scheiterte mit 5.125 auf 26SC9983; 5.125: BLE-Verbindungsintervall per /UCP anfordern; vorher: Programmvariante jetzt immer mit viaspeedcam parameter einstellbar, sc Varianten entfallen
 text T_symgr1[3][SYGLEN] 	= {"30,50,60", "70,80,!", "Smileys"};
 text T_defsym[NOSYM][4]		= {"30","50","60","70","80","!",":-(",":-)"};
 text T_uall[2][5]					= {"km/h","mph"};

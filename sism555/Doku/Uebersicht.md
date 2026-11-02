@@ -33,6 +33,13 @@
 ## Werkzeuge neu (2026-10-29)
 - `tools/flash_xmodem.py --port COM3 --bin <datei>`: Flash per RS232/USB (3, Strg+U, XMODEM-1K, y). `tools/relay_power.py zyklus 10` (Relais COM7): Stromzyklus. `ble_mainboard_test.py --sniff`: nRF52840-Mitschnitt (Plan: `Plan_BLE_Sniffer_nRF52840.md`). Bei `--address` immer `--pin` angeben (Seriennummer ohne `SC`).
 
+## NEU 2026-11-02: Testlauf am Tisch, drei Fehler gefunden (Board B, 5.127)
+Automatischer Testlauf: `tools/bt_testlauf.py` (Anleitung `tools/bt_testlauf_Anleitung.md`, Doppelklick `tools/bt_testlauf.bat`).
+1. **BT tot nach dem naechtlichen Neustart um 3:15** (3/3, Gegenprobe Stromzyklus 3/3 ok). Jedes Geraet im Feld, jede Nacht.
+2. **BT tot nach 1 s Stromunterbrechung** (2/2; 0,05-0,5 s und 2-30 s ok). Vermutlich Brown-out-Reset, den main.c nicht behandelt.
+3. **Verbinden in den ersten ca. 30 s nach dem Einschalten legt BT bis zum naechsten Stromzyklus lahm** (F11010; dabei gehen `AT&F1`/`$$$` als Daten an die Gegenstelle).
+1 und 2: der BT-UART wird nur nach echtem Einschalten/Watchdog gestartet. 3: Neuerkennung bei aktiver Verbindung. Details und Vorschlag 5.128: `project-status.md`, "Testlauf am Tisch 2026-11-02".
+
 ## Plan fuer Montag (vereinbart 2026-10-30)
 1. **Abnahme 5.127:** module-suite auf Board A (inkl. Download BLE+Classic); B in Windows neu koppeln, Classic-Smoke auf B; optional LTE-Sitzung auf B ausloesen, danach BLE verbinden.
 2. Stand taggen (z. B. `bt-5.127`) als Referenz.

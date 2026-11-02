@@ -4346,7 +4346,7 @@ async def run_fast_suite(args) -> int:
 # ---------------------------------------------------------------------------
 
 RELAY = None                          # PowerRelay; wird bei Programmende immer auf "Strom an" gesetzt
-BOOT_BANNER_RE = re.compile(r"Version \d+\.\d+")
+BOOT_BANNER_RE = re.compile(r"Version \d+\.\d+\s*$")   # Einschaltmeldung; die Info-Seite haengt ", V2" an (kein Treffer)
 DTC_RE = re.compile(r"\b[FWI]1\d{4}\b")
 
 
@@ -4407,13 +4407,14 @@ async def wait_capture(capture: list | None, pattern: re.Pattern, t0: float, tim
         return None
     deadline = t0 + timeout
     seen = 0
-    while time.monotonic() < deadline:
+    while True:                                   # mindestens ein Durchlauf, auch wenn die Frist schon vorbei ist
         for when, text in capture[seen:]:
-            if pattern.search(text):
+            if when >= t0 and pattern.search(text):
                 return round(when - t0, 2)
         seen = len(capture)
+        if time.monotonic() >= deadline:
+            return None
         await asyncio.sleep(0.1)
-    return None
 
 
 async def wait_boot(args, capture: list | None, t_on: float) -> dict:
@@ -4471,6 +4472,7 @@ async def run_smoke_single(args) -> int:
 async def bt_step_checks(args, phase, label: str, step: dict, capture, classic: bool, ble_count: int = 1) -> bool:
     """BLE-Smoke (ble_count Mal) und optional Classic-Smoke; Ergebnisse und [BT-Event]-Zahl in step. True = alles bestanden."""
     since = time.monotonic()
+    classic = classic and not args.no_classic
     step["ble"] = [await phase(f"{label} BLE {n}", "ble", run_smoke_test, hold=args.step_hold)
                    for n in range(1, ble_count + 1)]
     if classic:
@@ -4487,6 +4489,8 @@ def power_summary(result: dict, key: str) -> None:
     """Erfolg je Wert von key (z. B. Stromlos-Zeit) ins Log und nach result['summary']."""
     summary = {}
     for step in result["steps"]:
+        if step.get("result") == "skipped":
+            continue
         entry = summary.setdefault(str(step[key]), {"ok": 0, "fehler": 0})
         entry["ok" if step["result"] == "passed" else "fehler"] += 1
     result["summary"] = summary
@@ -4727,8 +4731,12 @@ async def rs232_read_protocol() -> str | None:
             await asyncio.sleep(0.2)
         text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
         if MARK_WERET in text:
+            channel.rx.clear()
             await channel.write(b"x")                     # keine weitere Seite
-        channel.rx.clear()
+        # put_protocol() fragt danach "Daten loeschen (j/n)?" - immer ausdruecklich NEIN (beobachtet 2026-11-02)
+        if await channel.rx.wait_for_marker(MARK_DELETE_DATA, 4.0) or MARK_DELETE_DATA in text:
+            channel.rx.clear()
+            await channel.write(b"n")
         await channel.rx.wait_for_marker(MARK_INFO_RANGE, 8.0)
         await channel.write(b"9")
         await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
@@ -4778,6 +4786,15 @@ async def run_nightly(args) -> int:
             ok = False
         rs232_capture_stop()
         await rs232_set_time(datetime.now().strftime("%H:%M:%S"))
+        if not ok and RELAY is not None:
+            # --nightly-recover: Stromzyklus, damit der naechste Durchlauf von einem funktionierenden BT ausgeht
+            capture = rs232_capture_start()
+            await asyncio.to_thread(RELAY.cycle, args.power_off)
+            await wait_boot(args, capture, time.monotonic())
+            step["recover"] = await phase(f"{label} nach Stromzyklus", "ble", run_smoke_test, hold=args.step_hold)
+            rs232_capture_stop()
+            await rs232_set_time(datetime.now().strftime("%H:%M:%S"))
+            log(f"Gegenprobe nach Stromzyklus: {step['recover']}.")
         result["steps"].append(step)
         if not ok:
             failures += 1
@@ -4818,6 +4835,18 @@ async def run_gsm_mux(args) -> int:
             step["modem_text"] = text[-300:]
             step["modem_error"] = bool(DTC_RE.search(text))
             log(f"Modem-Terminal {'offen' if entered and not step['modem_error'] else 'NICHT sauber geoeffnet'}.")
+            if not entered or step["modem_error"]:
+                # Modem antwortet nicht (z. B. F18001 auf 26SC9983, 2026-11-02): Firmware ist zurueck im Werksmenue,
+                # der MUX stand nie dauerhaft auf GSM -> Schritt sagt nichts aus
+                await channel.write(b"8")
+                await asyncio.sleep(1.0)
+                await channel.write(b"H")
+                step["main_menu_back"] = await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
+                step["result"] = "skipped"
+                log("Modem antwortet nicht - Schritt uebersprungen (kein Fehler des BT-Teils).")
+                rs232_capture_stop()
+                result["steps"].append(step)
+                continue
             step["during"] = await phase(f"{label} BLE waehrend GSM", "ble", run_smoke_single, hold=args.step_hold)
             await asyncio.sleep(max(0.0, args.gsm_hold - args.gsm_settle))
             channel.rx.clear()
@@ -4840,6 +4869,8 @@ async def run_gsm_mux(args) -> int:
     power_summary(result, "method")
     pc_events_export()
     result["result"] = "passed" if failures == 0 else "failed"
+    if result["steps"] and all(s.get("result") == "skipped" for s in result["steps"]):
+        result["result"] = "skipped"
     write_suite_report("gsm-mux", result, "VIASIS BT nach UART1-MUX auf GSM",
                        f"Modem-Terminal (GSM) {args.gsm_hold:g} s offen, {args.repeat} Mal.")
     return 0 if failures == 0 else 1
@@ -4887,7 +4918,10 @@ async def run_bt_timeout(args) -> int:
         in_window = disconnected_s is not None and 300 <= disconnected_s <= 440
         log(f"Trennung durch das Geraet: {'nach ' + str(disconnected_s) + ' s' if disconnected_s else 'KEINE'}"
             f" ({'im erwarteten Fenster 360-420 s' if in_window else 'ausserhalb des Fensters'}).")
-        await asyncio.sleep(5.0)
+        # Nach dem Zeitlimit schaltet measure.c das Modul ab (PINMODE3 Pull-up) und erst beim naechsten Minutentakt
+        # wieder ein -> bis zu 60 s nicht auffindbar (beobachtet 2026-11-02). Erst danach pruefen.
+        log(f"Warte {args.timeout_recover:g} s (Modul nach dem Zeitlimit bis zu 1 min aus) ...")
+        await asyncio.sleep(args.timeout_recover)
         ok = await bt_step_checks(args, phase, label, step, capture, classic=True, ble_count=1)
         if not in_window:
             step["result"] = "timeout_not_seen"
@@ -5175,14 +5209,20 @@ def main() -> int:
     p.add_argument("--dropout", type=float, default=0.1, help="[reboot-check] Dauer der kurzen Unterbrechung in s")
     p.add_argument("--power-off", type=float, default=10.0, help="[reboot-check] Stromlos-Zeit der Methode power")
     p.add_argument("--checks", type=int, default=2, help="[reboot-check/nightly/gsm-mux/bt-update] BLE-Smokes je Schritt")
+    p.add_argument("--no-classic", action="store_true",
+                   help="[Strom-/Neustart-/Tisch-Modi] keine Classic-Smokes (z. B. Geraet in Windows nicht gekoppelt)")
     p.add_argument("--nightly-set", default="03:13:30",
                    help="[nightly] Uhrzeit, auf die die Geraeteuhr gestellt wird (Neustart um 03:15, rtc.c)")
+    p.add_argument("--nightly-recover", action="store_true",
+                   help="[nightly] nach einem Fehlschlag Stromzyklus ueber das Relais und Gegenprobe (BLE-Smoke)")
     p.add_argument("--nightly-margin", type=float, default=45.0,
                    help="[nightly] Sekunden nach 03:15, bis der Neustart als erfolgt gilt und geprueft wird")
     p.add_argument("--gsm-settle", type=float, default=20.0, help="[gsm-mux] Wartezeit nach dem Oeffnen des Modem-Terminals")
     p.add_argument("--gsm-hold", type=float, default=60.0, help="[gsm-mux] Sekunden im Modem-Terminal (MUX auf GSM)")
     p.add_argument("--timeout-wait", type=float, default=480.0,
                    help="[bt-timeout] max. Wartezeit ohne Eingabe; erwartet wird die Trennung nach 360-420 s")
+    p.add_argument("--timeout-recover", type=float, default=90.0,
+                   help="[bt-timeout] Wartezeit nach der Trennung bis zur Pruefung (Modul ist bis zu 60 s aus)")
     args = p.parse_args()
 
     if args.mode in ("smoke", "transfer"):
@@ -5236,9 +5276,13 @@ def main() -> int:
         return asyncio.run(run_idle_latency_test(args))
     if args.mode == "receive":
         return asyncio.run(run_receive_test(args))
-    if args.mode in ("power-sweep", "boot-race", "reboot-check"):
+    bench_tests = {"power-sweep": run_power_sweep, "boot-race": run_boot_race, "reboot-check": run_reboot_check,
+                   "nightly": run_nightly, "gsm-mux": run_gsm_mux, "bt-timeout": run_bt_timeout, "bt-update": run_bt_update}
+    if args.mode in bench_tests:
         global RELAY
-        needs_relay = args.mode != "reboot-check" or any(m in args.reboot_methods for m in ("dropout", "power"))
+        needs_relay = (args.mode in ("power-sweep", "boot-race")
+                       or (args.mode == "reboot-check" and any(m in args.reboot_methods for m in ("dropout", "power")))
+                       or (args.mode == "nightly" and args.nightly_recover))
         if needs_relay:
             try:
                 RELAY = PowerRelay(args.relay_port, args.relay)
@@ -5249,12 +5293,7 @@ def main() -> int:
             register_port(args.relay_port, f"USB-Relais, Relais {args.relay} schaltet die Geraeteversorgung")
         if SNIFFER is None:
             log("WARNUNG: kein RS232-Mitschnitt - Hochlauf wird nur ueber feste Wartezeiten erkannt.")
-        test = {"power-sweep": run_power_sweep, "boot-race": run_boot_race, "reboot-check": run_reboot_check}[args.mode]
-        return asyncio.run(test(args))
-    if args.mode in ("nightly", "gsm-mux", "bt-timeout", "bt-update"):
-        test = {"nightly": run_nightly, "gsm-mux": run_gsm_mux, "bt-timeout": run_bt_timeout,
-                "bt-update": run_bt_update}[args.mode]
-        return asyncio.run(test(args))
+        return asyncio.run(bench_tests[args.mode](args))
     return asyncio.run(run_download_test(args))
 
 
