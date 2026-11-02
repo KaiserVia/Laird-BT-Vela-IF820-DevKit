@@ -5029,9 +5029,19 @@ async def run_bt_update(args) -> int:
                     transport.rx.clear()
                     await transport.write(b"y")
                     t_reboot = time.monotonic()
-                    seen = await transport.rx.wait_for_marker(MARK_PIN_PROMPT, 60.0)
+                    # Nach dem Neustart laeuft die Sitzung weiter (beobachtet 2026-11-02 mit 5.128): die Firmware schickt
+                    # Banner + Hauptmenue ohne neue PIN-Abfrage (Sitzung war schon angemeldet). PIN-Prompt gilt ebenso.
+                    seen = None
+                    while time.monotonic() - t_reboot < 60.0 and seen is None:
+                        if MARK_PIN_PROMPT.encode() in transport.rx.buf:
+                            seen = "PIN-Prompt"
+                        elif MARK_MAIN_RANGE.encode() in transport.rx.buf:
+                            seen = "Hauptmenue"
+                        else:
+                            await asyncio.sleep(0.2)
                     step["prompt_after_reboot_s"] = round(time.monotonic() - t_reboot, 1) if seen else None
-                    log(f"Nach dem Neustart: {'PIN-Prompt ueber dieselbe Classic-Verbindung' if seen else 'KEIN PIN-Prompt ueber Classic'}.")
+                    step["after_reboot"] = seen
+                    log(f"Nach dem Neustart: {seen + ' ueber dieselbe Classic-Verbindung' if seen else 'nichts ueber Classic (Verbindung tot)'}.")
                 else:
                     log("Pruefung des Images nicht 'ok' - kein 'y' gesendet.")
             version = next((m.group(0) for _, t in (capture or []) if (m := BOOT_BANNER_RE.search(t))), None)

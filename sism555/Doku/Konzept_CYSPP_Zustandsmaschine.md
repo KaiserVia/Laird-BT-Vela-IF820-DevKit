@@ -33,6 +33,30 @@ zurückgestellt.
 Bei "Enabled" mit extern HIGH gehaltenem Pin wird der Kanal nie transparent. Die Zustandsmaschine nutzt den Pin
 weiter nur lesend (IC54 Bit 7) und treibt ihn nur beim bewussten Trennen (`bt_disconnect()`).
 
+## 2a. Updates und Rückweg: fail-safe statt dauerhaft umstellen (bevorzugt, 2026-11-02)
+
+Die Modul-Konfiguration im Flash bleibt wie heute (`.CYSPPSP E=2` Autostart, `SAP F=01`). Die neue Firmware schaltet
+bei **jedem** Start nur im RAM des Moduls um (`.CYSPPSP E=1`, `/AX`, `SBTP C=0`, ohne `/SCFG`) und startet das Werben
+mit `.CYSPPSTART`, sobald sie bereit ist. Startet das Modul allein neu (Brown-out, `BT_TIMEOUT`-Abschaltung), gilt
+wieder der Flash-Stand (Autostart); die Firmware erkennt das am `BOOT`-Ereignis und schaltet erneut um.
+
+| Fall | Ergebnis |
+|---|---|
+| Update auf die neue Firmware (RS232, USB, Bluetooth) | läuft; Umschaltung beim ersten Start |
+| Update von einem alten Stand im Feld (z. B. 5.99) | läuft: das Modul hat dort Autostart im Flash, genau davon geht die neue Firmware aus; kein Umstellungsschritt. Das Update selbst führt noch die Update-Routine der alten Firmware aus (unverändert) |
+| Update über Bluetooth | Verbindung überlebt den LPC-Neustart (getestet 2026-11-02, `bt-update`), danach `.CYSPPSTART` |
+| Rückweg auf ältere Firmware (z. B. 5.128) | Modul hat Autostart im Flash, Verhalten wie heute, kein Werksreset nötig |
+| Firmware hängt oder verpasst ein Ereignis | Modul wirbt wie heute: Fehler gehen in die harmlose Richtung (sichtbar, nie unsichtbar) |
+
+Preis: In den ersten ein bis zwei Sekunden nach dem Einschalten wirbt das Modul noch, bis die Firmware umschaltet.
+Dafür muss die Umschaltung ganz an den Anfang des Hochlaufs (heute erreicht die Firmware das Modul erst nach ca. 13 s;
+Ursache noch zu messen). Ob `.CYSPPSP E=1` im RAM sofort wirkt und laufendes Werben mit `/AX` endet, klärt Phase 0.
+Damit entfällt das Risiko "Rückweg auf ältere LPC-Firmware" aus Abschnitt 5, ebenso der Flash-Teil von Phase 4.
+
+Pflichttests vor jeder Freigabe (in `bt_testlauf.py` aufnehmen): `bt-update` (vorhanden) und **Hin- und Rückweg mit
+echten Altständen** (alte Version, z. B. `fw_5.99`, flashen -> BT-Smoke -> neue Version über Bluetooth aufspielen ->
+BT-Smoke -> alte Version wieder flashen -> BT-Smoke). Welche Stände im Feld sind, gibt der Anwender vor.
+
 ## 3. Zustände
 
 | Zustand | Bedeutung | Modul | Firmware-Ausgang |

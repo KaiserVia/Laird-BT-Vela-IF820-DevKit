@@ -5461,6 +5461,27 @@ auf einem gekoppelten Board (A oder C); Board ohne LTE (Watchdog-Weg ohne GSM).
 **Nicht behoben, Beobachtung:** Das Geraet braucht nach dem Einschalten ca. 30 s bis zum Banner; das IF820 wirbt aber
 sofort. Ein Kunde, der in dieser Zeit verbindet, bekommt keinen PIN-Prompt und muss neu verbinden.
 
+**Voller Lauf mit Classic (B in Windows gekoppelt, COM16), `bt_testlauf.py`, 08:48-09:53, 5.128:**
+`nightly` 2/2, `reboot-check` dropout 3/3 und power 3/3, `power-sweep` alle 9 Zeiten je 2/2, `boot-race` alle
+6 Verzoegerungen je 2/2 (Folgeversuch), `bt-timeout` BLE 1/1, **`bt-timeout` Classic 0/1**, `bt-update` 1/1, `gsm-mux`
+uebersprungen. Classic-Smokes je dritter Schritt bestanden. Bericht `Doku/tools/Testreports/2026-11-02_08-48-32_26SC9983_testlauf/`.
+`bt-update`: Nach dem Update ueber Classic laeuft die Sitzung ueber dieselbe Verbindung weiter (Banner + Hauptmenue
+ohne neue PIN, Sitzung war angemeldet); der Test erwartete zuerst einen PIN-Prompt (Testfehler, korrigiert).
+
+**Fehler 4 - Schein-Verbindung nach dem BT-Zeitlimit, PIN-Endlosschleife (NEU, nicht behoben):** Nach 6 min ohne
+Eingabe trennt die Firmware (`measure.c`, `bt_disconnect()`) und macht das Modul danach bis zum naechsten Minutentakt
+stromlos (`PINMODE3` P1.16 Pull-up = Modul aus, Pull-down = ein; `hard.c`). Ein stromloses Modul zieht die CYSPP-
+Leitung (IC54 Bit 7) offenbar auf LOW. `communication_change()` haelt das fuer eine neue Verbindung: 1 bis 4 s nach
+der Trennung Banner und "PIN =" auf RS232, obwohl keine Gegenstelle da ist (gesehen im Classic- und im BLE-Lauf,
+auch mit 5.127 um 07:34; kein Rueckschritt durch 5.128). Im Classic-Lauf folgte beim Wiedereinschalten des Moduls
+(Minutentakt 09:49:02) eine **Endlosschleife: 10427 Zeilen "PIN = ******" in ca. 1,5 min**, vermutlich weil die
+Firmware im vermeintlich verbundenen Zustand Text an das Modul schickt und dessen Antworten (Ziffern) als PIN-Eingabe
+zaehlen. In dieser Zeit scheiterten BLE- und Classic-Smoke; ab ca. 09:50:40 von selbst wieder normal.
+**Vorschlag:** In `communication_change()` (libtool.c) eine BT-Verbindung nur annehmen, wenn das Modul eingeschaltet
+ist (`(PINMODE3&PULLDOWN)==PULLDOWN`); alternativ das IF820 beim Zeitlimit gar nicht abschalten (`/DIS` reicht).
+Umsetzung zurueckgestellt: Die Firmware-Dateien sind gerade durch die Arbeit an der CYSPP-Zustandsmaschine
+(Session "CYSPP-Zustandsmaschine", 5.129/5.130) unversioniert geaendert.
+
 **Geaenderte Dateien:** main.c, btio.c, btio.h, sprachen/sictxt.c (-> 5.128).
 
 ## Update 5.129 (TEST, 2026-11-02): Phase 0 der CYSPP-Zustandsmaschine - Testmenuepunkt "Modulbefehl senden"
