@@ -40,6 +40,9 @@ Automatischer Testlauf: `tools/bt_testlauf.py` (Anleitung `tools/bt_testlauf_Anl
 3. **Verbinden in den ersten ca. 30 s nach dem Einschalten legt BT bis zum naechsten Stromzyklus lahm** (F11010; dabei gehen `AT&F1`/`$$$` als Daten an die Gegenstelle).
 1 und 2: der BT-UART wird nur nach echtem Einschalten/Watchdog gestartet. 3: Neuerkennung bei aktiver Verbindung. Details und Vorschlag 5.128: `project-status.md`, "Testlauf am Tisch 2026-11-02".
 
+## Konzept CYSPP-Zustandsmaschine (2026-11-02, Entwurf)
+`Konzept_CYSPP_Zustandsmaschine.md`: Firmware steuert Werben/Verbindbarkeit selbst (`.CYSPPSP E=1`, `.CYSPPSTART`), sichtbar erst wenn bereit, Classic/BLE unterscheidbar, `/UCP`, Trenngrund. Phasen 0-4, Phase 0 = Machbarkeit am Geraet ohne Umbau.
+
 ## Plan fuer Montag (vereinbart 2026-10-30)
 1. **Abnahme 5.127:** module-suite auf Board A (inkl. Download BLE+Classic); B in Windows neu koppeln, Classic-Smoke auf B; optional LTE-Sitzung auf B ausloesen, danach BLE verbinden.
 2. Stand taggen (z. B. `bt-5.127`) als Referenz.
