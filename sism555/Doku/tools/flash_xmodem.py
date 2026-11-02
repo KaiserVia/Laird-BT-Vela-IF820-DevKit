@@ -52,6 +52,10 @@ def main():
     log(f"{a.bin}: {len(data)} Byte")
     ser = serial.Serial(a.port, a.baud, timeout=0.2)
     ser.reset_input_buffer()
+    ser.write(bytes([CAN, CAN]))                  # ein haengender XMODEM-Empfang (abgebrochener Versuch) endet damit
+    time.sleep(1.0)
+    ser.write(b"H")                               # Hauptmenue, auch aus einem Untermenue heraus
+    read_for(ser, 1.5)
     ser.write(b"\r")
     out = txt(read_for(ser, 2.0))
     log("Menue-Zustand: " + out.strip().splitlines()[-1] if out.strip() else "keine Ausgabe")
@@ -60,13 +64,24 @@ def main():
     log("nach '3': " + " | ".join(out.strip().splitlines()[:3]))
     ser.reset_input_buffer()
     ser.write(bytes([0x15]))
-    out = read_for(ser, 4.0, b"C")
-    log("nach Strg+U: " + repr(txt(out)[-120:]))
-    # auf 'C' warten (Geraet sendet es periodisch)
+    # auf das XMODEM-'C' warten (Geraet sendet es periodisch). Nur ein 'C' als letztes Zeichen mit 0,3 s Ruhe danach
+    # zaehlt: Textausgaben nach "Send file" (z. B. "[BT-Zustand] ...", Befehlsechos mit "C=00") enthalten auch ein 'C'.
+    out = b""
     t0 = time.time()
-    while b"C" not in out[-40:] and time.time() - t0 < 30:
-        out += ser.read(ser.in_waiting or 1)
-    if b"C" not in out:
+    last = time.time()
+    started = False
+    while time.time() - t0 < 30:
+        n = ser.in_waiting
+        if n:
+            out += ser.read(n)
+            last = time.time()
+        elif out.endswith(b"C") and time.time() - last >= 0.3:
+            started = True
+            break
+        else:
+            time.sleep(0.02)
+    log("nach Strg+U: " + repr(txt(out)[-120:]))
+    if not started:
         log("FEHLER: kein XMODEM-'C' vom Geraet")
         return 2
     ser.reset_input_buffer()

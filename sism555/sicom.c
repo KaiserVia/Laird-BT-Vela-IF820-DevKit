@@ -47,10 +47,11 @@ void firmware (void)		// Firmware Empfang, Pr�fung und IAP Programmierung
 	
  if ((flashsize==0)||((flashsize>8)&&(flashsize<=128))) puterror (DTC_SI_NO_FLASH, -1); // Flash fehlt oder zu klein
 	
+ bt_sm_lock();												// 5.132: IF820 unsichtbar waehrend des Updates (nicht bei Update ueber BT); 5.133: vor
+																			// der Aufforderung, sonst stoert die Zustandszeile den XMODEM-Start
  putln (T_fsend);											// Text "Send file with Xmodem (1k)...
  delete_protocol();										// Protokollzeiger im Parametersatz l�schen
  delete_data();												// Messdatenzeiger im Parametersatz l�schen
- bt_sm_lock();												// 5.132: IF820 unsichtbar waehrend des Updates (nicht bei Update ueber BT)
 
  if ((blno=xmodem_receive(FIRMWARE_MAX_FILESIZE,0))< 0)		// Empfang 1k Xmodem Daten
   puterror (DTC_SI_XMODEM_ERR, blno);								// Xmodem Fehlernummer als Detail ausgeben

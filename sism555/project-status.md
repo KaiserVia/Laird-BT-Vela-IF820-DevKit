@@ -5677,3 +5677,48 @@ Laeufen griff der Abbruch beim Warten auf das ACK (`getbyte()` endet bei `comcha
 `bt_link_gone()` wirkt, wenn die Verbindung waehrend des Sendens eines Blocks bei CTS-Rueckstau wegbricht (Funkverlust
 ohne sauberes Trennen bis zum Supervision-Timeout); das ist am Tisch ohne Abschirmung nicht nachstellbar und bleibt
 ungeprueft.
+
+### Pruefung 5.132 auf Board C (26SC9994), 2026-11-02 13:40-13:53
+
+Kurzprofil komplett bestanden (nightly, reboot-check, power-sweep, boot-race, bt-update; Classic ueber COM6). boot-race:
+beide Erstversuche (2 s, 8 s) bestanden, Banner nach 17,97 s (C hat kein LTE). In allen Kaltstarts "[BT-Zustand] AUS
+(unsichtbar bis Hochlauf fertig)", ca. 14 s spaeter "BEREIT (Hochlauf fertig, sichtbar)". C scheiterte am 29.10. noch
+mit BLE und Classic. Bericht `Doku/tools/Testreports/2026-11-02_13-40-17_26SC9994_testlauf/`.
+
+### Pruefung 5.132 auf Board A (99SC9923), 2026-11-02 15:27-15:41 - zwei Fehler gefunden
+
+Kurzprofil formal bestanden, der Mitschnitt zeigt aber:
+1. **Nach jedem Kaltstart nicht verborgen** ("nicht verborgen: Verbindung aktiv"), auch wenn der PC erst 8 s spaeter
+   verbindet. Auf A liest CYSPP waehrend des Modulstarts nach dem Einschalten LOW (auf B/C HIGH); `bt_sm_hide()` gab
+   beim ersten LOW sofort auf. Folge: boot-race 8 s scheiterte im Erstversuch (Windows brach den Connect ab, BT-Init
+   lief parallel), der Folgeversuch ging. Nach dem naechtlichen Neustart (Modul bleibt versorgt) wurde verborgen.
+2. **Firmware-Update ueber RS232 stoert XMODEM:** `bt_sm_lock()` stand in `firmware()` hinter der Aufforderung
+   "Send file ...", seine Zeile "[BT-Zustand] AUS (gesperrt: Firmware-Update)" kam mitten in den XMODEM-Start;
+   `flash_xmodem.py` nahm ein 'C' aus dem Text als Startzeichen und brach nach 10 Wiederholungen ab (zweimal,
+   Antworten 'c', ' ', '(', 'U', 'p', 'd', 'a').
+
+Bericht `Doku/tools/Testreports/2026-11-02_15-27-11_99SC9923_testlauf/`.
+
+## Update 5.133 (TEST, 2026-11-02): Verbergen bei CYSPP LOW im Modulstart, Update-Sperre vor der XMODEM-Aufforderung
+
+- `bt_sm_hide()` (btio.c): bricht bei Pin LOW nicht mehr ab, sondern wartet weiter (`bt_sm_cmd()` sendet bei LOW ohnehin
+  nichts, dann 350 ms statt 50 ms Pause, damit das Fenster weiterhin ca. 4 s lang ist). Erst am Ende: Pin noch LOW ->
+  "nicht verborgen: Verbindung aktiv", sonst "keine Antwort auf /AX".
+- `firmware()` (sicom.c): `bt_sm_lock()` vor `putln(T_fsend)`.
+- `Doku/tools/flash_xmodem.py`: startet nur bei einem 'C' als letztem Zeichen mit 0,3 s Ruhe danach (das periodische
+  XMODEM-Poll), und schickt vorher CAN CAN + 'H' (ein abgebrochener Versuch liess das Geraet im Untermenue stehen).
+  Damit liess sich 5.133 auch ueber das fehlerhafte 5.132 flashen.
+
+**Pruefung auf Board A (15:46-16:12, `--nur boot-race,power-sweep`, je 2 Wiederholungen):**
+- boot-race: 12 von 12 Erstversuchen bestanden, 12-mal "unsichtbar bis Hochlauf fertig" (mit 5.132: 0-mal nach
+  Kaltstart). Bericht `Doku/tools/Testreports/2026-11-02_16-04-40_unbekannt_boot-race/`.
+- power-sweep: 17 von 18 Kaltstarts verborgen. **Ein Fehlschlag bei 0,5 s stromlos (Fall 1 von 2):** das Modul
+  antwortete im ganzen Fenster nicht auf `/AX` ("keine Antwort auf /AX", also sichtbar gelassen), es kam keine BT-Init-
+  Zeile, und das Geraet war danach 30 s lang per BLE nicht auffindbar. Das Modul war nach der kurzen Unterbrechung
+  stumm (halber Reset, vgl. offener Punkt `RST_L` haengt an nichts) - nicht durch das Verbergen verursacht. Fall 2 bei
+  0,5 s bestanden. Bericht `Doku/tools/Testreports/2026-11-02_15-46-53_VIASIS_99SC9923_power-sweep/`.
+- Update-Sperre am Geraet geprueft (16:13, 5.133 ueber 5.133): "[BT-Zustand] AUS ... (gesperrt: Firmware-Update)" steht
+  jetzt vor "Send file with XModem(1K)", Flashen ohne Wiederholung.
+- Kleinigkeit: die Sperrzeile zeigt den Transport der letzten Sitzung ("AUS Classic (gesperrt ...)").
+
+**Geaenderte Dateien:** btio.c, sicom.c, sprachen/sictxt.c (-> 5.133), Doku/tools/flash_xmodem.py.

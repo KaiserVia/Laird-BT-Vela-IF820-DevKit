@@ -797,12 +797,12 @@ void bt_sm_hide (void)                         // main.c, frueh im Hochlauf
  uchar n;
  if (fp.btmodem!=IF820 || (i_reset==FIRM_UP_RES) || (i_reset==SLEEP_RES)) return;
  for (n=0; n<12; n++)                          // Modul startet nach dem Einschalten noch (BOOT nach ca. 2,5 s): bis ca. 4 s
- {                                             // wiederholen; laeuft schon eine Verbindung, sofort aufgeben
-  if (bt_sm_cmd(T_ax, T_axok)) break;
-  if (bt_link_busy()) { bt_sm_show("nicht verborgen: Verbindung aktiv"); return; }
-  ResetWDT(); osDelay(50);
+ {                                             // wiederholen; bei Pin LOW sendet bt_sm_cmd() nichts
+  if (bt_sm_cmd(T_ax, T_axok)) break;          // 5.133: nicht schon beim ersten LOW aufgeben - auf 99SC9923 liest der
+  ResetWDT(); osDelay(bt_link_busy() ? 350 : 50);   // Pin waehrend des Modulstarts LOW (dann kehrt bt_sm_cmd() sofort zurueck)
  }
- if (n>=12) { bt_sm_show("nicht verborgen: keine Antwort auf /AX"); return; }   // sichtbar lassen (harmlose Richtung)
+ if (n>=12)                                    // sichtbar lassen (harmlose Richtung)
+ { bt_sm_show(bt_link_busy() ? "nicht verborgen: Verbindung aktiv" : "nicht verborgen: keine Antwort auf /AX"); return; }
  bt_sm_cmd(T_sbtp_hide, T_sbtpok);
  bt_sm_hidden=1;
  bt_state=BT_ST_AUS; bt_sm_show("unsichtbar bis Hochlauf fertig");

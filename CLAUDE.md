@@ -59,6 +59,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-02 - 5.133 (TEST):** Board C mit 5.132 Kurzprofil komplett bestanden. Board A (99SC9923) zeigte zwei Fehler, in 5.133
+  behoben: nach Kaltstart nicht verborgen (CYSPP liest im Modulstart LOW) und Update-Sperrzeile stoerte XMODEM; dazu
+  `flash_xmodem.py` robuster. A mit 5.133: boot-race 12/12, power-sweep 17/18 (1x Modul stumm nach 0,5 s stromlos).
 - **2026-11-02 - 5.132 (TEST), Phase 3:** unsichtbar auch waehrend Firmware-Update ueber RS232/USB und solange GSM
   UART1 haelt; `/UCP` vor dem Abo wieder an (`BT_UCP_ENABLE` 1). Details `sism555/project-status.md`, Update 5.132.
 - **2026-11-02 - 5.131 (TEST), Phase 2:** IF820 im Hochlauf unsichtbar (`/AX` + `SBTP C=0` ca. 3,7 s nach dem
