@@ -244,6 +244,13 @@ class SlowLinkError(Exception):
     """Der Ymodem-Durchsatz liegt nach der Pruefzeit unter der Schwelle (Link/PC/Modul in schlechtem Zustand)."""
 
 
+class LinkDropSimulated(Exception):
+    """--drop-after-blocks: der PC hat die Verbindung mitten im Ymodem-Empfang absichtlich hart getrennt (ohne CAN)."""
+
+
+DROP_AFTER_BLOCKS = 0   # --drop-after-blocks: 0 = aus
+
+
 def slow_threshold(args) -> float:
     """Schwelle in B/s fuer den aktuellen Transport; 0 = Pruefung aus."""
     if getattr(args, "min_bps", None) is not None:
@@ -2032,6 +2039,11 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5,
                 stats["blocks"] += 1
                 stats["bytes"] += len(data)
                 expected += 1
+                if DROP_AFTER_BLOCKS and stats["blocks"] >= DROP_AFTER_BLOCKS:
+                    log(f"--drop-after-blocks: trenne nach {stats['blocks']} Bloecken hart (kein ACK, kein CAN).")
+                    trace_event("link_drop_simulated", blocks=stats["blocks"], bytes=stats["bytes"])
+                    await transport.disconnect()
+                    raise LinkDropSimulated(f"Verbindung nach {stats['blocks']} Bloecken absichtlich getrennt.")
                 await transport.write(bytes([XMODEM_ACK]))
                 now = time.perf_counter()
                 if now >= next_progress:
@@ -2071,13 +2083,24 @@ async def ymodem_receive(transport, block_timeout: float, retry_limit: int = 5,
         stats["duration_s"] = round(time.perf_counter() - t_start, 3)
         stats["throughput_bps"] = round(stats["bytes"] / stats["duration_s"], 1) if stats["duration_s"] else 0
         return stats
-    except BaseException:
+    except BaseException as exc:
+        if isinstance(exc, LinkDropSimulated):
+            raise
         try:
             await transport.write(bytes([XMODEM_CAN]) * 3)
             log("Ymodem-Empfang abgebrochen; CAN CAN CAN an Geraet gesendet.")
         except Exception as abort_exc:
             log(f"Ymodem-Abbruch konnte nicht gesendet werden: {abort_exc}")
         raise
+
+
+async def _after_link_drop(args, exc) -> bool:
+    """--drop-after-blocks: RS232 noch 25 s mitschneiden (Abbruch auf der Firmware-Seite), dann BLE-Sichtbarkeit pruefen."""
+    log(f"{exc} RS232 wird noch 25 s mitgeschnitten, dann BLE-Sichtbarkeit.")
+    await asyncio.sleep(25.0)
+    found = await BleakScanner.find_device_by_address(args.address, timeout=10.0) if args.address else None
+    log(f"Geraet nach dem Abbruch {'wieder sichtbar' if found else 'NICHT sichtbar'}.")
+    return found is not None
 
 
 async def run_download_test(args) -> int:
@@ -2311,6 +2334,10 @@ async def run_download_test(args) -> int:
         log(f"Download abgeschlossen: {stats['bytes']} Byte in {stats['blocks']} Bloecken, "
             f"{stats['duration_s']} s, {stats['throughput_bps']:.0f} B/s "
             f"({stats['retries']} Retries).")
+    except LinkDropSimulated as exc:
+        result["result"] = "link_drop_simulated"
+        result["error"] = str(exc)
+        result["visible_after_drop"] = await _after_link_drop(args, exc)
     except Exception as exc:
         result["result"] = "failed"
         result["error"] = str(exc)
@@ -2384,6 +2411,10 @@ async def _receive_once(args, min_bps: float) -> tuple[int, dict]:
         log(f"LANGSAMER LINK: {exc}")
         trace_event("slow_link", level="warning", transport=args.transport, reason=str(exc),
                     threshold_bps=min_bps, rssi=BLE_INFO.get("rssi"), aborted=True)
+    except LinkDropSimulated as exc:
+        result["result"] = "link_drop_simulated"
+        result["error"] = str(exc)
+        result["visible_after_drop"] = await _after_link_drop(args, exc)
     except Exception as exc:
         result["result"] = "failed"
         result["error"] = str(exc)
@@ -5129,6 +5160,8 @@ def main() -> int:
                    help="[cycle] Pause zwischen zwei Zyklen in Sekunden")
     p.add_argument("--records", type=int, default=500,
                    help="[download] Anzahl Test-Messwerte, die vor dem Download erzeugt werden")
+    p.add_argument("--drop-after-blocks", type=int, default=0,
+                   help="[download/receive] Test Linkverlust: nach N Ymodem-Bloecken hart trennen (kein ACK, kein CAN)")
     p.add_argument("--write-only", action="store_true",
                    help="[download] nach dem Flash-Schreiben beenden, keinen Ymodem-Export starten")
     p.add_argument("--module-records", type=int, default=419430,
@@ -5234,6 +5267,8 @@ def main() -> int:
     p.add_argument("--timeout-recover", type=float, default=90.0,
                    help="[bt-timeout] Wartezeit nach der Trennung bis zur Pruefung (Modul ist bis zu 60 s aus)")
     args = p.parse_args()
+    global DROP_AFTER_BLOCKS
+    DROP_AFTER_BLOCKS = args.drop_after_blocks
 
     if args.mode in ("smoke", "transfer"):
         args.transport = "ble"

@@ -5659,3 +5659,21 @@ taub), und fordert vor dem Oeffnen des BLE-Datenkanals ein kurzes Verbindungsint
   BLE normal verbindbar.
 
 **Geaenderte Dateien:** btio.c, btio.h, hard.c, sicom.c, sprachen/sictxt.c (-> 5.132).
+
+### Ymodem-Abbruch bei Linkverlust am Geraet (5.132, Board B, 2026-11-02 13:26-13:30)
+
+Neue Testoption `ble_mainboard_test.py --drop-after-blocks N` (download/receive): Der PC trennt nach N empfangenen
+Ymodem-Bloecken hart (kein ACK, kein CAN), schneidet RS232 noch 25 s mit und prueft dann die BLE-Sichtbarkeit.
+Aufruf: `--mode download --transport ble|classic --records 5000 --drop-after-blocks 5 --pin 269983`.
+
+| Transport | Abbruch der Firmware nach dem Trennen | danach |
+|---|---|---|
+| BLE | 3,2 s: `F13010 Kommunikations-Protokollfehler`, Hauptmenue, `[BT-Zustand] BEREIT (Pin HIGH)` | nach 25 s wieder sichtbar |
+| Classic | 0,3 s: dasselbe Bild | nach 25 s wieder sichtbar |
+
+Am 22.10. (5.126) lief die Ymodem-Ausgabe nach einem BLE-Abbruch noch minutenlang weiter. **Einschraenkung:** In diesen
+Laeufen griff der Abbruch beim Warten auf das ACK (`getbyte()` endet bei `comchange`), nicht der neue Pfad
+`bt_link_gone()` in `sendblock()` (keine Zeile "Linkverlust"), weil der PC vor dem Trennen nicht mehr quittiert hatte.
+`bt_link_gone()` wirkt, wenn die Verbindung waehrend des Sendens eines Blocks bei CTS-Rueckstau wegbricht (Funkverlust
+ohne sauberes Trennen bis zum Supervision-Timeout); das ist am Tisch ohne Abschirmung nicht nachstellbar und bleibt
+ungeprueft.
