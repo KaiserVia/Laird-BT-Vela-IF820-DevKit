@@ -169,6 +169,7 @@ void runcycle (void)				// Messzyklenbetrieb
 		 if (!transferzeit)	zeitumstellung();		// Pr�fe und f�hre ggf. Sommer-/Winterzeit Umstellung durch
 		 else transferzeit--;										// Z�hle 60 Minuten Pr�fsperrzeit herunter
 		 if ((PINMODE3&PULLDOWN)!=PULLDOWN) PINMODE3|=PULLDOWN;	// Bluetooth abgeschaltet -> einschalten
+		 if (!osActiveThread) bt_sm_minute();	// 5.131: Sicherheitsnetz - falls /A am Ende des Hochlaufs scheiterte
 		 // IF820 (5.51) Selbstheilung: CYSPP darf im verbindungslosen Ruhezustand NIE als Ausgang
 		 // HIGH haengen - sonst kann das Modul weder SPP noch den BLE-CYSPP-Datenkanal aufbauen
 		 // (Datenpipe wird lokal de-asserted -> Trennung sofort beim Notify-Enable). Guard

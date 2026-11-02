@@ -140,6 +140,9 @@ Details und Berichtsordner: `project-status.md`, "Phase-0-Läufe am Gerät".
   Hauptrisiko "nach dem Trennen unsichtbar" (Abschnitt 5) und macht das Sicherheitsnetz einfacher. Offen: ob `E=1`
   dafür überhaupt nötig ist oder `E=2` (Flash wie heute) mit `/AX`/`/A` genügt; ob Werben nach einem Modul-Neustart
   (`BOOT`, Flash = Autostart) sofort wieder per `/AX` gestoppt werden muss.
+- **Nachtrag Frage 7 (12:04): `E=2` genügt.** `/AX` + `SBTP C=0` halten das Gerät dauerhaft unsichtbar, `/A` + `SBTP
+  C=1` machen es sichtbar und transparent verbindbar. Ein Modul-Neustart zur Laufzeit braucht kein `/AX`: Die Firmware
+  ist dann bereit, Werben ist gewollt. Umgesetzt als 5.131 (Phase 2).
 - `/UCP` vor dem Abo (Phase 3) funktioniert im Zustand VERBUNDEN.
 
 ## 7. Vorgehen in Phasen
@@ -148,7 +151,7 @@ Details und Berichtsordner: `project-status.md`, "Phase-0-Läufe am Gerät".
 |---|---|---|---|
 | 0 | Fragen aus Abschnitt 6 am Gerät klären (Testmenüpunkt + Skript) | **erledigt (5.129), Ergebnisse 6a** | keins |
 | 1 | Ereignis-Parser und Zustandsanzeige, **ohne Verhaltensänderung** (E bleibt 2) | **umgesetzt (5.130)**: Zustand, Transport, Trenngrund; Ymodem-Abbruch bei Linkverlust (Pin, da `DIS` im Datenmodus nicht ankommt) | gering |
-| 2 | Zustandsmaschine mit `/AX`/`/A` und `SBTP C` im RAM (nicht `.CYSPPSTART`/`F=00`, siehe 6a), Sicherheitsnetz, hinter `BT_CYSPP_SM` | Sichtbar erst wenn bereit | hoch, deshalb Schalter und volle Testreihe |
+| 2 | `/AX` + `SBTP C=0` früh im Hochlauf, `/A` + `SBTP C=1` am Ende, alles im RAM bei `E=2` (siehe 6a), Minutentakt als Sicherheitsnetz, Schalter `BT_CYSPP_SM` | **umgesetzt (5.131)**: unsichtbar ab ca. 3,7 s bis zum Ende des Hochlaufs | mittel (fail-safe: Modul-Neustart = Werben wie bisher) |
 | 3 | `GESPERRT` (LTE, Update, Flash), `/UCP` vor dem Abo | unsichtbar während Sperrzeiten, kürzeres BLE-Intervall | mittel |
 | 4 | Konfigurations-Umstellung im Feld, Rückweg, Service-Anleitung | ausrollbar | - |
 

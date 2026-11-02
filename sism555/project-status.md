@@ -5579,3 +5579,47 @@ Build 0 Fehler, 0 Warnungen.
   z. B. BLE-Adapter am PC waehrend `--mode download` abschalten).
 
 **Geaenderte Dateien:** btio.c, btio.h, libtool.c, main.c, measure.c, xmodem.c, sprachen/sictxt.c (-> 5.130).
+
+## Update 5.131 (TEST, 2026-11-02): Phase 2 der CYSPP-Zustandsmaschine - unsichtbar, bis die Firmware bereit ist
+
+**Vorpruefung (Phase 0, Frage 7, 5.130, 12:04, Bericht `Doku/tools/Testreports/2026-11-02_12-04-48_*`):** Mit dem
+Flash-Stand wie heute (`.CYSPPSP E=2` Autostart, `SAP F=01`) machen `/AX` + `SBTP C=0` (RAM) das Geraet sofort
+unsichtbar und nicht Classic-verbindbar, auch nach 30 s noch; `/A` + `SBTP C=1` -> sichtbar, BLE verbindbar und
+transparent, nach dem Trennen wirbt das Modul von selbst weiter, Classic verbindbar und transparent. **`E=1` ist also
+nicht noetig**, der Modul-Flash bleibt unveraendert.
+
+**Symptom (bisher):** Das IF820 wirbt ab dem Einschalten, die Firmware braucht bis zum Banner ca. 30 s. Wer in dieser
+Zeit verbindet, bekommt keinen PIN-Prompt (boot-race, Erstversuch 0 von 12 mit 5.128).
+
+**Aenderung (btio.c/.h, main.c, measure.c), Schalter `BT_CYSPP_SM` (btio.h, 1 = an, 0 = alter Ablauf):**
+- `bt_sm_hide()` in main.c direkt nach der I2C-Initialisierung (vor den Flash-Loeschungen, die mehrere Sekunden
+  dauern): `/AX` und `SBTP ...,C=00,...` still ans Modul, nur im RAM. `/AX` wird bis ca. 4 s wiederholt, weil das
+  Modul nach dem Einschalten selbst noch startet (BOOT nach ca. 2,5 s). Nicht bei Firmware-Update (`FIRM_UP_RES`, die
+  BT-Verbindung ueberlebt den Neustart), nicht bei Deep-Sleep-Reset, nie bei aktiver Verbindung (`bt_link_busy()`,
+  Befehle gingen sonst als Nutzdaten an die Gegenstelle), nie bei GSM-Besitz von UART1. Keine Antwort -> sichtbar
+  lassen und Zeile `[BT-Zustand] ... nicht verborgen: ...` (Fehler in die harmlose Richtung).
+- `bt_sm_boot_done()` am Ende des Hochlaufs: `SBTP C=01` (Werte wie `init_bluetooth()`, `T_sbtp_ns`) und `/A`
+  (Antwort `0000` oder `0107` = wirbt schon, beides gut) -> `[BT-Zustand] BEREIT (Hochlauf fertig, sichtbar)`.
+  Scheitert das (z. B. Verbindung oder GSM), wiederholt `bt_sm_minute()` im Minutentakt (measure.c).
+- Fail-safe: jeder Modul-Neustart (Brown-out, BT_TIMEOUT-Abschaltung, `/RBT`, Reflash einer alten Firmware) stellt
+  den Flash-Stand her = wirbt wie bisher. Kein Rueckweg-Problem auf aeltere Firmware.
+
+**Test am Geraet (Board B 26SC9983, 12:08-12:35):**
+- Erste Fassung (Verbergen erst nach `comstate`, ca. 16 s nach dem Einschalten): reboot-check BLE+Classic 3/3,
+  boot-race 12/12 bestanden, aber Verbinden vor Sekunde 16 lief am Verbergen vorbei (Erstversuch 4 von 12).
+- Zwischenfassung (frueh, ohne Wiederholung): `/AX` blieb unbeantwortet (Modul startete noch), nicht verborgen.
+- Endfassung: `[BT-Zustand] AUS (unsichtbar bis Hochlauf fertig)` ca. **3,7 s** nach dem Einschalten,
+  `BEREIT (Hochlauf fertig, sichtbar)` bei ca. 31,7 s, kurz vor dem Banner. boot-race 2 s und 8 s bestanden; bei 8 s
+  bestand der **Erstversuch** (der PC wartet, bis das Geraet sichtbar ist, und bekommt den PIN-Prompt). Bei 2 s lief
+  der Verbindungsversuch des Testskripts genau beim Sichtbarwerden ab (Folgeversuch bestanden).
+- Kurzprofil (`bt_testlauf.py --profil kurz`, 12:36-12:51, Bericht `..._12-35-58_26SC9983_testlauf/`): nightly,
+  reboot-check (BLE+Classic), power-sweep, boot-race, bt-update bestanden; gsm-mux uebersprungen (Modem antwortet
+  nicht). boot-race 8 s wieder mit bestandenem Erstversuch. Nightly-Reboot: unsichtbar/sichtbar in derselben Sekunde
+  (kurzer Reboot-Pfad). bt-update: kein Verbergen (`FIRM_UP_RES`), Verbindung ueberlebt den Neustart wie bisher.
+
+**Verbleibend:** In den ersten ca. 3,7 s nach dem Einschalten wirbt das Modul noch (Autostart). Wer genau dann
+verbindet, bekommt wie bisher keinen PIN-Prompt; die 5.128-Sicherung (keine Neuerkennung bei aktiver Verbindung)
+greift weiter. Phase 3 (GESPERRT waehrend LTE/Update/Flash, `/UCP` vor dem Abo) ist nicht umgesetzt.
+
+**Geaenderte Dateien:** btio.c, btio.h, main.c, measure.c, sprachen/sictxt.c (-> 5.131); `Doku/tools/cyspp_phase0.py`
+(Frage 7, Option `--start`, `--ohne-sap`).

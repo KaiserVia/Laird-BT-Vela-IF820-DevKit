@@ -112,6 +112,11 @@
 #define T_sbtdc    "SBTDC,C=" IF820_COD "\r"                        // bt_set_device_class (14/12)
 #define T_sbtdcok  "SBTDC,0000"
 #define T_sbtp_ns  "SBTP,T=7D00,D=02,C=01,F=01,S=02,V=0000,N=0000\r"// wie Werksdefault, aber F=01 = Sniff AUS
+#define T_sbtp_hide "SBTP,T=7D00,D=02,C=00,F=01,S=02,V=0000,N=0000\r"// 5.131: wie T_sbtp_ns, aber C=00 = Classic nicht verbindbar (nur RAM)
+#define T_ax       "/AX\r"     // 5.131: gap_stop_adv
+#define T_axok     "/AX,0000"
+#define T_a        "/A\r"      // 5.131: gap_start_adv mit den gespeicherten SAP-Parametern
+#define T_aok      "/A,0"      // 0000 = gestartet, 0107 = wirbt bereits - beides gut
 #define T_sbtpok   "SBTP,0000"
 // --- 5.55: BLE-Advertising dauerhaft (Kunde kann jederzeit verbinden) ---
 // Werksdefault SAP: T=03,C=07,H=0030,D=001E,L=0800,O=003C,F=00 -> 30 s High + 60 s Low = stoppt nach 90 s.
@@ -226,6 +231,11 @@ extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH t
 #define BT_TR_KEIN       0
 #define BT_TR_BLE        1
 #define BT_TR_CLASSIC    2
+// 5.131 Phase 2: 1 = IF820 im Hochlauf unsichtbar (/AX, SBTP C=0 im RAM), sichtbar erst am Ende (/A, SBTP C=1);
+// 0 = alter Ablauf (Modul wirbt ab Einschalten). Siehe btio.c bt_sm_hide().
+#define BT_CYSPP_SM      1
+extern void bt_sm_hide (void);            // main.c: frueh im Hochlauf
+extern void bt_sm_minute (void);          // measure.c: Minutentakt (Sicherheitsnetz)
 #define BT_MODULE_ON     ((PINMODE3&PULLDOWN)==PULLDOWN)   // 5.130: Modul versorgt (measure.c schaltet es nach BT_TIMEOUT per Pull-up ab)
 extern uchar bt_state, bt_transport;
 extern uint  bt_conn_interval, bt_dis_reason;

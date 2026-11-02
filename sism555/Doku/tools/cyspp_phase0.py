@@ -492,6 +492,44 @@ class Phase0:
                         f", danach transparent {(r.get('transparenz') or {}).get('transparent')}")
         return r
 
+    # --- Frage 7 (Vorbereitung Phase 2) -------------------------------------
+    async def q7(self) -> dict:
+        """Reicht E=2 (Flash wie heute) mit /AX, /A und SBTP C=0/1? Bleibt das Modul nach /AX still, wirbt es nach
+        dem Trennen von selbst weiter?"""
+        log("Frage 7: E=2 (Autostart) - /AX + SBTP C=0 still? /A + SBTP C=1 verbindbar und transparent?")
+        r = {"ax": (await self.con.cmd("/AX"))["ok"], "sbtp_c0": (await self.set_classic("00"))["ok"]}
+        await asyncio.sleep(0.5)
+        r["scan_gesperrt"] = await ble_visible(self.args.address, self.args.scan)
+        r["classic_gesperrt"] = await self.classic_probe("E=2, SBTP C=0")
+        await asyncio.sleep(20.0)
+        r["scan_nach_30s"] = await ble_visible(self.args.address, self.args.scan)
+        since_ev = self.con.mark()
+        r["a"] = (await self.con.cmd("/A"))["ok"]
+        r["sbtp_c1"] = (await self.set_classic("01"))["ok"]
+        await asyncio.sleep(0.5)
+        r["scan_bereit"] = await ble_visible(self.args.address, self.args.scan)
+        link = BleLink(self.args.address)
+        r["connected"] = await link.connect(self.args.connect_timeout)
+        if r["connected"]:
+            await asyncio.sleep(1.5)
+            since_sub = self.con.mark()
+            r["subscribed"] = await link.subscribe()
+            r["pin_low_nach_abo"] = await self.con.wait_pin("LOW", since_sub, 4.0)
+            r["transparenz"] = await self.transparency(link, "BLE (E=2, /A)")
+            await link.disconnect()
+            await asyncio.sleep(2.0)
+            r["scan_nach_trennen"] = await ble_visible(self.args.address, self.args.scan)
+        r["classic_bereit"] = await self.classic_probe("E=2, SBTP C=1")
+        r["events"] = events(self.con.module_lines(since_ev))
+        r["antwort"] = (f"gesperrt: BLE {'SICHTBAR' if r['scan_gesperrt']['visible'] else 'unsichtbar'}, Classic "
+                        f"{'verbindbar' if r['classic_gesperrt'].get('connected') else 'nicht verbindbar'}, nach 30 s BLE "
+                        f"{'SICHTBAR' if r['scan_nach_30s']['visible'] else 'unsichtbar'}; /A {'ok' if r['a'] else 'FEHLER'}, "
+                        f"bereit BLE {'sichtbar' if r['scan_bereit']['visible'] else 'UNSICHTBAR'}, transparent "
+                        f"{(r.get('transparenz') or {}).get('transparent')}, nach Trennen "
+                        f"{'wirbt weiter' if (r.get('scan_nach_trennen') or {}).get('visible') else 'still'}; Classic "
+                        f"{'verbindbar' if r['classic_bereit'].get('connected') else 'nicht verbindbar'}")
+        return r
+
     # --- Rueckweg ----------------------------------------------------------
     async def restore(self) -> dict:
         log("Rueckweg: /RBT (Modul startet mit Flash-Stand = Autostart neu) ...")
@@ -565,7 +603,7 @@ async def run(args) -> int:
         await p0.read_base()
         result["base"] = p0.base
         wanted = [int(x) for x in args.fragen.split(",")]
-        steps = {1: p0.q1, 2: p0.q2, 3: p0.q3, 4: p0.q4, 5: p0.q5, 6: p0.q6}
+        steps = {1: p0.q1, 2: p0.q2, 3: p0.q3, 4: p0.q4, 5: p0.q5, 6: p0.q6, 7: p0.q7}
         for number in wanted:
             try:
                 result["fragen"][f"Frage {number}"] = await steps[number]()

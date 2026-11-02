@@ -104,7 +104,10 @@ int main (void)
     if ((fp.i2cdev&IC35_b)!=IC35_b) puterror (DTC_MA_I2C_DPP, -1);					// DPP fehlt
 	  if (!(fp.i2cdev&ICLED_b) && fp.ledspot) puterror (DTC_MA_TCA6507, -1);	// Fehler externe LED Spotlampe
 		syserror++;	
-  } } // end if I2C Bus erfolgreich initialisiert   
+  } } // end if I2C Bus erfolgreich initialisiert
+	bt_release();																// 5.131: CYSPP sicher Eingang, bevor bt_sm_hide() den Pin liest
+	bt_sm_hide();																// 5.131: IF820 unsichtbar bis zum Ende des Hochlaufs - so frueh wie moeglich
+																							// (vor den Flash-Loeschungen unten, die Sekunden dauern; nur RAM, siehe btio.c)
 	
 	if (RSID&(POR|BODR))								// Power On oder Brownout Reset?
 	{		 
@@ -251,7 +254,7 @@ int main (void)
  // Bisher nur ueber test_BT()/init_bluetooth() im POR-Zweig: nach Reboot (BOOTTASK 3:15), Watchdog ohne GSM und
  // Brown-out blieb UART1 aus -> IF820 sah CTS HIGH, BT tot bis zum Stromzyklus (Testlauf 2026-11-02).
  if ((fp.btmodem==IF820) && (uart1_owner==MUX_NONE)) uart1_release(MUX_NONE);
- bt_sm_boot_done();				// 5.130: Zustand BEREIT (Modul wirbt per Autostart; nur Anzeige)
+ bt_sm_boot_done();				// 5.130: Zustand BEREIT; 5.131: Modul wieder sichtbar (/A, SBTP C=1)
 
  if (!(RSID&(POR|WDTR|EXTR))) protocol(BROWNOUT_ERROR);	// Brownout reset
   

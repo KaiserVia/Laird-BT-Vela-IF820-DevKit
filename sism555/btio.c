@@ -770,8 +770,62 @@ void bt_sm_link (uchar up)                     // aus communication_change(): CY
 
 void bt_sm_off (void) { if (fp.btmodem==IF820) { bt_sm_set(BT_ST_AUS,"Modul abgeschaltet (BT_TIMEOUT)"); } }
 
-void bt_sm_boot_done (void)                    // main.c, Ende des Hochlaufs: Modul wirbt (Autostart)
-{ if (fp.btmodem==IF820 && bt_state==BT_ST_AUS) bt_sm_set(BT_ST_BEREIT,"Hochlauf fertig"); }
+// 5.131 - Phase 2: unsichtbar, bis die Firmware bereit ist (Schalter BT_CYSPP_SM, btio.h). Das IF820 wirbt per Autostart
+// (Flash .CYSPPSP E=2, SAP F=01) sofort nach dem Einschalten, die Firmware braucht bis zum Banner ca. 30 s; wer in dieser
+// Zeit verbindet, bekommt keinen PIN-Prompt (Testlauf 2026-11-02, boot-race). Jetzt: frueh im Hochlauf /AX + SBTP C=0,
+// am Ende /A + SBTP C=1 - NUR im RAM des Moduls (kein /SCFG). Fail-safe: Jeder Modul-Neustart (Brown-out, BT_TIMEOUT,
+// /RBT) stellt den Flash-Stand her = wirbt wie bisher; nach jedem Trennen wirbt das Modul von selbst weiter (F=01).
+// Phase 0 (Konzept Abschnitt 6a): .CYSPPSTART taugt dafuer nicht (Central-Scan), E=2 mit /AX//A genuegt (Frage 7).
+// Nie bei laufender Verbindung (Befehle gingen als Nutzdaten an die Gegenstelle) und nie, waehrend GSM UART1 haelt.
+static uchar bt_sm_hidden=0;                   // 1 = /AX gesendet, /A steht noch aus (Minutentakt wiederholt)
+
+static bool bt_sm_cmd (char *cmd, char *ok)   // still senden, UART1 kurz auf BT; TRUE = Antwort gesehen
+{
+ bool r;
+ if (uart1_owner==MUX_GSM || bt_link_busy()) return(FALSE);
+ Init_BT_ch(BT_BAUD);
+ concpy=connect;                               // bt_command() stellt am Ende connect=concpy her
+ r=bt_command(cmd, ok, -300);
+ bxi1=rxi1;                                    // Antwortreste verwerfen
+ uart1_release(MUX_BT);                        // IF820: Leerlauf, UART1 bleibt aktiv (5.127)
+ return(r);
+}
+
+void bt_sm_hide (void)                         // main.c, frueh im Hochlauf
+{
+#if BT_CYSPP_SM
+ uchar n;
+ if (fp.btmodem!=IF820 || (i_reset==FIRM_UP_RES) || (i_reset==SLEEP_RES)) return;
+ for (n=0; n<12; n++)                          // Modul startet nach dem Einschalten noch (BOOT nach ca. 2,5 s): bis ca. 4 s
+ {                                             // wiederholen; laeuft schon eine Verbindung, sofort aufgeben
+  if (bt_sm_cmd(T_ax, T_axok)) break;
+  if (bt_link_busy()) { bt_sm_show("nicht verborgen: Verbindung aktiv"); return; }
+  ResetWDT(); osDelay(50);
+ }
+ if (n>=12) { bt_sm_show("nicht verborgen: keine Antwort auf /AX"); return; }   // sichtbar lassen (harmlose Richtung)
+ bt_sm_cmd(T_sbtp_hide, T_sbtpok);
+ bt_sm_hidden=1;
+ bt_state=BT_ST_AUS; bt_sm_show("unsichtbar bis Hochlauf fertig");
+#endif
+}
+
+static void bt_sm_unhide (const char *why)
+{
+ if (!bt_sm_cmd(T_sbtp_ns, T_sbtpok)) return;  // Classic wieder verbindbar (Werte wie init_bluetooth())
+ if (!bt_sm_cmd(T_a, T_aok)) return;           // "/A,0" passt auf 0000 und auf 0107 (wirbt schon)
+ bt_sm_hidden=0;
+ bt_state=BT_ST_AUS; bt_sm_set(BT_ST_BEREIT,why);
+}
+
+void bt_sm_minute (void)                       // measure.c, Minutentakt: Sicherheitsnetz fuer bt_sm_unhide()
+{ if (bt_sm_hidden && fp.btmodem==IF820) bt_sm_unhide("sichtbar (Minutentakt)"); }
+
+void bt_sm_boot_done (void)                    // main.c, Ende des Hochlaufs
+{
+ if (fp.btmodem!=IF820) return;
+ if (bt_sm_hidden) { bt_sm_unhide("Hochlauf fertig, sichtbar"); return; }
+ if (bt_state==BT_ST_AUS) bt_sm_set(BT_ST_BEREIT,"Hochlauf fertig");
+}
 
 // Aus communication_change(), Trennen-Zweig, VOR dem Verwerfen von rbuf: Solange BT_LINK noch gesetzt war, leitete
 // die ISR-Weiche Modulausgabe nach rbuf - dort steht dann ggf. schon das DIS-/BTDIS-Event mit dem Trenngrund. Nur

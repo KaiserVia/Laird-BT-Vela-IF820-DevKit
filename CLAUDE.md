@@ -59,6 +59,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-02 - 5.131 (TEST), Phase 2:** IF820 im Hochlauf unsichtbar (`/AX` + `SBTP C=0` ca. 3,7 s nach dem
+  Einschalten, `/A` + `SBTP C=1` am Ende, nur RAM, Flash bleibt `E=2`), Schalter `BT_CYSPP_SM` in btio.h. Phase 3
+  (GESPERRT bei LTE/Update/Flash, `/UCP` vor dem Abo) offen. Details `sism555/project-status.md`, Update 5.131.
 - **2026-11-02 - 5.129/5.130 (TEST), CYSPP-Zustandsmaschine Phase 0+1:** Phase 0 am Geraet (Testmenue 8->7
   "Modulbefehl senden", `Doku/tools/cyspp_phase0.py`): `.CYSPPSTART` startet mit `E=1` einen Central-Scan statt
   Werben, `SAP F=00` sperrt `/A`; tragfaehig fuer Phase 2 ist `/AX`/`/A` + `SBTP C=0/1` im RAM (Konzept Abschnitt 6a).
