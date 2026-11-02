@@ -241,8 +241,6 @@ extern void bt_sm_hide (void);            // main.c: frueh im Hochlauf
 extern void bt_sm_minute (void);          // measure.c: Minutentakt (Sicherheitsnetz)
 extern void bt_sm_lock (void);            // 5.132: sicom.c firmware(): unsichtbar waehrend des Updates (Haupt-Thread)
 extern void bt_sm_unlock (void);          // 5.132: firmware() ohne Neustart beendet
-extern void bt_sm_gsm_lock (void);        // 5.132: hard.c uart1_request(MUX_GSM), thread-tauglich
-extern void bt_sm_gsm_unlock (void);      // 5.132: hard.c uart1_release(), Rueckkehr in den Leerlauf
 #define BT_MODULE_ON     ((PINMODE3&PULLDOWN)==PULLDOWN)   // 5.130: Modul versorgt (measure.c schaltet es nach BT_TIMEOUT per Pull-up ab)
 extern uchar bt_state, bt_transport;
 extern uint  bt_conn_interval, bt_dis_reason;

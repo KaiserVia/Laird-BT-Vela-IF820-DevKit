@@ -495,7 +495,6 @@ uchar uart1_owner = MUX_NONE;				// Current UART1 owner, default: no owner
 uchar uart1_request (uchar requester, uint baud)	// Request UART1 resource
 {																											// Returns TRUE if granted
  uchar prev_owner;											// bisheriger Owner (fuer IF820 Command-Mode-Handling)
- if (requester == MUX_GSM) bt_sm_gsm_lock();	// 5.132: IF820 unsichtbar, solange GSM UART1 haelt (nur aus dem Leerlauf)
  __disable_irq();												// Critical section: protect owner + connect
  prev_owner = uart1_owner;								// merken, woher wir kommen
  if (uart1_owner == requester)						// Already owns UART1?
@@ -566,7 +565,6 @@ void uart1_release (uchar requester)		// Release UART1 resource
 	connect&=~UART1;											// keine Terminal-Ausgabe ans Modul
 	if ((requester != MUX_BT) && bt_cyspp_out)
 	 bt_release();												// CYSPP wieder Eingang (siehe unten, 5.51)
-	if (requester == MUX_GSM) bt_sm_gsm_unlock();	// 5.132: wieder sichtbar (nur wenn bt_sm_gsm_lock() verborgen hat)
  }
  else
  {

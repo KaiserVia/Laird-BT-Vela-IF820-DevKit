@@ -5722,3 +5722,17 @@ Bericht `Doku/tools/Testreports/2026-11-02_15-27-11_99SC9923_testlauf/`.
 - Kleinigkeit: die Sperrzeile zeigt den Transport der letzten Sitzung ("AUS Classic (gesperrt ...)").
 
 **Geaenderte Dateien:** btio.c, sicom.c, sprachen/sictxt.c (-> 5.133), Doku/tools/flash_xmodem.py.
+
+## Update 5.134 (TEST, 2026-11-02): keine BT-Sperre mehr waehrend GSM/LTE - UNGEPRUEFT
+
+**Symptom (Code-Analyse, nicht am Geraet beobachtet):** 5.132/5.133 verbargen das IF820 (`bt_sm_gsm_lock()`), sobald GSM
+UART1 anforderte. GSM haelt UART1 aber vom Einschalten bis zum Ausschalten des Modems, also die ganze Online-Zeit (MQTT-
+Zeitfenster, im Speedcam-/MQTT-Debug-Betrieb dauerhaft). Damit war das Geraet online per BT nicht erreichbar.
+**Bisheriges Design:** BT hat Vorrang - `communication_change()` (libtool.c) beendet bei einem BT-Connect eine laufende
+MQTT-Verbindung (`MQTT_fast_disconnect(1)`) und schaltet auf BT; measure.c startet das Modem nur ohne BT-Verbindung.
+**Fix:** `bt_sm_gsm_lock()`/`bt_sm_gsm_unlock()`, `bt_raw()`, `bt_sm_note` entfernt (btio.c/.h), Aufrufe in hard.c
+entfernt. Sperren im Hochlauf und beim Firmware-Update ueber RS232/USB bleiben.
+**Stand:** gebaut (0/0), auf Board A (99SC9923) geflasht. **Pruefung am 2026-11-03:** Geraet online (MQTT), per BT
+verbinden -> MQTT wird beendet, Banner/PIN ueber BT, nach dem Trennen geht das Geraet wieder online.
+
+**Geaenderte Dateien:** btio.c, btio.h, hard.c, sprachen/sictxt.c (-> 5.134).
