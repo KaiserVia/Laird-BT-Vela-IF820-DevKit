@@ -156,6 +156,8 @@ def build_plan(profile: str, board: dict, paired: bool, bin_path: Path | None, r
     if board["lte"]:
         plan.append({"mode": "gsm-mux", "args": ["--repeat", rep(2 if full else 1)],
                      "why": "UART1-MUX auf GSM (Modem-Terminal)"})
+        plan.append({"mode": "online-bt", "args": ["--repeat", rep(2 if full else 1)],
+                     "why": "BT verbinden, waehrend das Geraet online ist (MQTT); Einrichtung: device_setup.py"})
     if full:
         plan.append({"mode": "bt-timeout", "args": ["--repeat", "1", "--transport", "ble"],
                      "why": "Trennung nach 6 min ohne Eingabe (BLE)"})

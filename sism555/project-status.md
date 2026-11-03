@@ -5769,3 +5769,21 @@ Erkenntnisse: Gesamtueberblick in `Doku/tools/device_setup_Anleitung.md`. Wichti
 - Der B-Testlauf vom Morgen hat gsm-mux uebersprungen, weil das Modem in der Geraetekonfiguration gar nicht
   eingetragen war.
 - Offen (kosmetisch): ein TLS-Verbindungsfehler wird als "F12007 GSM SMS Senden fehlgeschlagen" gemeldet.
+
+### Pruefung 5.134 online (MQTT) + BT auf Board B, 2026-11-03 - Classic ja, BLE NEIN
+
+Neuer Testmodus `online-bt` (`ble_mainboard_test.py`, auch in `bt_testlauf.py` bei LTE-Boards): MQTT-Debug ueber RS232
+an, auf `MQTT Server connected` warten, BT-Smoke, danach Strg+F-Bericht (MQTT beendet?) und warten bis wieder online.
+Lauf 10:53-11:19, Bericht `Doku/tools/Testreports/2026-11-03_10-53-07_VIASIS_26SC9983_online-bt/`:
+
+| Schritt | Ergebnis |
+|---|---|
+| Classic waehrend online (2x) | bestanden: Banner/PIN, MQTT sofort beendet (`/leave`, `State=0`, Modem aus), wieder online nach 160 s / 185 s |
+| BLE waehrend online (2x) | **gescheitert**: PC verbindet, Subscribe ok, aber kein PIN-Prompt, keine `[BT-Zustand]`-Zeile, CYSPP bleibt HIGH, MQTT laeuft weiter (`State=6`) |
+
+**Verdacht (nicht gemessen), gleicher Mechanismus wie 5.127:** solange GSM UART1 haelt, steht der MUX auf dem Modem;
+das IF820 sieht seinen CTS dauerhaft "nicht bereit", kann die GATT-Events beim CCCD-Write nicht loswerden und oeffnet den
+CYSPP-Kanal nicht. Classic braucht diesen Schritt nicht. Folge: online ist das Geraet per BLE (App) nicht erreichbar,
+die Verbindung endet in einer Sackgasse. Erster Anlauf (10:46) scheiterte am Server: `MQTT Server connection refused -
+Unknown error`, Firmware versucht es nach ca. 2,5 min erneut; Zeitlimit des Tests deshalb 10 min.
+

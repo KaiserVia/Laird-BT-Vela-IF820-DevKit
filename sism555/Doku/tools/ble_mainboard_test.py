@@ -4907,6 +4907,170 @@ async def run_gsm_mux(args) -> int:
     return 0 if failures == 0 else 1
 
 
+MQTT_CONNECTED_RE = re.compile(r"MQTT Server connected")      # T_cmqtt (gsmio.c/mqtt.c)
+MQTT_LEAVE_RE = re.compile(r"/leave")                         # send_leave() im MQTT-Debug (MQTT_fast_disconnect(1))
+MQTT_REFUSED_RE = re.compile(r"connection refused")             # CONNACK abgelehnt (Serverseite), Firmware versucht es erneut
+MQTT_LINK_BIT = 0x20                                          # connect & MQTT_LINK im Strg+F-Bericht ("Connect=..h")
+
+
+async def rs232_debug_menu(channel) -> str | None:
+    """Hauptmenue -> 5 Funkmodems -> 2 Mobilfunk -> Strg+G: GSM/GPS/MQTT-Debugmenue. Gibt den Menuetext oder None."""
+    channel.rx.clear()
+    if not await navigate(channel, [(None, b"H"), (MARK_MAIN_RANGE, b"5"), (MARK_RANGE_4, b"2"),
+                                    (MARK_RANGE_8, bytes([0x07]))], 10.0):
+        return None
+    if not await channel.rx.wait_for_marker("1...9?", 8.0):
+        return None
+    text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
+    return text if "MQTT debug mode" in text else None
+
+
+async def rs232_mqtt_debug(on: bool, disconnect: bool = False) -> bool | None:
+    """MQTT-Debug (nur RAM, endet wenn das RS232-Terminal getrennt wird) ein-/ausschalten; optional danach Menuepunkt 8
+    'Disconnect from Server'. Gibt den Zustand vor dem Umschalten (None = Menue nicht erreicht)."""
+    channel = SnifferChannel(SNIFFER)
+    try:
+        text = await rs232_debug_menu(channel)
+        if text is None:
+            log("FEHLER: Debugmenue (Strg+G) nicht erreicht.")
+            return None
+        match = re.search(r"MQTT debug mode:\s*(\S+)", text)
+        was_on = bool(match) and match.group(1).lower() in ("ein", "on")
+        channel.rx.clear()
+        await channel.write(b"4" if was_on != on else b"9")
+        await asyncio.sleep(1.0)
+        if disconnect:
+            if await rs232_debug_menu(channel) is not None:
+                await channel.write(b"8")
+                await asyncio.sleep(5.0)
+        await channel.write(b"H")
+        await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 15.0)
+        return was_on
+    finally:
+        channel.close()
+
+
+async def rs232_report() -> dict:
+    """Strg+F (radiostatus()) im Hauptmenue: Connect-Bits, MQTT-State, CSQ."""
+    channel = SnifferChannel(SNIFFER)
+    try:
+        channel.rx.clear()
+        await channel.write(b"H")
+        await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 15.0)
+        channel.rx.clear()
+        await channel.write(bytes([0x06]))
+        await channel.rx.wait_for_marker("GPS:", 8.0)
+        await asyncio.sleep(0.5)
+        text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
+    finally:
+        channel.close()
+    report = {}
+    for key, pattern, base in (("connect", r"Connect=([0-9A-Fa-f]+)h", 16), ("mqtt_state", r"State=(\d+)", 10),
+                               ("csq", r"CSQ=(\d+)", 10)):
+        match = re.search(pattern, text)
+        if match:
+            report[key] = int(match.group(1), base)
+    if "connect" in report:
+        report["mqtt_link"] = bool(report["connect"] & MQTT_LINK_BIT)
+    return report
+
+
+async def run_online_bt(args) -> int:
+    """5.134: BT-Verbindung, waehrend das Geraet online ist (MQTT). MQTT-Debug ueber RS232 an (Modem dauerhaft an), auf
+    'MQTT Server connected' warten, dann BLE- bzw. Classic-Smoke (sichtbar, Banner, PIN). Danach muss MQTT beendet sein
+    (BT hat Vorrang: communication_change() -> MQTT_fast_disconnect(1)) und das Geraet nach dem Trennen von selbst wieder
+    online gehen (wait_min=3 -> ca. 3-5 min). Zum Schluss MQTT-Debug aus und vom Server trennen.
+    Voraussetzung: Geraet eingerichtet (device_setup.py), RS232 bleibt waehrend des ganzen Laufs offen."""
+    if not need_rs232("online-bt"):
+        return 2
+    result = {"mode": "online-bt", "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+              "repeat": args.repeat, "steps": [], "phases": []}
+    if not await resolve_power_target(args):
+        result["result"] = "device_not_found"
+        write_report("online-bt", result)
+        return 2
+    phase = make_phase_runner(args, result, "ONLINE-BT")
+    transports = ["ble"] + ([] if args.no_classic else ["classic"])
+    failures = 0
+    capture = rs232_capture_start()
+    t_on = time.monotonic()
+    before = await rs232_mqtt_debug(True)
+    if before is None:
+        result["result"] = "failed"
+        result["error"] = "Debugmenue nicht erreicht (Mobilfunk-Menue fehlt? Servertyp MQTT? device_setup.py --check)"
+        rs232_capture_stop()
+        write_report("online-bt", result)
+        return 1
+    log(f"MQTT-Debug an (vorher {'an' if before else 'aus'}) - warte bis {args.online_timeout:g} s auf die Serververbindung ...")
+    online_s = await wait_capture(capture, MQTT_CONNECTED_RE, t_on, args.online_timeout)
+    result["first_online_s"] = online_s
+    result["refused_before_online"] = sum(1 for _, text in capture if MQTT_REFUSED_RE.search(text)) if capture else None
+    if result["refused_before_online"]:
+        log(f"Hinweis: Server hat {result['refused_before_online']} Verbindungsversuch(e) abgelehnt (Serverseite).")
+    if online_s is None:
+        log("FEHLER: Geraet geht nicht online - Einrichtung pruefen (device_setup.py --online). Kein BT-Fehler.")
+        result["result"] = "not_online"
+        await rs232_mqtt_debug(False, disconnect=True)
+        rs232_capture_stop()
+        write_suite_report("online-bt", result, "VIASIS BT waehrend MQTT online",
+                           "Geraet ging nicht online - Test nicht durchfuehrbar.")
+        return 1
+    log(f"Online nach {online_s} s.")
+    await asyncio.sleep(args.online_settle)                       # Join/Status/Parameter abwarten
+    number = 0
+    for rep in range(1, args.repeat + 1):
+        for transport in transports:
+            number += 1
+            label = f"#{number:02d} {transport.upper()} waehrend online ({rep}/{args.repeat})"
+            print(f"\n{'#' * 70}\n  ONLINE-BT {label}\n{'#' * 70}")
+            step = {"label": label, "transport": transport, "repeat": rep}
+            pre = await rs232_report()
+            step["report_before"] = pre
+            if not pre.get("mqtt_link"):
+                # zwischen zwei Schritten noch nicht wieder online: warten (sonst prueft der Schritt nichts Neues)
+                t_wait = time.monotonic()
+                again = await wait_capture(capture, MQTT_CONNECTED_RE, t_wait, args.online_timeout)
+                await asyncio.sleep(args.online_settle)
+                pre = await rs232_report()
+                step["report_before"] = pre
+                step["waited_online_s"] = again
+            if not pre.get("mqtt_link"):
+                step["result"] = "not_online"
+                log("Geraet vor dem BT-Schritt nicht online - Schritt nicht aussagekraeftig.")
+                result["steps"].append(step)
+                failures += 1
+                continue
+            t_bt = time.monotonic()
+            test = run_smoke_test if transport == "ble" else run_classic_smoke_test
+            step["smoke"] = await phase(label, transport, test, hold=args.step_hold)
+            step["leave_seen"] = await wait_capture(capture, MQTT_LEAVE_RE, t_bt, 0) is not None
+            post = await rs232_report()
+            step["report_after"] = post
+            step["mqtt_ended"] = post.get("mqtt_link") is False
+            log(f"Nach der BT-Sitzung: MQTT {'beendet' if step['mqtt_ended'] else 'NOCH VERBUNDEN'}"
+                f" (Connect={post.get('connect', 0):X}h, /leave {'gesehen' if step['leave_seen'] else 'nicht gesehen'}).")
+            t_off = time.monotonic()
+            step["reconnect_s"] = await wait_capture(capture, MQTT_CONNECTED_RE, t_off, args.online_reconnect)
+            log(f"Wieder online: {str(step['reconnect_s']) + ' s nach der BT-Sitzung' if step['reconnect_s'] is not None else 'NEIN'}.")
+            ok = step["smoke"] == "passed" and step["mqtt_ended"] and step["reconnect_s"] is not None
+            step["result"] = "passed" if ok else "failed"
+            trace_event("online_bt_step", level="info" if ok else "warning",
+                        **{k: v for k, v in step.items() if k != "label"}, label=label)
+            result["steps"].append(step)
+            if not ok:
+                failures += 1
+            await asyncio.sleep(args.online_settle)
+    await rs232_mqtt_debug(False, disconnect=True)
+    log("MQTT-Debug aus, vom Server getrennt.")
+    rs232_capture_stop()
+    power_summary(result, "transport")
+    pc_events_export()
+    result["result"] = "passed" if failures == 0 else "failed"
+    write_suite_report("online-bt", result, "VIASIS BT waehrend MQTT online",
+                       f"MQTT-Debug, je Transport {args.repeat} Mal: BT verbinden, MQTT beendet, wieder online.")
+    return 0 if failures == 0 else 1
+
+
 async def run_bt_timeout(args) -> int:
     """BT_TIMEOUT (6 min ohne Empfang, measure.c): verbinden, PIN, dann nichts mehr senden. Erwartet: die Firmware trennt
     nach 360 bis 420 s selbst (bt_disconnect(), Meldung 'Bluetoothverbindung getrennt'). Danach muss das Geraet wieder
@@ -5111,7 +5275,7 @@ def main() -> int:
     p.add_argument("--mode", choices=("smoke", "transfer", "classic-smoke", "cycle", "download", "receive",
                                       "classic-suite", "module-suite", "fast-suite", "idle-latency",
                                       "interleave", "soak", "info", "power-sweep", "boot-race", "reboot-check",
-                                      "nightly", "gsm-mux", "bt-timeout", "bt-update"),
+                                      "nightly", "gsm-mux", "bt-timeout", "bt-update", "online-bt"),
                    default="smoke")
     p.add_argument("--transport", choices=("ble", "classic"), default="ble",
                    help="Uebertragungsweg fuer --mode cycle/download/receive (classic-smoke/classic-suite/smoke/"
@@ -5262,6 +5426,12 @@ def main() -> int:
                    help="[nightly] Sekunden nach 03:15, bis der Neustart als erfolgt gilt und geprueft wird")
     p.add_argument("--gsm-settle", type=float, default=20.0, help="[gsm-mux] Wartezeit nach dem Oeffnen des Modem-Terminals")
     p.add_argument("--gsm-hold", type=float, default=60.0, help="[gsm-mux] Sekunden im Modem-Terminal (MUX auf GSM)")
+    p.add_argument("--online-timeout", type=float, default=600.0,
+                   help="[online-bt] max. Wartezeit auf 'MQTT Server connected' nach dem Einschalten von MQTT-Debug")
+    p.add_argument("--online-reconnect", type=float, default=480.0,
+                   help="[online-bt] max. Wartezeit bis wieder online nach der BT-Sitzung (Firmware wartet 3 min)")
+    p.add_argument("--online-settle", type=float, default=20.0,
+                   help="[online-bt] Pause nach dem Verbinden (Join/Status/Parameter) vor dem BT-Schritt")
     p.add_argument("--timeout-wait", type=float, default=480.0,
                    help="[bt-timeout] max. Wartezeit ohne Eingabe; erwartet wird die Trennung nach 360-420 s")
     p.add_argument("--timeout-recover", type=float, default=90.0,
@@ -5322,7 +5492,8 @@ def main() -> int:
     if args.mode == "receive":
         return asyncio.run(run_receive_test(args))
     bench_tests = {"power-sweep": run_power_sweep, "boot-race": run_boot_race, "reboot-check": run_reboot_check,
-                   "nightly": run_nightly, "gsm-mux": run_gsm_mux, "bt-timeout": run_bt_timeout, "bt-update": run_bt_update}
+                   "nightly": run_nightly, "gsm-mux": run_gsm_mux, "bt-timeout": run_bt_timeout, "bt-update": run_bt_update,
+                   "online-bt": run_online_bt}
     if args.mode in bench_tests:
         global RELAY
         needs_relay = (args.mode in ("power-sweep", "boot-race")
