@@ -1,0 +1,12 @@
+{
+  "servertyp": "MQTT",
+  "apn": "datamobile.ag",
+  "apn_user": "",
+  "apn_pass": "",
+  "roaming": true,
+  "mqtt_server": "vt.gonicus.de",
+  "mqtt_port": 8883,
+  "set_clock": true,
+  "clock_tolerance_s": 60,
+  "keep_online": false
+}

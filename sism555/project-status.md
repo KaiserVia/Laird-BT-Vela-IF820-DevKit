@@ -5753,3 +5753,19 @@ verbinden -> MQTT wird beendet, Banner/PIN ueber BT, nach dem Trennen geht das G
 
 **Offen bleibt** der eigentliche 5.134-Punkt (BT-Connect, waehrend das Geraet online/MQTT ist): gsm-mux konnte ihn nicht
 abdecken, weil das Modem am Testplatz nicht antwortete.
+
+### Mobilfunk/MQTT-Einstellung als Skript (`Doku/tools/device_setup.py`), 2026-11-03
+
+Board B (26SC9983) fuer LTE/MQTT eingerichtet (APN datamobile.ag, Roaming an, MQTT vt.gonicus.de:8883, TLS-Zertifikate
+im Modem). Daraus `device_setup.py` + `device_setup.json` + Anleitung: liest die Werte, aendert nur Abweichungen,
+optional `--online` (MQTT-Debug, Serververbindung) und `--persist` (Stromzyklus, Nachpruefung). Auf B bestanden:
+Einstellen (Roaming aus -> ein), online nach 30 s (`State=6`, CSQ 10), Werte nach 5 s stromlos erhalten.
+Erkenntnisse: Gesamtueberblick in `Doku/tools/device_setup_Anleitung.md`. Wichtig:
+- "Change configuration" mit "Modem/Email j" setzt Servertyp/APN/Roaming zurueck; ein Servertyp-Wechsel setzt den
+  MQTT-Server auf `cloud.viatraffic.com` zurueck.
+- Die datamobile-SIM ist im Roaming: mit Roaming aus scheitert der APN-Test (F12005).
+- SIM-/Netzabfrage (Debug-Menue 2) waehrend einer MQTT-Sitzung meldet faelschlich "NOT REGISTERED" und schickt
+  AT-Kommandos in die laufende Sitzung.
+- Der B-Testlauf vom Morgen hat gsm-mux uebersprungen, weil das Modem in der Geraetekonfiguration gar nicht
+  eingetragen war.
+- Offen (kosmetisch): ein TLS-Verbindungsfehler wird als "F12007 GSM SMS Senden fehlgeschlagen" gemeldet.
