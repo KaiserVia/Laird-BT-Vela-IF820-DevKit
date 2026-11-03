@@ -57,3 +57,11 @@ Automatischer Testlauf: `tools/bt_testlauf.py` (Anleitung `tools/bt_testlauf_Anl
 3. Ymodem-Senden bei Linkverlust abbrechen (war als 5.127 geplant, kommt in eine spaetere Version).
 4. Aufräumen der temporären Diagnose (5.115/5.116, 5.118, 5.119), wenn die Untersuchung abgeschlossen ist.
 5. Allgemeine Änderungen auf `LTE-Update` übernehmen.
+
+## Online-/MQTT-Test: Mobilfunk-Konfiguration am Gerät (Stand 2026-11-03, Board B)
+- **APN: `datamobile.ag`**, USER und PASS leer, ROAMING ein (Funkmodems, Mobilfunk Modem, Konfiguriere APN). `datamobile.de` ist falsch.
+- SIM in den Halter **auf der Platine** stecken (über das Bedienteil kam sie nicht beim Modem an), Antennen für LTE und GPS anschliessen.
+- Servertyp MQTT einstellen (Mobilfunk Menue, Server), danach MQTT-Server eintragen. Cloud-Anlage und Zertifikate (`Zertifikate/`) sind fuer Board B offen.
+- Pruefen: Mobilfunk Menue, Strg+G, Punkt 2 (Registrierung, `NOT REGISTERED` = kein Netz) und Punkt 7 (ICCID); Strg+F im Hauptmenue: `SIMPIN=1`, `CSQ` ca. 10 bis 31, `;State=` bei MQTT 5/6.
+- `F12005` direkt nach dem APN-Eintrag: die Firmware baut sofort eine GPRS-Verbindung auf; es scheitert, solange das Modem nicht registriert ist.
+- Dauer-Online mit Terminal: Strg+G, Punkt 4 "MQTT debug mode" ein. Normal geht das Geraet nur im Zeitfenster (Zeitplanung, Mo-Fr 08:00-18:00) und nur ohne RS232-Terminal online.
