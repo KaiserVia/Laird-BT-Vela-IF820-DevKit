@@ -5736,3 +5736,20 @@ entfernt. Sperren im Hochlauf und beim Firmware-Update ueber RS232/USB bleiben.
 verbinden -> MQTT wird beendet, Banner/PIN ueber BT, nach dem Trennen geht das Geraet wieder online.
 
 **Geaenderte Dateien:** btio.c, btio.h, hard.c, sprachen/sictxt.c (-> 5.134).
+
+### Pruefung 5.134 auf Board B (26SC9983), 2026-11-03 - volles Profil bestanden
+
+`bt_testlauf.py --profil voll`, 07:23-08:28, Bericht `Doku/tools/Testreports/2026-11-03_07-23-43_26SC9983_testlauf/`:
+
+| Teil | Ergebnis |
+|---|---|
+| nightly (2x, 3:15-Neustart) | bestanden |
+| reboot-check (dropout, power je 3x) | bestanden |
+| power-sweep (2x, 0,05-30 s stromlos) | bestanden, kein stummes Modul |
+| boot-race (2x, Verbinden 1-12 s nach dem Einschalten) | bestanden; 4 Erstversuche "not found" (Geraet im Hochlauf verborgen, gewollt), Folgeversuch jeweils ok, Banner ca. 32 s |
+| gsm-mux | uebersprungen - Modem antwortet nicht (kein BT-Fehler) |
+| bt-timeout BLE / Classic | bestanden, Trennung nach 403 s / 391 s |
+| bt-update (Ymodem ueber Classic) | bestanden, Hauptmenue nach dem Neustart ueber dieselbe Verbindung |
+
+**Offen bleibt** der eigentliche 5.134-Punkt (BT-Connect, waehrend das Geraet online/MQTT ist): gsm-mux konnte ihn nicht
+abdecken, weil das Modem am Testplatz nicht antwortete.
