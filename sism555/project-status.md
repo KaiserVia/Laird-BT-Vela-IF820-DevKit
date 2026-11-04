@@ -5910,3 +5910,26 @@ Hochlaeufen `[BT-Zustand] AUS (unsichtbar ...)` und am Ende `BEREIT (Hochlauf fe
   "Wechsel der Stromquelle" (Kernel-Power 105), gleichzeitig verschwanden alle externen USB-Hubs mit RS232-Adapter
   (COM3), Relais (COM7) und Sniffer (COM15) - Laptop vom Dock getrennt. BLE-Scan findet danach kein VIASIS-Geraet.
   Hardwaretest von 26SC9993/9966 damit offen.
+
+### Nachtrag 2026-11-04 spaet: Board 26SC9966 (vormals als 26SC9993 gefuehrt) nach HW-Massnahme - BESTANDEN
+
+Nach dem Wiederanschluss des Docks: Werksreset (Testmenue 3, Strg+W, 5 Default parameter, j - auf Anwenderhinweis
+nach dem Flashen), danach Bluetooth eingetragen (1 Change configuration, Bluetooth j): IF820 bei 460800 erkannt,
+Name `VIASIS_26SC9966`, BLE-Adresse EA:6A:54:D4:8E:54, Classic COM19 (vom Anwender gekoppelt). Firmware 5.135.
+
+Hinweis: Vor dem Werksreset nahm das Geraet RS232-Eingaben nur kurz nach dem Hochlauf an (spaeter keine Reaktion,
+ohne Ausgabe); ab Werksreset nicht mehr beobachtet. F16003 (Messdatenzeiger ausserhalb Flash) beim Hochlauf vor dem
+Werksreset.
+
+| Test | Ergebnis |
+|---|---|
+| BLE-Smoke (frueher: Modulneustart bei jeder Verbindung) | bestanden, kein `BOOT`-Ereignis, Intervall 12 |
+| BLE-Zyklen | 5/5 |
+| reboot-check Stromzyklus / kurze Unterbrechung (BLE) | 3/3 / 3/3 |
+| power-sweep 0,05 bis 30 s (BLE) | 9/9 |
+| Classic-Smoke, Classic-Zyklen | bestanden, 5/5 |
+| Download 1 MB (100000 Messwerte) BLE | 6737 B/s, 0 Retries |
+| Download 1 MB Classic | 7597 B/s, 0 Retries |
+
+Folgerung: Die HW-Massnahme hat den Ausfall unter Funklast behoben; das Board verhaelt sich wie die gesunden Boards.
+Offen: Seriennummer (Geraet meldet 26SC9966, gefuehrt war 26SC9993), langer Dauerlauf (module-suite mit 4,2 MB).
