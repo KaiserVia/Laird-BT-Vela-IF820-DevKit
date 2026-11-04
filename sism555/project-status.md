@@ -5898,3 +5898,15 @@ Hochlaeufen `[BT-Zustand] AUS (unsichtbar ...)` und am Ende `BEREIT (Hochlauf fe
   `[BT-Sitzung beendet]` erst ca. 3 s nach dem Trennen durch Windows und nimmt in der Zeit kein Classic an. Das Skript
   wartet jetzt vor Classic auf diese Zeile (max. 10 s) plus 1 s. Fuer Kunden ohne Bedeutung (kein Wechsel BLE->Classic
   in 3 s).
+
+### Nachtrag 2026-11-04 nachmittags: "26SC9993" wieder angeschlossen - Board meldet sich als 26SC9966
+
+- Nach dem Anschliessen keine Antwort auf RS232; nach Stromzyklus (Relais) Hochlauf mit **Firmware 5.55**,
+  Information: **Seriennummer 26SC9966**, Betriebsstunden 3 h, Datum 01.01.2015, Schnittstellen nur **USB** (kein
+  Bluetooth eingetragen). Sieht nach neuer/getauschter Hauptplatine bzw. zurueckgesetztem Parameterspeicher aus.
+  Seriennummer NICHT geaendert (waere geraten), Rueckfrage an den Anwender.
+- 5.135 per `flash_xmodem.py` geflasht (13:59, Neustart mit 5.135 bestaetigt).
+- Danach Bluetooth eintragen (Testmenue 3, Strg+W, 1) nicht moeglich: um 14:01:44 Windows-Ereignis
+  "Wechsel der Stromquelle" (Kernel-Power 105), gleichzeitig verschwanden alle externen USB-Hubs mit RS232-Adapter
+  (COM3), Relais (COM7) und Sniffer (COM15) - Laptop vom Dock getrennt. BLE-Scan findet danach kein VIASIS-Geraet.
+  Hardwaretest von 26SC9993/9966 damit offen.
