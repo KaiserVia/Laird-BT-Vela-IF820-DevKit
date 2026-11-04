@@ -5787,3 +5787,47 @@ CYSPP-Kanal nicht. Classic braucht diesen Schritt nicht. Folge: online ist das G
 die Verbindung endet in einer Sackgasse. Erster Anlauf (10:46) scheiterte am Server: `MQTT Server connection refused -
 Unknown error`, Firmware versucht es nach ca. 2,5 min erneut; Zeitlimit des Tests deshalb 10 min.
 
+### Board 26SC9993 (5.134, CONNECTION-Draht auf P0.19), 2026-11-03 - IF820 startet bei jeder Verbindung neu
+
+Quick-Check, ob der CONNECTION-Draht wie auf Board A (99SC9923) funktioniert. Ergebnis: keine Aussage moeglich, weil
+keine Verbindung zustande kommt, weder BLE noch Classic, auch nach Hardware-Anpassung durch den Anwender und nach
+Loeschen/Neukoppeln in Windows (Classic-Port jetzt COM17, vorher faelschlich COM18).
+
+| Pruefung | Ergebnis |
+|---|---|
+| Modul-Einstellungen (Bluetooth-Menue 1) | normal, gleiche Werte wie Board B (`GTU F=01`, `.CYSPPGP E=02`, `GBTP C=01`) |
+| Werben (PC-Scan) | sichtbar, -66 dBm |
+| Empfang des Moduls (`/S` ueber Testmenue 8->7, 8 s) | 27 Geraete gehoert, staerkstes -78 dBm |
+| Leerlauf 40 s (Testmenue 8->7) | 0 Neustarts |
+| BLE-Verbindungsversuch (2x 30 s) | **Modul startet alle ca. 10 s neu** (`@E,...,BOOT`, 7x), PC: Timeout |
+| Classic-Versuch COM17 (2x) | `@E,ENC,C=00,S=00` (Link + Verschluesselung stehen), **ca. 2,6 s spaeter `BOOT`**, PC: "Kein Prozess am anderen Ende der Pipe" |
+
+Folgerung: Funk und Konfiguration sind in Ordnung, das IF820 setzt sich aber zurueck, sobald eine Verbindung aktiv wird.
+Die Firmware ist dafuer nicht verantwortlich (P0.19 ist Eingang mit Pull-up, `BT_CONN_GPIO` 0, nichts wird getrieben).
+Verdacht (nicht gemessen): Hardware des Boards, z. B. Versorgungseinbruch am Modul unter Verbindungslast (fehlende
+Entkopplung C128/C58, siehe CLAUDE.md) oder ein Fehler an der Umverdrahtung. Passt zur frueheren Beobachtung, dass das
+Modul nach dem Einschalten erst nach ca. 20 s auf `/PING` antwortete. Naechster Schritt am Board: 3P0V/VDDIO am Modul
+beim Verbindungsversuch mit dem Oszi messen, Umverdrahtung pruefen. Werkzeuge im Scratchpad der Sitzung (`evcheck.py`,
+`evclassic.py`, `idle.py`, `rxscan.py`).
+
+**Nachtrag 2026-11-04 - Software-Pruefung der Modulanbindung, Vergleich mit Referenzboard A (99SC9923, gesund,
+gleich umverdrahtet), beide 5.134, Testmenue 8->7 (Skripte `hwcheck.py`/`xtal.py` im Sitzungs-Scratchpad):**
+
+| Pruefung | 26SC9993 | 99SC9923 (Referenz) |
+|---|---|---|
+| RX/TX: 50x `/PING` schnell | 50/50 korrekt | 50/50 korrekt |
+| CTS/RTS: `GTU` | F=01 | F=01 |
+| 60 Befehle am Stueck (360 Bytes) | 30 Antworten | 30 Antworten (also Grenze des Testmenues, kein Boardfehler) |
+| 32-kHz-Takt, `/PING`-Laufzeit gegen LPC (57 s) | -191 ppm | +236 ppm |
+| dito gegen PC | -2187 ppm | -1758 ppm (LPC-mstimer selbst ca. -2000 ppm gegen PC) |
+| Sekundenzaehler springt gelegentlich um +-1..2 s | ja | ja (Eigenheit der Modulfirmware) |
+| CYSPP im Leerlauf | HIGH, Eingang | HIGH, Eingang |
+| Schlaf aus (`SSLP,L=00`, RAM), dann BLE | weiter Neustarts (6 in 60 s) | - |
+| BLE-Verbindung vom PC | Neustart des Moduls | verbunden nach 2,9 s |
+
+Folgerung: UART (RX/TX), Flusskontrolle, CYSPP und der 32-kHz-Takt verhalten sich auf 26SC9993 wie auf dem gesunden
+Board; ein Quarzdefekt wie frueher auf 26SC9983 zeigt sich nicht (nicht ausgeschlossen, dass der Quarz unter Last
+aussetzt). Der Schlafmodus ist nicht die Ursache. Uebrig bleibt ein Ausfall unter Funklast: Versorgung des Moduls
+(Einbruch beim Senden im Verbindungsbetrieb) oder Bauteil/Verdrahtung am Modul. Das ist per Software nicht weiter
+einzugrenzen; naechster Schritt ist die Messung von 3P0V/VDDIO am Modul waehrend eines Verbindungsversuchs.
+
