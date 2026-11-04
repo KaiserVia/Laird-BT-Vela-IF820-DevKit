@@ -5831,3 +5831,41 @@ aussetzt). Der Schlafmodus ist nicht die Ursache. Uebrig bleibt ein Ausfall unte
 (Einbruch beim Senden im Verbindungsbetrieb) oder Bauteil/Verdrahtung am Modul. Das ist per Software nicht weiter
 einzugrenzen; naechster Schritt ist die Messung von 3P0V/VDDIO am Modul waehrend eines Verbindungsversuchs.
 
+
+## Umfassender Test Board C (26SC9994) mit 5.134 (2026-11-04)
+
+Waehrend auf Hardware-Aenderungen gewartet wird: Board C auf 5.134 (neueste Version) gebracht und mit dem vollen
+Profil von `Doku/tools/bt_testlauf.py` plus anschliessender `module-suite` geprueft. Berichte:
+`Doku/tools/Testreports/2026-11-04_08-39-52_26SC9994_testlauf/` und `.../2026-11-04_09-36-57_VIASIS_26SC9994_module-suite/`.
+
+| Test | Ergebnis |
+|---|---|
+| nightly (Neustart 3:15) | 2/2 |
+| reboot-check Stromzyklus | 3/3 |
+| reboot-check kurze Unterbrechung (dropout 0,1 s) | 2/3 (siehe unten) |
+| power-sweep 0,05 bis 30 s stromlos | 18/18 |
+| boot-race (Verbinden 1 bis 12 s nach dem Einschalten) | 12/12 |
+| bt-timeout BLE / Classic (Trennung nach 6 min) | bestanden / bestanden |
+| bt-update (Firmware-Update ueber Classic, Neustart) | bestanden |
+| module-suite: Classic 12/12 Zyklen, BLE 12/12 Zyklen | bestanden |
+| module-suite: 3x Download 4,2 MB Classic (ca. 7450 B/s), 3x BLE (ca. 6630 B/s), Retries 0 | bestanden |
+
+Nicht geprueft: `gsm-mux` und Online-Betrieb (auf C kein Modem/SIM eingerichtet; Online-Test von 5.134 nur auf Board B).
+
+**Einziger Fehlschlag (dropout #003, Classic):** Windows konnte COM6 nicht oeffnen (OSError 121, Zeitlimit der
+Semaphore). Der Versuch kam ca. 3 s nach dem BLE-Smoke desselben Schritts; die Firmware meldete das Ende der
+BLE-Sitzung (`[BT-Zustand] BEREIT BLE ... DIS, Grund 0913h`) erst, waehrend Windows schon Classic aufbaute.
+Einordnung: Wechsel BLE->Classic ohne Pause, Windows-/Testablauf-seitig, nicht Firmware. Alle anderen
+Classic-Verbindungen (power-sweep, boot-race, module-suite) liefen. Moegliche Abhilfe im Testskript: nach BLE
+auf `BEREIT` auf RS232 warten, bevor Classic geoeffnet wird.
+
+**Befund W11015 bei jedem echten Einschalten (5.131-5.134):** Im Hochlauf steht etwa 1 s vor
+`[BT-Zustand] AUS (unsichtbar bis Hochlauf fertig)` die Warnung `W11015 CTS Timeout`. Ursache: `bt_sm_hide()`
+(btio.c) wiederholt `/AX` bis zu 12x, die ersten Versuche fallen in den Modulstart, CTS ist noch HIGH, `putb()`
+laeuft in den CTS-Timeout und `bt_command()` meldet `dtcerr(DTC_BT_CTS_TIMEOUT)`. Das Verbergen klappt danach
+(boot-race 12/12). Folge: **jeder Einschaltvorgang schreibt W11015 ins Geraeteprotokoll** (`dctext` -> `protocol`)
+und ueberdeckt damit echte CTS-Verdrahtungsfehler. Vorschlag: in `bt_sm_hide()` nur senden, wenn CTS LOW ist
+(Modul bereit), sonst warten; oder `cts_timeout` in der Schleife ohne Meldung zuruecksetzen. Nicht umgesetzt.
+
+Fazit Board C: Funktionen am Tisch (Verbindung, PIN, Menue, Downloads, Timeout, Update ueber BT, alle Neustart-
+und Stromlos-Faelle) laufen mit 5.134. Offen: W11015 im Hochlauf, Online-/GSM-Betrieb auf C.
