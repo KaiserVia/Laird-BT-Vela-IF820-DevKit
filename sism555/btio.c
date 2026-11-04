@@ -794,15 +794,22 @@ static bool bt_sm_cmd (char *cmd, char *ok)   // still senden, UART1 kurz auf BT
 void bt_sm_hide (void)                         // main.c, frueh im Hochlauf
 {
 #if BT_CYSPP_SM
- uchar n;
+ uint t0=mstimer;
+ bool ok=FALSE, rdy=FALSE;
  if (fp.btmodem!=IF820 || (i_reset==FIRM_UP_RES) || (i_reset==SLEEP_RES)) return;
- for (n=0; n<12; n++)                          // Modul startet nach dem Einschalten noch (BOOT nach ca. 2,5 s): bis ca. 4 s
+ while ((uint)(mstimer-t0) < 4500)             // Modul startet nach dem Einschalten noch (BOOT nach ca. 2,5 s): bis 4,5 s
  {                                             // wiederholen; bei Pin LOW sendet bt_sm_cmd() nichts
-  if (bt_sm_cmd(T_ax, T_axok)) break;          // 5.133: nicht schon beim ersten LOW aufgeben - auf 99SC9923 liest der
-  ResetWDT(); osDelay(bt_link_busy() ? 350 : 50);   // Pin waehrend des Modulstarts LOW (dann kehrt bt_sm_cmd() sofort zurueck)
+  if (uart1_owner!=MUX_GSM && !bt_link_busy()) // 5.133: nicht schon beim ersten LOW aufgeben - auf 99SC9923 liest der
+  {                                            // Pin waehrend des Modulstarts LOW (dann kehrt bt_sm_cmd() sofort zurueck)
+   rdy=Init_BT_ch(BT_BAUD);                    // 5.135: erst senden, wenn CTS LOW (Modul empfangsbereit). Vorher lief der
+   if (!rdy) uart1_release(MUX_BT);            // erste /AX im Modulstart in den CTS-Timeout -> W11015 bei JEDEM Einschalten
+   else if (bt_sm_cmd(T_ax, T_axok)) { ok=TRUE; break; }   // im Geraeteprotokoll (Test Board C 2026-11-04)
+  }
+  ResetWDT(); osDelay(bt_link_busy() ? 350 : 50);
  }
- if (n>=12)                                    // sichtbar lassen (harmlose Richtung)
- { bt_sm_show(bt_link_busy() ? "nicht verborgen: Verbindung aktiv" : "nicht verborgen: keine Antwort auf /AX"); return; }
+ if (!ok)                                      // sichtbar lassen (harmlose Richtung)
+ { bt_sm_show(bt_link_busy() ? "nicht verborgen: Verbindung aktiv" :
+              (rdy ? "nicht verborgen: keine Antwort auf /AX" : "nicht verborgen: Modul nicht bereit (CTS HIGH)")); return; }
  bt_sm_cmd(T_sbtp_hide, T_sbtpok);
  bt_sm_hidden=1;
  bt_state=BT_ST_AUS; bt_sm_show("unsichtbar bis Hochlauf fertig");

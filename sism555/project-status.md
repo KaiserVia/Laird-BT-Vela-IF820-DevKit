@@ -5869,3 +5869,14 @@ und ueberdeckt damit echte CTS-Verdrahtungsfehler. Vorschlag: in `bt_sm_hide()` 
 
 Fazit Board C: Funktionen am Tisch (Verbindung, PIN, Menue, Downloads, Timeout, Update ueber BT, alle Neustart-
 und Stromlos-Faelle) laufen mit 5.134. Offen: W11015 im Hochlauf, Online-/GSM-Betrieb auf C.
+
+## Update 5.135 (TEST, 2026-11-04): kein W11015 mehr bei jedem Einschalten
+
+**Symptom:** Seit 5.131 schrieb jeder echte Einschaltvorgang `W11015 CTS Timeout` ins Geraeteprotokoll (Test Board C,
+Abschnitt oben). **Ursache:** `bt_sm_hide()` sendete `/AX` schon waehrend des Modulstarts, CTS war noch HIGH,
+`putb()` lief in den CTS-Timeout. **Fix (btio.c, `bt_sm_hide()`):** vor jedem Versuch `Init_BT_ch()`; nur bei CTS LOW
+wird `/AX` gesendet, sonst UART1 freigeben und warten. Statt 12 fester Versuche ein Zeitfenster von 4,5 s. Kommt CTS
+nie auf LOW: neue Meldung `nicht verborgen: Modul nicht bereit (CTS HIGH)` (Modul bleibt sichtbar, harmlose Richtung).
+
+**Test Board C (26SC9994):** reboot-check power 3/3 (BLE und Classic), boot-race 6/6 (1 bis 12 s), in allen
+Hochlaeufen `[BT-Zustand] AUS (unsichtbar ...)` und am Ende `BEREIT (Hochlauf fertig, sichtbar)`, kein W11015.
