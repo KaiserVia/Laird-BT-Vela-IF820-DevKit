@@ -5880,3 +5880,21 @@ nie auf LOW: neue Meldung `nicht verborgen: Modul nicht bereit (CTS HIGH)` (Modu
 
 **Test Board C (26SC9994):** reboot-check power 3/3 (BLE und Classic), boot-race 6/6 (1 bis 12 s), in allen
 Hochlaeufen `[BT-Zustand] AUS (unsichtbar ...)` und am Ende `BEREIT (Hochlauf fertig, sichtbar)`, kein W11015.
+
+### Nachtrag 2026-11-04: LTE auf Board C eingerichtet, gsm-mux, Testskript
+
+- **Modem eingetragen** (Testmenue 3, Strg+W, 1 Change configuration, alle Werte behalten, Modem/Email j). Achtung:
+  Enter ohne Eingabe bei "Serial number" LOESCHT die Seriennummer (`getline()==1`), sie muss neu eingegeben werden.
+  **Erster Versuch: Modem nicht erkannt**, zweiter Versuch (Modem schon eingeschaltet): `EG91` erkannt.
+  Vermutlich sendet `init_gsm()` (gsmio.c) das erste `AT` direkt nach `gsm_power(1)`, bevor das Modem hochgefahren
+  ist. Nicht BT-relevant, nicht geaendert.
+- **device_setup.py --persist:** Servertyp MQTT, `vt.gonicus.de:8883`, APN `datamobile.ag`, Roaming ein, Uhr; alles
+  ueberlebt den Stromzyklus. SIM erkannt (`SIMPIN=1`), aber `CSQ=0` und `NOT REGISTERED` -> kein Empfang, LTE-Antenne
+  pruefen. Online-/MQTT-Test deshalb noch offen.
+- **gsm-mux 2/2 bestanden** (Modem-Terminal offen, BLE/Classic danach). "BLE waehrend GSM" zeigt erwartungsgemaess
+  keinen PIN-Prompt, solange das Modem-Terminal UART1 haelt (nur Hinweis, zaehlt nicht als Fehler).
+- **Testskript `ble_mainboard_test.py`, `bt_step_checks()`:** Der Classic-Fehler "COM6 Zeitlimit der Semaphore"
+  (heute 2x, dropout #003 und gsm-mux #02) kommt immer direkt nach einem BLE-Versuch: das Modul meldet
+  `[BT-Sitzung beendet]` erst ca. 3 s nach dem Trennen durch Windows und nimmt in der Zeit kein Classic an. Das Skript
+  wartet jetzt vor Classic auf diese Zeile (max. 10 s) plus 1 s. Fuer Kunden ohne Bedeutung (kein Wechsel BLE->Classic
+  in 3 s).

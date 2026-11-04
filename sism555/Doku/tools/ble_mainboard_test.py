@@ -4504,8 +4504,19 @@ async def bt_step_checks(args, phase, label: str, step: dict, capture, classic: 
     """BLE-Smoke (ble_count Mal) und optional Classic-Smoke; Ergebnisse und [BT-Event]-Zahl in step. True = alles bestanden."""
     since = time.monotonic()
     classic = classic and not args.no_classic
-    step["ble"] = [await phase(f"{label} BLE {n}", "ble", run_smoke_test, hold=args.step_hold)
-                   for n in range(1, ble_count + 1)]
+    step["ble"] = []
+    t_ble = time.monotonic()
+    for n in range(1, ble_count + 1):
+        t_ble = time.monotonic()
+        step["ble"].append(await phase(f"{label} BLE {n}", "ble", run_smoke_test, hold=args.step_hold))
+    if classic and ble_count > 0:
+        # 2026-11-04: Das Modul meldet das Ende der BLE-Sitzung erst ca. 3 s nach dem Trennen durch Windows; ein
+        # Classic-Verbindungsaufbau in dieser Zeit scheitert (COM6: Zeitlimit der Semaphore, OSError 121). Warten,
+        # bis die Firmware "[BT-Sitzung beendet]" meldet (max. 10 s), dann noch 1 s.
+        gone = await wait_capture(capture, re.compile(r"\[BT-Sitzung beendet\]"), t_ble, 10.0)
+        log(f"BLE-Sitzungsende auf RS232 {'nach ' + str(gone) + ' s' if gone is not None else 'nicht gesehen'} "
+            f"(ab Start BLE-Versuch), Classic folgt.")
+        await asyncio.sleep(1.0)
     if classic:
         step["classic"] = await phase(f"{label} Classic", "classic", run_classic_smoke_test, hold=args.step_hold)
     step["bt_events"] = count_bt_events(capture, since)
