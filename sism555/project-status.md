@@ -5899,7 +5899,11 @@ Hochlaeufen `[BT-Zustand] AUS (unsichtbar ...)` und am Ende `BEREIT (Hochlauf fe
   wartet jetzt vor Classic auf diese Zeile (max. 10 s) plus 1 s. Fuer Kunden ohne Bedeutung (kein Wechsel BLE->Classic
   in 3 s).
 
-### Nachtrag 2026-11-04 nachmittags: "26SC9993" wieder angeschlossen - Board meldet sich als 26SC9966
+### Nachtrag 2026-11-04 nachmittags: Board 26SC9966 angeschlossen (zuerst irrtuemlich als "26SC9993" gefuehrt)
+
+**Klarstellung des Anwenders (2026-11-05):** Das Board ist **26SC9966**, ein neues Board, das der Anwender erst seit
+2026-11-04 hat. Die Bezeichnung "26SC9993" war ein Versehen; es ist kein umgebautes oder umnummeriertes 26SC9993.
+Seriennummer 26SC9966 ist damit korrekt und bleibt.
 
 - Nach dem Anschliessen keine Antwort auf RS232; nach Stromzyklus (Relais) Hochlauf mit **Firmware 5.55**,
   Information: **Seriennummer 26SC9966**, Betriebsstunden 3 h, Datum 01.01.2015, Schnittstellen nur **USB** (kein
@@ -5909,9 +5913,9 @@ Hochlaeufen `[BT-Zustand] AUS (unsichtbar ...)` und am Ende `BEREIT (Hochlauf fe
 - Danach Bluetooth eintragen (Testmenue 3, Strg+W, 1) nicht moeglich: um 14:01:44 Windows-Ereignis
   "Wechsel der Stromquelle" (Kernel-Power 105), gleichzeitig verschwanden alle externen USB-Hubs mit RS232-Adapter
   (COM3), Relais (COM7) und Sniffer (COM15) - Laptop vom Dock getrennt. BLE-Scan findet danach kein VIASIS-Geraet.
-  Hardwaretest von 26SC9993/9966 damit offen.
+  Hardwaretest von 26SC9966 damit zunaechst offen.
 
-### Nachtrag 2026-11-04 spaet: Board 26SC9966 (vormals als 26SC9993 gefuehrt) nach HW-Massnahme - BESTANDEN
+### Nachtrag 2026-11-04 spaet: Board 26SC9966 (neues Board) - BESTANDEN
 
 Nach dem Wiederanschluss des Docks: Werksreset (Testmenue 3, Strg+W, 5 Default parameter, j - auf Anwenderhinweis
 nach dem Flashen), danach Bluetooth eingetragen (1 Change configuration, Bluetooth j): IF820 bei 460800 erkannt,
@@ -5931,8 +5935,10 @@ Werksreset.
 | Download 1 MB (100000 Messwerte) BLE | 6737 B/s, 0 Retries |
 | Download 1 MB Classic | 7597 B/s, 0 Retries |
 
-Folgerung: Die HW-Massnahme hat den Ausfall unter Funklast behoben; das Board verhaelt sich wie die gesunden Boards.
-Offen: Seriennummer (Geraet meldet 26SC9966, gefuehrt war 26SC9993), langer Dauerlauf (module-suite mit 4,2 MB).
+Folgerung: 26SC9966 verhaelt sich wie die gesunden Boards. **Achtung:** Das sagt nichts ueber 26SC9993 aus (IF820
+startet bei jeder Verbindung neu, Abschnitt 2026-11-03) - dieses Board wurde hier NICHT getestet, sein Fehler ist
+weiter offen.
+Seriennummer geklaert (26SC9966, siehe oben); langer Dauerlauf siehe naechster Nachtrag.
 
 ### Nachtrag 2026-11-05: Dauerlauf (module-suite) auf 26SC9966 mit 5.135 - BESTANDEN
 
