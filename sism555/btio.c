@@ -535,6 +535,7 @@ static char *bt_pair_verdict (uchar cyspp, uchar conn)
 static bool mon_active=FALSE;
 static uint mon_t0, mon_tpoll, mon_cc0;       // Start (mstimer), letzter Abruf, comchange_count bei Start
 static uchar mon_last7, mon_last5;            // zuletzt ausgegebene Pegel (0xFF = noch nichts ausgegeben)
+static uchar mon_lastthr;                     // 5.136 TEMPORAER: zuletzt gemeldeter GSM-Thread-Zustand
 
 static void bt_monitor_stop (void)
 {
@@ -558,18 +559,36 @@ void bt_cyspp_monitor (void)                  // Testmenue 7: Hintergrund-Monito
  bt_kvn("comchange_count", comchange_count);       // TEMPORAER (5.69): Startwert
  mon_cc0=comchange_count; mon_t0=mstimer; mon_tpoll=0;
  mon_last7=0xFF; mon_last5=0xFF;              // erster Abruf gibt den Ausgangszustand aus
+ mon_lastthr=0;                               // 5.136: Thread-Zeile erst beim ersten Wechsel (bzw. sofort, falls schon aktiv)
  mon_active=TRUE;
 }
 
 void bt_monitor_poll (void)                   // einmal je Hauptschleifendurchlauf aus measure.c
 {
- uchar now7, now5, cc; int st, cfg;
+ uchar now7, now5=0, cc, thr; int st, cfg;
  if (!mon_active) return;
  if ((uint)(mstimer-mon_tpoll) < 100) return; // alle 100 ms genuegt (I2C-Zugriff sparen)
  mon_tpoll=mstimer;
  if ((uint)(mstimer-mon_t0) >= MON_DURATION_MS)
  { cc=connect; connect&=~UART1; bt_monitor_stop(); connect=cc; return; }   // nur UART1-Bit weg, BT_LINK bleibt (ISR-Weiche liest es)
- if (osActiveThread) return;                  // I2C nicht neben einem GSM-/MQTT-Thread anfassen (wie communication_change)
+ // 5.136 TEMPORAER (LTE-BLE-Test): GSM-Thread-Wechsel und CONNECTION (P0.19, GPIO, kein I2C) auch
+ // waehrend des GSM-/MQTT-Threads melden - zeigt, ob CONNECTION bei einem BLE-Connect waehrend LTE LOW geht.
+ // CYSPP (I2C) wird waehrend des Threads weiter nicht gelesen.
+ thr = osActiveThread ? 1 : 0;
+ if (thr) now5 = (FIO0PIN & CONN_PIN) ? 1 : 0;
+ if (thr!=mon_lastthr || (thr && now5!=mon_last5))
+ {
+  // connect waehrend des Threads NICHT anfassen (der GSM-Thread schreibt es in uart1_request()); solange
+  // GSM UART1 haelt, ist das UART1-Bit ohnehin geloescht, die Ausgabe geht also nur ans RS232-Terminal.
+  if (!thr) { cc=connect; connect&=~UART1; }
+  newline(); putstr("Zustand [+"); putnumber(mstimer-mon_t0,0); putstr(" ms]: GSM-Thread ");
+  putstr(thr ? "aktiv" : "beendet");
+  if (thr) { putstr(", CONNECTION P0.19 "); putstr(now5 ? "HIGH" : "LOW"); mon_last5=now5; }
+  newline();
+  if (!thr) connect=cc;
+  mon_lastthr=thr;
+ }
+ if (thr) return;                             // I2C nicht neben einem GSM-/MQTT-Thread anfassen (wie communication_change)
  st = read_i2cdev(IC54, 0, 1);                // IC54 Eingangsregister lesen
  if (st < 0) return;                          // I2C-Fehler: naechster Abruf versucht es erneut
  now7 = (uchar)((st>>7)&1);                   // Bit7 = CYSPP-Leitung
