@@ -6042,3 +6042,15 @@ unbeantwortet (bleak `TimeoutError` nach 30-40 s), das Modul meldet kein `DIS` u
   getestet (Board in Windows nicht gekoppelt). gsm-mux/online-bt dadurch ebenfalls offen.
 - Werkzeug-Hinweis: In Git-Bash werden Argumente wie `/PING` in Pfade umgewandelt - fuer `term.py`-Modulbefehle
   `MSYS_NO_PATHCONV=1` setzen.
+
+**Nachtrag 15:10-15:20 (11SC1234):**
+- Anwender sah in Windows einen gekoppelten Classic-Eintrag `VIASIS_12SC1234`, mit dem sich der PC verbunden hatte
+  (Herkunft unklar), hat ihn geloescht und das Board als `VIASIS_11SC1234` neu gekoppelt (Adresse E2B316F2C74C, COM10).
+- **Classic-Smoke bestanden** (Banner 5.135, PIN 111234, Hauptmenue erreichbar).
+- **BLE weiter kaputt**, dreimal: Modul meldet `@E,...,C,...I=0006` (jetzt 7,5 ms) und `[BT-Zustand] VERBUNDEN BLE`,
+  der PC bekommt aber keine GATT-Antwort (bleak TimeoutError nach 30/90 s, auch ohne Dienst-Cache). Danach wirbt das
+  Modul bis zum Stromzyklus nicht mehr.
+- **LTE als Ursache ausgeschlossen:** Mit abgeschaltetem Modem (Konfiguration Modem/Email = n, Schnittstellen nur
+  Bluetooth, USB) und nach 5 s stromlos gleiches Bild. **Achtung: Modem ist auf 11SC1234 noch abgeschaltet**, fuer
+  LTE-Tests wieder einschalten (Change configuration, Modem/Email = j) und `device_setup.py --check` pruefen.
+- Offen: PC-Bluetooth (Gegenprobe mit 99SC9923 oder PC-BT-Neustart) oder Board-/Modulfehler.
