@@ -5933,3 +5933,23 @@ Werksreset.
 
 Folgerung: Die HW-Massnahme hat den Ausfall unter Funklast behoben; das Board verhaelt sich wie die gesunden Boards.
 Offen: Seriennummer (Geraet meldet 26SC9966, gefuehrt war 26SC9993), langer Dauerlauf (module-suite mit 4,2 MB).
+
+### Nachtrag 2026-11-05: Dauerlauf (module-suite) auf 26SC9966 mit 5.135 - BESTANDEN
+
+`ble_mainboard_test.py --mode module-suite --name VIASIS_26SC9966 --pin 269966 --rs232-port COM3 --no-identify`,
+06:43 bis 09:11 (ca. 2 h 27 min). Bericht: `Doku/tools/Testreports/2026-11-05_06-43-56_VIASIS_26SC9966_module-suite/`.
+
+| Phase | Ergebnis |
+|---|---|
+| 419430 Messwerte schreiben, Classic-Smoke, BLE-Smoke | bestanden |
+| Classic-Zyklen / BLE-Zyklen | 12/12 / 12/12 |
+| Classic-Download 4,2 MB 3x | 7545 / 7648 / 7665 B/s, je 0 Retries |
+| BLE-Download 4,2 MB 3x | 3166 / 2827 / 2999 B/s, je 0 Retries, alle vollstaendig |
+
+Auffaellig: Jeder BLE-Download lief beim ersten Versuch unter der Schwelle von 4500 B/s (ca. 3,1 KB/s). Das Skript hat
+nach 61 s abgebrochen (am Geraet je ein F13010-Protokolleintrag) und nach 120 s wiederholt, der zweite Versuch war genauso
+langsam, lief aber fehlerfrei durch. Der 1-MB-Download am Vortag hatte noch 6737 B/s. Das Bild gleicht Board B
+(2026-10-20): ca. 3,1 KB/s passt zu einem vom PC gewaehlten Verbindungsintervall von ca. 60 ms statt 7,5 ms. Im Trace
+steht keine `@E,C`-Zeile mit dem Intervall, daher ist das nicht belegt. Kein Fehler des Boards oder der Firmware; die
+Ursache liegt vermutlich bei der Windows-Seite (wie bei B weiter offen).
+Folgerung: 26SC9966 ist auch im Dauerlauf stabil (keine Verbindungsfehler, keine Retries, kein BOOT).
