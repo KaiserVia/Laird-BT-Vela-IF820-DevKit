@@ -4751,8 +4751,18 @@ async def rs232_navigate(steps: list, timeout: float = 8.0) -> bool:
 async def rs232_set_time(hhmmss: str) -> bool:
     """Hauptmenue -> 6 Information -> 4 Zeit -> hh:mm:ss -> 9 zurueck. Setzt timeupdate in der Firmware (neue Aufgaben)."""
     log(f"Stelle Geraeteuhr ueber RS232 auf {hhmmss} ...")
-    ok = await rs232_navigate([(None, b"H"), (MARK_MAIN_RANGE, b"6"), (MARK_INFO_RANGE, b"4"),
-                               (MARK_TIME_PROMPT, hhmmss.encode("ascii") + b"\r"), (MARK_INFO_RANGE, b"9")])
+    ok = False
+    for attempt in range(3):
+        if attempt:
+            # Direkt nach dem Ende einer BT-Sitzung wird das erste "H" auf RS232 manchmal verschluckt
+            # (nightly 2026-11-05: '1...6?' nie gesehen) - kurz warten, mit ESC neu ansetzen.
+            log(f"Uhr stellen: Menue nicht erreicht, Versuch {attempt + 1}/3 ...")
+            await asyncio.sleep(2.0)
+        ok = await rs232_navigate([(None, b"\x1bH" if attempt else b"H"), (MARK_MAIN_RANGE, b"6"),
+                                   (MARK_INFO_RANGE, b"4"),
+                                   (MARK_TIME_PROMPT, hhmmss.encode("ascii") + b"\r"), (MARK_INFO_RANGE, b"9")])
+        if ok:
+            break
     trace_event("device_clock_set", level="info" if ok else "warning", time=hhmmss, ok=ok)
     if not ok:
         log("Uhr stellen fehlgeschlagen (Menue nicht wie erwartet).")

@@ -5959,3 +5959,31 @@ langsam, lief aber fehlerfrei durch. Der 1-MB-Download am Vortag hatte noch 6737
 steht keine `@E,C`-Zeile mit dem Intervall, daher ist das nicht belegt. Kein Fehler des Boards oder der Firmware; die
 Ursache liegt vermutlich bei der Windows-Seite (wie bei B weiter offen).
 Folgerung: 26SC9966 ist auch im Dauerlauf stabil (keine Verbindungsfehler, keine Retries, kein BOOT).
+
+### Nachtrag 2026-11-05 vormittags: Board A (99SC9923, CONNECTION-Draht) mit 5.135 - BESTANDEN
+
+Board A stand noch auf 5.134 (Uhr ungestellt, 21.10.2026). 5.135 aus `fw_5.135/sism.bin` (identisch mit Commit 6fb3a04)
+per `flash_xmodem.py` geflasht. Die 5.136 im Arbeitsordner stammt aus der Session zur CYSPP-Zustandsmaschine und wurde
+hier nicht verwendet. PIN 999923. Berichte unter `Doku/tools/Testreports/2026-11-05_10-*`.
+
+| Test | Ergebnis |
+|---|---|
+| BLE-Smoke | bestanden |
+| boot-race 1/2/3/5/8/12 s nach Ein, je 3x | 18/18 im Erstversuch, kein W11015 |
+| power-sweep 0,2/0,3/0,5/0,7/1 s stromlos, je 4x (BLE, dazu Classic jeden 3. Schritt) | 20/20 BLE, 6/6 Classic |
+| BLE-Download 1 MB (100000 Messwerte) | 6632 B/s, 0 Retries, Intervall 15 ms |
+| nightly (Neustart 3:15), 3 Durchlaeufe | 3/3 Reboot im Protokoll, BLE 2x + Classic je bestanden |
+
+- Der Ausfall mit 5.133 (Modul stumm nach 0,5 s stromlos, 1 von 18) trat in 20 Versuchen um 0,2 bis 1 s nicht mehr auf.
+- Die drei Fehler aus dem Tischtest vom 2026-11-02 sind damit auf A nachgeprueft: naechtlicher Neustart (nightly 3/3),
+  1 s stromlos (4/4) und Verbinden in den ersten 30 s (boot-race 18/18).
+- Im power-sweep 3x `[BT-Zustand] AUS (nicht verborgen: Verbindung aktiv)`: Der PC hatte sich im Hochlauf schon wieder
+  verbunden, bevor `/AX` gesendet werden konnte. Gewolltes Verhalten (eine aktive Verbindung wird nicht verborgen),
+  kein Fehler.
+- **BLE-Verbindungsintervall:** Beim Smoke-Test verband Windows mit `I=0030` (60 ms). Nach unserem `/UCP` kam erst noch
+  einmal 60 ms, dann `CU ... I=000C` (15 ms). Sonst verbindet Windows mit `I=0006` (7,5 ms) und wechselt auf 15 ms.
+  Das stuetzt die Vermutung zum langsamen Dauerlauf auf 26SC9966 (ca. 3 KB/s = 60 ms). Dort enthielt der Trace aber
+  gar keine `[BT-Event]`-Zeile, auch kein `/UCP gesendet` - ob `/UCP` dort gesendet wurde, bleibt offen.
+- **Testskript:** Im nightly-Modus schlug das Zurueckstellen der Uhr direkt nach dem Ende der Classic-Sitzung 3x fehl
+  (`'1...6?'` nie gesehen, das erste `H` auf RS232 wurde offenbar verschluckt). `rs232_set_time()` versucht es jetzt bis
+  zu 3x mit 2 s Pause und ESC davor. Noch nicht am Geraet nachgeprueft. Uhr und Datum von Hand richtig gestellt.
