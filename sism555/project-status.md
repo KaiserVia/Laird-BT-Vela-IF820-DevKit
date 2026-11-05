@@ -5987,3 +5987,58 @@ hier nicht verwendet. PIN 999923. Berichte unter `Doku/tools/Testreports/2026-11
 - **Testskript:** Im nightly-Modus schlug das Zurueckstellen der Uhr direkt nach dem Ende der Classic-Sitzung 3x fehl
   (`'1...6?'` nie gesehen, das erste `H` auf RS232 wurde offenbar verschluckt). `rs232_set_time()` versucht es jetzt bis
   zu 3x mit 2 s Pause und ESC davor. Noch nicht am Geraet nachgeprueft. Uhr und Datum von Hand richtig gestellt.
+
+### Nachtrag 2026-11-05 mittags: Dauerlauf Board A (99SC9923) mit 5.135 - auch Classic wird im langen Lauf langsam
+
+module-suite ab 11:05 (`Testreports/2026-11-05_11-05-12_VIASIS_99SC9923_module-suite/`), um 13:05 abgebrochen
+(Umbau auf das neue Board, Anwenderentscheidung), waehrend des dritten Classic-Downloads bei 97 %.
+
+| Phase | Ergebnis |
+|---|---|
+| Classic-Zyklen / BLE-Zyklen | 11/12 (1x Windows: "COM12 nicht angeschlossen") / 12/12 |
+| Classic-Download 4,2 MB 1/3, 2/3 | 2920 / 2635 B/s, je 0 Retries, vollstaendig |
+| Classic-Download 3/3 | bis 97 % mit ca. 2650 B/s, abgebrochen |
+| BLE-Downloads | nicht mehr gelaufen |
+
+**Befund:** Diesmal waren die **Classic**-Downloads langsam (sonst ca. 7,5 KB/s), auf 26SC9966 die BLE-Downloads.
+Das Langsamwerden haengt also nicht am BLE-Verbindungsintervall von Windows, sondern tritt im langen Lauf auf
+(beide Male nach Schreiben von 419430 Messwerten). Moegliche Ursachen (nicht untersucht): Lesepfad aus dem Flash bei
+grossem Datenbestand, CTS-Bremse durch das Modul, Windows-Seite. Jeder erste Versuch unter der Schwelle erzeugt einen
+F13010 (Skript bricht nach 61 s ab und wiederholt). Naechster Schritt: in `trace.ndjson` ctswait/ctsDrop je Sitzung
+(`[BT-Sitzung beendet]`) zwischen schnellen und langsamen Downloads vergleichen.
+
+### Nachtrag 2026-11-05 nachmittags: neues Board 11SC1234 (BLE + LTE) - LTE ohne Netz, BLE haengt nach dem Verbinden
+
+**Bestand vor Aenderung:** Firmware 5.55, Seriennummer **11SC1234** (sieht nach Platzhalter aus, unveraendert
+uebernommen), 8 Betriebsstunden, keine Schnittstellen eingetragen, beim Hochlauf "Fehler Bluetooth" und "Fehler GSM/GPRS".
+RS232 nahm vor dem Werksreset nur kurz nach dem Hochlauf Eingaben an (wie bei 26SC9966).
+
+**Einrichtung:** 5.135 aus `fw_5.135/` geflasht, Werksreset (Strg+W, 5, j direkt nach Stromzyklus), Change
+configuration mit Bluetooth j und Modem/Email j: IF820 bei 460800 erkannt (war schon mit F=01 vorkonfiguriert), EG91
+erkannt (Revision EG91EXGAR08A16M1G). `device_setup.py --persist`: MQTT `vt.gonicus.de:8883`, APN `datamobile.ag`,
+Roaming ein, Uhr - alles nach Stromzyklus erhalten. PIN fuer BT: 111234.
+
+**LTE - kein Netz:** APN-Test F12005, MQTT-Testverbindung gescheitert, Registrierung NOT REGISTERED. Direkt am Modem
+(Strg+W, 7, 460800, GSM): `+CPIN: READY`, IMSI 295057531226097, ICCID 89883030000079021678, `+CFUN: 1`,
+nwscanmode 0 (auto). Aber `+CSQ: 99,99`, `+CEREG: 0,2` (sucht) und danach `0,0`, `+QNWINFO: No Service`,
+`+QENG: "servingcell","SEARCH"` ueber mehrere Minuten, auch nach `AT+COPS=0` und `AT+CFUN=4/1`; `AT+COPS=?` ->
+`+CME ERROR: 3`. Das Modem findet keine einzige Zelle -> Funkseite (Antenne, Antennenkabel/Stecker, Bestueckung) statt
+SIM. Die Firmware-Statuszeile hatte kurz vorher `CSQ=15` gezeigt - Herkunft unklar (evtl. alter Wert).
+
+**BLE - Verbindung haengt nach dem Connect (5 Versuche, auch nach Stromzyklen):** Das Board wird gefunden
+(`VIASIS_11SC1234_BLE`, RSSI ca. -60 dBm). Beim Verbinden meldet das Modul `@E,...,C,...,I=0030` (60 ms),
+`[BT-Zustand] VERBUNDEN BLE`, `/UCP` wird gesendet, danach kommt nichts mehr: die GATT-Abfrage des PCs bleibt
+unbeantwortet (bleak `TimeoutError` nach 30-40 s), das Modul meldet kein `DIS` und kein `BOOT` (Event-Sniff: nur `C` und
+`ASC,S=00`), wirbt danach nicht mehr (fuer den PC unsichtbar bis zum Stromzyklus).
+- Modul-Firmware `/QFV`: `E=01040C0C` = 1.4.12.12, wie auf allen anderen Boards.
+- Modul per `/RFAC` auf Werkszustand gesetzt (Meldung zunaechst W11015 CTS-Timeout, wirkte trotzdem: danach 115200,
+  CTS HIGH) und ueber Change configuration komplett neu eingerichtet (Schritte 1-4, /RBT, `BT init done`). Danach
+  unveraendert dasselbe Fehlerbild -> nicht die Modulkonfiguration.
+- Hinweis: Der BLE-Name mit Zusatz `_BLE` wird von unserer Firmware selbst gesetzt (`SDN$,T=00,N=VIASIS_<serno>_BLE`),
+  kein Fremdzustand.
+- Offen: PC-Seite oder Board. Eine Stunde vorher verband derselbe PC problemlos mit 99SC9923; dazwischen wurde der
+  module-suite-Lauf mitten im Classic-Download abgebrochen (Windows-BT-Stack evtl. in schlechtem Zustand). Gegenprobe:
+  Bluetooth am PC aus/ein oder Neustart, dann erneut; oder 99SC9923 wieder anschliessen und vergleichen. Classic nicht
+  getestet (Board in Windows nicht gekoppelt). gsm-mux/online-bt dadurch ebenfalls offen.
+- Werkzeug-Hinweis: In Git-Bash werden Argumente wie `/PING` in Pfade umgewandelt - fuer `term.py`-Modulbefehle
+  `MSYS_NO_PATHCONV=1` setzen.
