@@ -6054,3 +6054,27 @@ unbeantwortet (bleak `TimeoutError` nach 30-40 s), das Modul meldet kein `DIS` u
   Bluetooth, USB) und nach 5 s stromlos gleiches Bild. **Achtung: Modem ist auf 11SC1234 noch abgeschaltet**, fuer
   LTE-Tests wieder einschalten (Change configuration, Modem/Email = j) und `device_setup.py --check` pruefen.
 - Offen: PC-Bluetooth (Gegenprobe mit 99SC9923 oder PC-BT-Neustart) oder Board-/Modulfehler.
+
+## Update 5.136 (TEST, 2026-11-05): CONNECTION-Monitor auch waehrend LTE (temporaer, fuer den LTE-BLE-Test)
+
+**Anlass:** Fuer "BLE verbinden waehrend LTE" soll CONNECTION (P0.19) als zusaetzlicher Ausloeser dienen. Vorher ist
+zu pruefen, ob CONNECTION auch dann auf LOW geht, wenn GSM UART1 haelt und das IF820 deshalb CTS "nicht bereit" sieht.
+Der Monitor (Testmenue 3 -> 7) brach bisher waehrend des GSM-/MQTT-Threads komplett ab (`if (osActiveThread) return;`),
+weil CYSPP ueber I2C gelesen wird.
+
+**Aenderung (`bt_monitor_poll()`, btio.c):** meldet jetzt jeden Wechsel des GSM-Threads (`GSM-Thread aktiv`/`beendet`)
+und waehrend des Threads jede Aenderung von CONNECTION (P0.19, GPIO, kein I2C). CYSPP wird waehrend des Threads weiter
+nicht gelesen; `connect` wird waehrend des Threads nicht angefasst (der GSM-Thread schreibt es in `uart1_request()`).
+TEMPORAER, Rueckbau zusammen mit dem uebrigen Monitor-Code (siehe CLAUDE.md "Aufraeumen").
+
+**Stand:** auf 26SC9966 geflasht (Version bestaetigt), Commit f79d050. Test noch offen: 26SC9966 hat noch kein Modem in
+der Geraetekonfiguration (erster Versuch "Change configuration" mit Modem j: F12001, wie beim ersten Versuch auf Board C).
+
+### Nachtrag 2026-11-09: Board 26SC9993 - Verdacht korrigiert, Anleitung fuer die Messung
+
+Korrektur zur Folgerung vom 2026-11-04 ("Versorgung als naechstes messen"): Werben und Scannen (Funk aktiv) laufen auf
+26SC9993 stabil, der Neustart kommt nur mit einer Verbindung. Mit der Verbindung zieht das Modul CONNECTION auf LOW;
+wahrscheinlichster Verdacht ist daher der CONNECTION-Draht bzw. seine Gegenstelle (Modul treibt LOW gegen etwas hart
+HIGH oder in einen Kurzschluss), danach Versorgung und Bauteile am Modul. Fuer die Messung beim Kollegen mit Oszi:
+`Doku/Anleitung_26SC9993_Neustart_beim_Verbinden.md` (Terminalbefehle, Messpunkte, Gegenprobe "Draht abloeten") und
+das Skript `Doku/tools/if820_boot_check.py` (Modulbefehl-Modus, BLE-/Classic-Versuche, zaehlt `@E,...,BOOT`).
