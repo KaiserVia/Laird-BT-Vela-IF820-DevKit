@@ -6102,3 +6102,21 @@ Nicht getestet: gsm-mux, online-bt (Robustheit spaeter).
 geaendert (Change configuration, BT + Modem j). Es ist also 26SC9966 aus der LTE-Reparatur (passt zur Moduladresse
 EA6A54D48E54). APN/Roaming/MQTT danach unveraendert und nach Stromzyklus erhalten. BLE-Smoke und `classic-smoke`
 (COM19, PIN 269966) bestanden. LTE weiterhin ohne Netz (SIM 295057531226097, siehe oben).
+
+**Nachtrag 08:50 - LTE-Diagnose 26SC9966 per AT (ohne SIM-Ausbau):**
+- SIM: `CPIN READY`, PIN-Abfrage aus (`CLCK SC` = 0), Versuche 3/10 - SIM in Ordnung.
+- Modem: `nwscanmode` 0 (automatisch), `nwscanseq` LTE zuerst, `roamservice` 255 (automatisch), `CFUN 1`,
+  LTE-Baender 0x80800c5 (B1/B3/B7/B8/B20/B28). Kontext 1 ohne APN (normal, APN setzt die Firmware spaeter).
+- SIM-Sperrliste (FPLMN): nur **26223** (1&1). Telekom/Vodafone/O2 nicht gesperrt. LOCI: letzter Versuch
+  26201 (Telekom), Status "not updated".
+- Netzsuche `AT+COPS=?` (nach `COPS=2`): nur **Telekom LTE 26201**, Status unbekannt (nicht gesperrt).
+  Vodafone/O2 werden gar nicht gehoert.
+- Telekom fest gewaehlt (`COPS=1,2,"26201",7`): nach 12 s **`CME ERROR: 30` (No network service)**, kein
+  Ablehnungsgrund vom Netz (`CEER` 6,259), `servingcell SEARCH`, CSQ schwankt zwischen 10 und 99.
+- Danach `COPS=0`, `CEREG=0` zurueckgestellt.
+
+**Folgerung (korrigiert gegenueber oben):** Das Netz lehnt die SIM **nicht** ab - das Modem kann sich auf keine Zelle
+setzen, obwohl die Suche die Telekom kurz hoert. Das ist ein **Empfangsproblem**, kein SIM-Problem: Signal zu
+schwach/sporadisch (nur ein Netz hoerbar, CSQ 10 <-> 99). Zu pruefen: Antenne am richtigen EG91-Anschluss (Haupt-
+statt Diversity-/GNSS-Anschluss), Kabel/Stecker, Antennentyp; Gegenprobe mit Geraet am Fenster. Passt zu 11SC1234
+(dort CSQ dauerhaft 99).
