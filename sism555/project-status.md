@@ -6141,3 +6141,12 @@ MQTT/Online noch nicht getestet - Zertifikate sind noch nicht auf dem Geraet. Ve
   Strg+Z/Strg+C/H), BLE warb weiter. Erst ein Stromzyklus brachte RS232 zurueck. Offen: ob das Verlassen des
   Modem-Terminals bei 115200 haengt (Testskript) oder die Firmware danach festhaengt - noch nicht untersucht.
 - Uebergabe an den Anwender zum Aufspielen der Zertifikate (Geraet im Hauptmenue, 5.136).
+
+**Nachtrag 10:40 - 26SC9966 online (Zertifikate vom Anwender aufgespielt):**
+- `device_setup.py --online`: **online nach 100 s** (MQTT Server connected, PUBACK), state 6, CSQ 23.
+- `online-bt` (Bericht `Doku/tools/Testreports/2026-11-09_10-25-32_VIASIS_26SC9966_online-bt/`): **BLE und Classic
+  waehrend online bestanden** (BLE verbunden nach 1,6 s, Classic Hauptmenue erreicht). Nach jeder BT-Sitzung MQTT
+  beendet (`/leave` gesehen) und nach 213 s bzw. 190 s **von selbst wieder online**.
+- Erster Lauf (10:09) scheiterte nur bei Classic an der PC-Suche: Windows lieferte `stLastSeen` in Ortszeit statt
+  UTC (Alter -3595 s). `ble_mainboard_test.py` laesst jetzt auch das Alter gegen die Ortszeit gelten.
+- Board danach an die CYSPP-Sitzung fuer die kombinierten LTE+BT-Tests (CONNECTION-Leitung) uebergeben.

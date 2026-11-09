@@ -695,6 +695,12 @@ def scan_for_classic_devices(name_prefix: str) -> list[tuple[str, str]]:
                                                    info.stLastSeen.wMinute, info.stLastSeen.wSecond,
                                                    info.stLastSeen.wMilliseconds * 1000)
                                 age_seconds = (datetime.utcnow() - seen_at).total_seconds()
+                                # Windows liefert stLastSeen manchmal in Ortszeit statt UTC (2026-11-09: -3595 s,
+                                # Geraet aber sichtbar) -> auch das Alter gegen die Ortszeit gelten lassen
+                                age_local = (datetime.now() - seen_at).total_seconds()
+                                if not -1.0 <= age_seconds <= CLASSIC_VISIBILITY_MAX_AGE_SECONDS and \
+                                        -1.0 <= age_local <= CLASSIC_VISIBILITY_MAX_AGE_SECONDS:
+                                    age_seconds = age_local
                             except ValueError:
                                 age_seconds = float("inf")
                             if -1.0 <= age_seconds <= CLASSIC_VISIBILITY_MAX_AGE_SECONDS:
