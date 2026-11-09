@@ -6253,3 +6253,25 @@ Schaltplanfragen zur CTS-Beschaltung bei MUX auf LTE: `Doku/Fragen_Schaltplan_CT
   verfolgt.
 **Fazit:** 26SC9966 besteht alle Kurz-Robustheitstests; keine Firmware-Auffaelligkeit. Offen: GPS ohne Satelliten
 (Antenne), Dauerlauf/nightly nicht gemacht.
+
+### Test 5.137 auf 26SC9966 (2026-11-09 12:44-12:58): bestanden
+
+`online-bt` (je 1x BLE und Classic waehrend MQTT online), Bericht
+`Doku/tools/Testreports/2026-11-09_12-44-57_VIASIS_26SC9966_online-bt/`:
+
+| Schritt | Ablauf (RS232) | Ergebnis |
+|---|---|---|
+| BLE | `[BT-Zustand] CONNECTION LOW waehrend Mobilfunk - MQTT wird geordnet beendet (/leave)` -> 0,3 s spaeter `PUBLISH /leave` -> `DATEN (Pin LOW)` -> `PIN =` | bestanden, wieder online nach 206 s mit `PUBLISH /join` |
+| Classic | kein CONNECTION-Ausloeser (CYSPP kam gleichzeitig, `communication_change()` war zuerst dran), `/leave`, PIN | bestanden, wieder online nach 187 s mit `/join` |
+
+Der neue Ausloeser greift bei BLE vor dem CYSPP-Weg und laesst den gewohnten Ablauf (/leave, PIN, spaeter /join)
+unveraendert. Auf 26SC9966 haette BLE auch ohne ihn funktioniert; der Nachweis fuer den Fehlerfall (Board wie B) steht
+aus. Auch bei Classic kamen vor dem Banner Fremdbytes (`0xFF ...`) an.
+
+**Schaltplan Mainboard-V2 (Antworten in `Doku/Fragen_Schaltplan_CTS_MUX.md`):** Modul-CTS (`BLT-RTS`, IF820 Pin 14)
+hat R125 10 kOhm als **Pull-up** nach der geschalteten Modul-3V, in beiden Varianten bestueckt; `BLT-RXD/-TXD/-CTS`
+ohne Pull-Widerstand. Bei MUX auf LTE sieht das Modul damit "nicht bereit" (passt zu B) und `BLT-RXD` schwebt (passt zu
+den Fremdbytes). **Widerspruch:** 26SC9966 haengt trotzdem nicht - entweder sind die alten Boards anders beschaltet
+oder die HW-Massnahme vom 04.11. hat etwas geaendert. Klaerung: CTS-Pin am IF820 online messen (B und 26SC9966).
+Fuer die naechsten Muster: R125 als Pull-down (Strapping-Funktion von P10 im Datenblatt vorher pruefen) und Pull-up
+(z. B. 100 kOhm) auf `BLT-RXD`; der CONNECTION-Ausloeser bleibt als Absicherung.

@@ -43,6 +43,40 @@ Leitungen und an den internen Pull-ups/-downs des Moduls.
 **5. CONNECTION (IF820 Pin 33 → IC36 IO5 bzw. P0.19)**
 - Hängt am Netz noch etwas, z. B. ein Pull-up oder die alte GND-Verbindung, je nach Variante?
 
+## Antworten aus dem Schaltplan Mainboard-V2 (Stand 05.11.2026, ausgewertet 2026-11-09)
+
+Quelle: `Mainboard-V2-A1_05_11_2026.sch/.brd` (Layout-Rev.1). **Einschränkung:** Das ist das NEUE Board V2. Ob die alten
+Boards B (26SC9983) und 26SC9966 an diesen Leitungen gleich beschaltet sind, ist nicht belegt - dafür bleibt die Messung
+(Abschnitt "Gegenprobe").
+
+Zuordnung (IF820 = IC37, Flow-Mux = IC13, Daten-Mux = IC18):
+
+| Netz | MUX-Pin | IF820-Pin | Bauteil am Netz |
+|---|---|---|---|
+| BLT-RTS (= Modul-CTS) | IC13 Pin 9 (1Y0) | Pin 14 (P10) | **R125 10 kΩ als Pull-up nach N$184** |
+| BLT-CTS | IC13 Pin 7 | Pin 16 (P11) | keins |
+| BLT-RXD | IC18 Pin 7 | Pin 15 (P37) | keins |
+| BLT-TXD | IC18 Pin 9 | Pin 17 (P32) | keins |
+
+N$184 ist die geschaltete 3V-Versorgung des Moduls (P-MOSFET T10 DMP1045U-7 über R107 0 Ω).
+
+1. **Modul-CTS:** R125 10 kΩ ist ein **Pull-up** nach 3V, in **beiden** Varianten bestückt (kein Variantenflag), kein
+   Serienwiderstand zwischen IC13 und Modul. Bei MUX auf LTE ist die BT-Seite offen, das Modul sieht HIGH = "nicht
+   bereit". Das passt zum Fehler auf Board B. **Fix:** R125 als **Pull-down** nach GND statt nach 3V. Vorher im
+   IF820-Datenblatt prüfen, ob P10 beim Start ein Strapping-Pin ist (nicht geprüft).
+2. **Modul-RXD (BLT-RXD):** kein Pull-up. Die Leitung schwebt bei LTE, das erklärt die `0xFF`-Bytes vor dem Banner.
+   Gegenmaßnahme: Pull-up (z. B. 100 kΩ) auf BLT-RXD.
+3. **BLT-TXD und BLT-CTS:** ebenfalls ohne Pull-up/-down.
+4. **Varianten:** "Abwertskompatibel ohne LTE" und "Abwärtskompatibel mit LTE". IF820, IC13, IC18, R124/R125/R126 haben
+   kein Flag (immer bestückt). **R139** (0 Ω BT_DEV_WAKE <-> BLT-LINK) ist in beiden Varianten **nicht** bestückt,
+   BT_DEV_WAKE (Pin 28) hängt offen. R77 (10 kΩ) nur in "ohne LTE", R78 (100 Ω) nur in "mit LTE"; beide am Netz N$133
+   zu IC36 IO7. Welche Variante B und 26SC9966 haben und was am 2026-11-04 geändert wurde, steht nicht im Schaltplan.
+5. **CONNECTION:** IF820 Pin 33 (P27, im Plan "CYSPP/SPP") geht **direkt an LPC P0.19**, ohne Bauteil dazwischen (die
+   Umverdrahtung per Draht ist hier fest verdrahtet). Pin 12 (P13, Netz BLT-LINK) geht über R78 bzw. R77 an IC36 IO7.
+
+Folge: Die Hardware-Vermutung (Pull-up am Modul-CTS) trifft im neuen Schaltplan zu. Offen bleibt, ob die alten Boards
+gleich aufgebaut sind - das entscheidet die Messung.
+
 ## Gegenprobe am Board (falls der Schaltplan keine klare Antwort gibt)
 
 Gerät online bringen (MQTT verbunden). Dann am IF820 den **CTS-Pin** mit dem Multimeter gegen GND messen, auf B und auf
