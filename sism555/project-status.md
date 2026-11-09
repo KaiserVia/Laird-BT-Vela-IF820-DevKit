@@ -6079,7 +6079,7 @@ HIGH oder in einen Kurzschluss), danach Versorgung und Bauteile am Modul. Fuer d
 `Doku/Anleitung_26SC9993_Neustart_beim_Verbinden.md` (Terminalbefehle, Messpunkte, Gegenprobe "Draht abloeten") und
 das Skript `Doku/tools/if820_boot_check.py` (Modulbefehl-Modus, BLE-/Classic-Versuche, zaehlt `@E,...,BOOT`).
 
-### Board 29SC2929 (2026-11-09) - Inbetriebnahme mit 5.136: BLE und Classic ok, LTE ohne Netz
+### Board 26SC9966 (kurz als 29SC2929 eingerichtet, 2026-11-09) - Inbetriebnahme nach LTE-Reparatur mit 5.136: BLE und Classic ok, LTE ohne Netz
 
 **Vorher:** Firmware 5.55, keine Seriennummer, Schnittstellen nur Modem/Email-LTE. Auf 5.136 geflasht
 (`flash_xmodem.py`, `fw_5.136/sism.bin`), Werksreset, Seriennummer **29SC2929** (Anwender), Bluetooth + Modem
@@ -6097,3 +6097,8 @@ der LTE-Reparatur von 26SC9966?); EG91 Revision EG91EXGAR08A18M1G. Danach 5 s st
 hier ist Signal vorhanden, trotzdem keine Registrierung. Verdacht damit eher **SIM/Vertrag/Netzfreigabe** als Antenne.
 Gegenprobe: SIM in einem Board oder Handy pruefen, mit dem sie frueher lief, oder andere SIM einsetzen.
 Nicht getestet: gsm-mux, online-bt (Robustheit spaeter).
+
+**Nachtrag 08:05 - Board heisst wieder 26SC9966:** Auf Anwenderwunsch Seriennummer von 29SC2929 auf **26SC9966**
+geaendert (Change configuration, BT + Modem j). Es ist also 26SC9966 aus der LTE-Reparatur (passt zur Moduladresse
+EA6A54D48E54). APN/Roaming/MQTT danach unveraendert und nach Stromzyklus erhalten. BLE-Smoke und `classic-smoke`
+(COM19, PIN 269966) bestanden. LTE weiterhin ohne Netz (SIM 295057531226097, siehe oben).
