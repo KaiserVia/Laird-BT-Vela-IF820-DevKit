@@ -89,3 +89,37 @@ Gerät online bringen (MQTT verbunden). Dann am IF820 den **CTS-Pin** mit dem Mu
   Problem in Hardware. Der CONNECTION-Auslöser bleibt als Absicherung sinnvoll.
 - **Erklärt ihn nicht:** Die Ursache liegt woanders. Der CONNECTION-Auslöser (Firmware 5.137, in Arbeit) ist dann der
   Weg, weil er den MUX auf BT schaltet, bevor der Handshake hängen bleibt.
+
+## Wunschliste Pull-up / Pull-down für die nächsten Muster (Mainboard V2)
+
+**Grundregel:** Steht der MUX auf LTE, sind alle BT-Leitungen auf der Modulseite (Y0 von IC13/IC18) offen. Jede
+Leitung, die das Modul dann **liest**, braucht einen definierten Ruhepegel, und zwar den, bei dem das Modul nichts
+Falsches tut. Leitungen, die das Modul selbst **treibt**, brauchen nichts.
+
+**Back-Powering vermeiden:** Pull-ups nur nach der **geschalteten Modulversorgung N$184** (wie R125 heute), nie
+nach der dauerhaften 3V3. Sonst speist ein Pull-up das ausgeschaltete Modul über den Pin. Das hat schon Module zerstört,
+siehe Betriebsregel in CLAUDE.md. Pull-downs nach GND sind immer unkritisch.
+
+| Prio | Leitung (Netz, IF820-Pin) | Wer treibt sie? | Heute | Wunsch | Warum |
+|---|---|---|---|---|---|
+| **1** | Modul-CTS (`BLT-RTS`, Pin 14 / P10) | LPC-RTS über IC13, bei MUX LTE **niemand** | R125 10 kΩ **Pull-up** nach N$184 | R125 als **Pull-down 10 kΩ nach GND** (gleiches Pad, nur die andere Seite an GND) | Bei LTE sieht das Modul heute HIGH = "Host nicht bereit". Es darf dann nichts senden und hängt beim BLE-Handshake (Abo des Datenkanals) - genau der Fehler auf B. Mit Pull-down sieht es "bereit", schließt den Handshake ab und meldet die Verbindung über CYSPP. Datenblatt: P10 ist kein Strapping-Pin ("Pin When Not Used: floating"), ein Pull-down ist zulässig. |
+| **2** | Modul-RXD (`BLT-RXD`, Pin 15 / P37) | LPC-TXD über IC18, bei MUX LTE **niemand** | nichts | **Pull-up 100 kΩ nach N$184** | UART-Ruhepegel ist HIGH. Die offene Leitung fängt Störungen ein (vor allem beim Senden des LTE-Modems), das Modul hält sie für Zeichen und schickt sie der App als Daten - die `0xFF`-Bytes vor dem Banner (BLE und Classic beobachtet). 100 kΩ reicht für den Ruhepegel und belastet den LPC-Ausgang bei 460800 Baud nicht. |
+| 3 | Modul-TXD (`BLT-TXD`, Pin 17 / P32) | **Modul** (Ausgang) | nichts | nichts | Das Modul treibt die Leitung selbst. Ist das Modul aus, liegt am LPC-RXD1 sein interner Pull-up (nur wirksam, wenn der MUX auf BT steht). |
+| 3 | Modul-RTS (`BLT-CTS`, Pin 16 / P11) | **Modul** (Ausgang) | nichts | nichts | Wie TXD. Ist das Modul aus, hält der interne Pull-up am LPC-CTS1 (P2.2) die Leitung auf "nicht bereit" - richtig so, dann sendet der LPC nicht in ein totes Modul. |
+| **wichtig** | CYSPP (`BLT-LINK`, Pin 12 / P13, über R78 an IC36 IO7) | Modul (zieht LOW bei offenem Datenkanal), Host darf sie **nicht** treiben | R78 100 Ω (Variante mit LTE), R77 10 kΩ nach GND nur "ohne LTE" | **so lassen, R77 NICHT bestücken** | Am DVK nachgewiesen (CLAUDE.md): Die Leitung muss hochohmig sein. Ein Pull-down nach GND wirkt wie "Host zieht CYSPP LOW" und erzwingt den Datenmodus, das war ein Fehlerfall. Den Ruhepegel liefert der Pull-up im PCA9554 (IC36/IC54). |
+| – | CONNECTION (Pin 33 / P27 → LPC P0.19 direkt) | **Modul** (Ausgang) | nichts | nichts extern; LPC-Pull-up an P0.19 eingeschaltet lassen (PINMODE1) | Ist das Modul aus, hält der LPC-Pull-up den Pin auf HIGH = "keine Verbindung". So arbeitet der Auslöser in 5.137. Ein externer Pull-up nach 3V3 würde das ausgeschaltete Modul speisen. |
+| – | RST_L (Pin 34) | niemand | R124 nicht bestückt, interner Pull-up | **Leitung auf einen freien LPC-GPIO führen** (Open-Drain, nur LOW treiben); R124 unbestückt lassen oder 10 kΩ nach N$184 | Kein Pull-Thema, aber dringender Wunsch: Heute kann der LPC das Modul nicht zurücksetzen, ein hängendes Modul braucht einen Stromzyklus des ganzen Geräts. |
+| – | BT_DEV_WAKE (Pin 28) | niemand (R139 nicht bestückt) | offen | nichts | Datenblatt: "Pin When Not Used: floating". Wird von EZ-Serial nicht benutzt. |
+
+**Erwartete Wirkung von Prio 1 + 2:** BLE während LTE geht auch ohne CONNECTION-Auslöser (Modul hängt nicht mehr),
+und die App bekommt vor dem Banner keine Fremdbytes mehr. Der CONNECTION-Auslöser (5.137) bleibt trotzdem drin: Er
+beendet MQTT geordnet, sobald jemand verbindet, und hängt nicht davon ab, wie das Modul gerade CTS sieht.
+
+**Nebenwirkung von Prio 1:** Bei MUX auf LTE darf das Modul senden, seine Meldungen (`@E,...`) gehen dann ins Leere.
+Das ist unkritisch: Die Firmware erfährt Verbindungen über CYSPP und CONNECTION, nicht über diese Meldungen. Daten,
+die die App vor dem Umschalten schickt, gehen verloren. Auch das ist unkritisch, die App wartet ohnehin auf Banner und
+PIN-Prompt.
+
+**Für die alten Muster (Nacharbeit, falls gewünscht):** R125 auslöten und als 10 kΩ zwischen BLT-RTS und GND setzen
+(z. B. an einem GND-Pad in der Nähe). Für BLT-RXD 100 kΩ von IF820 Pin 15 nach N$184 (z. B. am Pad von R125 auf der
+3V-Seite).
