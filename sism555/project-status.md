@@ -6150,3 +6150,19 @@ MQTT/Online noch nicht getestet - Zertifikate sind noch nicht auf dem Geraet. Ve
 - Erster Lauf (10:09) scheiterte nur bei Classic an der PC-Suche: Windows lieferte `stLastSeen` in Ortszeit statt
   UTC (Alter -3595 s). `ble_mainboard_test.py` laesst jetzt auch das Alter gegen die Ortszeit gelten.
 - Board danach an die CYSPP-Sitzung fuer die kombinierten LTE+BT-Tests (CONNECTION-Leitung) uebergeben.
+
+**Nachtrag 11:00 - "RS232 stumm nach gsm-mux" geklaert (Auswertung Trace `Doku/tools/Testreports/2026-11-09_09-57-02_VIASIS_26SC9966_gsm-mux/`):**
+Kein Haenger und kein Board-/Firmwaredefekt im eigentlichen Sinn, sondern eine Fehlnavigation des Testskripts:
+1. Strg+Z beendet das Modem-Terminal, UART1 schaltet von GSM zurueck auf BT. Der dabei gesetzte `comchange` laesst
+   `getc()` in `putmenu()` des Werksmenues sofort -1 liefern -> `werkmenue()` endet von selbst (`while (c>0 && ...)`),
+   ohne Echo; das Testmenue wird ausgegeben.
+2. Das Skript sendete danach blind `8` ("Werksmenue verlassen") - das landete im **Testmenue: 8 = BT-Diagnose**
+   (Trace: `Ihre Auswahl 1...9?8`, dann `BT-Diagnose:`).
+3. `bt_diag_menu()` (btio.c) wartet bis zu **20 x 30 s = 10 min** auf `1`-`7` oder `9` und verwirft alles andere
+   **ohne Echo** (H, ESC, Strg+C, Strg+Z, AT). BT-Verbindungen werden dort zwar per `communication_change()` bemerkt,
+   aber Banner/PIN kommen nicht, weil die Hauptschleife nicht laeuft. Daher: BLE/Classic ohne PIN-Prompt, RS232
+   "stumm", BLE wirbt weiter. Der Stromzyklus nach ca. 5 min hat das beendet (von selbst nach spaetestens 10 min).
+**Einordnung:** einmalig durch das Skript ausgeloest, im normalen Betrieb nicht erreichbar (nur versteckte Service-/
+Testmenues). Fix im Skript: nach Strg+Z nur noch `H` senden (fuehrt aus Werks- und Testmenue ins Hauptmenue).
+Firmware-Vorschlag (nicht umgesetzt, temporaerer Diagnosecode): `bt_diag_menu()` sollte `H`/ESC als Abbruch annehmen.
+Bestaetigung am Board steht noch aus (Board gerade bei der CYSPP-Sitzung).

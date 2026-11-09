@@ -4912,7 +4912,12 @@ async def run_gsm_mux(args) -> int:
             channel.rx.clear()
             await channel.write(bytes([0x1A]))                    # Strg+Z beendet modem_terminal()
             step["left_terminal"] = await channel.rx.wait_for_marker(MARK_RANGE_8, 15.0)
-            await channel.write(b"8")                             # Werksmenue verlassen
+            # Nur 'H' senden, NICHT '8': Beim Verlassen des Modem-Terminals schaltet UART1 von GSM zurueck auf BT,
+            # der Schnittstellenwechsel laesst getc() im Werksmenue sofort -1 liefern - das Werksmenue verlaesst sich
+            # dann selbst. Ein '8' landete so im Testmenue (Punkt 8 = BT-Diagnose), das bis zu 20x30 s auf eine
+            # Ziffer wartet und alles andere stumm verwirft (2026-11-09, 26SC9966: "RS232 stumm"). 'H' fuehrt aus
+            # beiden Menues ins Hauptmenue (putmenu(): menu=0).
+            await channel.write(b"H")
             await asyncio.sleep(1.0)
             await channel.write(b"H")
             step["main_menu_back"] = await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
