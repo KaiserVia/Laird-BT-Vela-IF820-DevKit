@@ -6078,3 +6078,22 @@ wahrscheinlichster Verdacht ist daher der CONNECTION-Draht bzw. seine Gegenstell
 HIGH oder in einen Kurzschluss), danach Versorgung und Bauteile am Modul. Fuer die Messung beim Kollegen mit Oszi:
 `Doku/Anleitung_26SC9993_Neustart_beim_Verbinden.md` (Terminalbefehle, Messpunkte, Gegenprobe "Draht abloeten") und
 das Skript `Doku/tools/if820_boot_check.py` (Modulbefehl-Modus, BLE-/Classic-Versuche, zaehlt `@E,...,BOOT`).
+
+### Board 29SC2929 (2026-11-09) - Inbetriebnahme mit 5.136: BLE und Classic ok, LTE ohne Netz
+
+**Vorher:** Firmware 5.55, keine Seriennummer, Schnittstellen nur Modem/Email-LTE. Auf 5.136 geflasht
+(`flash_xmodem.py`, `fw_5.136/sism.bin`), Werksreset, Seriennummer **29SC2929** (Anwender), Bluetooth + Modem
+konfiguriert: IF820 bei 460800, FW 1.4.12.12, **Moduladresse EA6A54D48E54 = die von 26SC9966** (IF820 bzw. Board aus
+der LTE-Reparatur von 26SC9966?); EG91 Revision EG91EXGAR08A18M1G. Danach 5 s stromlos.
+
+| Pruefung | Ergebnis |
+|---|---|
+| BLE-Smoke (`VIASIS_29SC2929_BLE`, PIN 292929) | **bestanden**, verbunden nach 3,3 s, MTU 517 |
+| Classic SPP (COM19, in Windows noch als `VIASIS_26SC9966` gekoppelt) | **bestanden** (Banner 5.136, PIN, Hauptmenue; direkt per `spp.py`, weil `classic-smoke` den Namen sucht) |
+| `device_setup.py --persist --online` | APN/Roaming/MQTT gesetzt und nach Stromzyklus erhalten; **nicht online** (F12005/F12007) |
+| `--check --net`, AT-Befehle | SIM ok, **CSQ 10** (Signal da), aber `CEREG: 0,2`, `QNWINFO: No Service`, `servingcell SEARCH` |
+
+**Auffaellig:** IMSI **295057531226097** - dieselbe SIM, die auf 11SC1234 ebenfalls kein Netz fand. Dort war CSQ 99,
+hier ist Signal vorhanden, trotzdem keine Registrierung. Verdacht damit eher **SIM/Vertrag/Netzfreigabe** als Antenne.
+Gegenprobe: SIM in einem Board oder Handy pruefen, mit dem sie frueher lief, oder andere SIM einsetzen.
+Nicht getestet: gsm-mux, online-bt (Robustheit spaeter).
