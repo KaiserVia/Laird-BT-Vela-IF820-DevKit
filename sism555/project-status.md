@@ -6120,3 +6120,10 @@ setzen, obwohl die Suche die Telekom kurz hoert. Das ist ein **Empfangsproblem**
 schwach/sporadisch (nur ein Netz hoerbar, CSQ 10 <-> 99). Zu pruefen: Antenne am richtigen EG91-Anschluss (Haupt-
 statt Diversity-/GNSS-Anschluss), Kabel/Stecker, Antennentyp; Gegenprobe mit Geraet am Fenster. Passt zu 11SC1234
 (dort CSQ dauerhaft 99).
+
+**Nachtrag 09:37 - LTE auf 26SC9966 laeuft:** Geraet naeher ans Fenster, Antenne vom Anwender **auf den anderen
+EG91-Anschluss umgesteckt** (sass vorher am falschen). Sofort Zelle gefunden, kurz danach **registriert**:
+`CEREG: 0,5` (Roaming, wie bei der datamobile-SIM erwartet), `COPS: Telekom Deutschland smartsim`, LTE FDD,
+`CGATT: 1`, CSQ 21, RSRP ca. -100 dBm, RSRQ -14. Damit bestaetigt: Empfangsproblem durch Antennenanschluss, SIM ok.
+MQTT/Online noch nicht getestet - Zertifikate sind noch nicht auf dem Geraet. Vermutlich gleiche Ursache auf
+11SC1234 (CSQ 99) - dort Antennenanschluss pruefen.
