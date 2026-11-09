@@ -6166,3 +6166,43 @@ Kein Haenger und kein Board-/Firmwaredefekt im eigentlichen Sinn, sondern eine F
 Testmenues). Fix im Skript: nach Strg+Z nur noch `H` senden (fuehrt aus Werks- und Testmenue ins Hauptmenue).
 Firmware-Vorschlag (nicht umgesetzt, temporaerer Diagnosecode): `bt_diag_menu()` sollte `H`/ESC als Abbruch annehmen.
 Bestaetigung am Board steht noch aus (Board gerade bei der CYSPP-Sitzung).
+
+## LTE-BLE-Test auf 26SC9966 mit 5.136 (2026-11-09) - BLE waehrend LTE funktioniert, CONNECTION kommt auch waehrend LTE
+
+**Frage:** Geht eine BLE-Verbindung, waehrend das Geraet online ist (GSM haelt UART1), und taugt die CONNECTION-Leitung
+(P0.19) als frueher Ausloeser? Auf Board B (26SC9983, 5.134, 2026-11-03) war BLE waehrend MQTT online 2/2 gescheitert
+(CYSPP blieb HIGH, MQTT lief weiter).
+
+**Werkzeug:** `Doku/tools/lte_ble_thread.py` (Monitor 3->7 an, MQTT-Debug an, BLE-Verbindung genau beim Start des
+GSM-Threads, CYSPP-Notify abonniert, wartet auf den PIN-Prompt) sowie `ble_mainboard_test.py --mode online-bt`.
+
+| Fall | Ergebnis |
+|---|---|
+| BLE bei MQTT online, kein Thread (`State=6`, `Threads=0h`), online-bt 10:09 und 10:25 (Lauf des Parallel-Chats) | **2/2 bestanden**: CYSPP LOW ca. 2 s nach dem Verbinden, `/leave`, MQTT beendet, PIN, wieder online nach ca. 210 s. Classic 10:25 ebenfalls bestanden (10:09 nur an der PC-Suche gescheitert, kein Geraetefehler) |
+| BLE in den **Einwahl-Thread** (Modem einschalten + PIN, `GSM_REGISTRATION`, dauerte je ca. 12 s) | **2/2 bestanden**: CONNECTION nach 0,2 s LOW (waehrend der Thread laeuft), CCCD-Abo sofort bestaetigt, Verbindung bleibt stehen; PIN-Prompt erst mit dem Thread-Ende, 12,1-12,2 s nach Verbindungsbeginn |
+| BLE in den **MQTT-Verbindungsthread** (`MQTT_CONNECTION`, ca. 2,5 s) | 1/1 bestanden, PIN nach 3,6 s |
+| BLE kurz nach dem Einwahl-Thread (Modem an, kein Thread) | bestanden, CONNECTION ca. 0,9 s vor CYSPP LOW, PIN nach 1,8 s |
+
+**Befunde:**
+- **CONNECTION geht auch waehrend LTE sofort auf LOW** (0,2 s nach Verbindungsbeginn) - also frueher als CYSPP und
+  auch dann, wenn GSM UART1 haelt. Als frueher Ausloeser grundsaetzlich geeignet.
+- **Auf 26SC9966 blockiert der GSM-MUX das Modul nicht:** das CCCD-Abo wird sofort bestaetigt, die Verbindung haelt,
+  bis die Firmware nach dem Thread-Ende umschaltet (`thread_comchange`, `communication_change()`). Ein ATT-Timeout
+  (30 s) droht daher nicht. Der fuer B vermutete CTS-Stau tritt hier nicht auf; warum B scheiterte, ist offen
+  (boardspezifisch? B mit 5.136 nachpruefen, sobald frei).
+- **Einzige spuerbare Folge des Threads: Wartezeit.** Faellt der Connect in die Einwahl, kommt der PIN-Prompt erst nach
+  deren Ende (gemessen 12 s; der Thread ist durch die Zeitlimits in `atcpin()`/`modem_start()` begrenzt).
+- **Datenmuell vor dem Banner:** In 3 von 5 BLE-Sitzungen bekam die App vor dem Banner Bytes, die die Firmware nicht
+  gesendet hat - meist `0xFF` (bis ca. 18 Pakete, ca. 350 Bytes), einmal 6 Binaerbytes. Sie kommen, waehrend der MUX auf
+  GSM steht; das Modul reicht Leitungsrauschen auf `BLT-RXD` transparent weiter (bekannter Punkt "Pull-up auf
+  BLT-RXD fehlt", CLAUDE.md). Das Banner selbst kam immer vollstaendig.
+- `IC54` Bit 6 (B waehrend MQTT LOW, 26SC9966 HIGH) ist `GSM_LINK` (Modem-Statusleitung), wird nur bei Servertyp SMTP
+  ausgewertet - fuer BT ohne Bedeutung.
+- Kosmetisch (nur Diagnose): die Monitorzeilen von 5.136 vermischen sich mit gleichzeitigen Ausgaben des GSM-Threads.
+
+**Folgerung:** Auf 26SC9966 ist das Geraet waehrend LTE per BLE erreichbar, ohne CONNECTION-Ausloeser. CONNECTION
+koennte noch zwei Dinge verbessern: (1) die Wartezeit bis ca. 12 s verkuerzen, indem ein laufender Einwahl-Thread bei
+CONNECTION LOW abgebrochen wird (`osThreadTerminate`, wird in measure.c schon fuer haengende Registrierungen benutzt) -
+Eingriff in den GSM-Ablauf, Nutzen klein; (2) den Datenmuell kann die Firmware nicht verhindern, solange GSM UART1 haelt -
+Abhilfe Pull-up an `BLT-RXD` (Hardware) oder die App verwirft alles vor dem Banner. Offen: B (26SC9983) mit 5.136
+gegenpruefen.
