@@ -6127,3 +6127,17 @@ EG91-Anschluss umgesteckt** (sass vorher am falschen). Sofort Zelle gefunden, ku
 `CGATT: 1`, CSQ 21, RSRP ca. -100 dBm, RSRQ -14. Damit bestaetigt: Empfangsproblem durch Antennenanschluss, SIM ok.
 MQTT/Online noch nicht getestet - Zertifikate sind noch nicht auf dem Geraet. Vermutlich gleiche Ursache auf
 11SC1234 (CSQ 99) - dort Antennenanschluss pruefen.
+
+**Nachtrag 10:05 - 26SC9966 Funktionspruefung (LTE- und GPS-Antenne dran):**
+- **LTE:** weiter registriert (`CEREG 0,5`, Telekom, RSRP ca. -99 dBm). APN-Test ok (`APN gesetzt und im Modem
+  aktiviert`), MQTT scheitert erwartungsgemaess (Zertifikate fehlen noch).
+- **GPS:** in der Konfiguration eingetragen, Modul **LC76G** (LC76GABNR12A04S) erkannt, liefert NMEA. Nach
+  **5,5 min kein einziger Satellit in Sicht** (alle GSV mit 00, GPS/GLONASS/Galileo/BeiDou) - kein Fix. Verdacht
+  Antenne/Anschluss (aktive Antenne ohne Speisung, falscher Stecker, abgeschirmt).
+- **gsm-mux:** Erster Lauf uebersprungen (F18001): das Skript oeffnete das Modem-Terminal mit **9600 Baud**, das
+  EG91 antwortet nur mit 115200. Neue Option `--gsm-baud` (Vorgabe 115200) in `ble_mainboard_test.py`. Vermutlich
+  war das auch die Ursache des F18001 auf 26SC9983 (2026-11-02). Zweiter Lauf: Terminal offen, BLE verbindet in allen
+  Schritten (1-6 s), Ergebnis aber "unstable"; danach **Hauptmenue nicht gesehen und RS232 komplett stumm** (auch auf
+  Strg+Z/Strg+C/H), BLE warb weiter. Erst ein Stromzyklus brachte RS232 zurueck. Offen: ob das Verlassen des
+  Modem-Terminals bei 115200 haengt (Testskript) oder die Firmware danach festhaengt - noch nicht untersucht.
+- Uebergabe an den Anwender zum Aufspielen der Zertifikate (Geraet im Hauptmenue, 5.136).

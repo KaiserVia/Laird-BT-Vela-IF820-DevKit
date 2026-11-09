@@ -4880,7 +4880,9 @@ async def run_gsm_mux(args) -> int:
         channel = SnifferChannel(SNIFFER)
         try:
             entered = await navigate(channel, [(None, b"H"), (MARK_MAIN_RANGE, b"3"), (MARK_TESTMENU, bytes([0x17])),
-                                               (MARK_RANGE_8, b"7"), (MARK_RANGE_5, b"1"), (MARK_RANGE_4, b"2")], 8.0)
+                                               (MARK_RANGE_8, b"7"),
+                                               (MARK_RANGE_5, b"1" if args.gsm_baud == 9600 else b"2"),
+                                               (MARK_RANGE_4, b"2")], 8.0)
             await asyncio.sleep(args.gsm_settle)                  # Modem einschalten, Startmeldungen
             text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
             step["terminal_entered"] = entered
@@ -5447,6 +5449,8 @@ def main() -> int:
                    help="[nightly] Sekunden nach 03:15, bis der Neustart als erfolgt gilt und geprueft wird")
     p.add_argument("--gsm-settle", type=float, default=20.0, help="[gsm-mux] Wartezeit nach dem Oeffnen des Modem-Terminals")
     p.add_argument("--gsm-hold", type=float, default=60.0, help="[gsm-mux] Sekunden im Modem-Terminal (MUX auf GSM)")
+    p.add_argument("--gsm-baud", type=int, choices=(9600, 115200), default=115200,
+                   help="[gsm-mux] Baudrate im Modem-Terminal (EG91 antwortet nur mit 115200; 9600 ergab F18001)")
     p.add_argument("--online-timeout", type=float, default=600.0,
                    help="[online-bt] max. Wartezeit auf 'MQTT Server connected' nach dem Einschalten von MQTT-Debug")
     p.add_argument("--online-reconnect", type=float, default=480.0,
