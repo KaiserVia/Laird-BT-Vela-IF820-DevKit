@@ -307,6 +307,7 @@ void runcycle (void)				// Messzyklenbetrieb
 	{	
 	 if (comchange || thread_comchange) 					// �nderung Kommunikationsstatus
 	  communication_change ();										// Bearbeitung Schnittstellenwechsel	
+	 else bt_conn_trigger ();										// 5.137: CONNECTION LOW waehrend LTE -> MQTT geordnet beenden (btio.c)
   }	
 
 	if (connect&MQTT_LINK)												// besteht MQTT Verbindung?

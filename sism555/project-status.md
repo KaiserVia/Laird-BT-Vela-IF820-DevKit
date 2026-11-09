@@ -6206,3 +6206,28 @@ CONNECTION LOW abgebrochen wird (`osThreadTerminate`, wird in measure.c schon fu
 Eingriff in den GSM-Ablauf, Nutzen klein; (2) den Datenmuell kann die Firmware nicht verhindern, solange GSM UART1 haelt -
 Abhilfe Pull-up an `BLT-RXD` (Hardware) oder die App verwirft alles vor dem Banner. Offen: B (26SC9983) mit 5.136
 gegenpruefen.
+
+## Update 5.137 (TEST, 2026-11-09): CONNECTION als zusaetzlicher Ausloeser fuer BT waehrend LTE
+
+**Anlass:** Auf Board B (26SC9983) scheiterte BLE waehrend MQTT online: das Modul schloss den Handshake (CCCD-Write)
+bei MUX auf LTE nicht ab, CYSPP blieb HIGH, die Firmware erfuhr nichts. CONNECTION geht dagegen schon beim
+Verbindungsaufbau auf LOW, auch waehrend LTE (26SC9966: 0,2 s, siehe "LTE-BLE-Test auf 26SC9966").
+
+**Aenderung:** `bt_conn_trigger()` (btio.c), Aufruf in measure.c neben `communication_change()` (nur ohne aktiven
+GSM-/MQTT-Thread). Bedingung: IF820, Servertyp MQTT, CONNECTION (P0.19) LOW, GSM haelt UART1 (`uart1_owner==MUX_GSM`),
+keine BT-Sitzung. Dann derselbe geordnete Ablauf wie bei CYSPP LOW: `MQTT_fast_disconnect(1)` = `PUBLISH /leave`,
+MQTT-DISCONNECT, 800 ms, Modem aus, `wait_min=3`; danach geht das Geraet von selbst wieder online (mit `/join`).
+Ohne bestehende MQTT-Verbindung (Modem an, Einwahl fertig) nur Modem aus, kein `/leave`. Modem aus ->
+`uart1_release(MUX_GSM)` -> MUX auf BT, UART1 aktiv -> das Modul darf den Handshake abschliessen, CYSPP LOW,
+`communication_change()` wie bisher (Banner, PIN). Ein laufender Thread wird nicht abgebrochen. Je Verbindung
+hoechstens einmal (wieder scharf nach CONNECTION HIGH). RS232-Zeile: `[BT-Zustand] CONNECTION LOW waehrend Mobilfunk -
+MQTT wird geordnet beendet (/leave)`. Schalter `BT_CONN_TRIGGER` in btio.h (0 = Verhalten wie 5.136).
+Ohne P0.19-Draht liest der Pin ueber den Pull-up HIGH -> nie ausgeloest (Anwendervorgabe: Zusatz, nie Bedingung).
+
+**Bekannte Folge:** Jede BT-Verbindung waehrend LTE beendet MQTT, auch eine, die den Datenkanal nie oeffnet (z. B. eine
+Scanner-App, die nur kurz verbindet). Das galt mit CYSPP schon seit 5.134 fuer echte Sitzungen ("BT hat Vorrang").
+
+**Stand:** gebaut (0 Fehler, 0 Warnungen), am Geraet noch NICHT getestet. Test: 26SC9966 online, BLE verbinden ->
+Zeile `[BT-Zustand] CONNECTION LOW ...`, `/leave`, PIN, spaeter wieder online mit `/join` (darf nichts verschlechtern);
+der eigentliche Nachweis braucht ein Board, das wie B scheitert und den P0.19-Draht hat.
+Schaltplanfragen zur CTS-Beschaltung bei MUX auf LTE: `Doku/Fragen_Schaltplan_CTS_MUX.md`.

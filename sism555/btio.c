@@ -24,6 +24,7 @@
 #include "i2cm.h"		// IC54 (PCA9554) Zugriff fuer CYSPP-Steuerung
 #include "string.h"
 #include "dtc_codes.h"
+#include "mqtt.h"		// 5.137: MQTT_fast_disconnect() fuer den CONNECTION-Ausloeser
 
 bool bt_command (text * command, text * answer, int pause) // Bluetooth Kommando senden, Antwort empfangen
 {                                          // pause>0: Kommando+Antwort formatiert ans Terminal spiegeln
@@ -910,6 +911,37 @@ bool bt_link_gone (void)
  if (st<0 || !(st&BT_LINK)) return(FALSE);    // BT_LINK low aktiv: LOW = Verbindung steht noch
  { uchar cc=connect; connect=concpy & ~UART1; newline(); putln("[BT-Zustand] Linkverlust - Uebertragung abgebrochen"); connect=cc; }
  return(TRUE);
+}
+
+// 5.137 - CONNECTION (P0.19) als ZUSAETZLICHER Ausloeser fuer "BT-Verbindung waehrend LTE".
+// Problem (Board B 26SC9983, 2026-11-03): solange GSM UART1 haelt, steht der MUX (IC18/IC13) auf LTE. Auf manchen
+// Boards sieht das IF820 dann seinen CTS als "nicht bereit", schliesst den BLE-Handshake (CCCD-Write) nicht ab und
+// zieht CYSPP nie auf LOW - die Firmware erfaehrt von der Verbindung nichts, MQTT laeuft weiter, die App wartet ins
+// Leere. CONNECTION geht dagegen schon beim Verbindungsaufbau auf LOW (26SC9966: 0,2 s, auch waehrend LTE).
+// Ablauf: CONNECTION LOW + GSM haelt UART1 + keine BT-Sitzung + kein GSM-/MQTT-Thread -> MQTT geordnet beenden wie
+// bei CYSPP LOW in communication_change(): MQTT_fast_disconnect(1) = PUBLISH /leave, MQTT-DISCONNECT, 800 ms, Modem
+// aus, wait_min=3 (danach geht das Geraet von selbst wieder online, mit /join). Modem aus -> uart1_release(MUX_GSM)
+// -> MUX auf BT, UART1 aktiv (5.127) -> das Modul schliesst den Handshake ab, CYSPP LOW, communication_change()
+// uebernimmt wie heute (Banner, PIN). Ohne MQTT-Verbindung (Modem an, Einwahl fertig) nur Modem aus, kein /leave.
+// Ein laufender Thread wird NICHT abgebrochen; der Ausloeser wirkt nach dessen Ende (Pin bleibt LOW).
+// Ohne P0.19-Draht liegt der Pin ueber den Pull-up auf HIGH -> nie ausgeloest, Verhalten wie bisher. Je Verbindung
+// hoechstens einmal (erst nach CONNECTION HIGH wieder scharf). Aus measure.c, einmal je Hauptschleifendurchlauf.
+void bt_conn_trigger (void)
+{
+#if BT_CONN_TRIGGER
+ static uchar armed=1;
+ uchar cc, leave;
+ if (fp.btmodem!=IF820 || !(interfaces&BT_LINK) || fp.servertyp!=MQTT) return;   // SMTP-Datenanrufe nicht anfassen
+ if (FIO0PIN & CONN_PIN) { armed=1; return; }   // HIGH: keine Verbindung (oder kein Draht)
+ if (!armed || osActiveThread || (connect&BT_LINK) || uart1_owner!=MUX_GSM) return;
+ armed=0;
+ leave = (connect&MQTT_LINK) ? 1 : 0;           // /leave nur bei bestehender MQTT-Verbindung
+ cc=connect; connect=concpy & ~UART1;           // Meldung nur ans Terminal, nicht ans Modem
+ newline(); putstr("[BT-Zustand] CONNECTION LOW waehrend Mobilfunk - ");
+ putln(leave ? "MQTT wird geordnet beendet (/leave)" : "Modem wird abgeschaltet");
+ connect=cc;
+ MQTT_fast_disconnect(leave);
+#endif
 }
 
 void bt_sm_info (void)                         // Zeilen fuer bt_show_counters()

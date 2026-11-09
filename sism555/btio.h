@@ -265,6 +265,11 @@ extern void bt_module_cmd (void);            // TEMPORAER (5.129, Phase 0 Zustan
 // Board 99SC9923 mit RS232-Mitschnitt pruefen; kehren sie zurueck, brauchen wir eine Weiche ohne P0.19.
 #define BT_CONN_GPIO    0
 #define BT_CONN_ACTIVE  ((!BT_CONN_GPIO) || !(FIO0PIN & CONN_PIN))
+// 5.137: CONNECTION (P0.19) als zusaetzlicher Ausloeser - BT-Verbindung waehrend LTE beendet MQTT geordnet (/leave),
+// auch wenn das Modul den Handshake bei MUX auf LTE nicht abschliesst (CYSPP bleibt HIGH). Details bt_conn_trigger().
+// Nie eine Bedingung: ohne Draht liest P0.19 HIGH, dann passiert nichts. 0 = aus (Verhalten wie 5.136).
+#define BT_CONN_TRIGGER 1
+extern void bt_conn_trigger (void);       // 5.137: einmal je Hauptschleifendurchlauf (measure.c)
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
 extern void bt_reset_counters (void);     // Diagnosezaehler nullen (bei neuer BT-Verbindung)
 extern void bt_session_summary (void);    // TEMPORAER (5.118, nur Debug): Sitzungszaehler als Zeile beim Trennen - spaeter entfernen
