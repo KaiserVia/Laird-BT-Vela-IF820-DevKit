@@ -6231,3 +6231,25 @@ Scanner-App, die nur kurz verbindet). Das galt mit CYSPP schon seit 5.134 fuer e
 Zeile `[BT-Zustand] CONNECTION LOW ...`, `/leave`, PIN, spaeter wieder online mit `/join` (darf nichts verschlechtern);
 der eigentliche Nachweis braucht ein Board, das wie B scheitert und den P0.19-Draht hat.
 Schaltplanfragen zur CTS-Beschaltung bei MUX auf LTE: `Doku/Fragen_Schaltplan_CTS_MUX.md`.
+
+### 26SC9966 Robustheitstests mit 5.136 (2026-11-09, nach der LTE+BLE-Pruefung der CYSPP-Sitzung)
+
+| Test | Ergebnis |
+|---|---|
+| gsm-mux (Modem-Terminal 115200, 30 s) | **bestanden**: nach dem Terminal BLE 2/2, Classic ok, RS232 bleibt erreichbar (BLE *waehrend* GSM erwartungsgemaess ohne PIN-Prompt) |
+| boot-race (1-12 s nach dem Einschalten, je 3x) | **18/18**, alle im Erstversuch, Banner nach ca. 30-35 s |
+| power-sweep (0,05-30 s stromlos, je 3x) | **27/27** |
+| cycle 12x | **BLE 12/12, Classic 12/12** |
+| online-bt 3x (BT waehrend MQTT online) | BLE 3/3; Classic 1/3 - beide Fehler im Skript, siehe unten. Nach jeder BT-Sitzung `/leave` und nach 193-213 s von selbst wieder online |
+| online-bt 1x nach Skript-Korrektur | **BLE 1/1, Classic 1/1** |
+
+**Skript-Korrekturen (`ble_mainboard_test.py`):**
+- gsm-mux, Fehlerpfad (F18001): sendete ebenfalls blind `8` und landete in BT-Diagnose - jetzt auch dort nur `H`.
+- online-bt `rs232_report()`: das erste `H` nach einer Classic-Sitzung ging verloren, `Connect=` fehlte und das Skript
+  meldete "MQTT NOCH VERBUNDEN (Connect=0h)" obwohl `/leave` kam. Jetzt bis zu 3 Versuche (ESC+H); im Pruefllauf griff
+  der 2. Versuch.
+- Einmaliges F18001 beim ersten gsm-mux-Versuch (Modem antwortete nicht im Terminal), zweiter Versuch sofort ok; dabei
+  lief noch der CYSPP-Monitor (Testmenue 7, "laeuft") aus der vorherigen Sitzung, danach ausgeschaltet. Nicht weiter
+  verfolgt.
+**Fazit:** 26SC9966 besteht alle Kurz-Robustheitstests; keine Firmware-Auffaelligkeit. Offen: GPS ohne Satelliten
+(Antenne), Dauerlauf/nightly nicht gemacht.

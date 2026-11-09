@@ -4898,7 +4898,9 @@ async def run_gsm_mux(args) -> int:
             if not entered or step["modem_error"]:
                 # Modem antwortet nicht (z. B. F18001 auf 26SC9983, 2026-11-02): Firmware ist zurueck im Werksmenue,
                 # der MUX stand nie dauerhaft auf GSM -> Schritt sagt nichts aus
-                await channel.write(b"8")
+                # Firmware verlaesst das Werksmenue nach F18001 schon selbst (Testmenue steht) -> kein '8' senden,
+                # das waere Testmenue 8 = BT-Diagnose (wartet 10 min stumm, 2026-11-09). 'H' geht aus beiden Menues.
+                await channel.write(b"H")
                 await asyncio.sleep(1.0)
                 await channel.write(b"H")
                 step["main_menu_back"] = await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 8.0)
@@ -4985,19 +4987,28 @@ async def rs232_mqtt_debug(on: bool, disconnect: bool = False) -> bool | None:
 
 
 async def rs232_report() -> dict:
-    """Strg+F (radiostatus()) im Hauptmenue: Connect-Bits, MQTT-State, CSQ."""
-    channel = SnifferChannel(SNIFFER)
-    try:
-        channel.rx.clear()
-        await channel.write(b"H")
-        await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 15.0)
-        channel.rx.clear()
-        await channel.write(bytes([0x06]))
-        await channel.rx.wait_for_marker("GPS:", 8.0)
-        await asyncio.sleep(0.5)
-        text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
-    finally:
-        channel.close()
+    """Strg+F (radiostatus()) im Hauptmenue: Connect-Bits, MQTT-State, CSQ.
+    Bis zu 3 Versuche: das erste 'H' nach dem Ende einer BT-Sitzung geht oft verloren (wie beim Uhrstellen);
+    ohne Wiederholung fehlte "Connect=" und online-bt wertete das als "MQTT NOCH VERBUNDEN" (2026-11-09)."""
+    text = ""
+    for attempt in range(3):
+        channel = SnifferChannel(SNIFFER)
+        try:
+            channel.rx.clear()
+            await channel.write(b"\x1bH" if attempt else b"H")
+            await channel.rx.wait_for_marker(MARK_MAIN_RANGE, 15.0)
+            channel.rx.clear()
+            await channel.write(bytes([0x06]))
+            await channel.rx.wait_for_marker("GPS:", 8.0)
+            await asyncio.sleep(0.5)
+            text = bytes(channel.rx.buf).decode("cp1252", errors="replace")
+        finally:
+            channel.close()
+        if re.search(r"Connect=[0-9A-Fa-f]+h", text):
+            break
+        log(f"Statusabfrage (Strg+F) ohne Connect-Zeile, Versuch {attempt + 2}/3 ..." if attempt < 2
+            else "Statusabfrage (Strg+F) dreimal ohne Connect-Zeile.")
+        await asyncio.sleep(2.0)
     report = {}
     for key, pattern, base in (("connect", r"Connect=([0-9A-Fa-f]+)h", 16), ("mqtt_state", r"State=(\d+)", 10),
                                ("csq", r"CSQ=(\d+)", 10)):
