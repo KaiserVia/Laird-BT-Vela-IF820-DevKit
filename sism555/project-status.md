@@ -6275,3 +6275,20 @@ den Fremdbytes). **Widerspruch:** 26SC9966 haengt trotzdem nicht - entweder sind
 oder die HW-Massnahme vom 04.11. hat etwas geaendert. Klaerung: CTS-Pin am IF820 online messen (B und 26SC9966).
 Fuer die naechsten Muster: R125 als Pull-down (Strapping-Funktion von P10 im Datenblatt vorher pruefen) und Pull-up
 (z. B. 100 kOhm) auf `BLT-RXD`; der CONNECTION-Ausloeser bleibt als Absicherung.
+
+
+## Test 5.137 auf Board B (26SC9983, ohne CONNECTION-Draht) - 2026-11-09
+
+B von 5.134 auf 5.137 geflasht, `online-bt` mit 3 Runden (Bericht `Doku/tools/Testreports/2026-11-09_15-14-00_VIASIS_26SC9983_online-bt`):
+
+| Transport | Ergebnis |
+|---|---|
+| BLE waehrend MQTT online | **0/3** (je mit Wiederholung): Verbindung + CCCD-Quittung nach 21 ms, aber kein PIN-Prompt, kein `/leave`, MQTT bleibt verbunden; danach zweimal 8 min nicht wieder online |
+| Classic waehrend MQTT online | 3/3: `/leave`, PIN, wieder online nach 144-160 s |
+
+Kein `CONNECTION LOW`-Ausloeser im RS232-Mitschnitt - erwartet, B hat keinen Draht CONNECTION -> P0.19 (Anwender
+bestaetigt), P0.19 liest dauerhaft HIGH, die Regel bleibt wie vorgesehen stumm. Bei Classic kommt `DATEN (Pin LOW)`
+direkt nach `VERBUNDEN Classic` - das Modul zieht CYSPP ohne vorherige UART-Meldung, deshalb geht Classic. Bei BLE
+kommt CYSPP erst nach dem CCCD-Handshake, den das Modul bei CTS HIGH (MUX auf LTE, R125-Pull-up) nicht abschliesst
+(Vermutung, nicht gemessen). Naechster Schritt: CTS am IF820 online auf B messen, dann R125 als 10 kOhm Pull-down nach
+GND umsetzen und `online-bt` wiederholen.
