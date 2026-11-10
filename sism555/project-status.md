@@ -6414,3 +6414,17 @@ Noch offen: Classic-Durchgang 3/3 nachholen. Nach dem Abbruch kann am Geraet der
 Nachgeholt 15:27-15:37 (`online-bt --repeat 1`): BLE 1/1, Classic 1/1 bestanden, MQTT jeweils mit `/leave` beendet und
 nach 192-211 s wieder online. **Gesamt 26SC9966 mit R125 nach GND: BLE waehrend LTE online 4/4, Classic 3/3.** Bericht
 `Doku/tools/Testreports/2026-11-10_15-26-55_VIASIS_26SC9966_online-bt`.
+
+### Nachtrag Board B: BLE-Downloads wiederholt (2026-11-10, 15:46-16:19)
+
+B lag nach dem Haenger stromlos (Umstecken). Danach Modul wieder ansprechbar: `/PING` ok, CYSPP HIGH, `/QFV` meldet
+`E=01040C0C` = **Modul-FW 1.4.12.12**. Alle vorhandenen Module laufen auf 1.4.12.12 (Anwender), ein Vergleich mit 1.4.18.18
+ist derzeit nicht moeglich. Die FW-Version erklaert den Haenger also nicht allein: A und B haben mit derselben FW frueher
+BLE-Downloads fehlerfrei bestanden.
+
+Drei BLE-Downloads einzeln (`--mode receive --transport ble`): **3/3 bestanden**, je 4199424 Byte, 6702 / 6661 / 6759 B/s,
+0 Retries. Berichte `Doku/tools/Testreports/2026-11-10_15-46-18_unbekannt_receive`, `..._15-57-26_...`, `..._16-08-40_...`.
+
+**Folgerung:** Der Haenger aus der module-suite (BLE-Download bei 57 %, Modul danach stumm) liess sich nicht reproduzieren,
+vorerst Einzelfall. Er gehoert zum offenen Punkt "Modul faellt gelegentlich aus, nur langer Stromzyklus hilft". Dort fehlt
+weiter die Moeglichkeit, das Modul per RST zurueckzusetzen (`BT_TIMEOUT` schaltet es nur ca. 1 min ab, das reichte nicht).
