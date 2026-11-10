@@ -6335,3 +6335,52 @@ Berichte: `Doku/tools/Testreports/2026-11-10_08-33-11_VIASIS_26SC9983_interleave
 BLE waehrend LTE, UART1 im Leerlauf aus (5.127) und BT-UART nach Reset nicht gestartet (5.128). Die Firmwarefixes 5.127
 und 5.128 bleiben trotzdem richtig (Boards mit Pull-up im Feld). Starkes Argument fuer R125 nach GND in V2.
 B steht wieder auf 5.137. Naechster Schritt: Pull-up 47 kOhm auf BLT-RXD (Spezifikation in `Doku/Fragen_Schaltplan_CTS_MUX.md`).
+
+### Nachtrag: Pull-up BLT-RXD zurueckgestellt
+
+Der im letzten Absatz genannte naechste Schritt entfaellt vorerst: Anwenderentscheidung 2026-11-10, alle Boards
+bekommen nur R125 nach GND (`Doku/Board-Inventar.md`, Umruestaktion).
+
+## Robustheitstests Board B mit R125-Pull-down (5.137, 2026-11-10)
+
+Drei Tests auf B (26SC9983, R125 nach GND, kein P0.19-Draht, Firmware 5.137):
+
+**1. BLE waehrend GSM-/MQTT-Thread** (`lte_ble_thread.py`, `LTEBLE_NAME=VIASIS_26SC9983`): **3/3.** BLE mitten in der
+Einwahl (Registrierungs-Thread, 3 s nach Start: PIN-Prompt nach 10,6 s; 8 s nach Start: nach 3,5 s) und waehrend des
+MQTT-Connect-Threads (0,5 s nach Start: nach 3,3 s). Mit Pull-up war BLE waehrend LTE auf B 0/3.
+
+**2. Stromzyklen** (`bt_testlauf.py --profil voll --nur reboot-check,power-sweep,boot-race --bin keins`): **alles
+bestanden.** Unterbrechung 3/3, Stromzyklus 3/3, power-sweep 0,05-30 s **18/18**, boot-race 1-12 s **12/12**. Bericht
+`Doku/tools/Testreports/2026-11-10_09-37-48_26SC9983_testlauf/testlauf.md`.
+
+**3. module-suite** (`ble_mainboard_test.py --mode module-suite`, 10:14-11:39): **gescheitert, ein neuer Befund.**
+
+| Phase | Ergebnis |
+|---|---|
+| Classic smoke, Classic cycle | bestanden, 12/12 |
+| BLE smoke, BLE cycle | bestanden, 12/12 |
+| Flash schreiben (419430 Messwerte) | bestanden |
+| Classic Download 1/3 | Windows: `could not open port 'COM16'` (Semaphore-Timeout), PC-Seite |
+| Classic Download 2/3, 3/3 | erster Versuch jeweils "langsamer Link" (< 5500 B/s) abgebrochen, Wiederholung **bestanden** (4890 bzw. 4201 B/s, 0 Retries, RSSI -63) |
+| BLE Download 1/3 | lief mit 6,6 KB/s, bei 57 % (11:37:59) **Verbindung weg** (`Not connected`) |
+| BLE Download 2/3, 3/3 | Geraet nicht gefunden (wirbt nicht mehr) |
+
+Bericht: `Doku/tools/Testreports/2026-11-10_10-14-27_VIASIS_26SC9983_module-suite`.
+
+**Was nach dem BLE-Abbruch passierte (RS232-Trace und Nachpruefung):**
+- Firmware merkte den Abbruch nicht: kein `[BT-Sitzung beendet]`, letzter Zustand `[BT-Zustand] DATEN (Pin LOW)` von
+  11:31:49. Ymodem lief bis zum Timeout weiter (`F13010` um 11:38:29). Danach RS232-Ausgabe sehr langsam (ca. 1 s pro
+  Menuezeile), weil `putb()` weiter Richtung BT spiegelt - das bekannte "Split-Brain"-Bild.
+- Monitor 3->7 um ca. 11:44: `CYSPP bit7 LOW`, Bit7 Eingang, `bt_cyspp_out 0`. Das **Modul** haelt CYSPP LOW.
+- 11:45: `BT_TIMEOUT` (6 min ohne Empfang) -> "Bluetoothverbindung getrennt", `W11015 CTS Timeout`, Modul abgeschaltet.
+  Beim naechsten Minutentakt wieder eingeschaltet (measure.c).
+- 11:48-11:50: Modul wirbt weiter **nicht** (BLE-Scan 20 s), `/PING` und `/QS` ueber Testmenue 8->7 **ohne Antwort**,
+  CYSPP weiter LOW. RS232 wieder schnell. Die kurze Abschaltung durch `BT_TIMEOUT` hat das Modul nicht zurueckgeholt.
+
+Einordnung: Das passt zum offenen Punkt "BT-Modul faellt gelegentlich komplett aus, nur langer Stromzyklus hilft"
+(CLAUDE.md) - hier unter Dauerlast (BLE-Ymodem, ca. 6 min, 2,4 MB). Ob R125 nach GND damit zusammenhaengt, ist offen:
+Waehrend des Downloads steht der MUX auf BT und der LPC treibt den Modul-CTS selbst, R125 wirkt dort nicht. Moegliche
+Ursache ist der "lockup under heavy UART loading", den die Modul-FW 1.4.18.18 behebt (Modul-FW von B nicht geprueft).
+Classic-Downloads und alle Verbindungszyklen liefen fehlerfrei.
+
+Offen: B mit langem Stromzyklus wiederbeleben, BLE-Downloads einzeln wiederholen; Modul-FW-Version von B auslesen.

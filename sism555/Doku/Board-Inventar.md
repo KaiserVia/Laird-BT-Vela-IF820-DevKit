@@ -27,7 +27,7 @@ Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umg
 
 | Seriennummer | R125 vorgefunden | Umbau R125 -> GND | Abnahme nach Umbau |
 |---|---|---|---|
-| 26SC9983 (B) | **Pull-up** (3V) | 2026-11-10 | `online-bt` BLE 3/3, Classic 3/3; 5.126/5.127-Gegenprobe bestanden (2026-11-10) |
+| 26SC9983 (B) | **Pull-up** (3V) | 2026-11-10 | `online-bt` BLE 3/3, Classic 3/3; 5.126/5.127-Gegenprobe bestanden; BLE während GSM-Thread 3/3, power-sweep 18/18, boot-race 12/12; module-suite: Zyklen 12/12 je Transport, Classic-Downloads bestanden, **BLE-Download bei 57 % abgebrochen, danach Modul stumm** (2026-11-10) |
 | 26SC9966 | **offen** (nicht bestückt) | offen | - |
 | 99SC9923 (A) | ? | offen | - |
 | 26SC9994 (C) | ? | offen | - |
@@ -39,7 +39,7 @@ Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umg
 
 | Seriennummer | Kurzname | HW-Besonderheiten | Zuletzt geflasht | Bekannter Status | Zuletzt getestet |
 |---|---|---|---|---|---|
-| **26SC9983** | B | R125 nach GND umgebaut (vorher Pull-up), **kein** P0.19-Draht; früher Quarztausch am IF820 (+10 MΩ parallel) | 5.137 | Mit Pull-down `online-bt`: BLE während LTE **3/3**, Classic 3/3 (vorher mit Pull-up BLE 0/3). Ohne LTE unauffällig. | 2026-11-10 |
+| **26SC9983** | B | R125 nach GND umgebaut (vorher Pull-up), **kein** P0.19-Draht; früher Quarztausch am IF820 (+10 MΩ parallel) | 5.137 | Mit Pull-down `online-bt`: BLE während LTE **3/3**, Classic 3/3 (vorher mit Pull-up BLE 0/3). Stromzyklen bestanden. **module-suite 2026-11-10: Modul hing nach BLE-Download-Abbruch (CYSPP LOW, kein `/PING`), `BT_TIMEOUT` holte es nicht zurück.** | 2026-11-10 |
 | **26SC9966** | - | R125 nicht bestückt (offen), CONNECTION -> P0.19 verdrahtet, LTE + SIM | 5.137 | BLE und Classic während LTE in allen Läufen bestanden, 5.137-Auslöser mit `/leave`/`/join` bestanden; Robustheit (gsm-mux, boot-race 18/18, power-sweep 27/27, cycle 12/12) bestanden. | 2026-11-09 |
 | **99SC9923** | A | CONNECTION -> P0.19 verdrahtet (früher über IC54-Pad IO5) | 5.135 | module-suite 5.135 am 05.11. bis zum Abbruch ohne Fehler (Classic im langen Lauf langsam, ca. 2,6 KB/s). | 2026-11-05 |
 | **26SC9994** | C | unverändert, HW V2 | 5.134 | Umfassender Test 5.134 bestanden (bis auf 1x kurze Unterbrechung 0,1 s); scheiterte vor 5.127 an UART1-Abschaltung im Leerlauf. | 2026-11-04 |
