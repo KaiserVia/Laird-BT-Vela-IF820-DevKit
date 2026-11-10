@@ -12,7 +12,8 @@ Gerätefirmware **sism555** (LPC1766, Keil-Projekt `sism555/sism.uvprojx`).
 Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
-- **Aktueller Branch:** `LTE-Update` (Hauptlinie)
+- **Aktueller Branch:** `connection-pin` (Arbeitsstand seit 5.101, alle TEST-Versionen 5.127-5.137);
+  `LTE-Update` ist die Hauptlinie, Zusammenführung offen
 - **⚠ Nebenbranch `connection-pin` (ab 5.101) - HARDWARE-ABHAENGIG, nicht auf normale Boards
   flashen:** setzt eine Umverdrahtung voraus (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**;
   in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen GND-Verbindung dafür aufgetrennt wurde).
@@ -31,7 +32,7 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 ## WICHTIGSTE Datei zuerst lesen
 
 ➡ **`sism555/project-status.md`** — das laufende Projekttagebuch mit allen
-Entscheidungen, Updates (aktuell bis **Update 5.59**), offenen Punkten,
+Entscheidungen, Updates (neueste ganz unten), offenen Punkten,
 Hardware-Merkern und der Diagnose-Code-Systematik. **Bei jeder neuen Session
 zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
@@ -59,6 +60,16 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-10 - Ursache "BLE während LTE hängt" gefunden: R125.** R125 (10 kΩ) zieht den Modul-CTS (IF820 Pin 14)
+  nach 3 V. Steht der UART-MUX auf LTE, sieht das Modul "Host nicht bereit" und schließt den BLE-Handshake (CCCD) nicht
+  ab, zieht CYSPP nie auf LOW, die Firmware merkt die Verbindung nicht. Belege: Board B (26SC9983, R125 bestückt) mit
+  5.137 BLE während LTE 0/3, Classic 3/3; 26SC9966 (R125 **nicht** bestückt) besteht BLE während LTE in allen Läufen.
+  Classic ist nicht betroffen (CYSPP geht dort ohne UART-Meldung auf LOW). Anwender baut R125 auf B um, danach
+  `online-bt` wiederholen. Für V2: R125 nach GND statt 3 V (Wunschliste in `sism555/Doku/Fragen_Schaltplan_CTS_MUX.md`).
+- **2026-11-09 - 5.137 (TEST):** CONNECTION (P0.19) als zusätzlicher Auslöser - BT-Verbindung während LTE beendet MQTT
+  geordnet (`/leave`), nach dem Trennen `/join`. Auf 26SC9966 bestanden; ohne P0.19-Draht (B) bleibt er wie vorgesehen
+  stumm. 5.136: CONNECTION-Monitor (Testmenü 3->7) auch während LTE (temporär). 5.135: kein W11015 mehr beim Einschalten.
+  5.134: keine BT-Sperre mehr während GSM/LTE (BT hat Vorrang, beendet MQTT).
 - **2026-11-02 - 5.133 (TEST):** Board C mit 5.132 Kurzprofil komplett bestanden. Board A (99SC9923) zeigte zwei Fehler, in 5.133
   behoben: nach Kaltstart nicht verborgen (CYSPP liest im Modulstart LOW) und Update-Sperrzeile stoerte XMODEM; dazu
   `flash_xmodem.py` robuster. A mit 5.133: boot-race 12/12, power-sweep 17/18 (1x Modul stumm nach 0,5 s stromlos).
@@ -243,6 +254,10 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   und der Aufruf im else-Zweig von `bt_sniff_poll()` (btio.c) geben die Modul-Events `C` (Verbindungsparameter
   I=/L=/O=) und `DIS` (Trenngrund R=) immer als Zeile `[BT-Event] @E,...` auf RS232 aus. Nur fuer die Ursachensuche
   bei BLE-Abbruechen/Langsamlauf (PC vs. Modul). **Wieder entfernen**, sobald die Untersuchung abgeschlossen ist.
+- **Aufraeumen - TEMPORAER seit 5.129/5.136:** `bt_module_cmd()` (Testmenue 8->7 "Modulbefehl senden", 5.129) und
+  die Erweiterung von `bt_monitor_poll()` um GSM-Thread-Wechsel und CONNECTION waehrend LTE (`mon_lastthr`, 5.136,
+  btio.c). Nur fuer Phase 0 der Zustandsmaschine bzw. den LTE-BLE-Test; nach Abschluss entfernen. `bt_conn_trigger()`
+  (5.137) ist dagegen Funktion, kein Diagnosecode (Schalter `BT_CONN_TRIGGER` in btio.h).
 - **Aufraeumen - TEMPORAER seit 5.118 (Anwenderentscheidung 2026-10-14):** `bt_session_summary()`
   (btio.c/.h) gibt beim BT-Trennen eine Zeile `[BT-Sitzung beendet] TX=... ctswait=... ctsDrop=...` ans Terminal,
   Aufruf in `libtool.c` (`communication_change()`, Trennen-Zweig). Nur fuer die Ymodem-/CTS-Fehlersuche (5.117),
@@ -262,6 +277,8 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   in **beiden** Bestückungsvarianten als nicht bestückt eingetragen. Das Datenblatt (S. 34)
   fordert 100 nF an **jedem** Power-Pin. Bester Kandidat für „läuft ~1 min, dann träge".
   Wahrscheinlichkeit 55 % gegen das Symptom, 100 % dass die Maßnahme richtig ist.
+- **R125 (Pull-up am Modul-CTS) blockiert BLE waehrend LTE** (Befund 2026-11-10, siehe "Aktueller Stand"). Ohne
+  R125 (26SC9966) geht es, aber nur ueber einen undefinierten, offenen Pegel; fuer V2 10 kOhm nach GND gewuenscht.
 - **Pull-up auf `BLT-RXD` fehlt** → 0xFF-Junk am BT-Terminal, sobald der MUX auf GSM schaltet
   (Modul reicht Leitungsrauschen transparent weiter). 10–100 kΩ nach VDDIO, 90 %.
 - **KORREKTUR (2026-08-18):** 32-kHz-Quarz `Q3` ist doch bestückt (Anwender hat es am Board
@@ -340,4 +357,4 @@ nicht gemacht, damit der Fix nicht mit den offenen BT-Themen vermischt wird.
 - Übergabe zwischen beiden läuft über **diese Datei plus die Doku unter `sism555/Doku/`**.
 
 ---
-*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-08-05.*
+*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-10.*

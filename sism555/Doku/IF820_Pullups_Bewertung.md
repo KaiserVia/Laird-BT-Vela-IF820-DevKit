@@ -54,18 +54,23 @@ Beim Modul-CTS ist es keine reine Fehlerfrage, beide Varianten haben einen Preis
   Ob P10 beim Start eine Sonderfunktion hat (Strapping), steht nicht im Datenblatt. Weder Tabelle 18 noch Tabelle 21
   nennt so etwas. P10 ist dort ein normaler GPIO (KSO2, ADC, PA_Ramp optional).
 
-**Empfehlung:** R125 nicht ungeprueft umdrehen. Wenn 5.137 die Verbindung waehrend LTE zuverlaessig rettet, ist der
-Pull-up die sauberere Loesung (es gehen keine Daten verloren). Ein Pull-down kommt nur in Frage, wenn die Firmwareloesung
-nicht reicht. Dann muss die Firmware damit leben, dass Ereignisse waehrend LTE fehlen.
+~~Empfehlung (2026-11-09): R125 nicht ungeprueft umdrehen, erst 5.137 abwarten.~~
 
-Noch offen ist ein Widerspruch: Ist R125 auf allen Boards gleich bestueckt, muesste auch 26SC9966 waehrend LTE haengen.
-Das tut es nicht. Klaeren laesst sich das mit einer Messung am Modul-CTS waehrend MQTT online, auf B und auf 26SC9966.
+**Stand 2026-11-10 - ueberholt durch Befund:** Der Widerspruch ist geklaert. Auf 26SC9966 ist **R125 nicht bestueckt**
+(Modul-CTS offen) - dort geht BLE waehrend LTE in allen Laeufen. Auf B (26SC9983) ist R125 als Pull-up bestueckt - mit
+5.137 BLE waehrend LTE 0/3, Classic 3/3. Der 5.137-Ausloeser (CONNECTION) hilft nur mit P0.19-Draht, den B nicht hat.
+Damit ist der Pull-up die Ursache, die Firmwareloesung allein reicht auf Boards ohne Draht nicht.
+
+**Neue Empfehlung:** R125 nach **GND** statt nach N$184 (Pull-down 10 kOhm). Der Verlust von Modulereignissen waehrend
+LTE ist hinnehmbar: Die Firmware erkennt die Verbindung ueber den CYSPP-Pin (IC54 Bit 7), nicht ueber die Ereignisse; die
+Zustandsmaschine zeigt dann nur weniger `[BT-Zustand]`-Zeilen. Offen lassen (wie auf 26SC9966) funktioniert im Versuch,
+ist aber kein definierter Pegel. Anwender baut R125 auf B um (2026-11-10), danach `online-bt` als Nachweis.
 
 ## Kurzfassung: Was aendern?
 
 1. **BLT-RXD: Pull-up 10-100 kOhm nach N$184 nachruesten.** Eindeutig sinnvoll, beseitigt den `0xFF`-Muell.
 2. **R77:** pruefen, wohin er zieht. Als Pull-down an CYSPP darf er nicht bestueckt sein.
-3. **R125 (Modul-CTS):** vorerst lassen. Entscheiden erst nach dem Ergebnis von 5.137 und der CTS-Messung.
+3. **R125 (Modul-CTS): nach GND statt nach 3V** (Befund 2026-11-10: der Pull-up blockiert BLE waehrend LTE).
 4. Alle anderen Leitungen (TXD, Modul-RTS, CONNECTION, CP_ROLE, LP_MODE, RST, WAKE-Pins): **kein Pull noetig**.
    Bei CP_ROLE und CYSPP sind Pulls sogar schaedlich.
 5. Pull-ups an Modulleitungen immer an N$184 (geschaltete Modulversorgung) anschliessen, nie an die dauerhafte 3V.

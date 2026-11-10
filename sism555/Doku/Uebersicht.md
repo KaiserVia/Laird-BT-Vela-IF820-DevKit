@@ -1,17 +1,27 @@
-# Übersicht: Wo steht was (Stand 2026-10-29, Firmware 5.126, Branch `connection-pin`)
+# Übersicht: Wo steht was (Stand 2026-11-10, Firmware 5.137, Branch `connection-pin`)
 
 ## Zuerst lesen
 - `../../CLAUDE.md`: Projektkontext, Regeln (Commits, Binaries), offene Punkte, Temporär-Code zum Aufräumen.
-- `../project-status.md`: das Projekttagebuch, neueste Einträge ganz unten (5.117 bis 5.126, Dauertest 5.118, Prüfrunde 5.124, Diskriminierungstest BLE, Vergleichsläufe A/B vom 21.10., Lauf vom 22.10.).
+- `../project-status.md`: das Projekttagebuch, neueste Einträge ganz unten (bis 5.137, Test auf B vom 09.11., R125-Befund vom 10.11.).
+- `Board-Inventar.md`: welches Board welche Hardware und Firmware hat.
+
+## NEU 2026-11-10: BLE während LTE - Ursache R125
+- **Fehlerbild:** Gerät online (MQTT, UART-MUX auf LTE), BLE verbindet, Abo wird quittiert, aber kein PIN-Prompt, kein `/leave`, MQTT bleibt. Classic geht.
+- **Ursache:** R125 (10 kΩ Pull-up am Modul-CTS, IF820 Pin 14). Bei MUX auf LTE ist die Leitung vom LPC getrennt, R125 zieht sie auf HIGH = "Host nicht bereit". Das Modul schließt den BLE-Handshake nicht ab und zieht CYSPP nicht auf LOW, die Firmware merkt nichts.
+- **Belege:** B (26SC9983, R125 bestückt) mit 5.137: BLE 0/3, Classic 3/3. 26SC9966 (R125 nicht bestückt): BLE während LTE in allen Läufen bestanden.
+- **Abhilfe:** R125 entfernen (Versuch auf B läuft), für V2 10 kΩ nach GND (`Fragen_Schaltplan_CTS_MUX.md`, Wunschliste). Zusätzlich 5.137: CONNECTION auf P0.19 als zweiter Auslöser, braucht den Draht.
+- Bewertung aller Pull-Widerstände: `IF820_Pullups_Bewertung.md`. Messanleitung für das Board mit Modulneustart beim Verbinden: `Anleitung_26SC9993_Neustart_beim_Verbinden.md`.
 
 ## Firmware (`sism555/`)
 - Quellcode Bluetooth: `btio.c`, `btio.h`; `sio.c` (`putb`, CTS); `USB_tools.c`; `hard.c`. Version: `sprachen/sictxt.c` (`T_version`).
-- Binaries: `sism.hex`, `sism.bin` = neueste Version (5.126). Ältere, ungetrackt: `fw_5.118/`, `fw_5.120/`, `fw_5.99/`.
-- Schalter in `btio.h`: `BT_CONN_GPIO` (0), `BT_UCP_ENABLE` (0, das `/UCP` aus 5.125).
+- Binaries: `sism.hex`, `sism.bin` = neueste Version (5.137). Ältere, ungetrackt: `fw_5.99/`, `fw_5.118/`, `fw_5.120/`, `fw_5.129/` bis `fw_5.137/`.
+- Schalter in `btio.h`: `BT_CONN_GPIO` (0), `BT_UCP_ENABLE` (1 seit 5.132), `BT_CYSPP_SM` (1, Zustandsmaschine seit 5.131), `BT_CONN_TRIGGER` (1, 5.137).
 - Build: `"/c/Keil_v5/UV4/UV4.exe" -b sism.uvprojx -o build_log.txt -j0` im Ordner `sism555`.
 
 ## Tests und Werkzeuge (`Doku/tools/`)
-- `ble_mainboard_test.py`: Testskript, Modi smoke, cycle, module-suite, fast-suite, soak, interleave, info.
+- `ble_mainboard_test.py`: Testskript, Modi smoke, cycle, module-suite, fast-suite, soak, interleave, info, power-sweep, boot-race, reboot-check, nightly, gsm-mux, bt-timeout, bt-update, **online-bt** (BLE/Classic während MQTT online, prüft `/leave` und `/join`).
+- `flash_xmodem.py --port COM3 --bin fw_5.137/sism.bin --expect-version 5.137`: Flashen über RS232.
+- `lte_ble_thread.py`: BLE während der GSM-Threads (Registrierung, MQTT-Connect). `if820_boot_check.py`: zählt Modulneustarts beim Verbinden.
 - `comports.bat`: welcher COM-Port gehört wozu. `trace_stray_check.py`: Prüfung auf Stray-Zeichen.
 - Reports: `Doku/tools/Testreports/<Datum>_<Name>_<Modus>/` mit `*.html`, `trace.ndjson`, JSON.
 
