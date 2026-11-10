@@ -7,7 +7,7 @@
 
 | Seriennummer | Kurzname | HW-Besonderheiten | Zuletzt geflasht | Bekannter Status | Zuletzt getestet |
 |---|---|---|---|---|---|
-| **26SC9983** | B | R125 bestückt (Pull-up Modul-CTS), **kein** P0.19-Draht; früher Quarztausch am IF820 (+10 MΩ parallel) | 5.137 | 5.137 `online-bt`: BLE während LTE **0/3**, Classic 3/3 (R125-Fehlerbild). Anwender baut R125 um, danach `online-bt` wiederholen. Ohne LTE unauffällig (volles Profil 5.134 bestanden). | 2026-11-09 |
+| **26SC9983** | B | **R125 nach GND umgebaut (Pull-down, 2026-11-10)**, **kein** P0.19-Draht; frueher Quarztausch am IF820 (+10 MΩ parallel) | 5.137 | Mit Pull-down `online-bt`: BLE waehrend LTE **3/3**, Classic 3/3 (vorher mit Pull-up BLE 0/3). Ohne LTE unauffaellig (volles Profil 5.134 bestanden). | 2026-11-10 |
 | **26SC9966** | - | **R125 nicht bestückt** (Modul-CTS offen), CONNECTION -> P0.19 verdrahtet, LTE + SIM | 5.137 | BLE und Classic während LTE in allen Läufen bestanden, 5.137-Auslöser mit `/leave`/`/join` bestanden; Robustheit (gsm-mux, boot-race 18/18, power-sweep 27/27, cycle 12/12) bestanden. | 2026-11-09 |
 | **99SC9923** | A | CONNECTION -> P0.19 verdrahtet (früher über IC54-Pad IO5) | 5.135 | module-suite 5.135 am 05.11. bis zum Abbruch ohne Fehler (Classic im langen Lauf langsam, ca. 2,6 KB/s). | 2026-11-05 |
 | **26SC9994** | C | unverändert, HW V2 | 5.134 | Umfassender Test 5.134 bestanden (bis auf 1x kurze Unterbrechung 0,1 s); scheiterte vor 5.127 an UART1-Abschaltung im Leerlauf. | 2026-11-04 |

@@ -6299,3 +6299,19 @@ LTE in allen Laeufen bestanden (MQTT idle, Registrierungs-Thread, MQTT-Connect-T
 - BLE waehrend LTE 0/3, Classic 3/3. Sehr starkes Indiz fuer R125 als Ursache. Offen lassen funktioniert vermutlich, weil
 die Leitung nach dem Umschalten den zuletzt vom LPC getriebenen LOW-Pegel haelt (TS5A23157 offen, kaum Leckstrom) -
 fuer die Serie nicht verlaesslich, dort 10 kOhm nach GND. Naechster Schritt: R125 auf B ausloeten, `online-bt` wiederholen.
+
+## Nachweis: R125 als Pull-down behebt BLE waehrend LTE (Board B, 5.137, 2026-11-10)
+
+Anwender hat R125 auf B (26SC9983) umgebaut: Modul-CTS jetzt mit 10 kOhm nach **GND** statt nach 3V. Kein P0.19-Draht,
+Firmware unveraendert 5.137. `online-bt` mit 3 Runden (Bericht `Doku/tools/Testreports/2026-11-10_07-54-36_VIASIS_26SC9983_online-bt`):
+
+| Transport | vorher (R125 Pull-up, 09.11.) | jetzt (Pull-down) |
+|---|---|---|
+| BLE waehrend MQTT online | 0/3, kein PIN, kein `/leave` | **3/3**: PIN, `/leave`, wieder online mit `/join` nach 203/448/209 s |
+| Classic waehrend MQTT online | 3/3 | 3/3, wieder online nach 204-213 s |
+
+**Damit bewiesen:** Der Pull-up an R125 war die Ursache dafuer, dass BLE waehrend LTE haengt. Mit Pull-down geht BLE ueber
+den normalen CYSPP-Weg (`communication_change()`), ohne CONNECTION-Draht und ohne Firmwareaenderung. Die eine laengere
+Wiederverbindung (448 s, Runde 2) liegt nach der BT-Sitzung und betrifft nur den Mobilfunk-Neuaufbau.
+**Empfehlung fuer Mainboard V2:** R125 nach GND (Wunschliste `Doku/Fragen_Schaltplan_CTS_MUX.md`, Prio 1). Alte Muster
+mit bestuecktem Pull-up: R125 nach GND umsetzen oder entfernen.
