@@ -5,6 +5,9 @@
 - `../project-status.md`: das Projekttagebuch, neueste Einträge ganz unten (bis 5.137, Test auf B vom 09.11., R125-Befund vom 10.11.).
 - `Board-Inventar.md`: welches Board welche Hardware und Firmware hat.
 
+## NEU 2026-11-10: Umrüstung aller Boards
+Alle Boards bekommen R125 nach GND und 47 kΩ Pull-up auf BLT-RXD. Vorher waren sie unterschiedlich bestückt (R125 Pull-up oder offen). Stand je Board, vorgefundener R125-Zustand und Abnahme: `Board-Inventar.md`, Abschnitt "Umrüstaktion November 2026".
+
 ## NEU 2026-11-10: BLE während LTE - Ursache R125
 - **Fehlerbild:** Gerät online (MQTT, UART-MUX auf LTE), BLE verbindet, Abo wird quittiert, aber kein PIN-Prompt, kein `/leave`, MQTT bleibt. Classic geht.
 - **Ursache:** R125 (10 kΩ Pull-up am Modul-CTS, IF820 Pin 14). Bei MUX auf LTE ist die Leitung vom LPC getrennt, R125 zieht sie auf HIGH = "Host nicht bereit". Das Modul schließt den BLE-Handshake nicht ab und zieht CYSPP nicht auf LOW, die Firmware merkt nichts.

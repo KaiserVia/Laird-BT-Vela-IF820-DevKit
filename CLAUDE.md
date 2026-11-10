@@ -60,6 +60,12 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **⚠ 2026-11-10 - UMRÜSTAKTION ALLER BOARDS:** R125 (Modul-CTS) nach GND + 47 kOhm Pull-up auf BLT-RXD nach N$184.
+  Die Boards waren vorher **unterschiedlich** bestückt (R125 Pull-up oder offen). Vor jedem Test im
+  `sism555/Doku/Board-Inventar.md` nachsehen, ob das Board schon umgebaut ist und wie R125 vorgefunden wurde; ältere
+  Testergebnisse gelten nur für den damaligen Zustand. Auf B nachgewiesen: Pull-down behebt BLE während LTE (0/3 -> 3/3)
+  und auch die Fehler, die 5.127/5.128 per Firmware behoben haben (Gegenprobe mit 5.126/5.127 bestanden).
+
 - **2026-11-10 - Ursache "BLE während LTE hängt" gefunden: R125.** R125 (10 kΩ) zieht den Modul-CTS (IF820 Pin 14)
   nach 3 V. Steht der UART-MUX auf LTE, sieht das Modul "Host nicht bereit" und schließt den BLE-Handshake (CCCD) nicht
   ab, zieht CYSPP nie auf LOW, die Firmware merkt die Verbindung nicht. Belege: Board B (26SC9983, R125 bestückt) mit
