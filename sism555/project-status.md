@@ -6403,3 +6403,11 @@ Ordner vom 2026-11-10 12:14-12:32.
 **Folgerung:** Der Pull-down stoert auf einem Board mit CONNECTION-Draht nichts: Normalbetrieb, Hochlauf und BLE waehrend
 GSM-Thread laufen wie mit offenem R125. Offen: BLE/Classic waehrend LTE **online** (MQTT verbunden), sobald die SIM
 erkannt wird.
+
+### Nachtrag 26SC9966: online-bt mit SIM (2026-11-10, 13:33-13:58, abgebrochen)
+
+SIM neu gesteckt, danach `online-bt --repeat 3`. Vom Anwender vor dem letzten Durchgang abgebrochen:
+**BLE waehrend LTE online 3/3, Classic 2/3 bestanden** (Classic 3/3 nicht mehr gelaufen). Jedes Mal MQTT geordnet
+beendet (`/leave`), Wiedereinwahl nach 197-446 s. Bericht `Doku/tools/Testreports/2026-11-10_13-33-46_VIASIS_26SC9966_online-bt`.
+Damit funktioniert BLE waehrend LTE mit R125 nach GND auch auf einem Board mit CONNECTION-Draht.
+Noch offen: Classic-Durchgang 3/3 nachholen. Nach dem Abbruch kann am Geraet der MQTT-Debug-Modus noch an sein.
