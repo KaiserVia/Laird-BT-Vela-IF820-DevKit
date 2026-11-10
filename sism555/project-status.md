@@ -6315,3 +6315,23 @@ den normalen CYSPP-Weg (`communication_change()`), ohne CONNECTION-Draht und ohn
 Wiederverbindung (448 s, Runde 2) liegt nach der BT-Sitzung und betrifft nur den Mobilfunk-Neuaufbau.
 **Empfehlung fuer Mainboard V2:** R125 nach GND (Wunschliste `Doku/Fragen_Schaltplan_CTS_MUX.md`, Prio 1). Alte Muster
 mit bestuecktem Pull-up: R125 nach GND umsetzen oder entfernen.
+
+### Gegenprobe mit alten Firmwarestaenden: Pull-down faengt auch die Fehler aus 5.127 und 5.128 ab (Board B, 2026-11-10)
+
+Frage: Hilft der Pull-down an R125 nur bei BLE waehrend LTE, oder auch bei den frueheren Fehlern mit derselben Wirkung
+(Modul-CTS HIGH, weil der LPC die Leitung nicht treibt)? Dazu auf B (R125 nach GND, sonst unveraendert) alte Versionen aus
+der Git-Historie geflasht:
+
+| Firmware | damaliger Fehler (mit Pull-up) | Test heute (Pull-down) | Ergebnis |
+|---|---|---|---|
+| 5.126 (vor dem Leerlauf-Fix 5.127) | B: BLE und Classic scheiterten bei jedem Versuch (UART1 im Leerlauf aus) | `interleave --rounds 3` | **BLE 3/3, Classic 3/3** |
+| 5.127 (vor dem Reset-Fix 5.128) | B: BT nach dem Neustart um 3:15 tot (3/3) | `nightly --repeat 3` (Reboot im Protokoll bestaetigt) | **3/3**, je 2x BLE + 1x Classic |
+| 5.137 (zurueck) | - | `interleave --rounds 2` | BLE 2/2, Classic 2/2 |
+
+Berichte: `Doku/tools/Testreports/2026-11-10_08-33-11_VIASIS_26SC9983_interleave`, `..._08-35-29_..._nightly`,
+`..._08-46-16_..._interleave`.
+
+**Folgerung:** Der Pull-down beseitigt die ganze Fehlerklasse "Modul-CTS HIGH, solange der LPC die Leitung nicht treibt":
+BLE waehrend LTE, UART1 im Leerlauf aus (5.127) und BT-UART nach Reset nicht gestartet (5.128). Die Firmwarefixes 5.127
+und 5.128 bleiben trotzdem richtig (Boards mit Pull-up im Feld). Starkes Argument fuer R125 nach GND in V2.
+B steht wieder auf 5.137. Naechster Schritt: Pull-up 47 kOhm auf BLT-RXD (Spezifikation in `Doku/Fragen_Schaltplan_CTS_MUX.md`).
