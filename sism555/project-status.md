@@ -6292,3 +6292,10 @@ direkt nach `VERBUNDEN Classic` - das Modul zieht CYSPP ohne vorherige UART-Meld
 kommt CYSPP erst nach dem CCCD-Handshake, den das Modul bei CTS HIGH (MUX auf LTE, R125-Pull-up) nicht abschliesst
 (Vermutung, nicht gemessen). Naechster Schritt: CTS am IF820 online auf B messen, dann R125 als 10 kOhm Pull-down nach
 GND umsetzen und `online-bt` wiederholen.
+
+**Nachtrag 2026-11-10 - Widerspruch 26SC9966 aufgeloest:** Auf 26SC9966 ist **R125 nicht bestueckt** (Modul-CTS offen,
+Anwenderbefund). Auf B ist R125 als Pull-up bestueckt. Damit passt alles zusammen: 26SC9966 (CTS offen) - BLE waehrend
+LTE in allen Laeufen bestanden (MQTT idle, Registrierungs-Thread, MQTT-Connect-Thread, 5.137); B (CTS per R125 auf HIGH)
+- BLE waehrend LTE 0/3, Classic 3/3. Sehr starkes Indiz fuer R125 als Ursache. Offen lassen funktioniert vermutlich, weil
+die Leitung nach dem Umschalten den zuletzt vom LPC getriebenen LOW-Pegel haelt (TS5A23157 offen, kaum Leckstrom) -
+fuer die Serie nicht verlaesslich, dort 10 kOhm nach GND. Naechster Schritt: R125 auf B ausloeten, `online-bt` wiederholen.

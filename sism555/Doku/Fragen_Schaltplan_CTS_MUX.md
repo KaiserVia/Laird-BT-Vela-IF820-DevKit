@@ -123,3 +123,10 @@ PIN-Prompt.
 **Für die alten Muster (Nacharbeit, falls gewünscht):** R125 auslöten und als 10 kΩ zwischen BLT-RTS und GND setzen
 (z. B. an einem GND-Pad in der Nähe). Für BLT-RXD 100 kΩ von IF820 Pin 15 nach N$184 (z. B. am Pad von R125 auf der
 3V-Seite).
+
+
+## Nachtrag 2026-11-10: R125 auf 26SC9966 nicht bestueckt
+
+Auf 26SC9966 ist R125 **offen** (nicht bestueckt). Das erklaert den Widerspruch: 26SC9966 besteht BLE waehrend LTE in
+allen Laeufen, B (R125 als Pull-up bestueckt) scheitert 0/3. Offen lassen genuegt im Versuch, ist aber kein definierter
+Pegel - fuer die naechsten Muster bleibt der Wunsch **10 kOhm nach GND** (Prio 1).
