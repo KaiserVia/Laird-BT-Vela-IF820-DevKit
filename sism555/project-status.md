@@ -6384,3 +6384,22 @@ Ursache ist der "lockup under heavy UART loading", den die Modul-FW 1.4.18.18 be
 Classic-Downloads und alle Verbindungszyklen liefen fehlerfrei.
 
 Offen: B mit langem Stromzyklus wiederbeleben, BLE-Downloads einzeln wiederholen; Modul-FW-Version von B auslesen.
+
+## Abnahme 26SC9966 nach Umbau R125 offen -> GND (5.137, 2026-11-10)
+
+26SC9966 hatte R125 unbestueckt (Modul-CTS offen), jetzt 10 kOhm nach GND. Hat den P0.19-Draht (CONNECTION). Kurzprogramm
+(30 min):
+
+| Test | Ergebnis |
+|---|---|
+| `online-bt --repeat 3` (BLE/Classic waehrend LTE online) | **nicht durchfuehrbar**: `F12009 SIM-Karte nicht erkannt`, Geraet geht nicht online (kein BT-Fehler; SIM nach dem Umbau pruefen) |
+| `lte_ble_thread.py` 3 s / 8 s / 0,5 s nach Start des GSM-Threads | **3/3**: verbunden nach 1,0-2,8 s, PIN-Prompt nach 8,1 / 3,1 / 10,9 s. Beim 0,5-s-Lauf zeigte der Monitor CONNECTION LOW waehrend des aktiven GSM-Threads und "beide LOW -> Datenpipe steht" |
+| `interleave --rounds 3` (ohne LTE) | **bestanden**, Classic 3/3, BLE 3/3 |
+| `boot-race --race-delays 2,8,20` | bestanden wie vorgesehen: 2 s Erstversuch scheitert (Modul im Hochlauf verborgen, 5.131), Folgeversuch ok; 8 s und 20 s direkt ok; Banner 35,2-35,4 s |
+
+Berichte: `Doku/tools/Testreports/2026-11-10_12-27-35_VIASIS_26SC9966_interleave` und die zugehoerigen boot-race/online-bt-
+Ordner vom 2026-11-10 12:14-12:32.
+
+**Folgerung:** Der Pull-down stoert auf einem Board mit CONNECTION-Draht nichts: Normalbetrieb, Hochlauf und BLE waehrend
+GSM-Thread laufen wie mit offenem R125. Offen: BLE/Classic waehrend LTE **online** (MQTT verbunden), sobald die SIM
+erkannt wird.
