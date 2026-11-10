@@ -6,7 +6,7 @@
 - `Board-Inventar.md`: welches Board welche Hardware und Firmware hat.
 
 ## NEU 2026-11-10: Umrüstung aller Boards
-Alle Boards bekommen R125 nach GND und 47 kΩ Pull-up auf BLT-RXD. Vorher waren sie unterschiedlich bestückt (R125 Pull-up oder offen). Stand je Board, vorgefundener R125-Zustand und Abnahme: `Board-Inventar.md`, Abschnitt "Umrüstaktion November 2026".
+Alle Boards bekommen R125 nach GND. Der Pull-up auf BLT-RXD ist zurückgestellt. Vorher waren sie unterschiedlich bestückt (R125 Pull-up oder offen). Stand je Board, vorgefundener R125-Zustand und Abnahme: `Board-Inventar.md`, Abschnitt "Umrüstaktion November 2026".
 
 ## NEU 2026-11-10: BLE während LTE - Ursache R125
 - **Fehlerbild:** Gerät online (MQTT, UART-MUX auf LTE), BLE verbindet, Abo wird quittiert, aber kein PIN-Prompt, kein `/leave`, MQTT bleibt. Classic geht.

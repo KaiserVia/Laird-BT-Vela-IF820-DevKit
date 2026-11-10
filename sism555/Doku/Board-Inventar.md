@@ -5,15 +5,15 @@
 > Ausführliche Historie bleibt in `project-status.md` - hier nur der aktuelle Kurzstatus.
 > Stand 2026-11-10.
 
-## Umrüstaktion November 2026 (R125 nach GND + Pull-up BLT-RXD)
+## Umrüstaktion November 2026 (nur R125 nach GND)
 
 Ab 2026-11-10 werden **alle Boards** umgerüstet (Anwenderentscheidung). Grund und Nachweis: `project-status.md`,
 "Nachweis: R125 als Pull-down behebt BLE waehrend LTE" und "Gegenprobe mit alten Firmwarestaenden".
 
 | Umbau | Vorgabe |
 |---|---|
-| **1. R125 (Modul-CTS, IF820 Pin 14)** | 10 kOhm nach **GND** statt nach N$184 (Pull-down). Ein bisher offenes R125 bekommt ebenfalls 10 kOhm nach GND. |
-| **2. Pull-up BLT-RXD (IF820 Pin 15)** | **47 kOhm** nach **N$184** (geschaltete Modulversorgung, nie dauerhafte 3V), Modulseite des MUX (zwischen IC18 Pin 7 und IF820 Pin 15). Das frei gewordene N$184-Pad von R125 eignet sich als Gegenpol. Spezifikation: `Fragen_Schaltplan_CTS_MUX.md`. |
+| **R125 (Modul-CTS, IF820 Pin 14)** | 10 kOhm nach **GND** statt nach N$184 (Pull-down). Ein bisher offenes R125 bekommt ebenfalls 10 kOhm nach GND. |
+| ~~Pull-up BLT-RXD~~ | **Zurückgestellt** (Anwenderentscheidung 2026-11-10): vorerst **nicht** umbauen. Spezifikation für später (47 kOhm nach N$184) in `Fragen_Schaltplan_CTS_MUX.md`. Folge: die `0xFF`-Bytes vor dem Banner bleiben. |
 
 **Warum der Ausgangszustand wichtig ist:** Die Boards waren unterschiedlich bestückt. Alle Testergebnisse **vor** dem
 Umbau gelten nur für den damaligen R125-Zustand:
@@ -25,15 +25,15 @@ Umbau gelten nur für den damaligen R125-Zustand:
 Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umgebaut wurde. Nach dem Umbau mindestens
 `online-bt` (BLE während LTE) und ein kurzer `interleave` als Abnahme.
 
-| Seriennummer | R125 vorgefunden | Umbau 1 (R125 -> GND) | Umbau 2 (47k BLT-RXD) | Abnahme nach Umbau |
-|---|---|---|---|---|
-| 26SC9983 (B) | **Pull-up** (3V) | 2026-11-10 | offen | `online-bt` BLE 3/3, Classic 3/3; 5.126/5.127-Gegenprobe bestanden (2026-11-10) |
-| 26SC9966 | **offen** (nicht bestückt) | offen | offen | - |
-| 99SC9923 (A) | ? | offen | offen | - |
-| 26SC9994 (C) | ? | offen | offen | - |
-| 26SC9993 | ? | offen | offen | - |
-| 11SC1234 | ? | offen | offen | - |
-| 12SC3456 | ? | offen | offen | - |
+| Seriennummer | R125 vorgefunden | Umbau R125 -> GND | Abnahme nach Umbau |
+|---|---|---|---|
+| 26SC9983 (B) | **Pull-up** (3V) | 2026-11-10 | `online-bt` BLE 3/3, Classic 3/3; 5.126/5.127-Gegenprobe bestanden (2026-11-10) |
+| 26SC9966 | **offen** (nicht bestückt) | offen | - |
+| 99SC9923 (A) | ? | offen | - |
+| 26SC9994 (C) | ? | offen | - |
+| 26SC9993 | ? | offen | - |
+| 11SC1234 | ? | offen | - |
+| 12SC3456 | ? | offen | - |
 
 ## Boards
 

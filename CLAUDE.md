@@ -60,7 +60,8 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
-- **⚠ 2026-11-10 - UMRÜSTAKTION ALLER BOARDS:** R125 (Modul-CTS) nach GND + 47 kOhm Pull-up auf BLT-RXD nach N$184.
+- **⚠ 2026-11-10 - UMRÜSTAKTION ALLER BOARDS:** nur R125 (Modul-CTS) nach GND. Der Pull-up auf BLT-RXD ist
+  zurückgestellt (`0xFF`-Bytes vor dem Banner bleiben vorerst).
   Die Boards waren vorher **unterschiedlich** bestückt (R125 Pull-up oder offen). Vor jedem Test im
   `sism555/Doku/Board-Inventar.md` nachsehen, ob das Board schon umgebaut ist und wie R125 vorgefunden wurde; ältere
   Testergebnisse gelten nur für den damaligen Zustand. Auf B nachgewiesen: Pull-down behebt BLE während LTE (0/3 -> 3/3)
