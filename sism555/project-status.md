@@ -6411,3 +6411,6 @@ SIM neu gesteckt, danach `online-bt --repeat 3`. Vom Anwender vor dem letzten Du
 beendet (`/leave`), Wiedereinwahl nach 197-446 s. Bericht `Doku/tools/Testreports/2026-11-10_13-33-46_VIASIS_26SC9966_online-bt`.
 Damit funktioniert BLE waehrend LTE mit R125 nach GND auch auf einem Board mit CONNECTION-Draht.
 Noch offen: Classic-Durchgang 3/3 nachholen. Nach dem Abbruch kann am Geraet der MQTT-Debug-Modus noch an sein.
+Nachgeholt 15:27-15:37 (`online-bt --repeat 1`): BLE 1/1, Classic 1/1 bestanden, MQTT jeweils mit `/leave` beendet und
+nach 192-211 s wieder online. **Gesamt 26SC9966 mit R125 nach GND: BLE waehrend LTE online 4/4, Classic 3/3.** Bericht
+`Doku/tools/Testreports/2026-11-10_15-26-55_VIASIS_26SC9966_online-bt`.

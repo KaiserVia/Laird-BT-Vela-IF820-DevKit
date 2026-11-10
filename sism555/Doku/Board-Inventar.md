@@ -28,7 +28,7 @@ Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umg
 | Seriennummer | R125 vorgefunden | Umbau R125 -> GND | Abnahme nach Umbau |
 |---|---|---|---|
 | 26SC9983 (B) | **Pull-up** (3V) | 2026-11-10 | `online-bt` BLE 3/3, Classic 3/3; 5.126/5.127-Gegenprobe bestanden; BLE während GSM-Thread 3/3, power-sweep 18/18, boot-race 12/12; module-suite: Zyklen 12/12 je Transport, Classic-Downloads bestanden, **BLE-Download bei 57 % abgebrochen, danach Modul stumm** (2026-11-10) |
-| 26SC9966 | **offen** (nicht bestückt) | 2026-11-10 | BLE während GSM-Thread 3/3, `interleave` BLE 3/3 + Classic 3/3, boot-race ok; nach SIM-Tausch `online-bt` BLE 3/3, Classic 2/3 (abgebrochen, 3. Classic offen) (2026-11-10) |
+| 26SC9966 | **offen** (nicht bestückt) | 2026-11-10 | BLE während GSM-Thread 3/3, `interleave` BLE 3/3 + Classic 3/3, boot-race ok; nach SIM-Tausch `online-bt` BLE 4/4, Classic 3/3 (2026-11-10) |
 | 99SC9923 (A) | ? | offen | - |
 | 26SC9994 (C) | ? | offen | - |
 | 26SC9993 | ? | offen | - |
