@@ -130,3 +130,19 @@ PIN-Prompt.
 Auf 26SC9966 ist R125 **offen** (nicht bestueckt). Das erklaert den Widerspruch: 26SC9966 besteht BLE waehrend LTE in
 allen Laeufen, B (R125 als Pull-up bestueckt) scheitert 0/3. Offen lassen genuegt im Versuch, ist aber kein definierter
 Pegel - fuer die naechsten Muster bleibt der Wunsch **10 kOhm nach GND** (Prio 1).
+
+
+## Spezifikation Pull-up BLT-RXD (Stand 2026-11-10, ersetzt den Wert "100 kOhm" oben)
+
+| Punkt | Vorgabe |
+|---|---|
+| Netz | `BLT-RXD` (Modul-RXD), **Modulseite** des MUX: zwischen IC18 Pin 7 (2Y0) und IF820 Pin 15 (P37) |
+| nicht | auf der LPC-Seite (IC18 COM / LPC TXD1) - dort haengt auch LTE dran |
+| Gegenpol | **N$184** (geschaltete Modulversorgung, wie R125 bisher) - **nie** die dauerhafte 3V (Rueckspeisung) |
+| Wert | **47 kOhm** (zulaessig 47-100 kOhm), 1 % oder 5 %, Bauform wie R125 |
+| Bestueckung | in **beiden** Varianten (mit und ohne LTE) |
+| Begruendung Wert | haelt die offene Leitung gegen max. ca. 1 uA Leckstrom (IC18 + Modul) sicher HIGH (< 0,05 V Abfall); bei abgeschaltetem Modul und MUX auf BT fliessen aus dem LPC-TXD nur ca. 70 uA in N$184 (bei 10 kOhm waeren es 0,3 mA) |
+| Erwartete Wirkung | keine `0xFF`-Bytes mehr vor dem Banner (Vergleichswert B, 10.11.: bis 127 Byte am Stueck) |
+
+**Nacharbeit Muster:** Das freie N$184-Pad von R125 (seit dem Umbau R125 nach GND unbenutzt) als Gegenpol nutzen, 47 kOhm
+von dort zu IF820 Pin 15 bzw. zur Leiterbahn BLT-RXD zwischen IC18 Pin 7 und dem Modul.
