@@ -6458,3 +6458,8 @@ Kandidaten:
    die Modul-FW 1.4.12.12 haengt. Nicht geprueft (Kopplung entfernen braucht den Anwender).
 Naechste Schritte: (a) in Windows `VIASIS_26SC9994` entfernen, BLE-smoke ohne Kopplung wiederholen, danach Classic neu
 koppeln; (b) faellt (a) negativ aus: Umbaustelle R125 und 3P0V am Modul beim BLE-Connect messen.
+
+**Nachtrag 09:47 (26SC9994):** Anwender hat `VIASIS_26SC9994` in Windows entfernt und um 9:44 **neu gekoppelt**
+(waehrend des ersten Versuchs). BLE-smoke 09:44 (Kopplung im Gange) und 09:46 (frische Kopplung): beide scheitern
+gleich - `C` (I=0030), `/UCP`, einmal auch `CU` vom Modul, danach keine GATT-Antwort, `/PING` tot. Ein **veralteter
+Schluessel** als Ursache ist damit unwahrscheinlich. Nicht getestet: BLE **ganz ohne** Classic-Kopplung.
