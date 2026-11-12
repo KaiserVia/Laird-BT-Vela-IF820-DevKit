@@ -6463,3 +6463,11 @@ koppeln; (b) faellt (a) negativ aus: Umbaustelle R125 und 3P0V am Modul beim BLE
 (waehrend des ersten Versuchs). BLE-smoke 09:44 (Kopplung im Gange) und 09:46 (frische Kopplung): beide scheitern
 gleich - `C` (I=0030), `/UCP`, einmal auch `CU` vom Modul, danach keine GATT-Antwort, `/PING` tot. Ein **veralteter
 Schluessel** als Ursache ist damit unwahrscheinlich. Nicht getestet: BLE **ganz ohne** Classic-Kopplung.
+
+### 99SC9923 (A) nach Umbau R125 offen -> Pull-down (2026-11-12): Abnahme bestanden
+
+5.135 -> 5.137 geflasht. BLE-smoke bestanden **mit denselben Windows-Parametern wie bei C** (`C` mit I=0030,
+O=03C0, `/UCP`, `CU` auf I=000C, Datenkanal offen), Classic-smoke bestanden, `interleave` 40/40 (BLE 20/20,
+Classic 20/20), boot-race 12/12 (1-12 s, je 2x). Kein Modem auf A, `online-bt` entfaellt.
+**Folgerung fuer 26SC9994:** Gleicher PC, gleiche Verbindungsparameter, gleiches `/UCP` - auf A geht es, auf C friert
+das Modul ein. PC/Windows und `/UCP` sind damit als Ursache fuer C ausgeschlossen, es bleibt die Hardware von C.
