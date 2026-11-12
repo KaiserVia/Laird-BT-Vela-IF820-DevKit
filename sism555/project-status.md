@@ -6428,3 +6428,33 @@ Drei BLE-Downloads einzeln (`--mode receive --transport ble`): **3/3 bestanden**
 **Folgerung:** Der Haenger aus der module-suite (BLE-Download bei 57 %, Modul danach stumm) liess sich nicht reproduzieren,
 vorerst Einzelfall. Er gehoert zum offenen Punkt "Modul faellt gelegentlich aus, nur langer Stromzyklus hilft". Dort fehlt
 weiter die Moeglichkeit, das Modul per RST zurueckzusetzen (`BT_TIMEOUT` schaltet es nur ca. 1 min ab, das reichte nicht).
+
+### 26SC9994 (C) nach Umbau R125 Pull-up -> Pull-down (2026-11-12): BLE friert das Modul ein, Classic ok
+
+Ausgangszustand: 5.135, R125 laut Anwender vorher 10k Pull-up, jetzt 10k nach GND. Auf 5.137 geflasht
+(`fw_5.137/sism.bin`, identisch mit Commit d05c510), kein Werksreset noetig.
+
+| Pruefung | Ergebnis |
+|---|---|
+| BLE-smoke 5.137 (2x) | **scheitert**: `@E,...,C,...,I=0030,O=03C0` (60 ms), `[BT-Zustand] VERBUNDEN BLE`, `/UCP gesendet`, danach nichts mehr (kein `CU`, keine GATT-Antwort an den PC) |
+| `/PING` danach (Testmenue 8->7) | **keine Antwort** - Modul komplett stumm; wirbt auch nicht mehr. Nur Stromzyklus hilft (Flashen hilft nicht, RST nicht angeschlossen) |
+| `/PING` nach Stromzyklus, vor BLE | Antwort ok (`@R,...,/PING,0000`) |
+| BLE-smoke mit **5.135** | gleiches Bild -> keine 5.136/5.137-Regression |
+| BLE-smoke mit **5.137 ohne `/UCP`** (lokaler Testbuild `BT_UCP_ENABLE 0`, nicht committet) | gleiches Bild, diesmal nicht einmal das `C`-Ereignis -> `/UCP` ist nicht die Ursache |
+| bleak-Connect ohne Dienst-Cache + Event-Sniff (8->1) | TimeoutError nach 90 s, auf RS232 **keine** Modulausgabe |
+| Classic-smoke (COM6) | **bestanden** |
+| Classic cycle 12x | **12/12** |
+| `device_setup.py --check` | APN/MQTT/Roaming ok, SIM ok; **Uhr stand auf 28.07.3856**, neu gestellt |
+
+**Einordnung:** Das IF820 friert beim BLE-Verbindungsaufbau vollstaendig ein (UART tot, kein Werben), Classic
+laeuft. Firmware als Ursache ausgeschlossen (5.135/5.137/ohne `/UCP` gleich). Vor dem Umbau (5.134, 2026-11-04) lief
+BLE auf C. Gleiches Fehlerbild wie auf 11SC1234 (2026-11-05, dort R125-Zustand unbekannt, noch nicht umgebaut).
+Kandidaten:
+1. **Umbau/Hardware**: R125 nach GND (Modul-CTS P10 dauerhaft LOW) oder Loetschaden am Modul beim Umbau. Gegen R125
+   als Ursache spricht: B und 26SC9966 laufen mit derselben Aenderung.
+2. **Windows-Kopplungszustand**: In der Geraeteliste haben genau die funktionierenden Boards einen Eintrag mit
+   `_BLE`-Namen (99SC9923, 26SC9966, 26SC9983), die mit dem BLE-Haenger (26SC9994, 11SC1234) nur den Classic-Namen.
+   Moeglich, dass Windows beim LE-Connect zu einem Classic-gekoppelten Geraet eine Verschluesselung versucht, an der
+   die Modul-FW 1.4.12.12 haengt. Nicht geprueft (Kopplung entfernen braucht den Anwender).
+Naechste Schritte: (a) in Windows `VIASIS_26SC9994` entfernen, BLE-smoke ohne Kopplung wiederholen, danach Classic neu
+koppeln; (b) faellt (a) negativ aus: Umbaustelle R125 und 3P0V am Modul beim BLE-Connect messen.
