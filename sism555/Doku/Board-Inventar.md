@@ -31,7 +31,7 @@ Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umg
 | 26SC9966 | **offen** (nicht bestückt) | 2026-11-10 | BLE während GSM-Thread 3/3, `interleave` BLE 3/3 + Classic 3/3, boot-race ok; nach SIM-Tausch `online-bt` BLE 4/4, Classic 3/3 (2026-11-10) |
 | 99SC9923 (A) | **offen** (nicht bestückt, Anwender) | vor 2026-11-12 | 5.137: BLE-smoke (I=48 -> `/UCP` -> 15 ms) und Classic-smoke bestanden, `interleave` 40/40 (BLE 20/20, Classic 20/20), boot-race 12/12; kein Modem, daher kein `online-bt` (2026-11-12) |
 | 26SC9994 (C) | **Pull-up** 10k (Anwender) | vor 2026-11-12 | **BLE scheitert: Modul friert bei jedem BLE-Verbindungsaufbau komplett ein** (kein `/PING` mehr, wirbt nicht, nur Stromzyklus hilft), mit 5.135, 5.137 und 5.137 ohne `/UCP`. Classic-smoke ok, Classic cycle 12/12. Vor dem Umbau (5.134, 2026-11-04) lief BLE. Siehe project-status.md (2026-11-12) |
-| 26SC9993 | ? | offen | - |
+| 26SC9993 | **offen** (nicht bestückt, Anwender) | vor 2026-11-12 | **Abnahme abgebrochen:** Board läuft nicht hoch (RS232 nur 1 Müllbyte, kein BLE-Werben) und **pfeift hörbar** - Versorgungsfehler vermutet (2026-11-12) |
 | 11SC1234 | ? | offen | - |
 | 12SC3456 | ? | offen | - |
 

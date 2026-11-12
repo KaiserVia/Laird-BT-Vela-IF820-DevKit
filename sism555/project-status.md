@@ -6471,3 +6471,9 @@ O=03C0, `/UCP`, `CU` auf I=000C, Datenkanal offen), Classic-smoke bestanden, `in
 Classic 20/20), boot-race 12/12 (1-12 s, je 2x). Kein Modem auf A, `online-bt` entfaellt.
 **Folgerung fuer 26SC9994:** Gleicher PC, gleiche Verbindungsparameter, gleiches `/UCP` - auf A geht es, auf C friert
 das Modul ein. PC/Windows und `/UCP` sind damit als Ursache fuer C ausgeschlossen, es bleibt die Hardware von C.
+
+### 26SC9993 nach Umbau R125 offen -> Pull-down (2026-11-12): Abnahme abgebrochen
+
+Nach dem Einschalten ueber das Relais nur ein einzelnes unlesbares Byte auf RS232, kein Startbanner, kein BLE-Werben.
+Der Anwender hoert das Board **pfeifen** - Test abgebrochen. Verdacht: Fehler in der Versorgung (Schaltregler/
+Kurzschluss), moeglicherweise aus der Reparatur oder dem Umbau. Nichts geflasht oder geaendert.
