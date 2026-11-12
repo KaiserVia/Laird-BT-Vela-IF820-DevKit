@@ -12,8 +12,12 @@ Gerätefirmware **sism555** (LPC1766, Keil-Projekt `sism555/sism.uvprojx`).
 Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
-- **Aktueller Branch:** `connection-pin` (Arbeitsstand seit 5.101, alle TEST-Versionen 5.127-5.137);
-  `LTE-Update` ist die Hauptlinie, Zusammenführung offen
+- **Aktueller Branch (dieser Ordner):** `main`. Am 2026-11-12 zusammengeführt: `main`, `LTE-Update` und
+  `connection-pin` stehen auf demselben Stand (5.137, PR #2). Weitere Branches liegen in **eigenen Ordnern**
+  (git worktree), nicht hier umschalten:
+  - `Integrate-Joachim-SW` -> `C:\viaTraffic\GitHub\Projects\Joachim-Integration` (Übernahme von Joachims 5.60, `sism560_V2`)
+  - `DevelopLightSensor` -> `C:\viaTraffic\GitHub\Projects\LightSensor`
+  - `branch-550` -> `C:\viaTraffic\GitHub\Projects\branch-550` (alter Stand 5.50)
 - **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
   (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen
   GND-Verbindung dafür aufgetrennt wurde) und dürfen nicht auf Boards ohne Draht (mit der Weiche auf 1,

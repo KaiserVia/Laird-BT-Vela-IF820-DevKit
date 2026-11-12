@@ -13,3 +13,6 @@ Listings/
 sism555/Doku/QUECTEL-EG91/
 sism555/Doku/RN4678/
 sism555/Doku/BT730 (Hersteller Laird)/
+__pycache__/
+*.pyc
+fw_*/
