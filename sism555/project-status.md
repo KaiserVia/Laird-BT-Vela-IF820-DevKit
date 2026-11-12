@@ -6504,3 +6504,7 @@ BLE-smoke 2x nach Stromzyklus: beide **scheitern** unveraendert (`C` I=0030, `/U
 **Nachtrag 15:05 - 11SC1234 nach Bauteiltausch (Anwender, Bauteile nicht beschrieben):** Board laeuft hoch (5.137),
 wirbt als `VIASIS_11SC1234_BLE`. BLE-smoke 2x (einmal nach 10 s stromlos): beide **scheitern** beim Verbinden, danach
 wirbt das Modul nicht mehr - unveraendert eingefroren. Der Tausch hat den BLE-Haenger nicht behoben.
+
+**Nachtrag 15:15 - 11SC1234 defekt:** Kurz nach dem Test pfeift das Board hoerbar (Anwender), wie zuvor 26SC9993.
+Keine weiteren Tests. Die Hardware-Experten pruefen das Board am Montag 2026-11-16. Offen fuer die Pruefung: welche
+Bauteile getauscht wurden, Versorgung des Moduls (3P0V/VDDIO), 32-kHz-Quarz mit 10 MOhm parallel.
