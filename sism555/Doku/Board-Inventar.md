@@ -32,7 +32,7 @@ Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umg
 | 99SC9923 (A) | **offen** (nicht bestückt, Anwender) | vor 2026-11-12 | 5.137: BLE-smoke (I=48 -> `/UCP` -> 15 ms) und Classic-smoke bestanden, `interleave` 40/40 (BLE 20/20, Classic 20/20), boot-race 12/12; kein Modem, daher kein `online-bt` (2026-11-12) |
 | 26SC9994 (C) | **Pull-up** 10k (Anwender) | vor 2026-11-12 | **BLE scheitert: Modul friert bei jedem BLE-Verbindungsaufbau komplett ein** (kein `/PING` mehr, wirbt nicht, nur Stromzyklus hilft), mit 5.135, 5.137 und 5.137 ohne `/UCP`. Classic-smoke ok, Classic cycle 12/12. Vor dem Umbau (5.134, 2026-11-04) lief BLE. Siehe project-status.md (2026-11-12) |
 | 26SC9993 | **offen** (nicht bestückt, Anwender) | vor 2026-11-12 | **Abnahme abgebrochen:** Board läuft nicht hoch (RS232 nur 1 Müllbyte, kein BLE-Werben) und **pfeift hörbar** - Versorgungsfehler vermutet (2026-11-12) |
-| 11SC1234 | **Pull-up** 10k (Anwender) | vor 2026-11-12 | 5.137: **BLE friert das Modul beim Verbinden ein** (wie 26SC9994, hier schon vor dem Umbau am 05.11.); auch mit Modul-Schlaf aus (`SSLP,L=00`). Classic-smoke ok, Classic cycle 6/6. Moduleinstellungen identisch mit funktionierenden Boards (2026-11-12) |
+| 11SC1234 | **Pull-up** 10k (Anwender) | vor 2026-11-12 | 5.137: **BLE friert das Modul beim Verbinden ein** (wie 26SC9994, hier schon vor dem Umbau am 05.11.); auch mit Modul-Schlaf aus (`SSLP,L=00`). Classic-smoke ok, Classic cycle 6/6. Moduleinstellungen identisch mit funktionierenden Boards. Mit gelöteter Brücke (Anwender) weiter BLE 0/2, Classic ok (2026-11-12) |
 | 12SC3456 | ? | offen | - |
 
 ## Boards

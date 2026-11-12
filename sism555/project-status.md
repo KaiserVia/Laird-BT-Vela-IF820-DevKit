@@ -6492,3 +6492,8 @@ Modul-Schlaf, Windows-Kopplung und PC (99SC9923 geht am selben PC mit denselben 
 Es bleibt Hardware am bzw. um das Modul. Kandidaten fuer die Messung: 32-kHz-Quarz (auf 26SC9983 war er schon einmal
 defekt, Fix dort neuer Quarz + 10 MOhm parallel - pruefen, ob die 10 MOhm auf den anderen Boards fehlen), 3P0V/VDDIO
 am Modul beim BLE-Verbindungsaufbau, fehlende Entkopplung C128/C58.
+
+**Nachtrag 12:00 - 11SC1234 mit geloeteter Bruecke (Anwender, Stelle nicht dokumentiert):** BLE-smoke 2x nach
+Stromzyklus: beide **scheitern** gleich - `C` mit I=0006, O=0064 (Windows waehlte direkt 7,5 ms, also kein `/UCP`),
+danach keine GATT-Antwort, `/PING` tot. Classic-smoke weiter bestanden. Die Bruecke behebt den BLE-Haenger nicht.
+Bemerkenswert: auch ganz ohne `/UCP` haengt das Modul.
