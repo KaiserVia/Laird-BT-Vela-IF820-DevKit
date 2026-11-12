@@ -6497,3 +6497,6 @@ am Modul beim BLE-Verbindungsaufbau, fehlende Entkopplung C128/C58.
 Stromzyklus: beide **scheitern** gleich - `C` mit I=0006, O=0064 (Windows waehlte direkt 7,5 ms, also kein `/UCP`),
 danach keine GATT-Antwort, `/PING` tot. Classic-smoke weiter bestanden. Die Bruecke behebt den BLE-Haenger nicht.
 Bemerkenswert: auch ganz ohne `/UCP` haengt das Modul.
+
+**Nachtrag 12:47 - 26SC9994 erneut (nach Hardware-Pruefung durch den Anwender, Aenderung nicht beschrieben):**
+BLE-smoke 2x nach Stromzyklus: beide **scheitern** unveraendert (`C` I=0030, `/UCP`, keine GATT-Antwort).
