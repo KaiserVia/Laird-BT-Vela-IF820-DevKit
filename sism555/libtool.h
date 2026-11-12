@@ -46,5 +46,6 @@ extern int plus_com (uchar mode);								// UART1 Kommunikation mit Matrix Contr
 extern void md_simulation (uint anzahl, uchar terminal);		// Erzeuge Messdaten im Speicher
 extern void communication_change (void);				// Bearbeitung Schnittstellenwechsel, Änderung der Kommunikation
 extern void reboot (void);											// Startet CPU neu
+extern void hf_measurement (void);							// 5.L1: Via-2 Sendefrequenz messen und ausgeben
 
 #endif /*LIBTOOL_H_*/

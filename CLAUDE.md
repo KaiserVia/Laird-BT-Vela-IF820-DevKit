@@ -60,6 +60,12 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-12 - 5.L1 (TEST), Branch `Integrate-Joachim-SW`:** Joachims Stand 5.60 (Mainboard V2, Via-2-Radarempfänger)
+  integriert. Der Radar-Empfänger wird wie LTE/BT/GPS per Selbsttest erkannt (`fp.radar`, `radar_detect()` in i2cm.c);
+  Pins, Transceiver, HF-Messung und Menüs richten sich danach. Nicht am Gerät getestet. Analyse:
+  `sism555/Doku/Integration_Joachim_V2.md`. Parallel-Branch `DevelopLightSensor` (VEML7700, Versionen 5.s1 ...) im
+  Worktree `Projects\LightSensor`. Neue Worktrees brauchen `sism555\Objects\sism.sct` aus dem Hauptordner (nicht im Git).
+
 - **2026-11-12 - Abnahme nach Umrüstung:** Funktionsfähig mit 5.137 sind **99SC9923 (A), 26SC9983 (B), 26SC9966**.
   26SC9994 (C) und 11SC1234: BLE friert das Modul beim Verbinden ein, Classic ok (Hardware vermutet, Quarz/Versorgung).
   11SC1234 und 26SC9993 pfeifen nach Nacharbeit hörbar und sind defekt, HW-Prüfung am 2026-11-16. An den drei

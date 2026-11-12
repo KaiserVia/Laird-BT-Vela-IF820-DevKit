@@ -6508,3 +6508,42 @@ wirbt das Modul nicht mehr - unveraendert eingefroren. Der Tausch hat den BLE-Ha
 **Nachtrag 15:15 - 11SC1234 defekt:** Kurz nach dem Test pfeift das Board hoerbar (Anwender), wie zuvor 26SC9993.
 Keine weiteren Tests. Die Hardware-Experten pruefen das Board am Montag 2026-11-16. Offen fuer die Pruefung: welche
 Bauteile getauscht wurden, Versorgung des Moduls (3P0V/VDDIO), 32-kHz-Quarz mit 10 MOhm parallel.
+
+## Update 5.L1 (TEST, 2026-11-12): Integration Joachim 5.56-5.60 (Mainboard V2, Via-2-Radarempfaenger)
+
+Branch `Integrate-Joachim-SW`, Worktree `C:\viaTraffic\GitHub\Projects\Joachim-Integration`. Quelle: Joachims Stand
+`C:\viaTraffic\GitHub\Projects\sism560_V2\sism560_V2` (5.60), gemeinsame Basis `C:\viaTraffic\GitHub\Projects\sism555`
+(5.55). Analyse und Entscheidungen: `Doku/Integration_Joachim_V2.md`.
+
+**Ziel (Anwendervorgabe):** eine Firmware fuer alle Hardware-Staende. Wie LTE (`fp.gsm`), BT (`fp.btmodem`) und GPS
+(`fp.gps`) wird jetzt auch der Radar-Empfaenger per Selbsttest erkannt und gespeichert; die Revisionsbuchstaben
+(`J2`/`V2`) spielen fuer die Firmware keine Rolle.
+
+**Umsetzung:**
+- `fp.radar` (RADAR_UNBEKANNT/RADAR_TRX/RADAR_VIA2) ersetzt `fuellbyte1` im ersten 1k-Block - Layout und Groesse des
+  Parameterblocks unveraendert.
+- `radar_detect()` (i2cm.c) bei jedem `InitI2C_Devices()`: antwortet IC32 (Digitalpoti 0x5C, nur Via-2), ist es Via-2;
+  sonst wird ueber IC37 nur P1.4 (Via-2: HF_DIS) als Ausgang LOW geschaltet und nochmal gefragt. Kein LPC-Pin mit
+  wechselnder Bedeutung wird vor der Erkennung getrieben. Weicht das Ergebnis vom gespeicherten Typ ab: Info I17005.
+- `Init_Radar_Ports()` (hard.c): Via-2 -> P1.20 (DA_SS) und P1.26 (FMin) Eingang, P1.21 DIS_MESS Ausgang HIGH,
+  P4.29 DIS_IF Ausgang LOW. Bisheriger Transceiver -> EN_ANA und USB_RPWR Ausgang wie bisher. `Init_Ports()` schaltet
+  EN_ANA/USB_RPWR nicht mehr pauschal als Ausgang; bei Update-/Sleep-Reset (ohne I2C-Init) gilt `fp.radar` aus dem RAM.
+- Je nach Typ: `transceiver()` (Via-2: IC37 HF_DIS, Joachims Fassung; txrcon nur Bits 0-7), Power-down (`EINT0`) und
+  `reboot()` (Via-2: IC37 P1=0x10 statt 0), `DPWR` 15/40 ms, `DTXFEN` nur beim bisherigen Transceiver, `t_amp_en`
+  Via-2 25/15 ms, Sendefrequenz-Bereich Via-2 24150-24200 MHz, Messbeginn in `runcycle()` (Via-2: IC37 statt EN_ANA).
+- Via-2 neu (Joachim): HF-Frequenzmessung `mess_hf()` (Timer 0, CAP0.0 an P1.26), `hf_measurement()` (Taste STRT im
+  Hauptmenue), Transceiver-Menue mit Frequenzanzeige, "Module Frequency Characteristic" (`f_characteristic`), "Set Module
+  Frequency" (`set_single_dpp`); Verstaerkerabgleich `set_dpp` mit zwei Messkanaelen ohne MUX IC39.
+- Fuer alle Boards (Joachim): `fp.sprache` = (LANGUAGE<<4)|(OEM<<2)|Sprachindex, alle Leser maskieren `&0x03`, nach
+  Firmware-Update werden Sprachpaket/OEM nachgetragen; GSM CTS-Wartezeit 250 statt 200 Versuche, PWRKEY-Puls 600 ms;
+  Anzeige-Treiber bei POR/Brown-out frueh aus (Wartezeit 150+100 statt 250 ms); `Dis_CapCnt` setzt jetzt auch `T3CCR`
+  zurueck (vorher `T2CCR=T2CCR=0`); Statuszeile `;COMchg`; `test_i2c_device()` schaltet den Transceiver danach aus.
+- Bewusst **nicht** uebernommen: Joachims Entfernen des Ereignisses `REBOOT`/`T_reb[]` (bleibt), Entfernen von
+  `MQTT_fast_disconnect` in `reboot()` (bleibt), BT-Versorgung per `DIS_BT` (P1.16 bleibt ungetrieben, Pull-down = BT
+  ein; eigene BT-Abschaltung waere ein neues Thema, z. B. als Modul-Reset), Entfernen der `CSFLASH2`-Umschaltung in der
+  GPS-Erkennung, kuerzere POR-Wartezeit 50 -> 30 ms.
+
+**Annahmen, am Geraet zu pruefen:** auf dem bisherigen Board antwortet nichts auf I2C 0x5C; auf dem Via-2-Board ist
+IC37 ohne EN_ANA erreichbar; Via-2-Empfaenger und neues Mainboard treten nur zusammen auf.
+
+Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet.

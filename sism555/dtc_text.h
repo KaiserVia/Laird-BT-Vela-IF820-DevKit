@@ -99,6 +99,7 @@ static const dtc_entry_t dtc_table[] = {
   {17002,'F',"I2C Geraet fehlt"},
   {17003,'F',"I2C DPP fehlt"},
   {17004,'F',"LED-Treiber TCA6507 fehlt"},
+  {17005,'I',"Radar-Empfaenger gewechselt"},
   {17050,'I',"Zeit via Backend"},
   {17051,'I',"Zeit via GPS"},
   {17052,'I',"Zeit via Netz"},

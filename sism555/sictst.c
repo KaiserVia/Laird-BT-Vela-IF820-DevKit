@@ -73,6 +73,101 @@ void i2c_scan	(void)		// Check I2C bus for answering devices
  putln(T_i2cfound); 
 }
 
+void set_single_dpp (uchar adr)			// 5.L1 (Joachim 5.60): 1-fach Digitalpoti einstellen
+{																		// Uebergabe adr - I2C Adresse
+ int c=0;														// Hilfsvariable Zeicheneingabe
+ uint result;
+ ushort chn;
+
+ putln(T_ende);				// Textausgabe  "Ende mit Return"
+ putln(T_plsmin2);		// Change with +/- keys
+ space(11);
+
+ if (adr==IC32) transceiver (ein);
+
+ while (1)
+ {
+	ResetWDT();	 																	// Watchdog Timer reset
+	delchar(11);
+	chn=read_i2cdev (adr, 0x0C, 2)&0x1FF; 				// 9 Bit Volatile Wiper Register lesen
+  putnumber (chn,3);														// 3 stellig ausgeben
+
+	if (adr==IC32)
+  {
+	 transceiver(ein);
+	 osDelay(DPWR);
+   result=mess_hf();														// Messe Sendefrequenz
+	 if (result) result=HF_const/result;
+	 space(3);
+	 putnumber (result,	5);
+	 transceiver(aus);
+	}
+
+	c=getc(TERMINAL_CHAR_TIMEOUT); 								// Warte timeout lang auf Eingabe
+	if (is_CRLF(c)>0)  														// Return Eingabe?
+	{
+	 write_i2c_dev (adr,2,((chn&0xFF)<<8)|((0x02<<4)|(chn>>8))); // DPP Stufe ins non-volatile wiper 0 schreiben
+	 break;																				// Ende
+	}
+  else if (c=='-') write_i2c_dev (adr,1,0x08);	// Dekrement Wiper?
+	else if (c=='+') write_i2c_dev (adr,1,0x04); 	// Inkrement Wiper?
+	else if (c=='H') break;												// Abbruch ohne Schreiben
+ }
+
+ newline();
+}
+
+void f_characteristic (uchar adr)		// 5.L1 (Joachim 5.60): Modul-Frequenzkennlinie mit MCP4561 Digitalpoti
+{																		// Uebergabe adr - I2C Adresse
+ int c=0;														// Hilfsvariable Zeicheneingabe
+ uint result;
+ ushort chn, save;
+ uchar pause=100;
+
+ putln(T_ende);				// Textausgabe  "Ende mit Return"
+
+ save=read_i2cdev (adr, 0x0C, 2)&0x1FF; 	// 9 Bit Volatile Wiper Register lesen
+ if (adr==IC32) write_i2c_dev (adr,2,0); 	// DPP Volatile wiper 0 nullen
+
+ for (chn=3; chn; chn--)
+ {
+  transceiver (ein);											// Dummy Messung da erste Messung haeufig falsch
+  osDelay(DPWR);
+  mess_hf();															// Messe Sendefrequenz
+  transceiver(aus);
+  osDelay(pause);
+ }
+
+ while (1)
+ {
+	ResetWDT();	 																	// Watchdog Timer reset
+	newline();
+	chn=read_i2cdev (adr, 0x0C, 2); 							// Volatile Wiper Register 0 lesen
+  putnumber (chn++,3);													// Schrittzaehler 3 stellig ausgeben
+
+	if (adr==IC32)
+  {
+	 transceiver (ein);
+	 osDelay(DPWR);
+   result=mess_hf();														// Messe Sendefrequenz
+	 transceiver(aus);
+	 if (result) result=HF_const/result;
+	 space(3);
+	 putnumber (result,	5);
+	}
+	c=getc(pause); 															// Warte timeout lang auf Eingabe
+	if (is_CRLF(c) || (c=='H') || (chn>=257) ) 	// Return oder 'H' Eingabe? Ja, Ende
+	{
+	 transceiver(aus);
+	 write_i2c_dev (adr,2,((save&0xFF)<<8)|(save>>8)); // DPP	volatile wiper 0 wieder herstellen
+	 break;
+	}
+	else write_i2c_dev (adr,1,0x04);									// Increment Volatile Wiper 0
+ }
+
+ newline();
+}
+
 void set_dpp (uchar adr, uchar feature)	// Digitalpoti einstellen 
 {											// Übergabe adr - I2C Adresse
 											// 			feature - Zusatzfunktion
@@ -85,7 +180,7 @@ void set_dpp (uchar adr, uchar feature)	// Digitalpoti einstellen
 
  putmstr(L_dpp);			// +/- Text ausgeben
 
- if (feature==IC35)	putln(T_imp);		// Verstärkerabgleich? Ja, Text Imp/s hinter Kanälen ausgeben  				
+ if (feature==IC35)	putln(IS_VIA2?T_imp2:T_imp);		// Verstaerkerabgleich? Ja, Text Imp/s hinter Kanaelen ausgeben (5.L1: Via-2 zwei Kanaele)
  else newline();			// Sonstige DPP	Einstellungen				
 
  while (1)
@@ -106,7 +201,17 @@ void set_dpp (uchar adr, uchar feature)	// Digitalpoti einstellen
 	}	// end for 
 	if (is_CRLF(c)) break;												// Return Eingabe? Ja, Ende
   
-  if (feature==IC35)				  // Zusatzfunktion für Verstärkerabgleich?
+  if ((feature==IC35) && IS_VIA2)	// 5.L1 (Joachim 5.60): Via-2 ohne MUX IC39, zwei Messkanaele
+  {
+   cap20=cap30=0;							// reset Impulszaehler
+	 En_Count;									// Enable capture count interrupts Timer 2 und 3
+   osDelay(125);						  // Messzeitfenster
+	 imps[1]=8*cap30;						// Kanal Poti 0 - D-IQA
+   osDelay(125);						  // Messzeitfenster
+	 imps[0]=4*cap20;						// Kanal Poti 2 - D-IFA
+   delchar(30);						   	// alte Ausgabe loeschen
+  }
+  else if (feature==IC35)				  // Zusatzfunktion für Verstärkerabgleich?
   {
 	 FIO1SET=MUX_A;							// MUX IC39, A=1, B=0, Auswahl D-IQA		
 	 FIO1CLR=MUX_B;		
@@ -128,7 +233,7 @@ void set_dpp (uchar adr, uchar feature)	// Digitalpoti einstellen
 
   if (feature==IC35)					// Zusatzfunktion für Verstärkerabgleich?
   {
-	 for (i=0;i<4;i++) putnumber(imps[i],7);			// Ausgabe Pulszahl Kanal  	
+	 for (i=0;i<(IS_VIA2?2:4);i++) putnumber(imps[i],7);			// Ausgabe Pulszahl Kanal (5.L1: Via-2 zwei Kanaele)
    c=getbyte(100);															// Warte 0,1 s auf Eingabe
    bxi=rxi;				// Bearbeitungs- und Emfangs-Zeichenindizes gleichsetzen
   }
@@ -148,7 +253,7 @@ void set_dpp (uchar adr, uchar feature)	// Digitalpoti einstellen
   } 															
  } // end while 
  
- FIO1CLR=MUX_B;			// unselect IC74 Verstärker IQ Signal
+ if (!IS_VIA2) FIO1CLR=MUX_B;			// unselect IC74 Verstaerker IQ Signal (5.L1: nicht bei Via-2)
  Dis_CapCnt;				// Disable Capture Count  Interrupts Timer 2 und 3
  newline();
  newline();
@@ -170,7 +275,7 @@ void test_i2c_device (void)				// Test I2C Devices
 	 putstr(T_i2cdev);								// Text "I2C Device " 	
 	 idl=lookup_i2cdevices (adr);			// Prüfe ob Adresse in Liste bekannter Devices	
 	 typ=i2cdev[idl].typ;	
-   if (typ==DPP) transceiver(ein);	// Transceiver einschalten		
+   if ((typ==DPP)||(typ==DPPT)) transceiver(ein);	// Transceiver einschalten
    while (1)
    {
     put2str(T_i2creg,T_i2cval);
@@ -191,20 +296,25 @@ void test_i2c_device (void)				// Test I2C Devices
     } // end for 
     if (result>=0)					 								// Erfolgreich ausgelesen
     { 
-		 if ((typ==EXPD)||(typ==DPP))						// I2C Expander oder DPP
+		 if ((typ==EXPD)||(typ==DPP)||(typ==DPPT))		// I2C Expander oder DPP
 		 {		
-			if (ja(T_change)<=0) return;	 				// Change? Nein, Abbruch
+			if (ja(T_change)<=0) break;	 				// Change? Nein, Ende (5.L1: Transceiver danach aus)
 			reg=getnumber(T_i2creg+1,0,0xFF);			// Register lesen	
 			result=getnumber(T_value,0,0x100);		// Wert für Register lesen 
 			if (typ==DPP) reg<<=4;								// Registeradresse ins upper nibble schieben
+			else if (typ==DPPT)	transceiver(ein);	// DS3501
 	    if (!write_i2c_dev (adr,2,((result<<8)|reg))) break;	// Einzelregister beschreiben, bei Fehler Abbruch 	     
 		 } // end if typ 		
-     else return;														// Ende kleiner Expander PCA9554 		
+     else break;														// Ende kleiner Expander PCA9554
     } // end if (result)
    } // end while  
-  } // end Schreiberfolg  
+  } // end Schreiberfolg
+	else 																						// 5.L1 (Joachim 5.60): Fehlermeldung nur, wenn das Device nicht antwortet
+	{
 	if (typ==DPP)	puterror (DTC_TST_I2C_DPP, -1);			// DPP Fehlermeldung ausgeben
-	else puterror (DTC_TST_I2C_EXPANDER, -1);						// EXPANDER Fehlermeldung ausgeben
+	 else puterror (DTC_TST_I2C_EXPANDER, -1);					// EXPANDER Fehlermeldung ausgeben
+	}
+	if ((typ==DPP)||(typ==DPPT)) transceiver(aus);			// Transceiver wieder aus
  } // end if adr 
 }
 

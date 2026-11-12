@@ -76,6 +76,7 @@
 #define DTC_MA_I2C_DEVICE       17002   /* I2C Geraet fehlt */
 #define DTC_MA_I2C_DPP          17003   /* I2C DPP fehlt */
 #define DTC_MA_TCA6507          17004   /* LED-Treiber TCA6507 fehlt */
+#define DTC_MA_RADAR_TYPE       17005   /* Radar-Empfaenger anders als gespeichert (Info, Wert = neuer Typ) */
 
 /* --- Subsystem 18: Hardware/libtool (libtool.c) -------------------- */
 #define DTC_LIB_GSM_ERR         18001   /* GSM-Fehler in libtool */
