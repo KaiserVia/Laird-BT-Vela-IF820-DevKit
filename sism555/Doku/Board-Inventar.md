@@ -32,7 +32,7 @@ Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umg
 | 99SC9923 (A) | **offen** (nicht bestückt, Anwender) | vor 2026-11-12 | 5.137: BLE-smoke (I=48 -> `/UCP` -> 15 ms) und Classic-smoke bestanden, `interleave` 40/40 (BLE 20/20, Classic 20/20), boot-race 12/12; kein Modem, daher kein `online-bt` (2026-11-12) |
 | 26SC9994 (C) | **Pull-up** 10k (Anwender) | vor 2026-11-12 | **BLE scheitert: Modul friert bei jedem BLE-Verbindungsaufbau komplett ein** (kein `/PING` mehr, wirbt nicht, nur Stromzyklus hilft), mit 5.135, 5.137 und 5.137 ohne `/UCP`. Classic-smoke ok, Classic cycle 12/12. Vor dem Umbau (5.134, 2026-11-04) lief BLE. Siehe project-status.md (2026-11-12) |
 | 26SC9993 | **offen** (nicht bestückt, Anwender) | vor 2026-11-12 | **Abnahme abgebrochen:** Board läuft nicht hoch (RS232 nur 1 Müllbyte, kein BLE-Werben) und **pfeift hörbar** - Versorgungsfehler vermutet (2026-11-12) |
-| 11SC1234 | ? | offen | - |
+| 11SC1234 | **Pull-up** 10k (Anwender) | vor 2026-11-12 | 5.137: **BLE friert das Modul beim Verbinden ein** (wie 26SC9994, hier schon vor dem Umbau am 05.11.); auch mit Modul-Schlaf aus (`SSLP,L=00`). Classic-smoke ok, Classic cycle 6/6. Moduleinstellungen identisch mit funktionierenden Boards (2026-11-12) |
 | 12SC3456 | ? | offen | - |
 
 ## Boards
@@ -44,7 +44,7 @@ Beim Umbau bitte je Board eintragen, wie R125 **vorgefunden** wurde und wann umg
 | **99SC9923** | A | CONNECTION -> P0.19 verdrahtet (früher über IC54-Pad IO5); R125 nach GND (vorher offen); kein Modem | 5.137 | Abnahme nach Umbau bestanden (BLE/Classic-smoke, interleave 40/40, boot-race 12/12). Früher: module-suite 5.135 bis zum Abbruch ohne Fehler (Classic im langen Lauf langsam, ca. 2,6 KB/s). | 2026-11-12 |
 | **26SC9994** | C | HW V2; R125 nach GND umgebaut (vorher Pull-up 10k); kein P0.19-Draht; keine LTE-Antenne | 5.137 | **Nach Umbau: BLE friert das Modul beim Verbinden ein** (siehe Umrüsttabelle), Classic ok. Uhr stand auf 3856, neu gestellt. Vorher: umfassender Test 5.134 bestanden. | 2026-11-12 |
 | **26SC9993** | - | ? | ? | IF820 startet bei jeder Verbindung neu (`BOOT`). Verdacht CONNECTION-Draht, nicht Versorgung. In Reparatur; Messanleitung `Anleitung_26SC9993_Neustart_beim_Verbinden.md`. | 2026-11-09 |
-| **11SC1234** | - | früher als 12SC1234 bezeichnet; **Modem abgeschaltet** (Konfiguration Modem/Email = n) | 5.135 | Classic geht, BLE: PC bekommt keine GATT-Antwort, danach wirbt das Modul bis zum Stromzyklus nicht mehr. Ursache offen (PC oder Board). | 2026-11-05 |
+| **11SC1234** | - | früher als 12SC1234 bezeichnet; **Modem abgeschaltet** (Konfiguration Modem/Email = n); R125 nach GND (vorher Pull-up) | 5.137 | Classic geht, **BLE friert das Modul ein** (vor und nach dem Umbau). PC als Ursache ausgeschlossen (99SC9923 geht mit gleichen Parametern). Hardware-Ursache vermutet, gleiches Bild wie 26SC9994. | 2026-11-12 |
 | **12SC3456** | - | Hand-Umbau IF820 Pin 33/CONNECTION -> IC54 Pad IO5 (GND-Bahn aufgetrennt, 18 kΩ Pull-up) | 5.103 | Alter Umbau, Spannungsversorgungs-Verdacht seit 2026-06. Nicht ohne Prüfung weiterverwenden. | 2026-09-29 |
 | **269996** | - | - | - | **Hardwaredefekt, bestätigt** (nicht reparabel ohne Bauteil-Nacharbeit) | 2026-08 |
 

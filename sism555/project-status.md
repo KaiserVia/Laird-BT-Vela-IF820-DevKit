@@ -6477,3 +6477,18 @@ das Modul ein. PC/Windows und `/UCP` sind damit als Ursache fuer C ausgeschlosse
 Nach dem Einschalten ueber das Relais nur ein einzelnes unlesbares Byte auf RS232, kein Startbanner, kein BLE-Werben.
 Der Anwender hoert das Board **pfeifen** - Test abgebrochen. Verdacht: Fehler in der Versorgung (Schaltregler/
 Kurzschluss), moeglicherweise aus der Reparatur oder dem Umbau. Nichts geflasht oder geaendert.
+
+### 11SC1234 nach Umbau R125 Pull-up -> Pull-down (2026-11-12): BLE friert das Modul ein, Classic ok
+
+5.135 -> 5.137. **Gleiches Fehlerbild wie 26SC9994:** BLE-smoke - `C` (I=0030, O=03C0), `/UCP`, danach keine
+GATT-Antwort, Modul stumm bis zum Stromzyklus. Auf diesem Board trat das schon **vor** dem Umbau auf (2026-11-05),
+der R125-Umbau ist also nicht die Ursache. Moduleinstellungen (Bluetooth-Menue 1: `/QFV E=01040C0C`, `GTU F=01`,
+`.CYSPPGP E=02`, `GBTP`, `GAP`, `GPEM`, `.CYSPPGK`, `GSBP`) **identisch** mit den funktionierenden Boards.
+Schlaf des Moduls im RAM aus (`SSLP,L=00`, `GSLP` bestaetigt L=00) aendert nichts. Classic-smoke bestanden, Classic
+cycle 6/6.
+
+**Stand der zwei BLE-Haenger-Boards (26SC9994, 11SC1234):** Firmware (5.135/5.137/ohne `/UCP`), Moduleinstellungen,
+Modul-Schlaf, Windows-Kopplung und PC (99SC9923 geht am selben PC mit denselben Parametern) als Ursache ausgeschlossen.
+Es bleibt Hardware am bzw. um das Modul. Kandidaten fuer die Messung: 32-kHz-Quarz (auf 26SC9983 war er schon einmal
+defekt, Fix dort neuer Quarz + 10 MOhm parallel - pruefen, ob die 10 MOhm auf den anderen Boards fehlen), 3P0V/VDDIO
+am Modul beim BLE-Verbindungsaufbau, fehlende Entkopplung C128/C58.
