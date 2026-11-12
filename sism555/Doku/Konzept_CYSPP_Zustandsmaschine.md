@@ -1,4 +1,9 @@
-# Konzept: CYSPP-Zustandsmaschine in der Firmware (Stand 2026-11-02, Entwurf)
+# Konzept: CYSPP-Zustandsmaschine in der Firmware (Stand 2026-11-11)
+
+> Phasen 0-3 sind umgesetzt (5.129-5.134). Die Abschnitte vor 6a sind der ursprüngliche Entwurf und
+> beschreiben teils den verworfenen Ablauf mit `.CYSPPSP E=1`/`.CYSPPSTART` sowie die Zustände
+> `GESPERRT`/`STOERUNG`, die es im Code nicht gibt (`btio.h` kennt `BT_ST_AUS`, `BEREIT`, `VERBUNDEN`,
+> `DATEN`). Maßgeblich für den Ist-Stand sind Abschnitt 6a und die Phasentabelle.
 
 Bisher steuert das IF820 den BT-Ablauf selbst (CYSPP "Enable + Autostart"), die Firmware reagiert nur auf den
 CYSPP-Pin. Dieses Konzept beschreibt, was es heißt, den Ablauf in die Firmware zu holen: Die Firmware entscheidet,
@@ -152,7 +157,7 @@ Details und Berichtsordner: `project-status.md`, "Phase-0-Läufe am Gerät".
 | 0 | Fragen aus Abschnitt 6 am Gerät klären (Testmenüpunkt + Skript) | **erledigt (5.129), Ergebnisse 6a** | keins |
 | 1 | Ereignis-Parser und Zustandsanzeige, **ohne Verhaltensänderung** (E bleibt 2) | **umgesetzt (5.130)**: Zustand, Transport, Trenngrund; Ymodem-Abbruch bei Linkverlust (Pin, da `DIS` im Datenmodus nicht ankommt) | gering |
 | 2 | `/AX` + `SBTP C=0` früh im Hochlauf, `/A` + `SBTP C=1` am Ende, alles im RAM bei `E=2` (siehe 6a), Minutentakt als Sicherheitsnetz, Schalter `BT_CYSPP_SM` | **umgesetzt (5.131)**: unsichtbar ab ca. 3,7 s bis zum Ende des Hochlaufs | mittel (fail-safe: Modul-Neustart = Werben wie bisher) |
-| 3 | `GESPERRT` (LTE, Update, Flash), `/UCP` vor dem Abo | **umgesetzt (5.132)** für Update über RS232/USB und GSM-Sitzung (GSM-Pfad thread-tauglich per direktem UART-Schreiben); `/UCP` wieder an. Offen: lange Flash-Schreibvorgänge | mittel |
+| 3 | `GESPERRT` (LTE, Update, Flash), `/UCP` vor dem Abo | **umgesetzt (5.132)** für Update über RS232/USB (`bt_sm_lock()`/`bt_sm_unlock()`); die Sperre während der GSM-Sitzung wurde in 5.134 wieder entfernt (BT hat Vorrang und beendet MQTT); `/UCP` wieder an. Offen: lange Flash-Schreibvorgänge | mittel |
 | 4 | Konfigurations-Umstellung im Feld, Rückweg, Service-Anleitung | ausrollbar | - |
 
 Phase 1 lohnt sich auch allein (Trenngrund, Ymodem-Abbruch) und ist die Grundlage für alles Weitere.

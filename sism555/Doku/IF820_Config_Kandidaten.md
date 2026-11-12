@@ -2,8 +2,8 @@
 
 > **Zweck:** Systematischer Durchgang durch die komplette EZ-Serial-Kommandoreferenz
 > (`Documentation/EZ-GUIDE-EZ-SERIAL-VELA-IF820_v2_2.pdf`) mit Blick auf unseren Use-Case.
-> **Nichts davon ist umgesetzt** — das ist eine Entscheidungsvorlage. Bitte pro Fall abhaken:
-> übernehmen / verwerfen / später.
+> Ursprünglich eine Entscheidungsvorlage. Was davon umgesetzt ist, steht im Abschnitt
+> „Umsetzungsstand"; die Fälle B und C sind nicht umgesetzt.
 >
 > **Stand:** 2026-07-30, nach Version 5.54. Quelle für alle Defaults: der Guide v2.2, wörtlich belegt.
 
@@ -33,7 +33,10 @@ nicht einstellbar.
 ## Umsetzungsstand (2026-07-30)
 
 - **A1, A2, A5 — umgesetzt in Firmware 5.57** (selbstheilend im Init, Schritte 3d/3e/3f).
-- **A3 — umgesetzt in 5.55/5.56** (dauerhaftes Advertising, Low-Duty-Intervall 3 s).
+- **A3 — umgesetzt in 5.55/5.56** (dauerhaftes Advertising). Stand 5.137: `SAP,T=04,C=07,H=0030,D=001E,L=0140,O=0000,F=01`
+  (`T_sap` in `btio.h`), also reines Low-Duty mit 200 ms Intervall (bis 5.5x 3 s), für alle Geräte gleich,
+  bewusst auch für Batteriegeräte.
+- **`/UCP` (Verbindungsintervall anfordern) — umgesetzt, seit 5.132 aktiv** (`BT_UCP_ENABLE 1`, I=6 = 7,5 ms).
 - **A4 — verworfen (Entscheidung 2026-07-30).** Die App liest die Seriennummer weiter aus dem
   Advertising-Namen; die PIN-gleiche Zahl wird **nicht** zusätzlich broadcastet. Auslöser:
   Sicherheitsfund, dass die Zugangs-PIN **die** numerische Seriennummer ist
@@ -61,7 +64,7 @@ nicht einstellbar.
 - **Risiko:** gering; zu große Pakete würden ohnehin an die ausgehandelte MTU angepasst.
 - **Wirkungsbereich:** nur BLE/CYSPP-Datenmodus. Batteriegeräte ohne Verbindung unberührt.
 
-### A3 — BLE-Advertising dauerhaft (nur netzbetriebene Geräte) (`SAP …,D=0,O=0,F=01`)
+### A3 — BLE-Advertising dauerhaft (`SAP …,O=0,F=01`)  ✅ umgesetzt (5.55, für alle Geräte; Ist-Werte siehe Umsetzungsstand)
 - **Default:** Advertising stoppt nach ~90 s (High-Duty 30 s + Low-Duty 60 s), F=0x00.
 - **Vorschlag (netzbetrieben):** `SAP,T=4,C=07,H=00A0,D=0,L=0140,O=0,F=01`
   (undirected low-duty, ~200 ms Intervall, Dauer unendlich, Auto-Advertising bei Boot/Disconnect).

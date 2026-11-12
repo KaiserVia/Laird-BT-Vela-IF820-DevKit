@@ -1,6 +1,12 @@
 # Vela IF820 (EZ-Serial) – Konzept & Befehls-Mapping für sism555
 
 Stand: 2026-06-16
+
+> **Historisches Konzept, vor der Umsetzung geschrieben.** Die Firmware weicht an mehreren Stellen ab:
+> Namen per `SDN$,T=00/T=01` (nicht `SDN,N=`), Betriebsbaud 460800 (nicht 307200), Trennen per `/DIS`
+> (nicht `/BTDIS`), keine BT-PIN (`SBTPIN` wird nicht benutzt), `STXP` wird nicht gesendet,
+> Verbindungsstatus über CYSPP an IC54 Bit 7 (nicht CONNECTION). Ist-Stand: `btio.h`/`btio.c`,
+> `CLAUDE.md`, `IF820_Pin_Referenz.md`.
 Ziel: Den **Ezurio/Laird Vela IF820** (Infineon CYW20820, Firmware **EZ-Serial**) als dritten
 BT-Modultyp neben **Laird 730-SA** und **Microchip RN4678** in die viasis3004-Firmware
 (`sism555`, LPC1766) einbauen. **Dieses Dokument ist reines Konzept/Mapping – noch kein Code.**

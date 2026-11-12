@@ -12,7 +12,7 @@ Alle Boards bekommen R125 nach GND. Der Pull-up auf BLT-RXD ist zurückgestellt.
 - **Fehlerbild:** Gerät online (MQTT, UART-MUX auf LTE), BLE verbindet, Abo wird quittiert, aber kein PIN-Prompt, kein `/leave`, MQTT bleibt. Classic geht.
 - **Ursache:** R125 (10 kΩ Pull-up am Modul-CTS, IF820 Pin 14). Bei MUX auf LTE ist die Leitung vom LPC getrennt, R125 zieht sie auf HIGH = "Host nicht bereit". Das Modul schließt den BLE-Handshake nicht ab und zieht CYSPP nicht auf LOW, die Firmware merkt nichts.
 - **Belege:** B (26SC9983, R125 bestückt) mit 5.137: BLE 0/3, Classic 3/3. 26SC9966 (R125 nicht bestückt): BLE während LTE in allen Läufen bestanden.
-- **Abhilfe:** R125 entfernen (Versuch auf B läuft), für V2 10 kΩ nach GND (`Fragen_Schaltplan_CTS_MUX.md`, Wunschliste). Zusätzlich 5.137: CONNECTION auf P0.19 als zweiter Auslöser, braucht den Draht.
+- **Abhilfe:** R125 mit 10 kΩ nach GND (auf B und 26SC9966 am 2026-11-10 umgebaut und nachgewiesen, alle Boards werden umgerüstet, siehe `Board-Inventar.md`), für V2 ebenso (`Fragen_Schaltplan_CTS_MUX.md`, Wunschliste). Zusätzlich 5.137: CONNECTION auf P0.19 als zweiter Auslöser, braucht den Draht.
 - Bewertung aller Pull-Widerstände: `IF820_Pullups_Bewertung.md`. Messanleitung für das Board mit Modulneustart beim Verbinden: `Anleitung_26SC9993_Neustart_beim_Verbinden.md`.
 
 ## Firmware (`sism555/`)
@@ -54,7 +54,7 @@ Automatischer Testlauf: `tools/bt_testlauf.py` (Anleitung `tools/bt_testlauf_Anl
 1 und 2: der BT-UART wird nur nach echtem Einschalten/Watchdog gestartet. 3: Neuerkennung bei aktiver Verbindung. Details und Vorschlag 5.128: `project-status.md`, "Testlauf am Tisch 2026-11-02".
 
 ## Konzept CYSPP-Zustandsmaschine (2026-11-02, Entwurf)
-`Konzept_CYSPP_Zustandsmaschine.md`: Firmware steuert Werben/Verbindbarkeit selbst (`.CYSPPSP E=1`, `.CYSPPSTART`), sichtbar erst wenn bereit, Classic/BLE unterscheidbar, `/UCP`, Trenngrund. Phasen 0-4, Phase 0 = Machbarkeit am Geraet ohne Umbau.
+`Konzept_CYSPP_Zustandsmaschine.md`: Firmware steuert Werben/Verbindbarkeit selbst (`/AX`, `/A`, `SBTP C=0/1` nur im RAM, Flash bleibt `.CYSPPSP E=2`; `.CYSPPSTART` in Phase 0 verworfen), sichtbar erst wenn bereit, Classic/BLE unterscheidbar, `/UCP`, Trenngrund. Phasen 0-3 umgesetzt (5.129-5.132), die Sperre während der GSM-Sitzung in 5.134 wieder entfernt.
 
 ## Plan fuer Montag (vereinbart 2026-10-30)
 1. **Abnahme 5.127:** module-suite auf Board A (inkl. Download BLE+Classic); B in Windows neu koppeln, Classic-Smoke auf B; optional LTE-Sitzung auf B ausloesen, danach BLE verbinden.
@@ -67,8 +67,9 @@ Automatischer Testlauf: `tools/bt_testlauf.py` (Anleitung `tools/bt_testlauf_Anl
 ## Offene Entscheidungen
 1. ~~Windows-Geräte B/C entfernen und neu koppeln~~ (Ursache war 5.127-Fehler, siehe oben; B muss fuer Classic trotzdem neu gekoppelt werden).
 2. ~~Auf C wieder 5.126 flashen~~ (C laeuft auf 5.127).
-3. Ymodem-Senden bei Linkverlust abbrechen (war als 5.127 geplant, kommt in eine spaetere Version).
-4. Aufräumen der temporären Diagnose (5.115/5.116, 5.118, 5.119), wenn die Untersuchung abgeschlossen ist.
+3. Ymodem-Senden bei Linkverlust abbrechen: umgesetzt in 5.130 (`bt_link_gone()`, Aufruf in `xmodem.c` `sendblock()`).
+4. Aufräumen der temporären Diagnose (5.115/5.116, 5.118, 5.119 nur die `[BT-Event]`-Ausgabe, 5.129 `bt_module_cmd()`, 5.136 Monitor während LTE), wenn die Untersuchung abgeschlossen ist. Liste in `CLAUDE.md`, "Aufraeumen".
+5. Befunde aus `fable_review_2026-11-11.md` (Code- und Doku-Durchsicht) bewerten und einplanen.
 5. Allgemeine Änderungen auf `LTE-Update` übernehmen.
 
 ## Online-/MQTT-Test: Mobilfunk-Konfiguration am Gerät (Stand 2026-11-03, Board B)

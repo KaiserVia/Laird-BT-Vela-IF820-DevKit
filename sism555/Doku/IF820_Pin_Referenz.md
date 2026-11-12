@@ -71,13 +71,15 @@ classification: "Intern"
   Daran hängen: Terminal-Routing auf BT, Ausgabe von Banner + PIN-Prompt, PIN-Rücksetzung beim
   Trennen, das 6-Minuten-Inaktivitätstimeout. Wir lesen ihn per I²C über IC54 Bit 7, getriggert
   vom EINT1-Interrupt des Port-Expanders.
-- **Wir haben keine Alternative:** CONNECTION ist unverdrahtet (Punkt 2), und wir parsen die
-  `@E,...`-Ereignisse des Moduls produktiv **nicht** (nur im Diagnose-Testmenü). Damit ist dieser
-  Pin unsere einzige Informationsquelle über den Verbindungszustand — und zwar transport-neutral,
-  d. h. die Firmware weiß nicht, ob Classic oder BLE anliegt.
-- **Als Ausgang nutzen wir ihn an genau einer Stelle:** `bt_disconnect()` treibt ihn bewusst HIGH,
+- **Die Verbindungserkennung bleibt an diesem Pin** (Nachtrag 2026-11-11, Stand 5.137): CONNECTION
+  ist nur auf umgebauten Boards verdrahtet (LPC P0.19, Punkt 2) und dient nicht als `BT_LINK`
+  (`BT_CONN_GPIO 0`). Die `@E,...`-Ereignisse wertet die Firmware seit 5.130 aus (`bt_sm_event()`:
+  Zustand, Transport BLE/Classic, Trenngrund) - nur zur Anzeige und für `/UCP`, nicht für die
+  Verbindungserkennung.
+- **Als Ausgang nutzen wir ihn an zwei Stellen:** `bt_disconnect()` treibt ihn bewusst HIGH,
   um beim Inaktivitätstimeout die Verbindung zu beenden (danach `/DIS`, dann sofort wieder
-  freigeben). Das ist der vom Hersteller vorgesehene Trennmechanismus.
+  freigeben), und der Menüpunkt "Bluetooth deinstallieren" (`sicom.c`, 300 ms HIGH). Dazu kommen
+  die Diagnose-Testmenüpunkte 8->2 und 8->6.
 - **Warum wir ihn sonst NICHT treiben:** Genau das war der BLE-Bug. Bis 5.65–5.87 trieben wir ihn
   an vier weiteren Stellen HIGH (Reconfig, UART-Umschaltung auf GSM/GPS, Deinstallieren) — jedes
   Mal war damit der BLE-Datenkanal tot.
@@ -150,9 +152,11 @@ Verhalten bei Classic **selbst gemessen** werden.
 - Sekundärnutzen wäre eine **Verbindungs-LED** am Gerät (siehe LED-Variante oben); das ist bei uns
   aber kein Anforderungspunkt.
 
-**Auf unserem Board:** **unverdrahtet** — im Schaltplan hat IC37 P27 überhaupt kein Netz.
-Der Kandidat „P27 → IC54 IO5" (Maßnahme 2 in `HW_Massnahmen_Bewertung_2026-08.md`) ist
-zurückgestellt.
+**Auf unserem Board:** im Schaltplan **unverdrahtet** (IC37 P27 hat kein Netz). Auf umgebauten
+Boards (siehe `Board-Inventar.md`) führt ein Draht zu LPC-Pin **P0.19** (`CONN_PIN` in `hard.h`,
+nur lesen). Die Firmware nutzt ihn seit 5.137 als zusätzlichen Auslöser „BT-Verbindung während
+LTE" (`BT_CONN_TRIGGER`, `bt_conn_trigger()`) und für Diagnoseanzeigen; `BT_LINK` hängt weiter
+allein an CYSPP. Der frühere Kandidat „P27 → IC54 IO5" wurde nur in 5.101-5.108 benutzt.
 
 ---
 
@@ -362,7 +366,7 @@ direkt an der CYSPP-Leitung. Siehe `HW_Massnahmen_Bewertung_2026-08.md`, Abschni
 - **RTS/CTS nutzen wir bewusst**, obwohl sie „optional" sind: bei 460800 Bd und 256-Byte-Puffern
   gehen ohne Flow Control Daten verloren. Die Firmware erzwingt die Aktivierung sogar selbst —
   erkennt sie ein Werksmodul (Flow Control aus), bootstrappt sie es per `cts_bypass` und
-  verifiziert danach den CTS-Handshake; bleibt CTS HIGH, gibt es `F11009`.
+  verifiziert danach den CTS-Handshake; antwortet das Modul danach nicht (z. B. CTS bleibt HIGH), gibt es `F11018` (`F11009` nur noch im Laird/RN4678-Fallback).
 - **Besonderheit bei uns:** Diese vier Leitungen sind über einen Analog-MUX (IC18) mit GSM **geteilt** — Eigentümer-Verwaltung über `uart1_request()`/`uart1_release()`. Deshalb kann das
   Gerät für Sekunden „stumm" sein, obwohl die BT-Verbindung steht.
 - **Offener Punkt:** Beim Wegschalten des MUX floatet die Modul-RXD und das Modul reicht

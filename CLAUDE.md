@@ -14,15 +14,15 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
 - **Aktueller Branch:** `connection-pin` (Arbeitsstand seit 5.101, alle TEST-Versionen 5.127-5.137);
   `LTE-Update` ist die Hauptlinie, Zusammenführung offen
-- **⚠ Nebenbranch `connection-pin` (ab 5.101) - HARDWARE-ABHAENGIG, nicht auf normale Boards
-  flashen:** setzt eine Umverdrahtung voraus (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**;
-  in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen GND-Verbindung dafür aufgetrennt wurde).
-  Details: `sism555/project-status.md`, Update 5.101 und 5.109. **Seit 5.120 (2026-10-19) braucht die
-  Funktion die Verdrahtung nicht mehr:** `BT_CONN_GPIO` in `btio.h` steht auf 0, `BT_LINK` hängt allein an
-  `CYSPP`; `CONNECTION` (P0.19) wird nur noch für Diagnoseanzeigen gelesen (auf unveränderten Boards dauerhaft
-  HIGH, dort bedeutungslos). Mit der Weiche auf 1 (5.110-5.119) war auf Boards ohne P0.19-Draht jede
-  BT-Eingabe tot (PIN nicht tippbar). OFFEN: ob die "Stray-Zeichen nach dem Trennen" (5.110) ohne die Weiche
-  zurückkehren - Prüfung mit `sism555/Doku/tools/trace_stray_check.py` auf dem verdrahteten Board 99SC9923.
+- **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
+  (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen
+  GND-Verbindung dafür aufgetrennt wurde) und dürfen nicht auf Boards ohne Draht (mit der Weiche auf 1,
+  5.110-5.119, war dort jede BT-Eingabe tot). Details: `sism555/project-status.md`, Update 5.101 und 5.109.
+  **Ab 5.120 (2026-10-19) läuft die Firmware auf allen Boards:** `BT_CONN_GPIO` in `btio.h` steht auf 0,
+  `BT_LINK` hängt allein an `CYSPP`. `CONNECTION` (P0.19) wird für Diagnoseanzeigen gelesen und ist seit 5.137
+  zusätzlicher Auslöser für "BT während LTE" (`BT_CONN_TRIGGER`); ohne Draht liest der Pin dauerhaft HIGH,
+  der Auslöser bleibt dann stumm. Geprüft mit 5.124 (2026-10-20): ohne die Weiche keine Stray-Zeichen nach dem
+  Trennen in 30 Zyklen (`sism555/Doku/tools/trace_stray_check.py`).
 - **Aktuelle Firmware-Version:** siehe `sism555/project-status.md` (diese Datei hier wird nicht
   bei jeder Version nachgeführt) - `T_version` in `sism555/sprachen/sictxt.c`
 - **Firmware-Quellcode:** `sism555/` (Hauptdatei BT: `btio.c` / `btio.h`)
@@ -60,6 +60,10 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-12 - Abnahme nach Umrüstung:** Funktionsfähig mit 5.137 sind **99SC9923 (A), 26SC9983 (B), 26SC9966**.
+  26SC9994 (C) und 11SC1234: BLE friert das Modul beim Verbinden ein, Classic ok (Hardware vermutet, Quarz/Versorgung).
+  11SC1234 und 26SC9993 pfeifen nach Nacharbeit hörbar und sind defekt, HW-Prüfung am 2026-11-16. An den drei
+  funktionierenden Boards keine Hardware-Versuche mehr. Stand je Board: `sism555/Doku/Board-Inventar.md`.
 - **⚠ 2026-11-10 - UMRÜSTAKTION ALLER BOARDS:** nur R125 (Modul-CTS) nach GND. Der Pull-up auf BLT-RXD ist
   zurückgestellt (`0xFF`-Bytes vor dem Banner bleiben vorerst).
   Die Boards waren vorher **unterschiedlich** bestückt (R125 Pull-up oder offen). Vor jedem Test im
@@ -71,8 +75,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
   nach 3 V. Steht der UART-MUX auf LTE, sieht das Modul "Host nicht bereit" und schließt den BLE-Handshake (CCCD) nicht
   ab, zieht CYSPP nie auf LOW, die Firmware merkt die Verbindung nicht. Belege: Board B (26SC9983, R125 bestückt) mit
   5.137 BLE während LTE 0/3, Classic 3/3; 26SC9966 (R125 **nicht** bestückt) besteht BLE während LTE in allen Läufen.
-  Classic ist nicht betroffen (CYSPP geht dort ohne UART-Meldung auf LOW). Anwender baut R125 auf B um, danach
-  `online-bt` wiederholen. Für V2: R125 nach GND statt 3 V (Wunschliste in `sism555/Doku/Fragen_Schaltplan_CTS_MUX.md`).
+  Classic ist nicht betroffen (CYSPP geht dort ohne UART-Meldung auf LOW). Erledigt am selben Tag: R125 auf B und
+  26SC9966 nach GND umgebaut, `online-bt` danach auf B BLE 3/3 und Classic 3/3, auf 26SC9966 BLE 4/4 und Classic 3/3
+  (`sism555/Doku/Board-Inventar.md`). Für V2: R125 nach GND statt 3 V (Wunschliste in `sism555/Doku/Fragen_Schaltplan_CTS_MUX.md`).
 - **2026-11-09 - 5.137 (TEST):** CONNECTION (P0.19) als zusätzlicher Auslöser - BT-Verbindung während LTE beendet MQTT
   geordnet (`/leave`), nach dem Trennen `/join`. Auf 26SC9966 bestanden; ohne P0.19-Draht (B) bleibt er wie vorgesehen
   stumm. 5.136: CONNECTION-Monitor (Testmenü 3->7) auch während LTE (temporär). 5.135: kein W11015 mehr beim Einschalten.
@@ -115,13 +120,14 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - **2026-10-20: Prüfrunde mit 5.124 auf zwei Boards** (`sism555/project-status.md`, "Prüfrunde mit Firmware 5.124"): Weiche aus (5.120) ohne Stray-Zeichen in 30
   Zyklen, Board B (26SC9983) funktioniert per BLE und Classic. **BLE-Durchsatz hängt am vom PC gewählten Verbindungsintervall:** B lief mit 60 ms (3,1 KB/s, Modul bremst per CTS
   ~1430x), A mit 7,5 ms (6,6 KB/s). Offen: warum Windows für B ein langes Intervall wählt (Gerät in Windows entfernen und neu koppeln als Gegenprobe).
-- Gerätename BLE + Classic einheitlich `VIASIS_<serno>`.
+- Gerätename: Classic `VIASIS_<serno>`, BLE `VIASIS_<serno>_BLE` (`bt_set_name()` in `btio.c`).
 - Zugangsschutz über bestehende **App-Layer-PIN** (kein BT-Passkey).
 - BT-Baud fix über `#define IF820_BAUD 460800` in `btio.h` (921600 verworfen — HW-Limit LPC1766).
 - BT-(Re)Konfig erzwingt Command-Mode selbst; Reconfig am besten über RS232.
 - BT-Init (5.16) selbstheilend: erkennt Werksmodul/Modultausch (F=00), aktiviert Flow Control
   per `cts_bypass`-Bootstrap automatisch (STU F=01 + /SCFG + /RBT), verifiziert danach den
-  CTS-Handshake; bleibt CTS trotzdem HIGH → `F11009` (echter Verdrahtungsfehler).
+  Erfolg per `/PING` mit Handshake; antwortet das Modul nach `/RBT` nicht (z. B. weil CTS HIGH bleibt) →
+  `F11018`. `F11009` kommt nur noch im Laird/RN4678-Fallback (`btio.c`, `Init_BT_ch(460800)` scheitert).
 
 ## ✅ BEHOBEN (2026-08-20): BLE-Datenkanal brach beim Subscribe ab
 
@@ -162,9 +168,12 @@ eigentliche Problem ist, dass unsere **Firmware** die Leitung über `bt_cmdmode(
 - `uart1_request()` (hard.c) — beim Verdrängen von BT durch GSM/GPS (`bt_displaced`)
 - Bluetooth-Deinstallieren-Menüpunkt (sicom.c case -1)
 
-Alle vier Stellen widersprechen der jetzt bestätigten Anforderung "Leitung nie aktiv treiben,
-auch nicht beim UART1-Muxwechsel oder bei Fehler-/Timeout-Pfaden" und müssen überarbeitet
-werden. **Voraussichtlich ist KEINE Hardware-Änderung nötig** (R77, CONNECTION-Pin-
+Alle vier Stellen widersprachen der Anforderung "Leitung nie aktiv treiben, auch nicht beim
+UART1-Muxwechsel oder bei Fehler-/Timeout-Pfaden". **Stand 5.137:** `init_bluetooth()` (seit 5.73)
+und `uart1_request()` treiben CYSPP nicht mehr. Bewusst geblieben sind `bt_disconnect()` (gezieltes
+Trennen mit `/DIS`, danach `bt_release()`, siehe Kommentar 5.74 in `btio.c`) und der
+Deinstallieren-Menüpunkt (`sicom.c` case -1: 300 ms HIGH, dann `bt_release()`), dazu die
+Testmenüpunkte 8->2 und 8->6. **Voraussichtlich ist KEINE Hardware-Änderung nötig** (R77, CONNECTION-Pin-
 Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md` und
 `Messprotokoll_CYSPP_Diagnose.md` (Wege A/B/C, R77/P27-Umverdrahtung) sind als *Lösungsweg*
 überholt, bleiben aber als Herleitungs-/Messhistorie erhalten.
@@ -182,8 +191,12 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
 
 ## Offene / zu beobachtende Punkte
 
-- **BACKLOG-Idee (2026-08-18, NICHT umgesetzt, bewusst zurueckgestellt) - Classic und BLE
-  getrennt behandeln (Transport-Erkennung):** Aktuell unterscheidet die Firmware nicht, ob eine
+- **ERLEDIGT (5.130-5.132) - Classic und BLE unterscheiden (Transport-Erkennung):** Die Firmware
+  erkennt den Transport aus den Modul-Events (`C` = BLE, `BTCON` = Classic; `bt_sm_event()`,
+  `bt_transport`, Zeilen `[BT-Zustand]`) bei unverändertem Autostart (`.CYSPPSP E=2`); `BT_LINK`
+  hängt weiter allein am CYSPP-Pin. `.CYSPPSTART`/`E=1` wurde in Phase 0 verworfen. Konzept:
+  `sism555/Doku/Konzept_CYSPP_Zustandsmaschine.md`. Der folgende Text ist die ursprüngliche
+  Backlog-Notiz vom 2026-08-18 (Stand vor der Umsetzung): Aktuell unterscheidet die Firmware nicht, ob eine
   BT-Verbindung Classic SPP oder BLE ist - `BT_LINK`/CYSPP-Pin ist ein einziges, transport-
   neutrales Signal ("irgendein transparenter Datenkanal ist aktiv"). Um das zu unterscheiden,
   muesste die Firmware die `@E,...`-Ereignisse des Moduls auswerten (gap_connected fuer BLE vs.
@@ -252,15 +265,18 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   (RST_L/Power-Cycle) bleibt als eigenstaendiges, ungeklaertes Thema bestehen - aber zumindest
   die heute wiederholt reproduzierten Faelle waren dieser eigene 5.89-5.91-Bug, kein Hardware-
   Defekt.
-- **Aufraeumen (bewusst temporaerer Diagnose-Code):** `bt_transfer_echo()`, `crc32_calc()`,
-  `bt_send_ack()` (btio.c/.h) und Testmenue-Punkt 8→3 sind reiner Diagnose-Code fuer die
+- **Aufraeumen (bewusst temporaerer Diagnose-Code):** `bt_transfer_echo()` (btio.c/.h), `crc32_calc()`,
+  `bt_send_ack()` (beide `static` in btio.c) und Testmenue-Punkt 8→3 sind reiner Diagnose-Code fuer die
   BLE-CYSPP-Untersuchung (Update 5.67), kein produktives Feature. Ebenso `comchange_count`
-  (hard.c/.h, Update 5.70) - zaehlt EINT1/IC54-Interrupts zur CYSPP-Bounce-Diagnose. Nach
+  (hard.c/.h, 5.69; Anzeige in btio.c) - zaehlt EINT1/IC54-Interrupts zur CYSPP-Bounce-Diagnose. Ebenfalls
+  temporaer (in `btio.h` so markiert): `bt_cyspp_contention_test()` (8→2), `bt_factory_reset()` (8→4),
+  `bt_force_disconnect_test()` (8→5), `bt_cyspp_manual_control()` (8→6). Nach
   Abschluss der CYSPP-Diagnose wieder entfernen (Anwenderentscheidung 2026-08-18).
-- **Aufraeumen - TEMPORAER seit 5.119 (Anwenderentscheidung 2026-10-19):** `ev_line`/`ev_n`/`bt_event_line()`
-  und der Aufruf im else-Zweig von `bt_sniff_poll()` (btio.c) geben die Modul-Events `C` (Verbindungsparameter
-  I=/L=/O=) und `DIS` (Trenngrund R=) immer als Zeile `[BT-Event] @E,...` auf RS232 aus. Nur fuer die Ursachensuche
-  bei BLE-Abbruechen/Langsamlauf (PC vs. Modul). **Wieder entfernen**, sobald die Untersuchung abgeschlossen ist.
+- **Aufraeumen - TEMPORAER seit 5.119 (Anwenderentscheidung 2026-10-19):** Nur noch die **Ausgabe** der Zeile
+  `[BT-Event] @E,...` (Events `C`, `CU`, `DIS`) in `bt_event_line()` (btio.c) ist temporaer - fuer die Ursachensuche
+  bei BLE-Abbruechen/Langsamlauf (PC vs. Modul). **ACHTUNG beim Rueckbau:** `ev_line`/`ev_n`/`bt_event_line()` selbst
+  und der Aufruf in `bt_sniff_poll()` muessen bleiben - sie speisen seit 5.125/5.130 `ucp_check()` (`/UCP`) und
+  `bt_sm_event()` (Zustandsmaschine). Nur den `putstr`-Block entfernen.
 - **Aufraeumen - TEMPORAER seit 5.129/5.136:** `bt_module_cmd()` (Testmenue 8->7 "Modulbefehl senden", 5.129) und
   die Erweiterung von `bt_monitor_poll()` um GSM-Thread-Wechsel und CONNECTION waehrend LTE (`mon_lastthr`, 5.136,
   btio.c). Nur fuer Phase 0 der Zustandsmaschine bzw. den LTE-BLE-Test; nach Abschluss entfernen. `bt_conn_trigger()`
@@ -273,8 +289,7 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   duerfen bleiben.
 - **Aufraeumen - TEMPORAER seit 5.115 (Anwenderentscheidung 2026-10-14):** Der
   **CYSPP/CONNECTION-Hintergrund-Monitor** (`bt_monitor_poll()` + Zustandsvariablen `mon_*` in
-  `btio.c`, Aufruf in `measure.c` neben `bt_sniff_poll()`, Deklaration `btio.h`, Zusatz "(ein/aus)"
-  im Testmenue-Text `sicom.c`) existiert nur fuer den CONNECTION-Test
+  `btio.c`, Aufruf in `measure.c` neben `bt_sniff_poll()`, Deklaration `btio.h`) existiert nur fuer den CONNECTION-Test
   (`sism555/Doku/Testplan_CONNECTION_P0-19.md`). **Rueckbau nach Abschluss des Tests:**
   `bt_cyspp_monitor()` wieder auf die blockierende Fassung (Commit `d6f8bb8`, 5.114) zuruecksetzen -
   oder, zusammen mit dem uebrigen CYSPP-Diagnosecode, ganz entfernen; ebenso `bt_monitor_active()` (btio.c/.h) und die zustandsabhaengige Menuezeile 7 in
@@ -309,8 +324,9 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   Timeout (teils nur 1 s, siehe project-status.md Update 5.63) und einen zeitkritischeren
   Verbindungsaufbau als Classic (reifere, fehlertolerantere Baseband-Prozedur mit längerem
   Timeout ~20 s). Ein kurzer Aussetzer, den Classic wegsteckt, kann eine BLE-Verbindung mit
-  1-Sekunden-Timeout sofort beenden. Fokus liegt daher auf den bereits angegangenen BLE-
-  Verbindungsparametern (PPCP/Supervision-Timeout, Update 5.66), nicht auf Antenne/Stromversorgung.
+  1-Sekunden-Timeout sofort beenden. Fokus liegt daher auf den BLE-Verbindungsparametern, nicht auf
+  Antenne/Stromversorgung. Das PPCP-Setzen (5.66) wurde in 5.75 wieder entfernt (nur noch Anzeige per
+  `/RLH`); seit 5.132 fordert die Firmware Intervall und Supervision-Timeout per `/UCP` an.
 - **`RST_L` (Pin 34) hängt am Mainboard an nichts.** Netz `N$160` enthält nur `IC37.RST` und
   `R124` Pad 1; **R124 (10 kΩ nach VDDIO) ist in beiden Varianten nicht bestückt**. Folgen:
   (a) der LPC kann das Modul **nicht** zurücksetzen — deshalb hilft bei einem hängenden Modul
@@ -323,7 +339,11 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   `HW_Massnahmen_Bewertung_2026-08.md` Abschnitt 9a.
 - **Betriebsregel:** immer nur **eine** Versorgungsquelle (Board **oder** DVK-USB, nie beides).
   Verstöße haben bereits zwei Module und ein DVK zerstört (Back-Powering).
-- BLE-Durchsatz-Optionen A/B (Backlog, noch nicht umgesetzt).
+- BLE-Durchsatz: Option B (`/UCP`, Wunschintervall 7,5 ms) ist seit 5.132 aktiv (`BT_UCP_ENABLE 1`);
+  Option A (No-Sleep während der Verbindung) ist nicht umgesetzt.
+- **Review 2026-11-11:** `sism555/Doku/fable_review_2026-11-11.md` - Befunde aus Code- und Doku-Durchsicht
+  (u. a. knappe Thread-Stacks, gemeinsam benutzter `flbuf`, `uart1_release()` bei laufender BT-Sitzung). Noch
+  nichts davon umgesetzt.
 
 ## ⚠ Repo-Hygiene: 141 Dateien zeigen Scheinänderungen
 
@@ -364,4 +384,4 @@ nicht gemacht, damit der Fix nicht mit den offenen BT-Themen vermischt wird.
 - Übergabe zwischen beiden läuft über **diese Datei plus die Doku unter `sism555/Doku/`**.
 
 ---
-*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-10.*
+*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-12.*

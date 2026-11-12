@@ -267,6 +267,151 @@ sind weiterhin offen.
 
 **Wahrscheinlichkeit, dass 1.4.18.18 die Lockups unter UART-Last behebt: 60 %.**
 
+### 9.1 Recherche 2026-10-01: Was ist zwischen 1.4.12.12 und 1.4.18.18 anders?
+
+**Quellenkürzel** (jede Aussage unten trägt ihre genaue Fundstelle):
+
+| Kürzel | Quelle |
+|---|---|
+| **GH-12** | GitHub-Release v1.4.12.12, https://github.com/Ezurio/Vela_IF820_Firmware/releases/tag/v1.4.12.12 |
+| **GH-16** | GitHub-Release v1.4.16.16 (GA2), https://github.com/Ezurio/Vela_IF820_Firmware/releases/tag/v1.4.16.16 |
+| **GH-18** | GitHub-Release v1.4.18.18 (GA3), https://github.com/Ezurio/Vela_IF820_Firmware/releases/tag/v1.4.18.18 |
+| **PCN-7C** | `Documentation/Ezurio_PCN #7C-2024_Vela IF820 Series Update Default Firmware to Internal LPO.pdf` |
+| **PCN-2E** | `Documentation/Ezurio_PCN #2E-2026_Vela IF820 Series Update Default Firmware to v1.4.18.18 (GA3).pdf` |
+| **DS** | `Documentation/EZ-DS-Vela IF820_v2_2.pdf` (Datenblatt) |
+| **PKG** | Lieferpaket `SupplierSourceCode/Vela_IF820_Firmware-1.4.18.18/Vela_IF820_Firmware-1.4.18.18/files/` |
+| **GA2** | Ezurio-Ankündigung https://www.ezurio.com/documentation/now-available-vela-if820-ga2-software-release |
+
+**1.4.12.12 (GA1, Nov 2023)**
+
+| Aussage | Fundstelle |
+|---|---|
+| Erstes Produktionsrelease: „This is the first production release of EZ-Serial firmware for the Vela IF820 module." | GH-12, Abschnitt „EZ-Serial GA1 Release" |
+| Nur **ein** Image pro Antennentyp (`…INT-ANT-EVK_141212…hex`), keine LPO-Variante | GH-12, Abschnitt „Programming"; lokal `SupplierSourceCode/IF820_INT_ANT_v1.4.12.12/` (nur eine `.hex`) |
+| LPO-Unterstützung kam erst mit 16.16 (siehe unten) → 12.12 setzt den externen Quarz voraus | GH-16, „EZ-Serial firmware fixes", 1. Punkt (Umkehrschluss) |
+
+**1.4.16.16 (GA2, Mai 2024)**
+
+| Aussage | Fundstelle |
+|---|---|
+| „Add support for internal LPO (low-power-oscillator): 2 new binaries for each antenna type." | GH-16, Abschnitt „EZ-Serial firmware fixes", Punkt 1 |
+| „Improve SPP connection throughput." | GH-16, „EZ-Serial firmware fixes", Punkt 2 |
+| „Set Bluetooth classic COD to zero." | GH-16, „EZ-Serial firmware fixes", Punkt 3 |
+| Ab-Werk-Firmware von 12.12 auf 16.16 umgestellt | PCN-7C, **S. 1, Abschnitt 2** „Description of Changes" |
+| „from v1.4.16.16 onwards, the **default setting is to use the internal LPO**" | PCN-7C, **S. 1, Abschnitt 3** „Reason for Change" |
+| „The major functional change of v1.4.16.16 is to default to using the internal LPO." | PCN-7C, **S. 1, Abschnitt 4** „Anticipated Impact" |
+| Wirksam ab Date Code `0924292` (Module 453-00171R) | PCN-7C, **S. 10, Abschnitt 6** „Factory Effectivity Date", Tabelle |
+
+**1.4.18.18 (GA3, Feb 2026)**
+
+| Aussage | Fundstelle |
+|---|---|
+| Ab-Werk-Firmware von 16.16 auf 18.18 umgestellt | PCN-2E, **S. 1, Abschnitt 2** |
+| **„Fix a lockup issue due in heavy UART loading."** | PCN-2E, **S. 1, Abschnitt 3**, Bugfix 3 · GH-18, „Bug Fixes", Punkt 3 |
+| „Support PUART baud rate greater than 2727272 bps … must use 2 stop bits" | PCN-2E, S. 1, Abschnitt 3, Bugfix 1 · GH-18, „Bug Fixes", Punkt 1 |
+| „When custom GATT profile has been added, it only works when CYSPP is enabled" (behoben) | PCN-2E, S. 1, Abschnitt 3, Bugfix 2 · GH-18, „Bug Fixes", Punkt 2 |
+| „Protocol Set Parse Mode (SPPM) now defaults to **disable auto parse**. In order to use binary mode, enable it…" | PCN-2E, S. 1, Abschnitt 3, New Feature 1 · GH-18, „New Features", Punkt 1 |
+| „Add support for keyboard paring. Add PKE event and /PE command." | PCN-2E, S. 1, Abschnitt 3, New Feature 2 · GH-18, „New Features", Punkt 2 |
+| **„Implement SBTP,F=1 to disable sniff feature. This improves SPP throughput."** | PCN-2E, **S. 1, Abschnitt 3, New Feature 3** · GH-18, „New Features", Punkt 3 |
+| **„Add using CYSPP pin to exit SPP MODE (pull CYSPP pin high) and transition back to command mode."** | PCN-2E, **S. 1, Abschnitt 3, New Feature 4** · GH-18, „New Features", Punkt 4 |
+| Known Issue: „M=4 (mode 4) is not supported for CYSPPSK command." | GH-18, Abschnitt „Known Issues" (nur GitHub, nicht im PCN) |
+| Kennzeichnung: Modulaufkleber Rev 3 → **Rev 4** | PCN-2E, **S. 2, Abschnitt 5.1** |
+| Wirksam ab Date Code **`0926102`** (Module 453-00171R) | PCN-2E, **S. 10, Abschnitt 6.1**, Tabelle |
+
+Einordnung für uns: `SPPM`-Änderung → wir nutzen Textmodus, voraussichtlich kein Effekt, beim
+Umstieg prüfen. Keyboard-Pairing und PUART > 2,7 Mbit/s irrelevant. `.CYSPPSK` M=4 betrifft uns
+nicht — wir senden M=01 (`btio.h`, Konstante für `.CYSPPSK,M=01,W=01,L=14,E=0D`).
+
+**Zwei Befunde, die unseren Code schon HEUTE betreffen (Module auf 12.12):**
+
+1. **`SBTP ... F=01` wirkt laut Hersteller erst ab 18.18.**
+   - Unser Code: `sism555/btio.h:114`
+     `#define T_sbtp_ns "SBTP,T=7D00,D=02,C=01,F=01,S=02,V=0000,N=0000\r" // … F=01 = Sniff AUS`
+   - Hersteller: PCN-2E S. 1 Abschnitt 3, New Feature 3 — dort steht „**Implement** SBTP,F=1",
+     also in 18.18 neu umgesetzt.
+   - Folgerung: Auf 12.12 wird F=01 zwar geschrieben, ist aber sehr wahrscheinlich **wirkungslos**
+     → Sniff vermutlich weiter aktiv (Classic-Durchsatz). *Nicht am Gerät verifiziert.*
+2. **„CYSPP HIGH beendet SPP" gibt es ebenfalls erst ab 18.18.**
+   - Hersteller: PCN-2E S. 1 Abschnitt 3, New Feature 4 („**Add** using CYSPP pin to exit SPP MODE").
+   - Deckt sich mit unserer eigenen Feststellung: `sism555/project-status.md`, **Update 5.47**
+     (Zeile ~1438: „bt_cmdmode() setzt CYSPP HIGH; dieses Feature gibt es erst ab 1.4.18.18") und
+     Zeile ~1504 („Versionssicher: CYSPP-HIGH-zum-SPP-Verlassen wirkt erst ab Modul-FW 1.4.18.18").
+   - Folgerung: Auf 12.12 trennt in `bt_disconnect()` faktisch das nachfolgende `/DIS`, nicht das
+     HIGH-Treiben.
+   - Hinweis: Der Guide (`EZ-GUIDE-EZ-SERIAL-VELA-IF820_v2_2.pdf`, S. 15) beschreibt das Verhalten
+     ohne Versionsangabe — er ist auf dem Stand v2.2 (2026) und damit für 18.18 geschrieben.
+
+### 9.2 Interner LPO vs. externer Quarz unter 1.4.18.18
+
+**Begriff:** Das IF820 hat keinen internen *Quarz*, sondern einen internen Oszillator (LPO).
+Beleg: DS **S. 7**, Feature-Liste „Power management": „On-chip 32 kHz **low power oscillator
+(LPO)** with optional external 32 kHz crystal oscillator support". Welche Taktquelle genutzt
+wird, legt das **Firmware-Image** fest (getrennte Binaries, siehe Tabelle) — ein
+Konfigurationskommando dafür kommt in keinem der Dokumente vor.
+
+**18.18 gibt es offiziell in beiden Varianten:**
+
+| Image | Für | Fundstelle |
+|---|---|---|
+| `v1.4.18.18_int-ant` (`20251116_ezserial_app_VELA-IF820-INT-ANT-EVK_141818_v1.4.18.18_download.hex`) | Boards **mit** 32,768-kHz-Quarz | GH-18, „EZ-Serial binaries", Link „Internal antenna" · PKG, Ordner `v1.4.18.18_int-ant/` |
+| `v1.4.18.18_int-ant_int-lpo` (`20251116_ezserial_app_VELA-IF820-INT-ANT-INT-LPO_141818_v1.4.18.18_download.hex`) | Boards **ohne** Quarz | GH-18, „EZ-Serial binaries", Link „Internal antenna internal LPO" · PKG, Ordner `v1.4.18.18_int-ant_int-lpo/` |
+
+**Herstellerregel, wörtlich:** „The `int-lpo` binaries should be used in designs where the module
+**DOES NOT** have a 32kHz crystal connected to the module."
+→ GH-18, Abschnitt „EZ-Serial binaries", Absatz unter der Link-Liste (wortgleich in GH-16,
+gleicher Abschnitt).
+
+**Offiziell unterstützt:** „The Vela IF820 USB dongle does not have a 32kHz external crystal. The
+Internal antenna internal LPO image should be used for the USB dongle **to function correctly**."
+→ GH-18, „EZ-Serial binaries", folgender Absatz · inhaltlich auch PCN-7C, S. 1, Abschnitt 3.
+Der Hersteller beschreibt die Wahl zwischen LPO und Quarz als OEM-Option und empfiehlt den
+Quarz für bestes Strom-/Timingverhalten → GA2-Ankündigung.
+
+**Das Datenblatt empfiehlt den Quarz trotzdem nachdrücklich:**
+
+| Aussage (wörtlich) | Fundstelle |
+|---|---|
+| „highly recommend to implement 32.768KHz crystal, **if not, link issue may be occurred**." | DS **S. 27**, Tabelle 21 (integrierte Antenne), **Fußnoten 8 und 9** zu Pin 4 `XTALI_32K` / Pin 5 `XTALO_32K` |
+| „Highly recommend to implement 32.768KHz crystal (pin4, pin5), Using the external crystal guarantees the **lowest power and highest timing accuracy**." | DS **S. 33**, §10.4 „Reference Schematic Design", Note |
+| „highly recommend placing external 32.768kHz crystal. Using the external crystal guarantees the lowest power and highest timing accuracy." | DS **S. 21**, Tabelle 18 (MHF4), Fußnote 2 · DS **S. 25**, §9.4 Note |
+| Revision 1.2, 7 May 2024: „**Add recommendation for 32.768KHz crystal.**" | DS **S. 2**, Revision History |
+
+Bemerkenswert: Die Quarz-Empfehlung kam im Mai 2024 ins Datenblatt (DS S. 2) — praktisch
+zeitgleich mit dem LPO-Image (GH-16, Mai 2024) und zwei Monate vor PCN-7C (Juli 2024).
+
+**Eine ppm-/Genauigkeitsangabe für den LPO fehlt** — weder DS noch PCN-7C noch GH-16/GH-18 nennen
+eine. (Volltextsuche im DS nach „LPO", „32.768", „crystal", „XTAL" durchgeführt; nur die oben
+gelisteten Treffer.)
+
+**Konsequenzen für uns:**
+
+1. **Q3 bestückt lassen und das Quarz-Image `int-ant` (ohne `int-lpo`) verwenden.** Begründung:
+   DS S. 27 / S. 33 (Quarz empfohlen) + GH-18-Regel (LPO-Image nur *ohne* Quarz). Q3 ist bestückt
+   — Beleg: `CLAUDE.md`, Abschnitt „Offene Punkte", „KORREKTUR (2026-08-18): 32-kHz-Quarz Q3 ist
+   doch bestückt (Anwender hat es am Board geprüft)". Unser heutiger Stand 12.12 (nur Quarz-Image,
+   siehe 9.1) + Q3 ist damit bereits stimmig.
+2. **Image muss zur Hardware passen.** Regel: GH-18, „EZ-Serial binaries". Eine Aussage, was bei
+   falscher Paarung passiert, macht der Hersteller nicht — nur „to function correctly" beim
+   Dongle (GH-18), was eine Fehlfunktion bei falscher Wahl nahelegt.
+3. **Neu gekaufte Module laufen vermutlich auf dem LPO.** Herleitung: ab Date Code `0926102` ab
+   Werk 18.18 (PCN-2E S. 10, Abschnitt 6.1) **und** seit 16.16 ist der LPO der Werksstandard
+   (PCN-7C S. 1, Abschnitt 3). *Welche der beiden 18.18-Varianten ab Werk geflasht wird, sagt
+   PCN-2E nicht ausdrücklich* — das ist eine Folgerung. Prüfen: Modulaufkleber Rev 4 (PCN-2E
+   S. 2, Abschnitt 5.1) bzw. Version im Boot-Event (`BOOT`, `E=…`; Dekodierung siehe
+   `project-status.md` Update 5.47). Die LPO-Variante ist am Boot-Event allein vermutlich
+   nicht erkennbar (Versionsnummer identisch).
+   Folge wäre eine Feld-Mischung aus 12.12/Quarz und 18.18/LPO.
+4. **Update auf 18.18 ist onboard nicht möglich.** Flash-Voraussetzungen: DS **S. 34, §11**
+   („Flashing uses BT_UART_TXD, BT_UART_RXD, BT_UART_CTS, BT_UART_RTS … Reset line is also
+   required … CTS needs to be low during a reset"). Bei uns sind HCI-UART und RST nicht
+   herausgeführt → Abschnitt 9a dieses Dokuments. Wege: Module mit 18.18 zukaufen oder vor dem
+   Einlöten per DVK/Adapter flashen (Flasher: PKG bzw. GH-18, „Flashing IF820 firmware").
+5. **Ob der Lockup-Fix unseren Restfall löst, ist nicht belegt.** Der Fix lautet nur „Fix a
+   lockup issue due in heavy UART loading" (PCN-2E S. 1, Abschnitt 3) — ohne Symptombeschreibung.
+   Unser Restfall („Modul antwortet nicht mehr, nur langer Power-Cycle hilft") ist beschrieben in
+   `CLAUDE.md`, „Offene Punkte", Eintrag „BT-Modul faellt gelegentlich komplett aus". Der
+   Zusammenhang ist plausibel, aber Vermutung.
+
 ---
 
 ## 9a. RST_L (Pin 34) — auf dem Mainboard an nichts angeschlossen
