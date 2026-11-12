@@ -6500,3 +6500,7 @@ Bemerkenswert: auch ganz ohne `/UCP` haengt das Modul.
 
 **Nachtrag 12:47 - 26SC9994 erneut (nach Hardware-Pruefung durch den Anwender, Aenderung nicht beschrieben):**
 BLE-smoke 2x nach Stromzyklus: beide **scheitern** unveraendert (`C` I=0030, `/UCP`, keine GATT-Antwort).
+
+**Nachtrag 15:05 - 11SC1234 nach Bauteiltausch (Anwender, Bauteile nicht beschrieben):** Board laeuft hoch (5.137),
+wirbt als `VIASIS_11SC1234_BLE`. BLE-smoke 2x (einmal nach 10 s stromlos): beide **scheitern** beim Verbinden, danach
+wirbt das Modul nicht mehr - unveraendert eingefroren. Der Tausch hat den BLE-Haenger nicht behoben.
