@@ -6508,3 +6508,35 @@ wirbt das Modul nicht mehr - unveraendert eingefroren. Der Tausch hat den BLE-Ha
 **Nachtrag 15:15 - 11SC1234 defekt:** Kurz nach dem Test pfeift das Board hoerbar (Anwender), wie zuvor 26SC9993.
 Keine weiteren Tests. Die Hardware-Experten pruefen das Board am Montag 2026-11-16. Offen fuer die Pruefung: welche
 Bauteile getauscht wurden, Versorgung des Moduls (3P0V/VDDIO), 32-kHz-Quarz mit 10 MOhm parallel.
+
+## Update 5.s1 (TEST, 2026-11-12, Branch `DevelopLightSensor`): Lichtsensor VEML7700 steuert die Anzeigehelligkeit
+
+**Ziel:** Auf Mainboard V2 (Stand 10.11.2026) ist der I2C-Lichtsensor IC1 VEML7700 (Vishay) in beiden Varianten
+bestueckt, an I2C0 (P0.27 SDA / P0.28 SCL, Pull-ups R144/R145 2,2 kOhm), feste 7-Bit-Adresse 0x10 (im Code 8-Bit
+`0x20`), kein Interrupt-Pin. Er soll die Helligkeit der LED-Anzeige steuern. Die Firmware muss weiter auf V1 laufen. Versionen auf diesem Branch heissen 5.s1, 5.s2 ... (parallele Entwicklung auf
+anderen Branches, Anwenderentscheidung 2026-11-12; `T_version[8]` reicht bis 5.s9999).
+Der zweite Sensor IC38 TSL25721 ist nicht bestueckt und wird nicht unterstuetzt.
+
+**Bisher:** `get_dimmung()` (libtool.c) liest je Messzyklus die Fotodiode SFH213 per A/D (`get_brightness()`, schaltet
+dazu die LEDs kurz ab), rechnet per Polynom in `dimm` (3...200) um und glaettet (1/4 je Aufruf); `set_pwm()` setzt
+daraus die Anzeige- und externe PWM.
+
+**Umsetzung (neue Dateien `lightsens.c/.h`, im Keil-Projekt eingetragen):**
+- `get_dimmung()` fragt zuerst `lightsens_dimm()`. Antwortet der VEML7700 beim ersten Aufruf nach einem Reset nicht
+  (V1), kommt -1 zurueck und es bleibt bei der Fotodiode. Glaettung, `set_pwm()` und LED-Spot unveraendert.
+- Gemessen wird nur bei dunkler Anzeige (`PINSEL4&PWM6` aus und `PWM_TRB` HIGH) und nur bei jedem 8. Aufruf
+  (`LS_EVERY`, ca. 4...12 s), weil die LEDs durch die Aussparung in der Frontscheibe auf den Sensor leuchten.
+- Die Messung blockiert 150 ms (`LS_WAIT`, Integrationszeit 100 ms). Nicht ueber zwei Aufrufe verteilt, weil die CPU
+  ohne Verkehr nach jedem Messzyklus in den Deep Sleep geht und per Watchdog-Reset (`SLEEP_RES`) aufwacht.
+  Messwert, Verstaerkung und Aufrufzaehler liegen deshalb im `__noinit`-RAM (Kennung `LS_MAGIC`).
+- Verstaerkung automatisch x2/x1/x1/4/x1/8 (uebersteuert ab Rohwert 60000 -> unempfindlicher, unter 1500 ->
+  empfindlicher). Aufloesung nach aktuellem Datenblatt (0,0336 lx/Zaehlwert bei x2/100 ms), keine
+  Linearitaetskorrektur ueber 1000 lx.
+- Kennlinie logarithmisch: bis 1 lx `dimm`=3 (wie die alte Kennlinie bei Dunkelheit), ab 10000 lx 200 (100 %).
+  Endpunkte als `#define` in `lightsens.h` (`LS_LUX_MIN/MAX`, `LS_DIM_MIN/MAX`), noch keine Parameter.
+- Bis zum ersten Messwert bleibt `dimm` unveraendert (Kaltstart 100).
+- Testmenue "Lichtsensor" (`licht_test()`, sictst.c): mit VEML7700 je Messung eine Zeile mit Lux, Rohwert,
+  Verstaerkung und berechnetem Dimmfaktor; ohne Sensor wie bisher der A/D-Wert.
+
+**Status:** Build ohne Fehler/Warnungen. Am Geraet noch nicht getestet. Offen: Kennlinie am Geraet abstimmen
+(Endpunkte, ggf. als Parameter), pruefen, ob der Sensor bei dunkler Anzeige noch Restlicht von den LEDs sieht.

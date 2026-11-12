@@ -409,6 +409,11 @@
               <FilePath>.\i2cm.c</FilePath>
             </File>
             <File>
+              <FileName>lightsens.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\lightsens.c</FilePath>
+            </File>
+            <File>
               <FileName>fio.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\fio.c</FilePath>
