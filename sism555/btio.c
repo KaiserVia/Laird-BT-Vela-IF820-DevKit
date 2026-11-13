@@ -847,18 +847,47 @@ static void bt_sm_unhide (const char *why)
 // 5.146 (Review 2.4): IF820 eingetragen, aber beim Hochlauf nicht erkannt (interfaces ohne BT_LINK, steht im
 // __noinit-RAM und uebersteht den Deep-Sleep-Reset) -> einmal pro Minute erneut /PING. Bisher blieb BT in diesem Fall
 // bis zum naechsten Stromzyklus tot (auch der naechtliche Neustart half nicht).
+// 5.148: Eskalation. Antwortet das IF820 nach BT_REDET_FULL Minuten immer noch nicht, einmal die volle Erkennung
+// (IF820 auf allen Baudraten, dann Laird/RN4678) - so wird auch ein getauschtes, aelteres Modul selbststaendig erkannt.
+// Findet sie nichts, bleibt IF820 eingetragen und es wird nur noch alle BT_REDET_SLOW Minuten gefragt.
+// Zustand im __noinit-RAM (Deep-Sleep-Reset nach jedem Messzyklus), beim Einschalten per bt_redetect_init() neu.
+static void bt_msg (char *m);                    // Vorwaertsdeklaration (Definition weiter unten)
+#define BT_REDET_MAGIC  0x52444554
+#define BT_REDET_FULL   10                     // Minuten bis zur vollen Erkennung
+#define BT_REDET_SLOW   15                     // danach Abfrage alle 15 Minuten
+static uint   rd_magic   __noinit;
+static ushort rd_tries   __noinit;             // Versuche seit dem Einschalten
+static uchar  rd_full    __noinit;             // 1 = volle Erkennung schon gelaufen
+
+void bt_redetect_init (void)                   // main.c, Einschalten (POR)
+{ rd_magic=BT_REDET_MAGIC; rd_tries=0; rd_full=0; }
+
 void bt_redetect_minute (void)                 // measure.c, Minutentakt, nur ohne aktiven Thread
 {
- static ushort tries=0;
- if ((fp.btmodem!=IF820) || (interfaces&BT_LINK)) { tries=0; return; }
+ bool ok;
+ if (rd_magic!=BT_REDET_MAGIC) bt_redetect_init();
+ if ((fp.btmodem!=IF820) || (interfaces&BT_LINK)) { rd_tries=0; rd_full=0; return; }
  if ((uart1_owner==MUX_GSM) || (connect&(BT_LINK|MQTT_LINK|GSM_LINK))) return;	// UART1 nicht stoeren
- tries++;
+ rd_tries++;
+ if (rd_full && (rd_tries%BT_REDET_SLOW)) return;	// nach der vollen Erkennung nur noch alle 15 Minuten
  bt_release();                                 // CYSPP sicher Eingang
- if (test_BT())
+ ok=(BT_TEST_LATE<2) && test_BT();             // Testschalter 2: IF820 antwortet nie
+ if (ok)
  {
   interfaces|=BT_LINK;
-  puterror_dtc(DTC_BT_IF820_REDETECT, tries);  // I11021, Wert = Versuche
-  tries=0;
+  puterror_dtc(DTC_BT_IF820_REDETECT, rd_tries);	// I11021, Wert = Versuche
+  rd_tries=0; rd_full=0;
+ }
+ else if (!rd_full && (rd_tries>=BT_REDET_FULL))
+ {
+  rd_full=1;
+  bt_msg(" IF820 10 min without answer -> full detection (IF820, Laird, RN4678)");
+  fp.btmodem=0;                                // init_bluetooth() mit "nichts eingetragen" -> Laird/RN4678-Suche erlaubt
+  init_bluetooth();
+  if (fp.btmodem && ((fp.btmodem!=IF820) || (interfaces&BT_LINK)))
+  { interfaces|=BT_LINK; puterror_dtc(DTC_BT_FULL_REDETECT, fp.btmodem); rd_tries=0; }	// I11022, Wert = Modultyp
+  else
+  { fp.btmodem=IF820; interfaces&=~BT_LINK; puterror_dtc(DTC_BT_FULL_REDETECT, -1); }	// nichts gefunden: IF820 behalten (-1 = ohne Wert; Wert 0 wuerde puterror_dtc() verschlucken)
  }
 }
 
@@ -1534,7 +1563,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
   cts_bypass=0;
 #if BT_TEST_LATE
   { static uchar late_done=0;           // 5.146 Testschalter: erste Erkennung ausfallen lassen (btio.h)
-    if ((prev==IF820) && !late_done) { late_done=1; skipdet=1; bt_msg(" TEST BT_TEST_LATE: detection skipped"); } }
+    if (((prev==IF820) && !late_done) || (BT_TEST_LATE>=2)) { late_done=1; skipdet=1; bt_msg(" TEST BT_TEST_LATE: detection skipped"); } }
 #endif
   if (!skipdet && ((FIO2PIN&CTS)==0))   // CTS schon LOW -> Modul meldet sich bereit
   {

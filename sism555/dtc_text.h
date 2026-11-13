@@ -69,6 +69,7 @@ static const dtc_entry_t dtc_table[] = {
   {11019,'I',"Reboot-Verifikation nach Retries ok"},
   {11020,'W',"IF820 antwortet beim Hochlauf nicht"},
   {11021,'I',"IF820 nachtraeglich erkannt"},
+  {11022,'I',"Volle BT-Erkennung nach 10 min"},
   {12001,'F',"Modem keine Antwort"},
   {12002,'F',"SIM-PIN-Problem"},
   {12003,'F',"GSM Verbindung Timeout"},

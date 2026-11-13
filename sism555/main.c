@@ -169,8 +169,9 @@ int main (void)
 		
     interfaces=RS232_LINK;					// RS232 Terminalanschluss ist immer vorhanden	
 		
-	  if (fp.usb) interfaces|=USB_LINK;		// USB definiert?	Ja, USB registrieren			 
-		
+	  if (fp.usb) interfaces|=USB_LINK;		// USB definiert?	Ja, USB registrieren
+
+    bt_redetect_init();							// 5.148: Neuerkennung im Minutentakt beim Einschalten neu (Zaehler 10 min)
     if (fp.btmodem)	{								// BT definiert?
 		 if (fp.btmodem==IF820) bt_release();	// CYSPP (IC54 Bit7) auf Eingang -> Modul kann Leitung fuer SPP-Connect treiben
 		 									// (PCA9554 haelt sein Register ueber Reflash; sonst bleibt CYSPP evtl. als Ausgang HIGH haengen)

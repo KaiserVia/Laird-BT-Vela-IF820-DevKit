@@ -34,6 +34,7 @@
 #define DTC_BT_REBOOT_VERIFY_OK 11019   /* Reboot-Verifikation nach Retries erfolgreich (Info) */
 #define DTC_BT_IF820_LATE       11020   /* 5.146: IF820 eingetragen, antwortet beim Hochlauf nicht - bleibt eingetragen, Minutentakt sucht weiter */
 #define DTC_BT_IF820_REDETECT   11021   /* 5.146: IF820 nachtraeglich erkannt (Info, Wert = Versuche im Minutentakt) */
+#define DTC_BT_FULL_REDETECT    11022   /* 5.148: volle BT-Erkennung nach 10 min ohne IF820-Antwort (Info, Wert = gefundener Modultyp, ohne Wert = keiner) */
 
 /* --- Subsystem 12: GSM/LTE (gsmio.c) ------------------------------ */
 #define DTC_GSM_NO_RESP         12001   /* Modem keine Antwort */

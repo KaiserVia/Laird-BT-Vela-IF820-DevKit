@@ -7027,3 +7027,20 @@ CTS, RS232 traege bis BT_TIMEOUT (6 min); Verbinden verloren -> kein Banner/PIN,
 **Test Board B:** BLE-smoke, Classic-smoke; `gsm-mux` 2/2 (BLE waehrend offenem Modem-Terminal wie seit 2026-11-04
 erwartet ohne PIN-Prompt, danach BLE 2/2 und Classic; Schritt #02 einmal "Modem antwortet nicht", bekannt);
 `online-bt` BLE 1/1, Classic 1/1 (online nach 118 s). Das Verlieren selbst ist nicht deterministisch provozierbar.
+
+## Update 5.148 (TEST, 2026-11-13): IF820 ohne Antwort -> nach 10 min volle BT-Erkennung
+
+**Anlass (Anwenderfrage zu 5.146):** Mit 5.146 bleibt ein eingetragenes IF820 erhalten und es gibt keine Laird/RN4678-Suche
+mehr. Ein getauschtes, aelteres Modul wuerde so nicht selbststaendig erkannt (nur per Werksinitialisierung oder
+"Bluetooth deinstallieren"). `fp.btmodem` liegt im geraetebezogenen Teil des Parameterblocks (nicht im Upload-Bereich) und
+wird nur durch eine erfolgreiche Erkennung auf IF820 gesetzt; praktisch betrifft das nur einen Modultausch.
+**Umsetzung (`bt_redetect_minute()`, btio.c):** Minute 1-9 `/PING` ans IF820 (I11021 bei Erfolg). Antwortet es nach
+10 Minuten noch nicht, einmal `init_bluetooth()` mit `fp.btmodem=0` (IF820 auf allen Baudraten, dann Laird/RN4678).
+Gefunden -> eintragen, `BT_LINK`, I11022 mit Modultyp. Nichts gefunden -> IF820 behalten, I11022 ohne Wert, danach
+Abfrage alle 15 min. Zustand im `__noinit`-RAM mit Kennung (Deep-Sleep-Reset), beim Einschalten `bt_redetect_init()`
+(main.c). Testschalter `BT_TEST_LATE` 2 = IF820 antwortet nie.
+**Test Board B:** Testbuild (`BT_TEST_LATE 2`), Stromzyklus, 13 min Mitschnitt: W11020 beim Hochlauf, nach 10 min
+"full detection", Laird/RN4678 nicht gefunden (I11016, I11017, F11010), I11022, IF820 bleibt eingetragen, RS232 antwortet.
+Erster Lauf: I11022 fehlte (Wert 0 wird von `puterror_dtc()` verschluckt) -> Wert -1. Auslieferungsbuild nach
+Stromzyklus: BLE-smoke und Classic-smoke bestanden. Nicht pruefbar ohne Board mit Laird/RN4678: der Fall "altes Modul
+gefunden" (dieselbe Erkennung wie bei neuen Boards).

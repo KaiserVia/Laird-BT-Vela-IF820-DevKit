@@ -238,6 +238,7 @@ extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH t
 // 0 = alter Ablauf (Modul wirbt ab Einschalten). Siehe btio.c bt_sm_hide().
 #define BT_CYSPP_SM      1
 extern void bt_sm_hide (void);            // main.c: frueh im Hochlauf
+extern void bt_redetect_init (void);      // 5.148: Zustand der Neuerkennung beim Einschalten zuruecksetzen
 extern void bt_redetect_minute (void);    // 5.146: IF820 nach verpasster Erkennung im Minutentakt neu suchen
 extern void bt_sm_minute (void);          // measure.c: Minutentakt (Sicherheitsnetz)
 extern void bt_sm_lock (void);            // 5.132: sicom.c firmware(): unsichtbar waehrend des Updates (Haupt-Thread)
@@ -273,6 +274,7 @@ extern void bt_module_cmd (void);            // TEMPORAER (5.129, Phase 0 Zustan
 
 // 5.146 TESTSCHALTER (Auslieferung immer 0): 1 = erste IF820-Erkennung beim Hochlauf ausfallen lassen, um den Pfad
 // "Modul startet zu spaet" (W11020, bt_redetect_minute(), I11021) deterministisch zu pruefen.
+// 5.148: 2 = IF820 antwortet nie (Erkennung immer uebersprungen) -> Eskalation nach 10 min pruefen (I11022 Wert 0).
 #define BT_TEST_LATE    0
 extern void bt_conn_trigger (void);       // 5.137: einmal je Hauptschleifendurchlauf (measure.c)
 extern void bt_show_counters (void);      // Durchsatz-Diagnose: CTS-Bremse/osDelay-Verluste anzeigen
