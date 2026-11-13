@@ -34,6 +34,7 @@
 #include "sictst.h"
 #include "mqtt.h"
 #include "dtc_codes.h"
+#include "hftrack.h"
 
 const ushort crc_table[PAGE] = {
 0x0000,0x1021,0x2042,0x3063,0x4084,0x50A5,0x60C6,0x70E7,0x8108,0x9129,0xA14A,0xB16B,0xC18C,0xD1AD,0xE1CE,0xF1EF,
@@ -437,7 +438,7 @@ static int transceiver_via2 (uchar mode)	// 5.L1: Transceiver Ein-/Ausschaltung 
    analog=(analog|AMP_EN|GAIN_A|GAIN_B|BW_A)&~HF_DIS;		// Transceiver ein, Verstaerkung minimal
    write_i2c_dev (IC37,3,(analog<<8)|0x02);
    if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); }
-   else getkey(DPWR+t_amp_en);
+   else getkey(re_time());		// 5.142: RE/-Zeit ab Einschalten (IC37 P0.7 = AMP_BW LOW), einstellbar, Standard 15 ms (vorher DPWR+t_amp_en = 30/40 ms)
   }  // end if zykl. Betrieb oder Testmodus
   analog&=~(GAIN_A|GAIN_B|HF_DIS);															// Transceiver ein und Minimal-Verstaerkung reset
   analog|=AMP_EN|AMP_BW|BW_A;
@@ -466,6 +467,7 @@ int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
 void set_measure_constants	(void)	// Konstanten f�r Messung anhand Parametereinstellung festlegen
 {
  IFConst=fp.TxF;												// Transceiver Sendefrequenz 24000 ... 24250 MHz laden
+ if (IS_VIA2 && hf_tx_mhz()) IFConst=hf_tx_mhz();	// 5.142: Via-2 zuletzt gemessene Sendefrequenz (Nachfuehrung)
  IFConst*=100000;
  IFConst/=IFDIV;													// 100 fache Dopplerkonstante (~4470 Hz/kmh)
  v_const=(100ul*CCLK)/(TDIV*IFConst/10);	// Konstante Geschwindigkeitsberechnung abh�ngig von Capture Z�hlerfrequenz
@@ -477,7 +479,7 @@ void set_measure_constants	(void)	// Konstanten f�r Messung anhand Parameterei
  }
 
  v_const=v_const*fp.vcor/100;		// Geschwindigkeitskorrekturfaktor ber�cksichtigen
- t_mess_max=DPWR+DTXFEN_T+t_amp_en+(100000*(LenTm+2)/(fp.vmm*IFConst));		// Max. Messzeit abh�ngig von kleinster Messgeschwindigkeit	  
+ t_mess_max=t_on_delay()+(100000*(LenTm+2)/(fp.vmm*IFConst));		// 5.142: t_on_delay() statt DPWR+DTXFEN_T+t_amp_en (Via-2: RE/-Zeit); Max. Messzeit abh�ngig von kleinster Messgeschwindigkeit	  
 }
 
 uint display_mode_speed (uchar psatz)	// Pr�fe Schwellen der Modi der Led Anzeige

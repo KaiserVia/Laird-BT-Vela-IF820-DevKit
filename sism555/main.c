@@ -31,6 +31,7 @@
 #include "measure.h"
 #include "mqtt.h"
 #include "dtc_codes.h"
+#include "hftrack.h"
 
 
  
@@ -255,9 +256,9 @@ int main (void)
 	wait_sms=0; 							// reset Warteminuten SMS
   wait_mail=0;							// reset Warteminuten Email 	 
 	LastErrorEvent=0;					// Letztes protokolliertes Fehlereignis
-	if (IS_VIA2) t_amp_en=(fp.vmm<5)?25:15;	// 5.L1 (Joachim 5.60): Via-2 Messverzoegerung 25/15 ms
-	else if (fp.vmm<5) t_amp_en=20;	// Messverzoegerung bei kleinsten gemessenen Geschwindigkeiten < 5 km/h vergroessern
-	else t_amp_en=20;
+	t_amp_en=20;							// Messverzoegerung Uebersteuerungszeit Verstaerker, bisheriger Transceiver (wie bisher nach jedem
+														// Neustart 20 ms; 5.142: Menue setzt nicht mehr 10 ms). Via-2 nutzt re_time() (hftrack.c).
+	hf_track_init (true);			// 5.142: Via-2 Nachfuehrung neu, erste Nachfuehrung 2 min nach dem Einschalten
  } // end if kein deep sleep reset			
  
  // 5.128: IF820 - BT-UART nach JEDER Reset-Art in den Leerlauf-Zustand (aktiv, RTS LOW, siehe uart1_release()).

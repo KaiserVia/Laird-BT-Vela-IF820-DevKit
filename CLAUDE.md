@@ -12,10 +12,10 @@ Gerätefirmware **sism555** (LPC1766, Keil-Projekt `sism555/sism.uvprojx`).
 Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
-- **Aktueller Branch (dieser Ordner):** `main`. Stand 2026-11-13: **alle Branches** (`main`, `LTE-Update`,
-  `connection-pin`, `Integrate-Joachim-SW`, `DevelopLightSensor`) auf demselben Stand 5.141 (PR #2, #3, #4).
-  `branch-550` und `mainboardv2-get-alive` gelöscht (waren vollständig enthalten; lokaler 5.50-Build gesichert in
-  `sism555/fw_5.50/`). Weitere Branches liegen in **eigenen Ordnern** (git worktree), nicht hier umschalten:
+- **Aktueller Branch (dieser Ordner):** `main`. Stand 2026-11-13: alles in `main` zusammengeführt (PR #2, #3, #4);
+  `LTE-Update`, `connection-pin`, `branch-550` und `mainboardv2-get-alive` gelöscht (waren vollständig enthalten;
+  lokaler 5.50-Build gesichert in `sism555/fw_5.50/`). Weitere Branches liegen in **eigenen Ordnern** (git worktree),
+  nicht hier umschalten:
   - `Integrate-Joachim-SW` -> `C:\viaTraffic\GitHub\Projects\Joachim-Integration` (Übernahme von Joachims 5.60, `sism560_V2`)
   - `DevelopLightSensor` -> `C:\viaTraffic\GitHub\Projects\LightSensor`
   - **2026-11-13: beide in `main` gemergt (5.L2 + 5.s1 -> 5.138).** Weiterarbeit an diesen Branches vorher mit
@@ -69,6 +69,10 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-13 - 5.142 (TEST), `main`:** Via-2 Frequenzkanal (10 x 5 MHz, 24155-24200, automatisch aus der letzten
+  Ziffer der Seriennummer), Werksabgleich IC32 auf den Kanal, Nachführung 2 min nach dem Einschalten und alle 15 min
+  (`hftrack.c`), RE/-Zeit einstellbar, Standard 15 ms (vorher effektiv 30 ms). Auf Board B geprüft (Abgleich, Nachführung
+  von Hand und automatisch, BLE/Classic). Offen: RE/-Zeit am Oszilloskop durch den HW-Kollegen. `Doku/HF_Kanal_Nachfuehrung.md`.
 - **2026-11-12 - 5.L1 (TEST), Branch `Integrate-Joachim-SW`:** Joachims Stand 5.60 (Mainboard V2, Via-2-Radarempfänger)
   integriert. Der Radar-Empfänger wird wie LTE/BT/GPS per Selbsttest erkannt (`fp.radar`, `radar_detect()` in i2cm.c);
   Pins, Transceiver, HF-Messung und Menüs richten sich danach. 2026-11-13 auf Board B (26SC9983) geprüft: als Via-2
