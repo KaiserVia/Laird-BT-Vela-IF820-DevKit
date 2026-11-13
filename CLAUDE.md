@@ -61,6 +61,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - `IF820_Config_Kandidaten.md` — Config-Audit, Kandidaten A/B
 - `Diagnose-Codes.csv` + `Diagnose-Codes_Konzept.md` — Fehler-/Ereignis-Katalog (Typ F/W/I)
 - `BT-Evalkit-Tasks.md` — Testplan (Test 1–12), `BT_Teststrategie.md`
+- `Testplan_Radar_V2.md` + `tools/radar_v2_test.py` (`--profil kurz` ca. 3 min / `lang` ca. 30 min, Anleitung
+  `tools/radar_v2_test_Anleitung.md`) — Radar-Empfänger-Erkennung (Via-2/bisher), HF-Frequenz, Transceiver aus,
+  Reset-Pfade, Protokoll; Bericht als `bericht.md` + `ergebnis.json` unter `tools/Testreports/`
 - `UART1_Owner_StateMachine.md` — UART1-Sharing BT/GSM
 - `Zeitsync_Plan.md`, `Fehlerspeicher_Strategie.md`, `parameterspeicher.md`
 

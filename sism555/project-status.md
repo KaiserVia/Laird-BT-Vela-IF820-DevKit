@@ -6694,3 +6694,34 @@ meldet "Version 5.138", danach 10 s stromlos ueber das Relais.
 - Nicht geprueft: `online-bt` (MQTT-Server trennt seit 2026-11-12 20:12 sofort, siehe Dauerlauf), laengere Laeufe.
 - Auffaellig, nicht untersucht: Die Geraeteuhr steht auf 13.03.2026 (am 2026-11-12 noch 21.10.2026, "ungestellt").
 Board B bleibt mit 5.138.
+
+## Werkzeug radar_v2_test.py und Testlauf 5.138 auf Board B (2026-11-13)
+
+Neues Testskript `Doku/tools/radar_v2_test.py` (Anleitung `Doku/tools/radar_v2_test_Anleitung.md`, Testfaelle
+`Doku/Testplan_Radar_V2.md`) fuer die Radar-Empfaenger-Erkennung und die Integration Joachim 5.60. Bedient das Geraet
+ueber RS232, schaltet die Versorgung ueber das Relais, ruft `flash_xmodem.py` und `bt_testlauf.py` auf. Profil `kurz`
+ca. 2 min (loescht nichts), `lang` ca. 25 min (flasht `--bin` neu). Bericht `bericht.md` + `ergebnis.json` unter
+`Doku/tools/Testreports/<Zeit>_radar_<profil>/`.
+
+**Laeufe auf 26SC9983 (B), 5.138:** `kurz` bestanden (10:07). `lang` (10:09, 31 min) bis auf vier Pruefungen
+bestanden, die das Skript selbst falsch bewertet hat (siehe unten); nach der Korrektur `lang --ohne flash,bt
+--zyklen 0` (10:32) komplett bestanden. Ergebnisse:
+- Erkennung Via-2 in allen Laeufen, passend zum I2C-Scan (IC32 auf 0x5C). Kein I17005 im Protokoll.
+- HF-Frequenz: Strg+T 24175 MHz in 40 von 40 Messungen, Transceiver-Menue 24173 MHz.
+- Transceiver aus (IC37 P1.4 HF_DIS Ausgang und Pegel = 1) nach Hochlauf, Firmware-Update ohne Stromzyklus
+  (`FIRM_UP_RES`), Strg+T, Online-Messen, I2C-Test, Kennlinie und Neustart 3:15.
+- Kennlinie IC32: 257 Stufen, 24156 -> 24269 MHz, steigt ohne Ruecksprung > 2 MHz; Wiper danach wieder 140.
+- 11 Kaltstarts (5 s), Stromlos 0,1/0,5/1/10 s: danach immer Via-2 und 24174-24175 MHz.
+- Firmware-Update ueber RS232: Sprache German, Seriennummer, HW "V2" unveraendert.
+- 5.L2: "I2C Devices" ohne Baustein liefert jedes Mal F20002.
+- Lichtsensor VEML7700 281-313 lx, Dimm 123-126. Bluetooth `reboot-check` bestanden.
+
+**Beobachtung Firmware (kein Fehler, aber gut zu wissen):** Nur der Kaltstart gibt den Banner aus. Nach 0,1-1 s
+stromlos startet das Geraet neu (IF820 meldet `[BT-Zustand] AUS ... BEREIT`), aber ohne Banner und ohne Protokoll-
+eintrag "Eingeschaltet"; einmal stand "I31 Watchdog reset" im Protokoll. Gleiches nach dem Neustart 3:15 ("I7
+Reboot"). Das Skript erkennt den Hochlauf deshalb auch an der Zeile `BEREIT (Hochlauf fertig`.
+
+**Nicht automatisch pruefbar:** Board mit bisherigem Transceiver und Typwechsel (I17005), Deep Sleep (mit
+angeschlossenem RS232 ist `RS232_LINK` gesetzt, das Geraet schlaeft nicht), Messung mit Doppler-Signal,
+Verstaerkerabgleich. Verdacht aus dem Code, offen: Strg+T waehrend der Online-Messung schaltet den Transceiver danach
+aus (`mainmenu()` behandelt STRT vor der Abfrage `!online`).
