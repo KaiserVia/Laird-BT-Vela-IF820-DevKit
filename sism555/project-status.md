@@ -6547,3 +6547,31 @@ Branch `Integrate-Joachim-SW`, Worktree `C:\viaTraffic\GitHub\Projects\Joachim-I
 IC37 ohne EN_ANA erreichbar; Via-2-Empfaenger und neues Mainboard treten nur zusammen auf.
 
 Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet.
+
+
+## Test 5.L1 am Geraet (Board B 26SC9983, 2026-11-13)
+
+Board B (26SC9983, Infoseite "V2", LTE, R125 nach GND, kein P0.19-Draht) mit 5.L1 per `flash_xmodem.py` (COM3)
+geflasht, danach 5 s stromlos ueber das Relais. Vorher lief 5.s1 (Lichtsensor).
+
+- **Erkennung: Via-2.** Board B hat also den Via-2-Empfaenger. Transceiver-Menue (Werksmenue Strg+W -> 4) zeigt die
+  Via-2-Fassung (5 Punkte, "Module Frequency Characteristic", "Set Module Frequency") und misst **24173 MHz**;
+  Strg+T im Hauptmenue misst **24174 MHz** (Bereich 24150-24200 MHz).
+- I2C-Scan: IC37 (0x42), IC58 (0x44), IC54 (0x46), IC35 (0x58), **IC32 (0x5C)** und 0x20 (VEML7700-Lichtsensor,
+  von 5.s1 bekannt). "I2C Devices" -> 92 liest die Register von IC32.
+- Hochlauf normal: BT `/PING` ok, `[BT-Zustand] BEREIT`, Banner "Version 5.L1". Protokoll nur I32 (Update) und
+  I1 (Eingeschaltet), keine Fehler; kein I17005, wie erwartet (erste Erkennung aus "unbekannt").
+- Online messen 20 s ohne Fehler (keine Fahrzeuge vor dem Radar, also keine Messwerte).
+- `bt_testlauf.py --profil kurz --nur reboot-check` zweimal bestanden (dropout und power, je BLE und Classic).
+
+**Werkzeug:** `bt_testlauf.py` und `ble_mainboard_test.py` erkannten Versionen mit Buchstaben (5.L1, 5.s1) nicht
+("Firmware None", "Banner NICHT gesehen" auch nach Stromzyklus). Die Versions-Regexe lassen jetzt einen Buchstaben
+nach dem Punkt zu; danach Banner nach Stromzyklus wieder erkannt. "Banner NICHT gesehen" beim kurzen Aussetzer und
+"BT-Init nicht gesehen" gab es schon mit 5.137 (fruehere Berichte), kein neuer Befund.
+
+**Befund im Code (Joachim 5.60 uebernommen, nicht behoben):** `test_i2c_device()` (sictst.c) benutzt `typ`
+uninitialisiert, wenn das Geraet nicht antwortet (Fehlercode-Auswahl und `transceiver(aus)`). Nur Testmenue; mit der
+naechsten Version `typ=0` vorbelegen.
+
+**Offen:** Board mit dem bisherigen Transceiver (Erkennung RADAR_TRX, kein Zugriff auf 0x5C, EN_ANA-Pfad) und der
+Wechsel des Empfaengers (I17005) sind noch nicht geprueft. Board B danach mit 5.L1 belassen.
