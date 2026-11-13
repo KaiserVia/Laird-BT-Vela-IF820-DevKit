@@ -6683,3 +6683,14 @@ Loeschen neu erzeugt.
 
 **Status:** Am Geraet noch nicht getestet. Nicht enthalten: ungespeicherte Aenderung an `project-status.md` im
 Worktree `LightSensor` (nicht committet).
+
+**Test 5.138 am Geraet (Board B 26SC9983, V2, 2026-11-13 ca. 09:30):** Mit `flash_xmodem.py` (COM3) geflasht, Neustart
+meldet "Version 5.138", danach 10 s stromlos ueber das Relais.
+- Infoseite: "Version 5.138, V2", Schnittstellen Bluetooth, USB, Modem/Email-LTE, GPS.
+- BLE-smoke bestanden (Banner, PIN, Hauptmenue), Classic-smoke bestanden (Banner "Version 5.138", PIN).
+- Lichtsensor (Testmenue 3->6): "Lichtsensor = VEML7700", 346,7-347,2 lx (Rohwert ~10320, Verstaerkung x2, Dimm 128),
+  stabil.
+- Via-2-Empfaenger: Strg+T im Hauptmenue misst 24175 MHz (5.L1: 24174 MHz).
+- Nicht geprueft: `online-bt` (MQTT-Server trennt seit 2026-11-12 20:12 sofort, siehe Dauerlauf), laengere Laeufe.
+- Auffaellig, nicht untersucht: Die Geraeteuhr steht auf 13.03.2026 (am 2026-11-12 noch 21.10.2026, "ungestellt").
+Board B bleibt mit 5.138.
