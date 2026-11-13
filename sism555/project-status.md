@@ -6915,3 +6915,13 @@ Abstand 5 MHz (24155...24200 MHz). Beschreibung: `Doku/HF_Kanal_Nachfuehrung.md`
 **Offen:** RE/-Zeit am Oszilloskop und Messzeitverlaengerung mit Fahrzeugen pruefen (HW-Kollege); Annahme RE/ =
 IC37 P0.7 (`AMP_BW`). Kennlinie/Einschwingzeit an weiteren Via-2-Modulen. Optionale Mail-Punkte (EN/-RS232,
 CS-A-Funk auf P1[15], RS232-2) nicht umgesetzt. Hinweis: `dtc_text.h` fehlen die Texte zu 17006-17008 (nicht von 5.142).
+
+## Update 5.s4 (TEST, 2026-11-13, Branch `DevelopLightSensor`): Diagnose-Texte 17006-17009 nachgetragen
+
+**Symptom (Hinweis der IF820-Sitzung):** `dtc_text.h` enthielt keine Eintraege fuer I17006, W17007, W17008 (17009).
+**Ursache:** `dtc_text.h` wird aus `Doku/Diagnose-Codes.csv` mit `tools/gen_dtc.py` erzeugt; in 5.s2/5.s3 wurde
+nur die CSV und `dtc_codes.h` ergaenzt, der Generator lief nicht. Folge: Ausgabe dieser Codes ohne Typ-Buchstaben
+und Kurztext (`sio.c` sucht in `dtc_table`).
+**Fix:** `python tools/gen_dtc.py` -> genau 4 neue Zeilen (17006-17009; 17009 ist veraltet, steht aber wie alle
+CSV-Zeilen in der Tabelle). Basis ist main 5.142. Merker: Nach jeder Aenderung an der CSV den Generator laufen
+lassen. Am Geraet nicht getestet (Codes ohne Eingriff nicht ausloesbar).
