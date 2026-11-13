@@ -239,8 +239,7 @@ int main (void)
 		gsm_power (2); 								// Uart1/MUX initialisieren und sleep disable			   
 	 }
 	 flash_erase (fp.md_page,1);		// Muss wg. reset aller Messdatenzeiger
-	 fp.sprache&=0x03;								// 5.139: LANGUAGE/OEM-Bits entfernt (siehe werkparameter()), hier nur noch
-																			// zur Sicherheit maskieren, falls ein Geraet die alten Bits noch gesetzt hat
+	 fp.sprache=(fp.sprache&0x03)|(LANGUAGE<<4)|(OEM<<2);		// 5.L1 (Joachim 5.60): Sprachpaket/OEM nach Firmware-Update eintragen
 	 if (fp.autotime_off>1) fp.autotime_off=0;		// 5.139: Geraete, die noch das alte fillbytes[2] mitbringen (nie
 																			// initialisiert), einmalig beim Update auf einen gueltigen Wert zwingen
   } // end if firmware update

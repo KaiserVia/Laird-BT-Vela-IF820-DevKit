@@ -6737,3 +6737,22 @@ sollte, falls spaeter gebraucht, bewusst und mit eigenem Versionshinweis erfolge
 Wiederverwendung eines "freien" Bytes wie beim jetzt entfernten Fall.
 
 **Build:** 0 Fehler, 0 Warnungen. `sism.bin` 175520 Byte. Noch nicht am Geraet getestet.
+
+## Update 5.140 (TEST, 2026-11-13): fp.sprache-Rueckbau aus 5.139 rueckgaengig gemacht
+
+**Anwenderentscheidung:** Punkt 1 aus Update 5.139 (Entfernen der LANGUAGE/OEM-Bits aus `fp.sprache`) wird
+zurueckgenommen. Die Bits bleiben bewusst erhalten - sie zeigen, welche Sprachpaket-/OEM-Variante der
+Update-Datei auf ein Geraet gehoert, und das ist wichtiger als die Abwaertskompatibilitaet beim
+Zurueckflashen. `werkparameter()` (flash.c) und der Firmware-Update-Zweig in `main.c` schreiben wieder
+`(LANGUAGE<<4)|(OEM<<2)|Sprachindex` wie vor 5.139.
+
+**Bewusst akzeptierte Einschraenkung:** Ein Geraet, das mit 5.L1-5.138/5.140 lief und danach auf eine
+Firmware vor 5.L1 (z. B. 5.55, 5.137) zurueckgeflasht wird, hat in `fp.sprache` einen Wert >2 stehen - diese
+aelteren Firmwares lesen das Byte ungemaskt als Index (`T_spritm[]`/`T_ja[]`/`T_nein[]` in `sicom.c`/`sio.c`).
+Abhilfe am Geraet: Sprache im Menue einmal neu waehlen, danach ist der Wert wieder gueltig (0-2). Nicht
+geplant, dies per Firmware zu automatisieren, da gerade die Variantenkennung erhalten bleiben soll.
+
+Die anderen beiden Punkte aus 5.139 (`fp.autotime_off`-Initialisierung, Compile-Zeit-Pruefung
+`sizeof(flashparameter)==2048`) bleiben unveraendert bestehen.
+
+**Build:** 0 Fehler, 0 Warnungen. Noch nicht am Geraet getestet.
