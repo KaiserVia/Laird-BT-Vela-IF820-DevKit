@@ -414,7 +414,8 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
 									//					werkinit=1 Werkinitialisierung 			
 									//					werkinit=2 Reset auf Standardparameter (Schaltschwellen, Zeitpl�ne, etc.)
  uint init=0;								// R�ckgabe 1 bei Werkinitialisierung
- uchar retry=4;							// 3+1 Versuche 
+ uchar retry=4;							// 3+1 Versuche
+ uchar from_copy=0;					// 5.145: Parameter ohne externes Flash aus der LPC-Kopie geladen
 
  if ((!werkinit) && flashsize)	    // Einschaltinitialisierung und Flash vorhanden?
  {
@@ -431,9 +432,16 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
 	 }	 
    if ((fp.Kennung==FLASHKENNUNG)&&(fp.pKennung==PARAKENNUNG)) break;		// Parameter Kennungen in Ordnung?
 	 osDelay(100);
-  } while (--retry);	// Bis zu 3 Versuche	
- } 
- 
+  } while (--retry);	// Bis zu 3 Versuche
+ }
+ else if ((!werkinit) && !flashsize)	// 5.145 (Review 4.2): externes Flash antwortet nicht
+ {																		// Bisher blieb retry=4: weder Kopie noch Werkparameter, fp behielt den
+	memcpy ((char *)&fp.Kennung, &fp_cp_area[0], sizeof(fp));	// __noinit-RAM-Inhalt und wurde unten als
+	if ((fp.Kennung==FLASHKENNUNG)&&(fp.pKennung==PARAKENNUNG))	// Sicherungskopie geschrieben. Jetzt: Kopie aus
+	 from_copy=1;																							// dem LPC-Flash, ist sie ungueltig, Werkparameter.
+	else retry=0;
+ }
+
  // FIX (5.96): fp.md_page/fp.md_start_page/fp.md_adr aus dem geladenen Parameterblock koennen
  // ausserhalb des tatsaechlich installierten Flash-Bereichs liegen (beobachtet auf Board 269990:
  // md_start_page=30913 bei nur maxpage=8191 gueltigen Seiten auf einem 4MB-Chip - Ursache dafuer
@@ -465,8 +473,9 @@ int InitParameter (uchar werkinit)	// Flash Parameterinitialisierung
 	if (werkinit==2) protocol(DEF_PARAMETER);	// Reset auf Default Parameter protokollieren 	
  } // end if Werkinitialisierung, Parameter reset oder falsche Kennung
  
- if (!parameter_to_progmem())						// Schreibt Sicherungskopie der Parameter in LPC1766 Programmspeicher
-  puterror(DTC_FL_PARAM_INIT, -1);		// Parameter-Initialisierung fehlgeschlagen
+ if (!from_copy)											// 5.145: unveraenderte Kopie nicht auf sich selbst zurueckschreiben
+  if (!parameter_to_progmem())						// Schreibt Sicherungskopie der Parameter in LPC1766 Programmspeicher
+   puterror(DTC_FL_PARAM_INIT, -1);		// Parameter-Initialisierung fehlgeschlagen
 
  if (flashsize!=0)							// Flash vorhanden?
  {

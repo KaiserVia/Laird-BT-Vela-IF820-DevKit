@@ -737,6 +737,10 @@ bool email_messdaten (void)			// Erweiterten Email Header ausgeben
  return(false);
 } 
 
+// 5.145 (Review 4.1): Adresse gesetzt = erstes Zeichen druckbar. Bisher isalpha(): eine Adresse mit Ziffer am Anfang
+// (1234@firma.de) galt als leer, die Datenmail ging nicht hinaus und die Messdaten wurden trotzdem geloescht.
+#define MAILADR_SET(a)	(((a)[0]>' ') && ((uchar)(a)[0]<0x7F))
+
 uchar sendmail (uchar mode)			// Email versenden und konfigurieren
 {										// �bergabe mode 	Bit 0	-	0/1 ohne/mit Terminalausgabe
 										//								Bit 1	-	0/1 Verbindung halten/schlie�en
@@ -748,6 +752,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
  uchar state=10;											// Zustandsvariable, beginne erst bei 10 wg. GPRS states
  uchar failure=0;											// Fehler aufgetreten
  uchar testmail=0;										// Hilfsvariable 1 wenn Testmail		
+ uchar no_mail=0;											// 5.145 (Review 4.1): Zustand 33 ohne Mailinhalt: 1 = Verbindungstest (Auftraege bleiben), 2 = kein Empfaenger (Auftraege erledigt, Daten bleiben)
  text *P_resp;												// Zeiger auf Modem - Antwortstring
  uchar uartsave=connect;							// Schnittstellenstatus sichern		
  uchar utc;														// Hilfsvariable f�r Zeitzone		
@@ -845,7 +850,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
    put2str(T_mailf, fp.emfrom); 					// Text und MAIL FROM Einstellung senden
    putln(T_cb);							 
    response=250;													// Serverantwortcode 250
-   if (mode<4)	state=33;		 							// Keine Mail zu senden -> QUIT Serververbindung schlie�en
+   if (mode<4)	{ state=33; no_mail=1; }		// Keine Mail zu senden -> QUIT Serververbindung schliessen (5.145: ohne Versand)
   }
   else if (state==21)											// Sende RCPT - Mail to
   {
@@ -855,7 +860,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   }
   else if (state==22)											// Sende RCPT - Mail copy 
   {
-   if (isalpha(fp.emcopy[0]))							// Mail copy to gesetzt?
+   if (MAILADR_SET(fp.emcopy))							// Mail copy to gesetzt?
    {
     put2str(T_mrcp,fp.emcopy);						// Empf�ngeradresse senden
     putln(T_cb);
@@ -871,13 +876,13 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
   else if (state==24)											// --- Mailheader aufbauen
   {	
    connect=UART1;													// Nicht an Terminal senden
-   if (isalpha(fp.emto[0]))		   					// Empf�ngeradresse gesetzt?
+   if (MAILADR_SET(fp.emto))		   					// Empf�ngeradresse gesetzt?
    {							
     putstr(T_hfrom);											// Headertext "From: "
     putln(fp.emfrom);											// Senderadresse
     putstr(T_hto);												// Headertext "To: "
     putln(fp.emto);												// Empf�ngeradresse
-    if (isalpha(fp.emcopy[0]))						// Mail copy to gesetzt?
+    if (MAILADR_SET(fp.emcopy))						// Mail copy to gesetzt?
     {
      putstr(T_hcc);												// Headertext "Cc: "
 		 putln(fp.emcopy);										// Mail copy to Empf�ngeradresse senden
@@ -911,7 +916,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
     putstr (T_viasis);										// Text "VIASIS-"
     put2str(fp.serno, T_dpkt);						// "Seriennummer: ausgeben	
    }
-   else state=33;				    							// Weiter mit QUIT Serververbindung
+   else { state=33; no_mail=2; }					// Weiter mit QUIT Serververbindung (5.145: ohne Versand, Daten nicht loeschen)
   }
   else if (state==25)											// Headertext "Subject: " je nach Emailtyp vervollst�ndigen 
   {
@@ -1015,7 +1020,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
    }
    break;	 
   }	// end failure
-  else if (state==33)											// Kein Fehler und Nachricht vom Server akzeptiert
+  else if ((state==33) && (no_mail!=1))	// Kein Fehler und Nachricht vom Server akzeptiert (5.145: nicht beim Verbindungstest)
   {
    if (mailtosend&TESTMAIL) 							// Testnachricht?
 	 {	 
@@ -1024,7 +1029,7 @@ uchar sendmail (uchar mode)			// Email versenden und konfigurieren
 	 }	 
    else if (mailtosend&DATAMAIL)					// Messdaten Email 
    {
-    delete_data();												// Messdaten im Speicher l�schen
+    if (!no_mail) delete_data();												// Messdaten im Speicher l�schen (5.145: nur wenn die Datenmail wirklich hinausging)
 		mailtosend&=~DATAMAIL;								// Messdaten Versandaufgabe l�schen
    }
    else if (mailtosend&ALARMMAIL)					// Status/Fehler Email Versandaufgabe l�schen

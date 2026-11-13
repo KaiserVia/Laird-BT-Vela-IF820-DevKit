@@ -58,10 +58,13 @@ bool write_i2c_dev (uchar dadr, uchar anz, uint data) // Anzahl Bytes an I2C Dev
 {																				// �bergabe i2cadr	- Deviceadress
 																				// 			anz		- Anzahl Bytes zu senden
 																				//			data	- max. 4 Bytes in 32 Bit gepackt
- uint rdelay;																				// Antwortzeit in us	
-		
- memcpy(flbuf, &data, sizeof(data));								// Data in Puffer kopieren														
- I2Cdrv->MasterTransmit(dadr>>1,flbuf,anz,false);		// Schreibt Anzahl Bytes an Slave device
+ uint rdelay;																				// Antwortzeit in us
+ uchar ibuf[4];																			// 5.145 (Review 1.2): eigener Puffer statt flbuf (flbuf traegt
+																										// auch die Adressbytes der Flash-Kommandos, beide Threads)
+
+ if (anz>sizeof(ibuf)) return (false);
+ memcpy(ibuf, &data, sizeof(data));								// Data in Puffer kopieren
+ I2Cdrv->MasterTransmit(dadr>>1,ibuf,anz,false);		// Schreibt Anzahl Bytes an Slave device
  rdelay=T1TC+200U*anz;															// Timer 1 Timeout Stand berechnen	
  while (I2Cdrv->GetStatus().busy)										// warte bis wieder bereit	
   if (T1TC > rdelay) break;													// Maximal 100 us auf Byte transfer warten
@@ -79,11 +82,12 @@ int read_i2cdev (uchar dadr, uchar adrcom, uchar anz)		// I2C Device mit repeate
 																			//					anz		- Anzahl bytes zu lesen
  int result=0;		
  uchar *Pbuf;		
- uint rdelay;													// Antwortzeit in us	
-	
- flbuf[0]=adrcom;																		// Kommando oder interne Adresse in Puffer
- if (anz>FBUFSIZE) return(-1);											// Abbruch
- I2Cdrv->MasterTransmit(dadr>>1,flbuf,1,true);			// Sendet Kommando an Slave device
+ uint rdelay;													// Antwortzeit in us
+ uchar ibuf[4];												// 5.145 (Review 1.2): eigener Puffer statt flbuf, siehe write_i2c_dev()
+
+ ibuf[0]=adrcom;																		// Kommando oder interne Adresse in Puffer
+ if (anz>sizeof(ibuf)) return(-1);									// Abbruch (Aufrufer lesen hoechstens 3 Byte)
+ I2Cdrv->MasterTransmit(dadr>>1,ibuf,1,true);			// Sendet Kommando an Slave device
  rdelay=T1TC+200;																		// Timer 1 Stand + 100 �s laden	
  while (I2Cdrv->GetStatus().busy)										// warte bis wieder bereit	 
 	if ((T1TC > rdelay)&& I2Cdrv->GetStatus().busy)		// Busy nochmal nachhaken wg. Multi-tasking	
@@ -91,7 +95,7 @@ int read_i2cdev (uchar dadr, uchar adrcom, uchar anz)		// I2C Device mit repeate
  
  if (result>=0)																			// Kein Abbruch?
  {
-  I2Cdrv->MasterReceive(dadr>>1,flbuf,anz,false);		// Anzahl bytes in Puffer einlesen
+  I2Cdrv->MasterReceive(dadr>>1,ibuf,anz,false);		// Anzahl bytes in Puffer einlesen
   rdelay=T1TC+200U*anz;															// Timer 1 Stand + 100 us / Byte laden 
   while (I2Cdrv->GetStatus().busy)									// warte bis wieder bereit
 	 if ((T1TC > rdelay)&&I2Cdrv->GetStatus().busy)		// Busy nochmal nachhaken wg. Multi-tasking
@@ -99,7 +103,7 @@ int read_i2cdev (uchar dadr, uchar adrcom, uchar anz)		// I2C Device mit repeate
   if ((result>=0) && (I2Cdrv->GetDataCount () == anz))		// Erfolg?
   {
    Pbuf=(uchar *)&result;	 													// Bytezeiger auf result Variable			
-	 if (anz<=3) while (anz--) *Pbuf++=flbuf[anz]; 		// bis zu 3 Pufferbytes nach result
+	 if (anz<=3) while (anz--) *Pbuf++=ibuf[anz]; 		// bis zu 3 Pufferbytes nach result
 	 return(result);		// R�ckgabe Pufferbytes 
   }	
  } // end if result>=0, Deviceadresse	

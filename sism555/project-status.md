@@ -6970,3 +6970,26 @@ in `HF_const/result` scheidet aus, es verschiebt nach unten.)
 **Fix:** `hf_measurement()` nutzt `hf_measure_khz()` (DPWR, Leermessung, Median aus 7). Ausgabe weiter in ganzen MHz,
 jetzt gerundet.
 **Test Board B:** 5.143 Strg+T 10x: 24171-24173, Menue 24169,2 MHz. 5.144 Strg+T 10x: 24169-24170, Menue 24169,2 MHz.
+
+## Update 5.145 (TEST, 2026-11-13): Review-Paket A (Datenverlust verhindern)
+
+Umsetzung der Befunde 1.1, 1.2, 4.1, 4.2 aus `Doku/fable_review_2026-11-11.md`:
+- **1.1 Thread-Stacks** (measure.c): USB_HostService und GSM_Registration 256 -> 512 Byte, MQTT_Connect 512 -> 768.
+  GSM_Registration brauchte laut Aufrufgraph 248 von 256 Byte. Die Stacks liegen im festen RTX-Bereich `OS_PRIVSTKSIZE`
+  (3072 Byte), belegt jetzt 1792: RAM-Aufteilung unveraendert, kein Werksreset noetig.
+- **1.2 I2C-Puffer** (i2cm.c): `write_i2c_dev()`/`read_i2cdev()` mit lokalem 4-Byte-Puffer statt `flbuf`. `flbuf` traegt
+  auch die Adressbytes der Flash-Kommandos; ein Threadwechsel zwischen `flash_adress()` und dem Senden konnte ein
+  Flash-Kommando mit fremder Adresse ausloesen. Alle Aufrufer lesen hoechstens 3 Byte. Offen: gleichzeitiger Zugriff
+  zweier Threads auf den I2C-Bus selbst.
+- **4.2 Parameter ohne externes Flash** (flash.c `InitParameter()`): bisher blieb `fp` (`__noinit`) unbestimmt und wurde
+  als Sicherungskopie in den LPC geschrieben. Jetzt: Kopie aus dem LPC laden, bei ungueltiger Kennung Werkparameter;
+  eine unveraenderte Kopie wird nicht zurueckgeschrieben.
+- **4.1 Datenmail** (gsmio.c `sendmail()`): Zustand 33 wurde auch beim Verbindungstest und ohne Empfaenger erreicht und
+  loeschte die Messdaten. Jetzt `no_mail` (1 = Verbindungstest: nichts anfassen; 2 = kein Empfaenger: Auftraege
+  erledigen, Daten behalten). Adresse gilt als gesetzt, wenn das erste Zeichen druckbar ist (bisher `isalpha()`).
+
+**Test Board B (26SC9983):** Update 5.144 -> 5.145 ueber XMODEM. Infoseite, Einstellungen, Kanal/Poti und eine von
+Hand gesetzte RE/-Zeit (20 ms) blieben erhalten (danach wieder automatisch). BLE-smoke, Classic-smoke bestanden,
+`online-bt` BLE 1/1 und Classic 1/1 (online nach 48 s; MQTT haelt wieder). Nicht am Geraet pruefbar: 4.1 (kein
+SMTP-Server eingerichtet) und 4.2 (Flash nicht abklemmbar), nur am Code geprueft. "Zeitquelle: ungestellt" nach dem
+Update ist alt (`g_timesrc` wird bei jedem Neustart zurueckgesetzt), Uhr laeuft richtig.

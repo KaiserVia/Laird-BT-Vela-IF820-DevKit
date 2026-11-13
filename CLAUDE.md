@@ -363,8 +363,15 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
 - BLE-Durchsatz: Option B (`/UCP`, Wunschintervall 7,5 ms) ist seit 5.132 aktiv (`BT_UCP_ENABLE 1`);
   Option A (No-Sleep während der Verbindung) ist nicht umgesetzt.
 - **Review 2026-11-11:** `sism555/Doku/fable_review_2026-11-11.md` - Befunde aus Code- und Doku-Durchsicht
-  (u. a. knappe Thread-Stacks, gemeinsam benutzter `flbuf`, `uart1_release()` bei laufender BT-Sitzung). Noch
-  nichts davon umgesetzt.
+  (u. a. knappe Thread-Stacks, gemeinsam benutzter `flbuf`, `uart1_release()` bei laufender BT-Sitzung).
+  **Paket A umgesetzt in 5.145** (1.1 Stacks, 1.2 I2C-Puffer, 4.1 Datenmail, 4.2 Parameter ohne Flash). Geplant:
+  Paket C (BT: 2.4, 2.2, 2.1), dann Paket B (4.3 Zeitsync im MQTT-Thread). Zurückgestellt: 2.7 PIN-Sperre
+  (Anwenderentscheidung nötig), 1.3/4.4 (`connect`-Weiche, größerer Umbau), 2.3 (HW-Messung).
+- **Offene optionale Punkte aus der Mail des HW-Kollegen (2026-11-13), bewusst zurückgestellt** (Anwender): Zwangs-
+  einschaltung RS232-1 beim Senden über EN/-RS232-1+2 (P1[0], R2 bestücken); CS-A-Funk von P0[1] auf P1[15] (R148 weg,
+  R83 bestücken; betrifft die BT/LTE-MUX-Umschaltung, Firmware muss die Verdrahtung erkennen); RS232-2 (UART3) für
+  Vario-LITE. Alle drei brauchen einen Hardware-Umbau, erst mit umgebautem Board angehen. Details:
+  `sism555/Doku/HF_Kanal_Nachfuehrung.md`, Abschnitt "Offen".
 
 ## ⚠ Repo-Hygiene: 141 Dateien zeigen Scheinänderungen
 

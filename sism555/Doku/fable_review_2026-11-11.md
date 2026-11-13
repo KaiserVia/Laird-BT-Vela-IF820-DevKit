@@ -11,6 +11,15 @@ Vollständig gelesen: `btio.c`, `btio.h`, `sio.c`, `hard.c`, `measure.c`, `main.
 getrennten Prüfläufen. Deren Befunde habe ich nur stichprobenartig am Code nachgelesen; wo das geschehen ist,
 steht es dabei.
 
+## Stand der Umsetzung
+
+- **5.145 (2026-11-13), Paket A:** 1.1 (Stacks USB/GSM 512, MQTT 768 Byte, im vorhandenen RTX-Bereich), 1.2 (I2C mit
+  lokalem Puffer statt `flbuf`), 4.1 (Datenmail löscht nur nach echtem Versand, Adressprüfung ohne `isalpha()`),
+  4.2 (ohne externes Flash Parameter aus der LPC-Kopie, sonst Werkparameter; Kopie nicht mit Zufallsinhalt
+  überschreiben). Details: `project-status.md`, Update 5.145.
+- Geplant: Paket C (2.4, 2.2, 2.1), danach Paket B (4.3). Zurückgestellt: 2.7 (Anwenderentscheidung), 1.3/4.4, 2.3.
+- Weiter offen zu 1.2: Zwei Threads können noch gleichzeitig auf den I2C-Bus selbst zugreifen (Treiberebene).
+
 ## Reihenfolge, in der ich die Punkte angehen würde
 
 | Nr. | Befund | Schwere | Status |

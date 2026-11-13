@@ -32,9 +32,13 @@
 #include "core_cm3.h"
 #include "hftrack.h"
 
-osThreadDef(USB_HostService, osPriorityNormal, 1, 256); 	// define USB_HostService as thread function
-osThreadDef(GSM_Registration, osPriorityNormal, 1, 256);	// GSM Modem Einschaltung und Registrierung als thread function
-osThreadDef(MQTT_Connect, osPriorityNormal, 1, 512);			// MQTT Verbindungsaufbau als thread function
+// 5.145 (Review 2026-11-11, 1.1): Stacks vergroessert. Laut Keil-Aufrufgraph (sism.htm) brauchte GSM_Registration
+// 184 Byte + 64 Byte Threadkontext = 248 von 256 Byte (8 Byte Reserve, Aufrufe ueber pchar nicht mitgezaehlt),
+// MQTT_Connect 424 von 512, USB_HostService 208 von 256. Die Stacks liegen im festen RTX-Bereich OS_PRIVSTKSIZE
+// (768 Worte = 3072 Byte, RTX_Conf_CM.c), belegt jetzt 512+512+768 = 1792 Byte: Speicheraufteilung unveraendert.
+osThreadDef(USB_HostService, osPriorityNormal, 1, 512); 	// define USB_HostService as thread function
+osThreadDef(GSM_Registration, osPriorityNormal, 1, 512);	// GSM Modem Einschaltung und Registrierung als thread function
+osThreadDef(MQTT_Connect, osPriorityNormal, 1, 768);			// MQTT Verbindungsaufbau als thread function
 
 int measure (uchar speichern)	// Geschwindigkeitsmessung
 {
