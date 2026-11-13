@@ -6947,3 +6947,11 @@ keine unerwarteten Codes; Lichtsensor ca. 1030 lx, Dimm 150.
 mit 5.138-5.141 Menue 24173 / Strg+T 24175. Vermutung: `hf_measurement()` misst 2 ms nach `transceiver(ein)`, bevor die
 Frequenz eingeschwungen ist, und schneidet `HF_const/result` auf ganze MHz ab. An die IF820-Sitzung gemeldet
 (Vorschlag: Strg+T ueber denselben Weg wie `hf_info()` messen). Kriterium bewusst nicht gelockert.
+## Update 5.143 (TEST, 2026-11-13): Via-2-Transceivermenue "zurueck" korrigiert
+
+**Symptom (gemeldet von der Joachim-Sitzung beim Anpassen von radar_v2_test.py):** In 5.142 verliess "9 zurueck" das
+Via-2-Transceivermenue nicht (Menue kam nur erneut), "5" (Abgleich auf Kanal) verliess es nach dem Abgleich.
+**Ursache:** Die Menueschleife in `transmenu()` (sicom.c) endete weiter bei `'5'` (altes Menue mit 4 Punkten), 5.142 hat
+das Menue auf 8 Punkte erweitert, `putmenu(T_tmenu2,'9')`. **Fix:** Abbruch bei `'9'`.
+**Test Board B:** 5.143 geflasht; "9" fuehrt zurueck ins Werksmenue, nach "5" (Abgleich Stufe 127, 24169,9 MHz) bleibt das
+Geraet im Transceivermenue.
