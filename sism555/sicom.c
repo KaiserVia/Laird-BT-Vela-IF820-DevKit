@@ -801,7 +801,7 @@ void transmenu (void) 	// Transceiver & Verst�rker Men�
    case '2': transceiver_test (); 	break;	// Test Verst�rker/Transceiver mit gedimmtem Display
   } 
   } // end bisheriger Transceiver
- } while ((c>0)&&(c!=(IS_VIA2?'5':'3')));	// Abbruch (5.L1: Via-2 Menue bis 5)
+ } while ((c>0)&&(c!=(IS_VIA2?'9':'3')));	// Abbruch mit "zurueck" (5.143: Via-2 Menue bis 9, 5.142 brach noch bei '5' ab)
 
  newline();	// Zeilenvorschub
 }

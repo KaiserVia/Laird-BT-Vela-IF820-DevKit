@@ -6915,3 +6915,12 @@ Abstand 5 MHz (24155...24200 MHz). Beschreibung: `Doku/HF_Kanal_Nachfuehrung.md`
 **Offen:** RE/-Zeit am Oszilloskop und Messzeitverlaengerung mit Fahrzeugen pruefen (HW-Kollege); Annahme RE/ =
 IC37 P0.7 (`AMP_BW`). Kennlinie/Einschwingzeit an weiteren Via-2-Modulen. Optionale Mail-Punkte (EN/-RS232,
 CS-A-Funk auf P1[15], RS232-2) nicht umgesetzt. Hinweis: `dtc_text.h` fehlen die Texte zu 17006-17008 (nicht von 5.142).
+
+## Update 5.143 (TEST, 2026-11-13): Via-2-Transceivermenue "zurueck" korrigiert
+
+**Symptom (gemeldet von der Joachim-Sitzung beim Anpassen von radar_v2_test.py):** In 5.142 verliess "9 zurueck" das
+Via-2-Transceivermenue nicht (Menue kam nur erneut), "5" (Abgleich auf Kanal) verliess es nach dem Abgleich.
+**Ursache:** Die Menueschleife in `transmenu()` (sicom.c) endete weiter bei `'5'` (altes Menue mit 4 Punkten), 5.142 hat
+das Menue auf 8 Punkte erweitert, `putmenu(T_tmenu2,'9')`. **Fix:** Abbruch bei `'9'`.
+**Test Board B:** 5.143 geflasht; "9" fuehrt zurueck ins Werksmenue, nach "5" (Abgleich Stufe 127, 24169,9 MHz) bleibt das
+Geraet im Transceivermenue.
