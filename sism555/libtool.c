@@ -381,7 +381,7 @@ uint ledsymbol (uchar speed)	// Pr�ft Anzeigeschaltschwellen der LED Anzeigesy
  return (0);	// kein Symbol anzuzeigen
 }
 
-int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
+static int transceiver_trx (uchar mode)	// Transceiver Ein-/Ausschaltung, bisheriger Transceiver
 {									// �bergabe mode 	= 0	Transceiver aus
 									//					= 1 Transceiver und Verst�rker ein
 									// 					= 2 Zyklischer Messbetrieb
@@ -419,6 +419,48 @@ int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
  return (1);	// Ergebnis ok
 }
 
+static int transceiver_via2 (uchar mode)	// 5.L1: Transceiver Ein-/Ausschaltung Via-2 (Joachim 5.60)
+{									// Uebergabe mode wie transceiver()
+ ushort analog;
+
+ if (mode==3) { putnumber (fp.txrcon,0x80); newline();	}
+ analog=(fp.txrcon&0x00FF&~GAIN_INH)|HF_DIS;	// Transceiver aus und MUX Verstaerkungsreduzierung; 5.L1: nur Bits 0-7
+ 																						// (alte Voreinstellung ANT_EN1/ANT_EN2 nicht auf IC37 P1 geben)
+ if (mode)		// Einschalten?
+ {
+	FIO1CLR=LED1;					// Status LED ein
+  if (mode>1)
+  {
+   if (mode==3) {putparameter(T_ic37, analog&~(GAIN_A|GAIN_B), (0x05<<16)|0x84, T_nil); getc (0); }
+   analog=(analog|AMP_EN|GAIN_A|GAIN_B|BW_A)&~HF_DIS;		// Transceiver ein, Verstaerkung minimal
+   write_i2c_dev (IC37,3,(analog<<8)|0x02);
+   if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); }
+   else getkey(DPWR+t_amp_en);
+  }  // end if zykl. Betrieb oder Testmodus
+  analog&=~(GAIN_A|GAIN_B|HF_DIS);															// Transceiver ein und Minimal-Verstaerkung reset
+  analog|=AMP_EN|AMP_BW|BW_A;
+	analog|=fp.txrcon&(GAIN_INH|GAIN_A|GAIN_B);										// volle Bandbreite, eingestellte Verstaerkung uebernehmen
+  if (!write_i2c_dev (IC37,3,(analog<<8)|0x02)) return (-1);	   // Kein Erfolg Fehlerabbruch
+  if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); }
+ } // end if mode
+ else
+ {
+	FIO1SET=LED1;					// Status LED aus
+	if (!write_i2c_dev (IC37,3,((((analog&~(GAIN_A|GAIN_B))|HF_DIS))<<8)|0x02)) return (-1); // Transceiver Ausschalten
+ }
+
+ return (1);	// Ergebnis ok
+}
+
+int transceiver (uchar mode)	// Transceiver Ein-/Ausschaltung
+{									// Uebergabe mode 	= 0	Transceiver aus
+									//					= 1 Transceiver und Verstaerker ein
+									// 					= 2 Zyklischer Messbetrieb
+									//					>= 3 Testmodus - wartet jede Stufe
+ if (IS_VIA2) return (transceiver_via2 (mode));		// 5.L1: nach erkanntem Radar-Empfaenger
+ return (transceiver_trx (mode));
+}
+
 void set_measure_constants	(void)	// Konstanten f�r Messung anhand Parametereinstellung festlegen
 {
  IFConst=fp.TxF;												// Transceiver Sendefrequenz 24000 ... 24250 MHz laden
@@ -433,7 +475,7 @@ void set_measure_constants	(void)	// Konstanten f�r Messung anhand Parameterei
  }
 
  v_const=v_const*fp.vcor/100;		// Geschwindigkeitskorrekturfaktor ber�cksichtigen
- t_mess_max=DPWR+DTXFEN+t_amp_en+(100000*(LenTm+2)/(fp.vmm*IFConst));		// Max. Messzeit abh�ngig von kleinster Messgeschwindigkeit	  
+ t_mess_max=DPWR+DTXFEN_T+t_amp_en+(100000*(LenTm+2)/(fp.vmm*IFConst));		// Max. Messzeit abh�ngig von kleinster Messgeschwindigkeit	  
 }
 
 uint display_mode_speed (uchar psatz)	// Pr�fe Schwellen der Modi der Led Anzeige
@@ -1175,6 +1217,15 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
  } // end if IC54 erfolgreich gelesen	
 }
 
+void hf_measurement (void)			// 5.L1 (Joachim 5.60): Via-2 Sendefrequenz messen und ausgeben
+{
+ uint result, HiF=0;
+
+ osDelay(2);	result = 	mess_hf();								// Kurz warten und messen
+ if (result) HiF=HF_const/result;								// Sendefrequenz in MHz
+ newline(); putnumber (HiF,0); putc(' '); putln(T_MHz);
+}
+
 void reboot (void)							// Erzeuge Watchdog reset und starte CPU neu
 {
  i_reset=BOOT_RES;													// Setze Resetursache 
@@ -1182,7 +1233,7 @@ void reboot (void)							// Erzeuge Watchdog reset und starte CPU neu
  if (connect&MQTT_LINK) MQTT_fast_disconnect(1); 		// MQTT Verbindung sofort schlie�en	
  PCONP|=PCI2C0|PCSSP1;															// I2C0 und SSP1 Bus einschalten
  FIO1CLR = GSMPWR|USB_RPWR|PWRKEY|EN_ANA;						// GSM, USB und Analogversorgung (Transceiver,Verst�rker) aus
- flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=0;							// Puffer mit Output Register 2, Port 0 und 1 null f�llen
+ flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=IS_VIA2?0x10:0;	// 5.L1: Via-2 P1.4 HF_DIS=1 -> Transceiver aus;							// Puffer mit Output Register 2, Port 0 und 1 null f�llen
  I2Cdrv->MasterTransmit(IC37>>1,flbuf,3,false);			// Puffer an IC37 senden -> 5V/3V3 Analogversorgung komplett aus	
  protocol(REBOOT);																	// Reboot protokollieren	
  flash_wbuf1 ((uchar *)&fp.Kennung, PARAMETERPAGE, sizeof(fp));	// Parameter sichern

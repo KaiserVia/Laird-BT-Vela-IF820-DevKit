@@ -270,6 +270,17 @@ void EINT2_IRQHandler (void)				// Interruptanforderung Detektionsfehler
  EXTINT|=(1<<2);		// Anforderung l�schen								 	
 }
 
+void TIMER0_IRQHandler (void)					// 5.L1: Timer 0 HF-Frequenzmessung Via-2 (mess_hf)
+{
+ if (T0IR&(1<<4))											// T0CR0 Interrupt?
+ {
+  tm.cIF[tmi++]=T0CR0;
+  if (tmi>=9)	T0CCR=0;								// Nach 9 Captures stop
+ }
+ while (T0IR) T0IR|=T0IR;							// Anstehenden Capture Interrupt loeschen
+}
+
+
 void TIMER1_IRQHandler (void)					// Timer 1 1ms Match Interrupt
 {
   T1MR0=T1TC+1000;										// n�chstes 1 ms Match setzen
@@ -654,15 +665,34 @@ void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
   else gps_pending=0;																	// kein Update, kein Sleep ->reset gps_pending
 
  	FIO0DIR = PWR_GPS|EX12_1|EX12_2|CSFLASH2|CSAF|CSBF|GSM_DTR|TXD_2;					// Port 0 Ausg�nge		
-	FIO1DIR = USB_PPWR|USB_RPWR|LED1|MUX_A|MUX_B|GSMPWR|PWRKEY|EN_ANA;								// Port 1 Ausg�nge		
+	FIO1DIR = USB_PPWR|LED1|MUX_A|MUX_B|GSMPWR|PWRKEY;	// Port 1 Ausgaenge; 5.L1: EN_ANA/USB_RPWR erst in Init_Radar_Ports()
 	FIO2DIR = DIS_TRB|LE_TRB|G_SHIFT|PWM_TRB;																					// Port 2 Ausg�nge		
 	FIO4DIR	= CSFLASH1;						 																										// Port 4 Ausg�nge
+	if ((RSID&WDTR)&&((i_reset==FIRM_UP_RES)||(i_reset==SLEEP_RES)))	// 5.L1: ohne I2C-Init (Update/Sleep) gilt fp.radar
+	 Init_Radar_Ports();																							// aus dem RAM, sonst setzt InitI2C_Devices() die Pins
 	
 	PINMODE0 = (PULLDOWN<<14)|(PULLDOWN<<18);						// Pulldown P0.7/9 SPI1 SCK und MOSI
 	PINMODE1 = (NOPULL<<18)|(NOPULL<<20);								// No pull resistor P0.25/P0.26 - AD02/AD03	
 	PINMODE3 = (NOPULL<<10)|(NOPULL<<18)|(NOPULL<<28)|(PULLDOWN<<0);	// No pull resistor P1.21-Testkopplung, P1.25-FSK, P1.30 - VBUS, BT Modul ein	  
 	Init_Peripheral ();																	// Initialisiert Ports fuer Peripherie
 }	
+
+void Init_Radar_Ports (void)	// 5.L1: Pins abhaengig vom Radar-Empfaenger (fp.radar) setzen
+{															// Unbekannt: P1.20, P1.21, P1.26, P4.29 bleiben Eingang
+ if (fp.radar==RADAR_VIA2)
+ {
+  FIO1DIR&=~(DA_SS|FMin);					// P1.20 D/A-Wandler und P1.26 HF-Messeingang nicht treiben
+  FIO1SET=DIS_MESS; FIO1DIR|=DIS_MESS;	// Ausgabe Fhf/8388608 aus
+  FIO4CLR=DIS_IF;   FIO4DIR|=DIS_IF;		// Transceiver-Verstaerker ein
+ }
+ else if (fp.radar==RADAR_TRX)
+ {
+  FIO1DIR&=~DIS_MESS; FIO4DIR&=~DIS_IF;	// P1.21 Testkopplung und P4.29 wie bisher Eingang
+  FIO1SET=USB_RPWR;										// USB 5V Regler ein
+  FIO1DIR|=USB_RPWR|EN_ANA;						// EN_ANA mit bisherigem Latch-Zustand (Init_Ports: aus)
+ }
+}
+
 
 void Init_Peripheral (void)		// Initialisiert Ports fuer Peripherie
 {															// Flash muss zuvor gelesen sein
@@ -843,6 +873,38 @@ void DeepSleep (void)										// Bringe CPU in Deep sleep mode
  SystemInit();													// PLL neu starten
  InitWatchdog(LONG_WD_32);							// Watchdog Timeout 32 Sekunden setzen 
  SystemCoreClockUpdate ();							// Setze SystemCoreClock Information	
+}
+
+uint mess_hf (void)							// 5.L1: Via-2 HF-Sendefrequenz messen (Joachim 5.60)
+{															// Rueckgabe: Timertakte fuer 8 Perioden Fhf/8388608, 0 bei Fehler
+ uchar int_is_active;
+
+ if (!IS_VIA2) return (0);									// P1.26 ist auf dem bisherigen Board USB_RPWR
+ int_is_active = (uchar) NVIC_GetActive(EINT2_IRQn);		// Doppler Fehlerinterrupt aktiviert?
+ if (int_is_active) NVIC_DisableIRQ (EINT2_IRQn);	// Falls ja, sperren, sonst wird tmi evtl. zurueck gesetzt
+
+ FIO1CLR = DIS_MESS;											// Starte Ausgabe Via-2 herunter geteilte Sendefrequenz
+ if ((PCONP&PCTIM0)==	0) PCONP|=PCTIM0;		// TIMER0 einschalten, falls aus
+ PCLKSEL0&=~((1<<2)|(1<<3));							// Clock Auswahl loeschen
+ PCLKSEL0|=(1<<2);												// Timer 0 Clock ist CCLK Systemclock
+ T0CR = 0x02;															// T0TCR stop and reset Timer 0
+ T0IR|= T0IR;															// Reset evtl. anstehende Interrupts
+ T0PR=0;																	// Vorteiler 1
+ tmi=0;																		// Messindex nullen
+ msdelay=50;															// Nach 50 ms ist spaetestens Ende
+ PINSEL3|=((1<<21)|(1<<20));							// CAP0.0 Pin 1.26
+ T0CCR=CAP0FE|CAP0I;											// Capture control fallende Flanke mit Interrupt
+ NVIC_EnableIRQ(TIMER0_IRQn);							// Enable Timer 0 Capture Interrupt
+ T0CR = 0x01;															// starte Timer 0
+ while (tmi<9)	if (msdelay==0) break;		// Warte bis 9 Captures eingetroffen
+ NVIC_DisableIRQ(TIMER0_IRQn);						// Disable Capture Interrupt
+ PINSEL3&=~((1<<21)|(1<<20));							// Pin 1.26	GPIO
+ if (tmi!=9) tm.cIF[0]=0; 									// Weniger als 9 Captures, 50 ms Abbruch?
+ else tm.cIF[0]=tm.cIF[8]-tm.cIF[0];
+ if (int_is_active) NVIC_EnableIRQ (EINT2_IRQn);	// Fehler Interrupt Dopplersignal ggf. wieder freigeben
+ PCONP&=~PCTIM0;													// TIMER0 abschalten
+ FIO1SET = DIS_MESS;											// Stoppe Ausgabe Fhf/8388608
+ return (tm.cIF[0]);
 }
 
 	

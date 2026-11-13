@@ -260,8 +260,8 @@ void werkeinstellung (uchar gesamt)		// Ausgabe der Werksparameter
  else newline();	
  if (gesamt) putparameter(T_hwrev, 0, (7<<16),fp.hwVersion); 		// Harware Revision ausgeben		
  putstr(T_sprache+1);									// Text "Language: ...
- if (fp.sprache>ANZSPRACHEN-1) fp.sprache=0;	// FIX: ungueltiger/korrupter Wert wuerde T_spritm[] weit ausserhalb lesen
- putln(&T_spritm[fp.sprache][0]);			// Gew�hlte Programmsprache
+ if ((fp.sprache&0x03)>ANZSPRACHEN-1) fp.sprache&=0xFC;	// FIX: ungueltiger Sprachindex wuerde T_spritm[] weit ausserhalb lesen
+ putln(&T_spritm[fp.sprache&0x03][0]);			// Gewaehlte Programmsprache (5.L1: Bits 0/1)
  if (gesamt) putparameter(T_sende,fp.TxF,(1<<16),T_MHz); 	// Parameter Sendefrequenz
  putstr(T_dimm);											// Dimm/PWM Modus f�r LED
  putln(&T_dimsel[fp.pwm][0]);
@@ -329,6 +329,7 @@ void Werkskonfiguration (void)			// Ger�tekonfiguration einlesen
 {
 
  int dummy;														// Hilfsvariable	
+ uchar spr=fp.sprache&0x03;						// 5.L1 (Joachim 5.60): Listenauswahl Sprache
 
 
  InitWatchdog(LONG_WD_32);						// langes Watchdog Interval auf 32 Sekunden setzen	
@@ -344,8 +345,10 @@ void Werkskonfiguration (void)			// Ger�tekonfiguration einlesen
  put2str(T_hwrev,T_ist);										// Text "Hardware:...
  dummy=getline(cbuf,sizeof(fp.hwVersion)-1,'a');							// alphanumerische Zeichen lesen
  if (dummy>1) memcpy(fp.hwVersion,cbuf,sizeof(fp.hwVersion));	// Zeichen �bernehmen
- list_selection(T_sprache, &T_spritm[0][0], &fp.sprache, ANZSPRACHEN, sizeof(T_spritm[0]));	// Listenauswahl Anzeigesprache
- dummy=getnumber(T_sende, Min_TXF, Max_TXF);		// Sendefrequenz einlesen
+ if (list_selection(T_sprache, &T_spritm[0][0], &spr, ANZSPRACHEN, sizeof(T_spritm[0]))>=0)	// Listenauswahl Anzeigesprache?
+	 fp.sprache=(fp.sprache&0xFC)|(spr&0x03);				// ausgewaehlte Sprache in Indexbits 0 und 1 uebernehmen
+ if (IS_VIA2) dummy=getnumber(T_sende, Min_TXF_VIA2, Max_TXF_VIA2);	// 5.L1: Sendefrequenz einlesen, Via-2 24150-24200 MHz
+ else dummy=getnumber(T_sende, Min_TXF, Max_TXF);		// Sendefrequenz einlesen
  if (dummy >0) fp.TxF=dummy;					
  if (getuchar(T_battoff,0,10,&fp.uoff)<0) newline();												// Batteriespannungsoffset einlesen
  list_selection(T_dimm, &T_dimsel[0][0], &fp.pwm, 3, sizeof(T_dimsel[0]));	// Listenauswahl PWM modi
@@ -772,13 +775,34 @@ void transmenu (void) 	// Transceiver & Verst�rker Men�
 	test_battery(0);							// HF-/Analog-Spannungsversorgung messen  
   putln(T_trx);									// Transceiver & Verst�rkermen� senden	
   putparameter (T_vtg, fp.u_hf, 5<<16, T_mVolt);		// Versorgung vor Men� ausgeben
-  c=putmenu(T_tmenu,'3');				// Restmen� senden, auf Auswahl warten
+  if (IS_VIA2)									// 5.L1 (Joachim 5.60): Via-2 mit Frequenzmessung und Modulabgleich
+  {
+	 int result;							// gemessene Sendefrequenz
+	 transceiver(ein);
+	 osDelay(10);
+	 result=mess_hf();							// Messe Sendefrequenz
+	 transceiver(aus);
+	 if (result) result=HF_const/result;
+	 putparameter ((text *)"Frequency", result, 5<<16, T_MHz);
+   c=putmenu(T_tmenu2,'5');			// Restmenue senden, auf Auswahl warten
+   switch (c)										// Auswahl auswerten
+   {
+    case '1': amplifier_adjust (); break;					// Abgleich Verstaerker/Transceiver-Kanaele
+	  case '2': f_characteristic (IC32); break;			// Frequenzkennlinie
+	  case '3': set_single_dpp (IC32); break;				// Manuelle Einstellung Sendefrequenz
+    case '4': transceiver_test (); break;				// Test Verstaerker/Transceiver mit gedimmtem Display
+   }
+  }
+  else
+  {
+  c=putmenu(T_tmenu,'3');				// Restmenue senden, auf Auswahl warten
   switch (c)										// Auswahl auswerten
   {
    case '1': amplifier_adjust (); break;		// Abgleich Verst�rker/Transceiver 	
    case '2': transceiver_test (); 	break;	// Test Verst�rker/Transceiver mit gedimmtem Display
   } 
- } while ((c>0)&&(c!='3'));	// Abbruch 
+  } // end bisheriger Transceiver
+ } while ((c>0)&&(c!=(IS_VIA2?'5':'3')));	// Abbruch (5.L1: Via-2 Menue bis 5)
 
  newline();	// Zeilenvorschub
 }
@@ -863,12 +887,12 @@ void specialmenu (void)			// Sondermenue
  						 if (fp.vmm < 5) 														// Kleinste Messgeschwindigkeit < 5 
 						 {	 
 							fp.txrcon|=BW_B;													// Verst�rker untere Grenzfrequenz auf 1,4 km/h reduzieren
-							t_amp_en=20;															// Messverz�gerung �bersteuerungszeit Verst�rker verl�ngern					 
+							t_amp_en=IS_VIA2?25:20;										// Messverzoegerung Uebersteuerungszeit Verstaerker verlaengern (5.L1: Via-2 25)
 						 }	 
 						 else 																			// Kleinste Messgeschwindigkeit >= 5 
 						 {	 
 							fp.txrcon&=~(BW_B);								  			// Verst�rker untere Grenzfrequenz auf 8,1 km/h nach oben setzen
-							t_amp_en=10;															// Messverz�gerung �bersteuerungszeit Verst�rker verk�rzen	 
+							t_amp_en=IS_VIA2?15:10;										// Messverzoegerung Uebersteuerungszeit Verstaerker verkuerzen (5.L1: Via-2 15)
 						 }	 
 						 break;   
    case '5': getuchar(T_vcor, Def_vcor, MAX_VCOR, &fp.vcor);				// Geschwindigkeitskorrekturfaktor
@@ -1426,7 +1450,8 @@ void radiostatus (void) 		// Bericht Tasks und Verbindungen, GSM, MQTT und GPS S
 	
  putstr (T_report);	putnumber (tasks,0); putstr(T_rp_conn); putnumber (connect,0x80); putstr(T_rp_thread); putnumber (osActiveThread,0x80); 
  putstr (";IC54="); putc (' '); putnumber (read_i2cdev (IC54, 0, 1),0x80); // Verbindungen, Tasks, Threadstatus kommt immer
- if (fp.vspcam) { putstr ("; Online:"); putc (online|0x30); }	 
+ if (comchange) putstr (";COMchg");					// 5.L1 (Joachim 5.60): Schnittstellenwechsel ansteht
+ if (fp.vspcam) { putstr ("; Online:"); putc (online|0x30); }
  if (fp.btmodem && ((connect&0x82)==0x82)) { putstr ("; BT Minuten: "); putnumber (bt_time_cpy,0); }
  newline();
  
@@ -1559,7 +1584,7 @@ void mainmenu (char c)		// Zeichenbearbeitung Terminalschnittstelle(n)
  if (c=='H') { menu=0; online=0; menrep=1; newline(); }		// Men�reset und Hauptmen�ausgabe
  if (c==ESC) if ((fp.ex12==2)||(fp.ex12==4)) { plus_com (0);	menrep=1; }	// Kommunikation Matrix controller 
  if (c==STRF) { radiostatus (); return;}									// Funkmodem und GPS Status ausgeben
- //if (c==STRT) { putstr("Reboot"); reboot(); }
+ if ((c==STRT) && IS_VIA2) { transceiver(ein); hf_measurement (); transceiver(aus); newline();}	// 5.L1 (Joachim 5.60): Sendefrequenz messen
 	
  if (!online && !simulation)											// Kein Online-Messmodus oder Simulation
  { 	

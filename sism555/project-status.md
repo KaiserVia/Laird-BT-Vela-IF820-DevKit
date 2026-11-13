@@ -6509,6 +6509,113 @@ wirbt das Modul nicht mehr - unveraendert eingefroren. Der Tausch hat den BLE-Ha
 Keine weiteren Tests. Die Hardware-Experten pruefen das Board am Montag 2026-11-16. Offen fuer die Pruefung: welche
 Bauteile getauscht wurden, Versorgung des Moduls (3P0V/VDDIO), 32-kHz-Quarz mit 10 MOhm parallel.
 
+## Dauerlauf 12 h auf Board B (26SC9983), Firmware 5.137 (2026-11-12 16:59 bis 2026-11-13 04:31)
+
+Aufbau: Steuerskript (`dauerlauf.py`, nur im Scratchpad) wiederholt 19 Runden aus vier Bloecken: `online-bt` (BLE und
+Classic je 2x waehrend MQTT online), `soak` (Ymodem-Downloads 505856 Byte), `interleave` (10 Runden BLE/Classic im
+Wechsel), `boot-race` (Relais). Nach einem fehlgeschlagenen Block 10 s stromlos, dann weiter. Board: R125 nach GND,
+kein P0.19-Draht, LTE mit SIM.
+
+| Block | Ergebnis |
+|---|---|
+| Downloads (Ymodem) | **44/44 bestanden, 0 Retries.** Runde 1: 13 BLE (6,69-6,78 KB/s) + 13 Classic (7,32-7,80 KB/s) im Wechsel; danach je Runde 1 BLE-Download. Der BLE-Download-Abbruch mit stummem Modul vom 2026-11-10 trat **nicht** wieder auf. |
+| `interleave` | 380 Verbindungszyklen, **2 Einzelfehler** (1x Classic nach BLE in Runde 4, 1x BLE nach Classic in Runde 15), jeweils im naechsten Zyklus wieder ok, Modul nicht haengend. |
+| `boot-race` | 19/19 bestanden, alle im Erstversuch. |
+| `online-bt` | Runden 1-3: BT waehrend online **12/12** (BLE 6, Classic 6). Ab Runde 4 (20:12) nicht mehr pruefbar, siehe unten. Runde 16: 1 BLE-Schritt waehrend online bestanden. Kein BT-Fehler beobachtet. |
+
+**Testskript-Fehler (kein Geraetefehler):** Die 18 "fehlgeschlagenen" `soak`-Bloecke ab Runde 2 brachen jeweils nach
+dem ersten, bestandenen Download mit `FileNotFoundError ... soak.csv` ab: mit `--soak-skip-write` schreibt
+`run_soak()` die CSV in den Report-Ordner `..._unbekannt_soak`, der nicht angelegt wird. **Behoben 2026-11-13:**
+Der Ordner wird beim ersten Geraetekontakt umbenannt (Inhalt wandert mit), `run_soak()` hielt aber den alten Pfad;
+jetzt wird der CSV-Pfad vor jedem Schreiben neu bestimmt (`soak_csv()`). Am Geraet noch nicht erneut gelaufen.
+
+**MQTT ab 20:12 instabil (offen, vermutlich serverseitig):** Bis 19:48 hielt jede Serververbindung. Ab 20:12 meldet die
+Firmware nach jedem `MQTT Server connected` 1-8 s spaeter `MQTTS disconnect`, Neuversuch jede Minute, bis zum Ende
+des Laufs (auch nach Stromzyklen). Funk gut (CSQ=21), `MQTT:Fail=0`. Das Testskript sieht das Geraet vor dem BT-Schritt
+nicht online und wertet den Schritt als Fehler, ohne BT zu pruefen. Ursache nicht geklaert; da Stromzyklen nichts
+aendern, liegt eher eine Server- oder Kontoaenderung nahe (zur selben Zeit arbeitete eine andere Sitzung an der
+viacloud-Geraeteaktualisierung). Am Server bzw. mit einem zweiten Geraet pruefen.
+
+**Fazit:** BT auf B ist mit 5.137 und R125 nach GND ueber 11,5 h stabil (Downloads, Wechsel, Kaltstarts). BT waehrend
+LTE ist nur fuer die ersten ca. 3 h belegt (13/13), danach wegen des MQTT-Problems nicht pruefbar.
+
+## Update 5.L1 (TEST, 2026-11-12): Integration Joachim 5.56-5.60 (Mainboard V2, Via-2-Radarempfaenger)
+
+Branch `Integrate-Joachim-SW`, Worktree `C:\viaTraffic\GitHub\Projects\Joachim-Integration`. Quelle: Joachims Stand
+`C:\viaTraffic\GitHub\Projects\sism560_V2\sism560_V2` (5.60), gemeinsame Basis `C:\viaTraffic\GitHub\Projects\sism555`
+(5.55). Analyse und Entscheidungen: `Doku/Integration_Joachim_V2.md`.
+
+**Ziel (Anwendervorgabe):** eine Firmware fuer alle Hardware-Staende. Wie LTE (`fp.gsm`), BT (`fp.btmodem`) und GPS
+(`fp.gps`) wird jetzt auch der Radar-Empfaenger per Selbsttest erkannt und gespeichert; die Revisionsbuchstaben
+(`J2`/`V2`) spielen fuer die Firmware keine Rolle.
+
+**Umsetzung:**
+- `fp.radar` (RADAR_UNBEKANNT/RADAR_TRX/RADAR_VIA2) ersetzt `fuellbyte1` im ersten 1k-Block - Layout und Groesse des
+  Parameterblocks unveraendert.
+- `radar_detect()` (i2cm.c) bei jedem `InitI2C_Devices()`: antwortet IC32 (Digitalpoti 0x5C, nur Via-2), ist es Via-2;
+  sonst wird ueber IC37 nur P1.4 (Via-2: HF_DIS) als Ausgang LOW geschaltet und nochmal gefragt. Kein LPC-Pin mit
+  wechselnder Bedeutung wird vor der Erkennung getrieben. Weicht das Ergebnis vom gespeicherten Typ ab: Info I17005.
+- `Init_Radar_Ports()` (hard.c): Via-2 -> P1.20 (DA_SS) und P1.26 (FMin) Eingang, P1.21 DIS_MESS Ausgang HIGH,
+  P4.29 DIS_IF Ausgang LOW. Bisheriger Transceiver -> EN_ANA und USB_RPWR Ausgang wie bisher. `Init_Ports()` schaltet
+  EN_ANA/USB_RPWR nicht mehr pauschal als Ausgang; bei Update-/Sleep-Reset (ohne I2C-Init) gilt `fp.radar` aus dem RAM.
+- Je nach Typ: `transceiver()` (Via-2: IC37 HF_DIS, Joachims Fassung; txrcon nur Bits 0-7), Power-down (`EINT0`) und
+  `reboot()` (Via-2: IC37 P1=0x10 statt 0), `DPWR` 15/40 ms, `DTXFEN` nur beim bisherigen Transceiver, `t_amp_en`
+  Via-2 25/15 ms, Sendefrequenz-Bereich Via-2 24150-24200 MHz, Messbeginn in `runcycle()` (Via-2: IC37 statt EN_ANA).
+- Via-2 neu (Joachim): HF-Frequenzmessung `mess_hf()` (Timer 0, CAP0.0 an P1.26), `hf_measurement()` (Taste STRT im
+  Hauptmenue), Transceiver-Menue mit Frequenzanzeige, "Module Frequency Characteristic" (`f_characteristic`), "Set Module
+  Frequency" (`set_single_dpp`); Verstaerkerabgleich `set_dpp` mit zwei Messkanaelen ohne MUX IC39.
+- Fuer alle Boards (Joachim): `fp.sprache` = (LANGUAGE<<4)|(OEM<<2)|Sprachindex, alle Leser maskieren `&0x03`, nach
+  Firmware-Update werden Sprachpaket/OEM nachgetragen; GSM CTS-Wartezeit 250 statt 200 Versuche, PWRKEY-Puls 600 ms;
+  Anzeige-Treiber bei POR/Brown-out frueh aus (Wartezeit 150+100 statt 250 ms); `Dis_CapCnt` setzt jetzt auch `T3CCR`
+  zurueck (vorher `T2CCR=T2CCR=0`); Statuszeile `;COMchg`; `test_i2c_device()` schaltet den Transceiver danach aus.
+- Bewusst **nicht** uebernommen: Joachims Entfernen des Ereignisses `REBOOT`/`T_reb[]` (bleibt), Entfernen von
+  `MQTT_fast_disconnect` in `reboot()` (bleibt), BT-Versorgung per `DIS_BT` (P1.16 bleibt ungetrieben, Pull-down = BT
+  ein; eigene BT-Abschaltung waere ein neues Thema, z. B. als Modul-Reset), Entfernen der `CSFLASH2`-Umschaltung in der
+  GPS-Erkennung, kuerzere POR-Wartezeit 50 -> 30 ms.
+
+**Annahmen, am Geraet zu pruefen:** auf dem bisherigen Board antwortet nichts auf I2C 0x5C; auf dem Via-2-Board ist
+IC37 ohne EN_ANA erreichbar; Via-2-Empfaenger und neues Mainboard treten nur zusammen auf.
+
+Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet.
+
+
+## Test 5.L1 am Geraet (Board B 26SC9983, 2026-11-13)
+
+Board B (26SC9983, Infoseite "V2", LTE, R125 nach GND, kein P0.19-Draht) mit 5.L1 per `flash_xmodem.py` (COM3)
+geflasht, danach 5 s stromlos ueber das Relais. Vorher lief 5.s1 (Lichtsensor).
+
+- **Erkennung: Via-2.** Board B hat also den Via-2-Empfaenger. Transceiver-Menue (Werksmenue Strg+W -> 4) zeigt die
+  Via-2-Fassung (5 Punkte, "Module Frequency Characteristic", "Set Module Frequency") und misst **24173 MHz**;
+  Strg+T im Hauptmenue misst **24174 MHz** (Bereich 24150-24200 MHz).
+- I2C-Scan: IC37 (0x42), IC58 (0x44), IC54 (0x46), IC35 (0x58), **IC32 (0x5C)** und 0x20 (VEML7700-Lichtsensor,
+  von 5.s1 bekannt). "I2C Devices" -> 92 liest die Register von IC32.
+- Hochlauf normal: BT `/PING` ok, `[BT-Zustand] BEREIT`, Banner "Version 5.L1". Protokoll nur I32 (Update) und
+  I1 (Eingeschaltet), keine Fehler; kein I17005, wie erwartet (erste Erkennung aus "unbekannt").
+- Online messen 20 s ohne Fehler (keine Fahrzeuge vor dem Radar, also keine Messwerte).
+- `bt_testlauf.py --profil kurz --nur reboot-check` zweimal bestanden (dropout und power, je BLE und Classic).
+
+**Werkzeug:** `bt_testlauf.py` und `ble_mainboard_test.py` erkannten Versionen mit Buchstaben (5.L1, 5.s1) nicht
+("Firmware None", "Banner NICHT gesehen" auch nach Stromzyklus). Die Versions-Regexe lassen jetzt einen Buchstaben
+nach dem Punkt zu; danach Banner nach Stromzyklus wieder erkannt. "Banner NICHT gesehen" beim kurzen Aussetzer und
+"BT-Init nicht gesehen" gab es schon mit 5.137 (fruehere Berichte), kein neuer Befund.
+
+**Befund im Code (Joachim 5.60 uebernommen, nicht behoben):** `test_i2c_device()` (sictst.c) benutzt `typ`
+uninitialisiert, wenn das Geraet nicht antwortet (Fehlercode-Auswahl und `transceiver(aus)`). Nur Testmenue; mit der
+naechsten Version `typ=0` vorbelegen.
+
+**Offen:** Board mit dem bisherigen Transceiver (Erkennung RADAR_TRX, kein Zugriff auf 0x5C, EN_ANA-Pfad) und der
+Wechsel des Empfaengers (I17005) sind noch nicht geprueft. Board B danach mit 5.L1 belassen.
+
+## Update 5.L2 (TEST, 2026-11-13): `test_i2c_device()` ohne uninitialisierte Variable
+
+**Symptom:** Werksmenue -> Component tests -> "I2C Devices" mit einer Adresse, unter der kein Baustein antwortet:
+Auswahl der Fehlermeldung (DPP oder Expander) und `transceiver(aus)` hingen von einem zufaelligen Speicherwert ab.
+**Ursache:** `typ` wurde nur gesetzt, wenn der Baustein antwortet (aus Joachim 5.60 uebernommen, Befund beim
+Geraetetest 5.L1). **Fix:** `typ=0` vorbelegt (sictst.c); ohne Antwort kommt jetzt immer die Expander-Meldung, der
+Transceiver wird nicht geschaltet. Nur Testmenue, Messbetrieb unveraendert.
+
+Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet (Board B laeuft mit 5.L1).
+
 ## Update 5.s1 (TEST, 2026-11-12, Branch `DevelopLightSensor`): Lichtsensor VEML7700 steuert die Anzeigehelligkeit
 
 **Ziel:** Auf Mainboard V2 (Stand 10.11.2026) ist der I2C-Lichtsensor IC1 VEML7700 (Vishay) in beiden Varianten
@@ -6557,3 +6664,22 @@ Live-Test 60 s (Messung ca. alle 0,45 s): Handy-Licht -> bis 1131 lx (Rohwert 33
 abgedeckt -> 2,8...4,4 lx (Dimm 25...35), danach wieder ca. 400 lx (Dimm 130). Der Sensor folgt sofort ohne
 Haenger. Die Verstaerkung blieb auf x2, weil das Handy-Licht die Umschaltschwelle (~2000 lx) nicht erreicht hat.
 Umschalten der Verstaerkung ist damit weiter ungeprueft, braucht Sonnenlicht oder eine helle Lampe direkt am Sensor.
+
+## Update 5.138 (TEST, 2026-11-13): Zusammenfuehrung main + Joachim (5.L2) + Lichtsensor (5.s1)
+
+Auf `main` (Ordner `Laird_BT_Vela-IF820-DevKit`) per Merge-Commit zusammengefuehrt, Reihenfolge: zuerst
+`Integrate-Joachim-SW` (5.L2: Joachims 5.60, Mainboard V2, Via-2-Radarempfaenger), dann `DevelopLightSensor`
+(5.s1: VEML7700 steuert die Anzeigehelligkeit). Beide Branches zweigten von 5.137 (`3e9cc1a`) ab.
+
+**Konflikte:** nur `T_version` (neu "5.138", Kommentar beider Seiten erhalten), `project-status.md` (beide Seiten
+haben nur angehaengt, alles behalten) und `sism.bin`/`sism.hex` (neu gebaut). `libtool.c` und `sictst.c` hat Git
+automatisch zusammengefuehrt; inhaltlich geprueft: der Lichtsensor aendert `get_dimmung()` und `licht_test()`,
+Joachim andere Funktionen (Transceiver, I2C-Digitalpotis, Testmenue); keine Ueberschneidung. I2C-Adressen getrennt
+(VEML7700 0x10, IC32 0x5C). `sism.uvprojx` enthaelt `lightsens.c`.
+
+**Build:** 0 Fehler, 0 Warnungen. `sism.bin` 175512 Byte, `sism.hex` stimmt mit `sism.bin` ueberein, Kopie in
+`fw_5.138/`. Hinweis: `fromelf` konnte `sism.bin` beim ersten Lauf nicht schreiben (Datei im Konfliktzustand), nach
+Loeschen neu erzeugt.
+
+**Status:** Am Geraet noch nicht getestet. Nicht enthalten: ungespeicherte Aenderung an `project-status.md` im
+Worktree `LightSensor` (nicht committet).

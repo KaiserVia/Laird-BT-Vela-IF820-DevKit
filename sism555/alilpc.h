@@ -201,6 +201,7 @@
 #define		IMMIN		(1<<1)		// Minutenwechsel generiert Interrupt
 
 // Aliase Timer
+#define		PCLKSEL0	LPC_SC->PCLKSEL0	// Peripheral clock selection 0
 #define		T0CR		LPC_TIM0->TCR	// Timer control register
 #define		T1CR		LPC_TIM1->TCR
 #define		T2CR		LPC_TIM2->TCR

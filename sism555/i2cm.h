@@ -11,10 +11,12 @@
 #define		DPP		2
 #define		EXPS	3
 #define		RTC		4
+#define		DPPT	5				// DS3501 Digitalpoti mit Byte-Registern
 
-#define Anz_I2C_Devices	7
+#define Anz_I2C_Devices	8
 
 // I2C Device Adressen
+#define		IC32		0x5C				// IC32 Digitalpoti Sendefrequenz Via-2-Empfaenger (nur Via-2)
 #define		IC35		0x58				// IC35 MCP4441 quad DPP Microchip für Verstärkereinstellung
 #define		IC37		0x42				// IC37 PCA9555 Expander für Messkontrolle
 #define		IC54		0x46				// IC54	PCA9554 Expander für Drehschalter und Interface Link
@@ -52,6 +54,7 @@ extern ARM_DRIVER_I2C Driver_I2C0;							// Definition I2C0 Struktur
 extern int Init_I2C	(void);																			// Initialisiere CMSIS I2C Treiber
 extern bool write_i2c_dev (uchar dadr, uchar anz, uint data); 	// Anzahl Bytes an I2C Device senden
 extern int read_i2cdev (uchar dadr, uchar adrcom, uchar anz);		// I2C Device mit repeated start auslesen
+extern uchar radar_detect (void);																// 5.L1: Radar-Empfaenger per Selbsttest bestimmen
 extern int InitI2C_Devices (void);															// I2C Bausteine initialisieren
 extern int get_com_status (void);  						// Status IC54 Datenschnittstellen und Hexschalter einlesen
 extern uchar get_turnswitch (void);							// Status Drehschalter lesen und Position dekodieren

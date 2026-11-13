@@ -78,7 +78,12 @@ int main (void)
  																									
  if (!(RSID&WDTR)|(i_reset==BOOT_RES)) // Kein Watchdog reset ausser Reboot?
  {													
-	osDelay(250); 
+	if (RSID&(POR|BODR))								// 5.L1 (Joachim 5.60): Power On oder Brownout Reset?
+	{
+	 FIO2CLR =	DIS_TRB | G_SHIFT;			// EN\ 3V3 Anzeige - Treiber
+	 Ledaus();													// Anzeige gleich dunkel schalten
+	}
+	osDelay(150); 
 	 
 	syserror|=InitSPIFlash();	// Initialisiere SPI und Flash   
 	if (InitParameter(0)==1) 	// Parameter Power On und ggf. Werkinitialisierung
@@ -87,6 +92,7 @@ int main (void)
 	 syserror++;							// Im Normalbetrieb sollte keine Werkinitialisierung vorkommen	
 	}  
 	Init_Peripheral ();				// Initialisiert Ports fuer Peripherie 
+	osDelay(100);							// 5.L1 (Joachim 5.60): Gesamtwartezeit wie bisher 250 ms
  }	
  
  if (Init_I2C()== ARM_DRIVER_OK) fp.i2cdev|=I2CB0;		// Initialisierung I2C Interface erfolgreich
@@ -233,6 +239,7 @@ int main (void)
 		gsm_power (2); 								// Uart1/MUX initialisieren und sleep disable			   
 	 }
 	 flash_erase (fp.md_page,1);		// Muss wg. reset aller Messdatenzeiger
+	 fp.sprache=(fp.sprache&0x03)|(LANGUAGE<<4)|(OEM<<2);		// 5.L1 (Joachim 5.60): Sprachpaket/OEM nach Firmware-Update eintragen
   } // end if firmware update	
 	
 	wait_min=Def_wait;				// Setze 3 Warteminuten f�r n�chste GPS, Email, SMS Aktivit�t XXX
@@ -246,7 +253,8 @@ int main (void)
 	wait_sms=0; 							// reset Warteminuten SMS
   wait_mail=0;							// reset Warteminuten Email 	 
 	LastErrorEvent=0;					// Letztes protokolliertes Fehlereignis
-	if (fp.vmm<5) t_amp_en=20;	// Messverz�gerung bei kleinsten gemessenen Geschwindigkeiten < 5 km/h vergr��ern
+	if (IS_VIA2) t_amp_en=(fp.vmm<5)?25:15;	// 5.L1 (Joachim 5.60): Via-2 Messverzoegerung 25/15 ms
+	else if (fp.vmm<5) t_amp_en=20;	// Messverzoegerung bei kleinsten gemessenen Geschwindigkeiten < 5 km/h vergroessern
 	else t_amp_en=20;
  } // end if kein deep sleep reset			
  

@@ -12,8 +12,14 @@ Gerätefirmware **sism555** (LPC1766, Keil-Projekt `sism555/sism.uvprojx`).
 Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
-- **Aktueller Branch:** `connection-pin` (Arbeitsstand seit 5.101, alle TEST-Versionen 5.127-5.137);
-  `LTE-Update` ist die Hauptlinie, Zusammenführung offen
+- **Aktueller Branch (dieser Ordner):** `main`. Am 2026-11-12 zusammengeführt: `main`, `LTE-Update` und
+  `connection-pin` stehen auf demselben Stand (5.137, PR #2). Weitere Branches liegen in **eigenen Ordnern**
+  (git worktree), nicht hier umschalten:
+  - `Integrate-Joachim-SW` -> `C:\viaTraffic\GitHub\Projects\Joachim-Integration` (Übernahme von Joachims 5.60, `sism560_V2`)
+  - `DevelopLightSensor` -> `C:\viaTraffic\GitHub\Projects\LightSensor`
+  - **2026-11-13: beide in `main` gemergt (5.L2 + 5.s1 -> 5.138).** Weiterarbeit an diesen Branches vorher mit
+    `git merge main` nachziehen, sonst laufen die Stände wieder auseinander.
+  - `branch-550` -> `C:\viaTraffic\GitHub\Projects\branch-550` (alter Stand 5.50)
 - **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
   (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen
   GND-Verbindung dafür aufgetrennt wurde) und dürfen nicht auf Boards ohne Draht (mit der Weiche auf 1,
@@ -59,6 +65,14 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - `Zeitsync_Plan.md`, `Fehlerspeicher_Strategie.md`, `parameterspeicher.md`
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
+
+- **2026-11-12 - 5.L1 (TEST), Branch `Integrate-Joachim-SW`:** Joachims Stand 5.60 (Mainboard V2, Via-2-Radarempfänger)
+  integriert. Der Radar-Empfänger wird wie LTE/BT/GPS per Selbsttest erkannt (`fp.radar`, `radar_detect()` in i2cm.c);
+  Pins, Transceiver, HF-Messung und Menüs richten sich danach. 2026-11-13 auf Board B (26SC9983) geprüft: als Via-2
+  erkannt, Sendefrequenz 24173 MHz, BT reboot-check bestanden; Board mit bisherigem Transceiver noch offen.
+  5.L2: nur `test_i2c_device()` korrigiert (uninitialisiertes `typ`). Analyse:
+  `sism555/Doku/Integration_Joachim_V2.md`. Parallel-Branch `DevelopLightSensor` (VEML7700, Versionen 5.s1 ...) im
+  Worktree `Projects\LightSensor`. Neue Worktrees brauchen `sism555\Objects\sism.sct` aus dem Hauptordner (nicht im Git).
 
 - **2026-11-12 - Abnahme nach Umrüstung:** Funktionsfähig mit 5.137 sind **99SC9923 (A), 26SC9983 (B), 26SC9966**.
   26SC9994 (C) und 11SC1234: BLE friert das Modul beim Verbinden ein, Classic ok (Hardware vermutet, Quarz/Versorgung).

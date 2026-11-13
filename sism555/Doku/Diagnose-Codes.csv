@@ -45,6 +45,7 @@ Code;Typ;Subsystem;Kurztext;Ursache;Abhilfe;SeitVersion;Status
 17002;F;System;I2C Geraet fehlt;Erwartetes I2C-Geraet nicht erkannt;I2C-Geraete und Adressen pruefen;5.09;aktiv
 17003;F;System;I2C DPP fehlt;DPP-Modul nicht am I2C-Bus erkannt;DPP-Modul und Verbindung pruefen;5.09;aktiv
 17004;F;System;LED-Treiber TCA6507 fehlt;TCA6507 nicht erkannt beim Systemstart;Optionale LED-Spotlampe und Verkabelung pruefen;5.09;aktiv
+17005;I;System;Radar-Empfaenger gewechselt;Selbsttest beim Hochfahren erkennt einen anderen Radar-Empfaenger als gespeichert (Wert 1 = bisheriger Transceiver, 2 = Via-2);Keine, Typ wird uebernommen; bei unerwartetem Wechsel IC32/IC37 pruefen;5.L1;aktiv
 18001;F;Hardware;GSM-Fehler in libtool;GSM-Modem meldet Fehler bei TCP/IP-Operation;Netzverbindung und GSM-Modem pruefen;5.09;aktiv
 18002;F;Hardware;LED-Treiber TCA6507 Fehler;TCA6507 nicht erreichbar oder Schreibfehler;TCA6507 und I2C-Bus pruefen;5.09;aktiv
 18003;F;Hardware;Hardware-Fehler;Unerwarteter Hardware-Fehler aufgetreten;Hardware pruefen, Service kontaktieren;5.09;aktiv

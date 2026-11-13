@@ -253,7 +253,7 @@ int is_CRLF (int c) // Pr�ft ob Zeichen Carriage return oder Line Feed
 
 text * sprachauswahl (text *s)	// Setzt Zeiger auf gew�hlte Ausgabesprache
 {																// Durchsuche String bis '\f' der gew�hlten Sprachnummer
- uchar i = fp.sprache;			// Laufvariable Sprachnummer
+ uchar i = fp.sprache&0x03;	// 5.L1: Sprachindex Bits 0/1 (Bits 2-7 OEM/Sprachpaket)
 
  if (i>ANZSPRACHEN-1) i=0;	// Ung�ltiger Zeiger
 
@@ -588,9 +588,9 @@ int ja (text *s)				// Pr�ft Eingabe ob Ja oder Nein
  if (c!='C') c|=0x20; 				// -> Kleinschreibung
  else return (c);					// Einleitung Modemdialog
 
- if (fp.sprache>ANZSPRACHEN-1) fp.sprache=0;	// FIX: ungueltiger/korrupter Wert wuerde T_ja[]/T_nein[] ausserhalb lesen
- if ((c == T_ja[fp.sprache]) | (c == 'y')) result=1;  	// 'Yes'
- else if (c == T_nein[fp.sprache]) result=-1;			// 'Nein'
+ if ((fp.sprache&0x03)>ANZSPRACHEN-1) fp.sprache&=0xFC;	// FIX: ungueltiger Sprachindex wuerde T_ja[]/T_nein[] ausserhalb lesen
+ if ((c == T_ja[fp.sprache&0x03]) | (c == 'y')) result=1;  	// 'Yes'
+ else if (c == T_nein[fp.sprache&0x03]) result=-1;			// 'Nein'
  else result=0; 
  if (result) putc (c);              					// echo     
  newline();
@@ -877,7 +877,7 @@ void puttage(uchar eintag)	// Ausgabe der Wochentagsk�rzel
    s=&T_tag[l][0];					// Zeiger auf Tagestext
    if (*s=='\f')						// Mehrsprachiger Text?
    {
-    i= fp.sprache;
+    i= fp.sprache&0x03;			// 5.L1: Sprachindex Bits 0/1 ausmaskieren
     while (i) { do s++; while (*s!='\f'); i--; }	// Durchsuche String bis '\f' der gew�hlten Sprachnummer
     s++; 										// Zeiger auf Anfang Teilzeichenkette der gew�hlten Sprache
    }

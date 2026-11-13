@@ -3358,13 +3358,13 @@ def parse_info_screen(text: str) -> dict:
     lines = [line.strip() for line in re.split(r"[\r\n]+", text)]
     lines = [line for line in lines if line]
     for line in lines:                                          # "Viasis 3003M - Version 5.124: J2"
-        if re.search(r"3003|viasis", line, re.I) and re.search(r"\d+\.\d{2,3}", line):
-            version = re.search(r"(\d+\.\d{2,3})", line)
+        if re.search(r"3003|viasis", line, re.I) and re.search(r"\d+\.(?:\d{2,3}|[A-Za-z]\d+)", line):
+            version = re.search(r"(\d+\.(?:\d{2,3}|[A-Za-z]\d+))", line)
             info["firmware"] = version.group(1)
             model = re.split(r"\s+-\s+", line, maxsplit=1)[0].strip()
-            if model and not re.search(r"\d+\.\d{2,3}", model):
+            if model and not re.search(r"\d+\.(?:\d{2,3}|[A-Za-z]\d+)", model):
                 info["modell"] = model
-            hardware = re.search(r"\d+\.\d{2,3}\s*[,:]\s*(\S+)", line)       # echte Seite: "Version 5.124, J2"
+            hardware = re.search(r"\d+\.(?:\d{2,3}|[A-Za-z]\d+)\s*[,:]\s*(\S+)", line)       # echte Seite: "Version 5.124, J2"
             if hardware:
                 info["hardware"] = hardware.group(1)
             break
@@ -4105,8 +4105,12 @@ async def run_soak(args) -> int:
                     result["result"] = "failed"
                     write_suite_report("soak", result, "VIASIS Dauer-Messreihe", "Flash-Schreiben fehlgeschlagen.")
                     return 1
-        report_dir = RUN_REPORT_DIR or REPORT_DIR
-        csv_path = report_dir / "soak.csv"
+        def soak_csv():
+            # Pfad jedes Mal neu bestimmen: Der Report-Ordner heisst anfangs "..._unbekannt_soak" und wird beim
+            # ersten Geraetekontakt umbenannt (Inhalt wandert mit). Mit --soak-skip-write passiert das erst im
+            # ersten Download - ein einmal gemerkter Pfad zeigte danach ins Leere (FileNotFoundError, 2026-11-13).
+            return (RUN_REPORT_DIR or REPORT_DIR) / "soak.csv"
+        csv_path = soak_csv()
         columns = ["zeit", "verstrichen_h", "pc_laufzeit_h", "nr", "geraet", "transport", "status", "bytes",
                    "dauer_s", "bps", "retries", "langsam", "rssi", "ctswait", "lost_ms", "ctsdrop", "txstuck"]
         csv_path.write_text(";".join(columns) + "\n", encoding="utf-8")
@@ -4137,6 +4141,7 @@ async def run_soak(args) -> int:
                    ym.get("retries", ""), int(bool(ym.get("slow"))) if ym else "",
                    BLE_INFO.get("rssi", "") if transport == "ble" else "", session.get("ctswait", ""),
                    session.get("lost_ms", ""), session.get("ctsdrop", ""), session.get("txstuck", "")]
+            csv_path = soak_csv()
             with csv_path.open("a", encoding="utf-8") as handle:
                 handle.write(";".join(str(item) for item in row) + "\n")
             entry = stats.setdefault((device, transport), {"n": 0, "fehler": 0, "bps": []})
@@ -4383,7 +4388,7 @@ async def run_fast_suite(args) -> int:
 # ---------------------------------------------------------------------------
 
 RELAY = None                          # PowerRelay; wird bei Programmende immer auf "Strom an" gesetzt
-BOOT_BANNER_RE = re.compile(r"Version \d+\.\d+\s*$")   # Einschaltmeldung; die Info-Seite haengt ", V2" an (kein Treffer)
+BOOT_BANNER_RE = re.compile(r"Version \d+\.[A-Za-z]?\d+\s*$")   # Einschaltmeldung; die Info-Seite haengt ", V2" an (kein Treffer)
 DTC_RE = re.compile(r"\b[FWI]1\d{4}\b")
 
 
@@ -4671,7 +4676,7 @@ async def firmware_reboot(args) -> dict:
     tail = (completed.stdout or "").strip().splitlines()[-3:]
     for line in tail:
         log("  flash: " + line)
-    version = re.search(r"Version (\d+\.\d+)", completed.stdout or "")
+    version = re.search(r"Version (\d+\.[A-Za-z]?\d+)", completed.stdout or "")
     await asyncio.to_thread(setup_rs232_sniffer, args)
     return {"flash_rc": completed.returncode, "version": version.group(1) if version else None, "flash_tail": tail}
 

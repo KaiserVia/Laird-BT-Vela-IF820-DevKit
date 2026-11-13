@@ -36,7 +36,7 @@ void EINT0_IRQHandler (void)		// Interruptanforderung Power Down
  PCONP|=PCI2C0|PCSSP1;										// I2C0 und SSP1 Bus einschalten
  FIO1CLR = GSMPWR|USB_RPWR|PWRKEY|EN_ANA;	// GSM, USB und Analogversorgung (Transceiver,Verst�rker) aus
  ResetWDT();															// watchdog timer reset	
- flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=0;							// Puffer mit Output Register 2, Port 0 und 1 null f�llen
+ flbuf[0]=0x02; flbuf[1]=0; flbuf[2]=IS_VIA2?0x10:0;	// 5.L1: Via-2 P1.4 HF_DIS=1 -> Transceiver aus;							// Puffer mit Output Register 2, Port 0 und 1 null f�llen
  I2Cdrv->MasterTransmit(IC37>>1,flbuf,3,false);			// Puffer an IC37 senden -> 5V/3V3 Analogversorgung komplett aus	
  flash_wbuf1 ((uchar *)&fp.Kennung, PARAMETERPAGE, sizeof(fp));	// Parameter sichern
  flash_wbuf1 (vbuf, fp.md_page, fp.md_adr);					// aktuelle Seite mit Messdaten sichern  
@@ -275,7 +275,7 @@ uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
  clean_cpy (T_version, fp.pVersion, sizeof(fp.pVersion));				// Neue Programmversion nach Parameterblock 
  clean_cpy (T_def_hw_rev,fp.hwVersion,sizeof(fp.hwVersion));		// Default Hardware Revision setzen
  fp.i2cdev=0;											// Reset installierte I2C Baugruppen   
- fp.sprache=Def_sprache;					// Programmsprache 
+ fp.sprache=(LANGUAGE<<4)|(OEM<<2)|Def_sprache;	// 5.L1 (Joachim 5.60): Sprachpaket, OEM und Sprachindex
  fp.psets=Def_paraset;						// Default Anzahl Parameters�tze
  for (i=0;i<MAXTAST;i++) 					// F�r alle definierbaren Tastverh�ltnisse
   fp.hell[i]=Def_hell;						// Helligkeit = Tastverh�ltniss einstellen
