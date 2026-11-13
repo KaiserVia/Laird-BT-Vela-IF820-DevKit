@@ -6538,5 +6538,22 @@ daraus die Anzeige- und externe PWM.
 - Testmenue "Lichtsensor" (`licht_test()`, sictst.c): mit VEML7700 je Messung eine Zeile mit Lux, Rohwert,
   Verstaerkung und berechnetem Dimmfaktor; ohne Sensor wie bisher der A/D-Wert.
 
-**Status:** Build ohne Fehler/Warnungen. Am Geraet noch nicht getestet. Offen: Kennlinie am Geraet abstimmen
+**Status:** Build ohne Fehler/Warnungen. Offen: Kennlinie am Geraet abstimmen
 (Endpunkte, ggf. als Parameter), pruefen, ob der Sensor bei dunkler Anzeige noch Restlicht von den LEDs sieht.
+
+**Erster Geraetetest (2026-11-13 ca. 04:35, Board 26SC9983 / B, V2):** Flashen ueber COM3 und Neustart in Ordnung,
+danach Stromzyklus 5 s ueber das Relais. Das Testmenue 3->6 erkennt "Lichtsensor = VEML7700". Im dunklen Raum
+gemessen: 1,47...1,78 lx (Rohwert 44...53, Verstaerkung x2, Dimmfaktor 11...15). Die Umrechnung stimmt
+(46 x 0,0336 = 1,55 lx; log. Kennlinie bei 1,54 lx = 12). Nach 2 min Leerlauf im Hauptmenue reagiert das Geraet,
+die Werte sind unveraendert. **Nicht geprueft** (nur am Tisch mit Licht moeglich): Umschalten der Verstaerkung
+bei hellem Licht und die sichtbare Wirkung auf die Anzeigehelligkeit im Normalbetrieb. Danach wurde das Board fuer
+den 5.L1-Test der Joachim-Sitzung freigegeben, auf dem Board steht weiterhin 5.s1.
+
+**Zweiter Geraetetest (2026-11-13 ca. 09:22, Board B, 5.s1 neu geflasht + Stromzyklus):** Raum auf der Nordseite,
+Winter, "normal hell bis leicht dunkel" (Anwender). Gemessen 385...390 lx (Rohwert ~11590, Verstaerkung x2),
+Dimmfaktor 130 von 200 (65 %). Werte sehr stabil (+/-0,1 %). Die Verstaerkung schaltet noch nicht um, weil der
+Rohwert weit unter 60000 liegt (x2 reicht bis ca. 2000 lx).
+Live-Test 60 s (Messung ca. alle 0,45 s): Handy-Licht -> bis 1131 lx (Rohwert 33663, Dimm 152), mit dem Finger
+abgedeckt -> 2,8...4,4 lx (Dimm 25...35), danach wieder ca. 400 lx (Dimm 130). Der Sensor folgt sofort ohne
+Haenger. Die Verstaerkung blieb auf x2, weil das Handy-Licht die Umschaltschwelle (~2000 lx) nicht erreicht hat.
+Umschalten der Verstaerkung ist damit weiter ungeprueft, braucht Sonnenlicht oder eine helle Lampe direkt am Sensor.
