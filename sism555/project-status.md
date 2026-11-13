@@ -6892,3 +6892,39 @@ Nachmessung 30 x Strg+T: 29 x 24176, 1 x 24174. Alle Werte im Band 24150-24200 M
 40 x 24175 (Raum damals ca. 300 lx, jetzt 965 lx - Geraet vermutlich waermer). Einzelne Messungen 2-3 MHz zu tief;
 Ursache offen (Einschwingen nach `transceiver(ein)`, `hf_measurement()` wartet nur 2 ms; Joachims Kennlinie verwirft
 deshalb die ersten Messungen). Kein Hinweis auf einen Fehler aus der Zusammenfuehrung.
+## Update 5.142 (TEST, 2026-11-13): Via-2 Frequenzkanal, Abgleich, Nachfuehrung, RE/-Zeit
+
+**Anlass:** Mail des HW-Kollegen ("unabdingbar"): Transceiver-Abgleich auf die Centerfrequenz mit Frequenzmessung,
+Nachfuehrung 2 min nach dem Einschalten und dann alle 15 min, RE/-Zeit (Uebersteuerungsreduzierung) 15 ms, Messzeit
+pruefen. Anwenderentscheidung: verschiedene Mittenfrequenzen je Geraet gegen gegenseitige Stoerung, 10 Kanaele im
+Abstand 5 MHz (24155...24200 MHz). Beschreibung: `Doku/HF_Kanal_Nachfuehrung.md`.
+
+**Umsetzung:**
+- Neues Modul `hftrack.c/.h`: Kanal (`fp.hfkanal`, 0 = letzte Ziffer der Seriennummer), Messpunkt = Median aus 7
+  `mess_hf()`-Messungen, Werksabgleich per Bisektion ueber IC32 (non-volatile, `fp.TxF`, I17011), Nachfuehrung im
+  Messzyklus (`hf_track_poll()` vor `measure(1)`, RTC-Faelligkeit, `__noinit`-Zustand), Totband +/-1,5 MHz, Steigung per
+  Probeschritt gelernt, nie ausserhalb 24150...24200 MHz, W17010 bei Fehlern.
+- RE/-Zeit: `transceiver_via2()` wartet `re_time()` (Standard 15 ms, bei `fp.vmm` < 5 km/h 25 ms, `fp.re_ms` einstellbar)
+  statt DPWR+t_amp_en (30/40 ms). `t_mess_max` und die dynamische Messzeitueberwachung in `measure()` nutzen beide
+  `t_on_delay()`. Bisheriger Transceiver: `t_amp_en` einheitlich 20 ms (Menue setzte bisher 10 ms bis zum Neustart).
+- `set_measure_constants()`: bei Via-2 die zuletzt gemessene Frequenz statt `fp.TxF`.
+- `mess_hf()`: Zeitlimit ueber `mstimer` statt `msdelay` (das benutzt auch gsmio.c im GSM-Thread).
+- Via-2-Transceivermenue: Statuszeilen (Kanal, Frequenz, Stufe, RE/-Zeit, max. Messzeit), neue Punkte 5 Abgleich,
+  6 Kanal, 7 RE/-Zeit, 8 Nachfuehrung sofort. `set_single_dpp()`: progressive Schritte 1...16 bei gehaltener Taste.
+- `fp.fill2[6]` -> `hfkanal`, `re_ms`, `fill2[4]` (Layout 2048 unveraendert, mit Sitzung "Flash-Parameter Handling"
+  abgestimmt). Neue Codes W17010, I17011 (dtc_codes.h, dtc_text.h, Diagnose-Codes.csv).
+
+**Test auf Board B (26SC9983, V2, Via-2):**
+- Kennlinie IC32 aufgenommen: steigend, nichtlinear (Stufe 0 = 24157, 128 = 24171, 192 = 24191, 256 = 24270 MHz).
+- Erster Abgleich gescheitert (Stufe 63, -8,3 MHz): nach Potispruengen schwingt die Frequenz langsam ein, 5 ms Wartezeit
+  reichten nicht. Behoben: messen bis zwei Messpunkte <= 0,3 MHz auseinander (2...8 Messpunkte). Danach Abgleich auf
+  Kanal 4 (24170): Stufe 126, 24169,9 MHz, I17011.
+- Nachfuehrung von Hand (Kanal 5 fest, -5,4 MHz): Probeschritt +8, Korrektur +12 Stufen, -0,3 MHz.
+- Automatisch: Kanal automatisch, Stromzyklus (+3,9 MHz bei Stufe 146), 167 s Online-Messen -> Stufe 122, -1,5 MHz.
+- Kanal-Parameter ueberlebt den Stromzyklus (Sicherung beim Abschalten).
+- BLE-smoke und Classic-smoke bestanden.
+- Board B steht auf 5.142, Kanal automatisch (4), Stufe 122.
+
+**Offen:** RE/-Zeit am Oszilloskop und Messzeitverlaengerung mit Fahrzeugen pruefen (HW-Kollege); Annahme RE/ =
+IC37 P0.7 (`AMP_BW`). Kennlinie/Einschwingzeit an weiteren Via-2-Modulen. Optionale Mail-Punkte (EN/-RS232,
+CS-A-Funk auf P1[15], RS232-2) nicht umgesetzt. Hinweis: `dtc_text.h` fehlen die Texte zu 17006-17008 (nicht von 5.142).

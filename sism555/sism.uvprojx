@@ -414,6 +414,11 @@
               <FilePath>.\lightsens.c</FilePath>
             </File>
             <File>
+              <FileName>hftrack.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\hftrack.c</FilePath>
+            </File>
+            <File>
               <FileName>fio.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\fio.c</FilePath>

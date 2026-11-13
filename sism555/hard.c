@@ -878,6 +878,7 @@ void DeepSleep (void)										// Bringe CPU in Deep sleep mode
 uint mess_hf (void)							// 5.L1: Via-2 HF-Sendefrequenz messen (Joachim 5.60)
 {															// Rueckgabe: Timertakte fuer 8 Perioden Fhf/8388608, 0 bei Fehler
  uchar int_is_active;
+ uint t0;																	// 5.142: eigener Zeitstempel statt msdelay (msdelay benutzt auch gsmio.c im GSM-Thread)
 
  if (!IS_VIA2) return (0);									// P1.26 ist auf dem bisherigen Board USB_RPWR
  int_is_active = (uchar) NVIC_GetActive(EINT2_IRQn);		// Doppler Fehlerinterrupt aktiviert?
@@ -891,12 +892,12 @@ uint mess_hf (void)							// 5.L1: Via-2 HF-Sendefrequenz messen (Joachim 5.60)
  T0IR|= T0IR;															// Reset evtl. anstehende Interrupts
  T0PR=0;																	// Vorteiler 1
  tmi=0;																		// Messindex nullen
- msdelay=50;															// Nach 50 ms ist spaetestens Ende
+ t0=mstimer;															// Nach 50 ms ist spaetestens Ende
  PINSEL3|=((1<<21)|(1<<20));							// CAP0.0 Pin 1.26
  T0CCR=CAP0FE|CAP0I;											// Capture control fallende Flanke mit Interrupt
  NVIC_EnableIRQ(TIMER0_IRQn);							// Enable Timer 0 Capture Interrupt
  T0CR = 0x01;															// starte Timer 0
- while (tmi<9)	if (msdelay==0) break;		// Warte bis 9 Captures eingetroffen
+ while (tmi<9)	if ((uint)(mstimer-t0)>=50) break;		// Warte bis 9 Captures eingetroffen
  NVIC_DisableIRQ(TIMER0_IRQn);						// Disable Capture Interrupt
  PINSEL3&=~((1<<21)|(1<<20));							// Pin 1.26	GPIO
  if (tmi!=9) tm.cIF[0]=0; 									// Weniger als 9 Captures, 50 ms Abbruch?

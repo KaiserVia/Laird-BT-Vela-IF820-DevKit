@@ -79,6 +79,9 @@ void set_single_dpp (uchar adr)			// 5.L1 (Joachim 5.60): 1-fach Digitalpoti ein
  int c=0;														// Hilfsvariable Zeicheneingabe
  uint result;
  ushort chn;
+ int lastc=0;												// 5.142: progressive Schritte bei gehaltener +/- Taste
+ uint lastt=0;
+ uchar step=1, i;
 
  putln(T_ende);				// Textausgabe  "Ende mit Return"
  putln(T_plsmin2);		// Change with +/- keys
@@ -110,8 +113,13 @@ void set_single_dpp (uchar adr)			// 5.L1 (Joachim 5.60): 1-fach Digitalpoti ein
 	 write_i2c_dev (adr,2,((chn&0xFF)<<8)|((0x02<<4)|(chn>>8))); // DPP Stufe ins non-volatile wiper 0 schreiben
 	 break;																				// Ende
 	}
-  else if (c=='-') write_i2c_dev (adr,1,0x08);	// Dekrement Wiper?
-	else if (c=='+') write_i2c_dev (adr,1,0x04); 	// Inkrement Wiper?
+  else if ((c=='-') || (c=='+'))							// 5.142: Taste gehalten (Wiederholung < 400 ms) -> Schritt 1, 2, 4, 8, 16
+  {
+   if ((c==lastc) && ((uint)(mstimer-lastt)<400)) { if (step<16) step*=2; }
+   else step=1;
+   lastc=c; lastt=mstimer;
+   for (i=0; i<step; i++) write_i2c_dev (adr,1,(c=='-')?0x08:0x04);	// Dekrement/Inkrement Wiper
+  }
 	else if (c=='H') break;												// Abbruch ohne Schreiben
  }
 

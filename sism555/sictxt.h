@@ -271,7 +271,9 @@ extern text T_secret[];
 #define T_color			"- Color "
 #define T_expwm			"PWM extern"
 #define T_tmenu			"\n1. Adjust amplifier\n2. Transceiver on"
-#define T_tmenu2		"\n1. Adjust Amplifier\n2. Module Frequency Characteristic\n3. Set Module Frequency\n4. Transceiver On"	// 5.L1 Via-2
+#define T_tmenu2		"\n1. Adjust Amplifier\n2. Module Frequency Characteristic\n3. Set Module Frequency\n4. Transceiver On\n5. Adjust To Channel Frequency\n6. Frequency Channel\n7. RE/ Time\n8. Track Frequency Now"	// 5.L1 Via-2, 5.142 Punkte 5-8
+#define T_hfkanal		"Frequency channel (0 = auto, 1...10 = 24155...24200 MHz)"	// 5.142
+#define T_rems			"RE/ time ms (0 = auto 15/25)"													// 5.142
 #define T_plsmin2		"Change with +/- key."		// 5.L1 Via-2 Einzelpoti
 #define T_vtg				"Voltage"
 #define	T_imp				" imp1/s imp2/s imp3/s imp4/s"

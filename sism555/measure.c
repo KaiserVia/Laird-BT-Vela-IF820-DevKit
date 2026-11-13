@@ -30,6 +30,7 @@
 #include "libtool.h"
 #include "USB_tools.h"
 #include "core_cm3.h"
+#include "hftrack.h"
 
 osThreadDef(USB_HostService, osPriorityNormal, 1, 256); 	// define USB_HostService as thread function
 osThreadDef(GSM_Registration, osPriorityNormal, 1, 256);	// GSM Modem Einschaltung und Registrierung als thread function
@@ -95,7 +96,7 @@ int measure (uchar speichern)	// Geschwindigkeitsmessung
 	} 
   
 	if (t_mess==0) break; 						// Absolute Messzeit�berwachung
-	if((int)(LenTm-(((t_mess+DPWR+DTXFEN_T+t_amp_en)*LenTm)/t_mess_max))>tmi)   
+	if((int)(LenTm-(((t_mess+t_on_delay())*LenTm)/t_mess_max))>tmi)   	// 5.142: gleiche Einschaltzeit wie in set_measure_constants()
    break; // Dynamische �berwachung Anzahl gemessener Dopplerperioden
  }	 // end while
  
@@ -385,8 +386,11 @@ void runcycle (void)				// Messzyklenbetrieb
 		set_pwm(0,0);												// Externe und interne PWM setzen 
 	  if (simulation) 										// Anzeige- und Schaltersimulation?
 		{ refresh=vtst; speed10=10*vtst; }	// Einfache und zehnfache Geschwindigkeit zuweisen
-	  else if ((tasks&MESSTASK)||online) 	// Messaufgabe oder Online Messmodus?	 	  	  
-	   refresh=measure(1); 				// Geschwindigkeit messen	  			       
+	  else if ((tasks&MESSTASK)||online) 	// Messaufgabe oder Online Messmodus?
+	  {
+	   hf_track_poll ();						// 5.142: Via-2 Sendefrequenz nachfuehren, wenn faellig (vor der Messung, Transceiver ist aus)
+	   refresh=measure(1); 				// Geschwindigkeit messen
+	  }
 	  else refresh=0;							// Anzeige nicht auffrischen	 
    } // end Messzyklus	
 	 else if (cycle==1)						// Anzeigeauffrischzyklus? 

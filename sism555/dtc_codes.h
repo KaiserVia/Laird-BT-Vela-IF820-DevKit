@@ -81,6 +81,8 @@
 #define DTC_MA_LS_DEFEKT        17007   /* V2: Lichtsensor VEML7700 antwortet nicht (Wert 1 = Hochlauf, 2 = Betrieb) */
 #define DTC_MA_LS_NOSIGNAL      17008   /* Lichtsensor ohne Signal seit LS_STUCK_H Betriebsstunden (Wert 1 = V1, 2 = V2, 3 = unbekannt) */
 /*      17009 veraltet (nur 5.s2, nie ausgeliefert): Ersatzhelligkeit ohne Uhrzeit */
+#define DTC_MA_HF_TRACK         17010   /* Via-2: Nachfuehrung/Abgleich Sendefrequenz gescheitert (Wert 1 Messung, 2 flach, 3 Anschlag, 4 Ziel) */
+#define DTC_MA_HF_ADJUST        17011   /* Via-2: Werksabgleich Sendefrequenz durchgefuehrt (Info, Wert = Frequenz MHz) */
 
 /* --- Subsystem 18: Hardware/libtool (libtool.c) -------------------- */
 #define DTC_LIB_GSM_ERR         18001   /* GSM-Fehler in libtool */

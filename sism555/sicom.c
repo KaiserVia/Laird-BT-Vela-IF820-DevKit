@@ -34,6 +34,7 @@
 #include "sictxt.h"
 #include "string.h"
 #include "dtc_codes.h"
+#include "hftrack.h"
 
 
 
@@ -777,20 +778,18 @@ void transmenu (void) 	// Transceiver & Verst�rker Men�
   putparameter (T_vtg, fp.u_hf, 5<<16, T_mVolt);		// Versorgung vor Men� ausgeben
   if (IS_VIA2)									// 5.L1 (Joachim 5.60): Via-2 mit Frequenzmessung und Modulabgleich
   {
-	 int result;							// gemessene Sendefrequenz
-	 transceiver(ein);
-	 osDelay(10);
-	 result=mess_hf();							// Messe Sendefrequenz
-	 transceiver(aus);
-	 if (result) result=HF_const/result;
-	 putparameter ((text *)"Frequency", result, 5<<16, T_MHz);
-   c=putmenu(T_tmenu2,'5');			// Restmenue senden, auf Auswahl warten
+	 hf_info ();										// 5.142: Kanal, Frequenz (Median), Stufe IC32, RE/-Zeit, max. Messzeit
+   c=putmenu(T_tmenu2,'9');			// Restmenue senden, auf Auswahl warten
    switch (c)										// Auswahl auswerten
    {
     case '1': amplifier_adjust (); break;					// Abgleich Verstaerker/Transceiver-Kanaele
 	  case '2': f_characteristic (IC32); break;			// Frequenzkennlinie
 	  case '3': set_single_dpp (IC32); break;				// Manuelle Einstellung Sendefrequenz
     case '4': transceiver_test (); break;				// Test Verstaerker/Transceiver mit gedimmtem Display
+    case '5': hf_adjust (); break;								// 5.142: Abgleich auf die Kanalfrequenz (Bisektion IC32)
+    case '6': getuchar(T_hfkanal, 0, HF_KANAELE, &fp.hfkanal); set_measure_constants (); break;	// 5.142: Kanal, 0 = automatisch
+    case '7': getuchar(T_rems, 0, RE_MS_MAX, &fp.re_ms); set_measure_constants (); break;		// 5.142: RE/-Zeit ms, 0 = automatisch
+    case '8': hf_track_now (true); break;				// 5.142: Nachfuehrung sofort (mit Ausgabe)
    }
   }
   else
@@ -887,12 +886,12 @@ void specialmenu (void)			// Sondermenue
  						 if (fp.vmm < 5) 														// Kleinste Messgeschwindigkeit < 5 
 						 {	 
 							fp.txrcon|=BW_B;													// Verst�rker untere Grenzfrequenz auf 1,4 km/h reduzieren
-							t_amp_en=IS_VIA2?25:20;										// Messverzoegerung Uebersteuerungszeit Verstaerker verlaengern (5.L1: Via-2 25)
+							t_amp_en=20;															// Messverzoegerung Uebersteuerungszeit Verstaerker (bisheriger Transceiver; Via-2: re_time())
 						 }	 
 						 else 																			// Kleinste Messgeschwindigkeit >= 5 
 						 {	 
 							fp.txrcon&=~(BW_B);								  			// Verst�rker untere Grenzfrequenz auf 8,1 km/h nach oben setzen
-							t_amp_en=IS_VIA2?15:10;										// Messverzoegerung Uebersteuerungszeit Verstaerker verkuerzen (5.L1: Via-2 15)
+							t_amp_en=20;															// 5.142: wie nach Neustart 20 ms (vorher 10 ms nur bis zum naechsten Neustart)
 						 }	 
 						 break;   
    case '5': getuchar(T_vcor, Def_vcor, MAX_VCOR, &fp.vcor);				// Geschwindigkeitskorrekturfaktor

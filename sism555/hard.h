@@ -313,6 +313,16 @@
 #define		HF_DIV				8388608				// Via-2: 1024 x 8192 Modulteiler Frequenzausgang
 #define		HF_const			(192*8388608)	// Via-2: 8 * 24 * HF_DIV
 
+// 5.142: Via-2 Frequenzkanaele und RE/-Zeit (Mail HW-Kollege 2026-11-13, Doku/HF_Kanal_Nachfuehrung.md)
+#define		HF_KANAELE		10						// Anzahl Frequenzkanaele
+#define		HF_KANAL_BASIS	24155					// Kanal 0 in MHz
+#define		HF_KANAL_ABST	5							// Kanalabstand in MHz
+#define		HF_KANAL_MHZ(k)	(HF_KANAL_BASIS+HF_KANAL_ABST*(k))	// Zielfrequenz Kanal k (0..9) in MHz
+#define		RE_MS_DEF			15						// RE/-Zeit ab Einschalten des Transceivers, Standard
+#define		RE_MS_LOW			25						// RE/-Zeit bei kleinster Messgeschwindigkeit < 5 km/h
+#define		RE_MS_MIN			5							// Einstellbereich RE/-Zeit
+#define		RE_MS_MAX			100
+
 // UART1 MUX Owner State Machine
 enum { MUX_NONE=0, MUX_BT, MUX_GSM, MUX_GPS };	// UART1 resource owner states
 extern uchar uart1_owner;													// Current UART1 MUX owner
@@ -479,7 +489,9 @@ typedef struct FlashSavedParameter { 	// Parameter, die dauerhaft im Flash gesic
  uchar radnet;									// Funknetzwerk 0/1 f�r GSM/UMTS
  uchar servertyp;								// Access 0/1 f�r SMTP/MQTT Server
  int8_t utc;										// Zeitzone -11 < utc < 12
- uchar fill2[6];								// F�llbytes damit GPS Datenfeld, die letzen 300 Bytes im 2k Block belegt
+ uchar hfkanal;									// 5.142: Via-2 Frequenzkanal, 0 = automatisch aus Seriennummer, 1..10 = Kanal 0..9 (HF_KANAL_MHZ)
+ uchar re_ms;										// 5.142: Via-2 RE/-Zeit (Verstaerkungsreduzierung nach Einschalten) in ms, 0 = automatisch (RE_MS_DEF/RE_MS_LOW)
+ uchar fill2[4];								// F�llbytes damit GPS Datenfeld, die letzen 300 Bytes im 2k Block belegt
  gpsgeo	gp[GPS_POS];						// GPS Datenfeld 25 Positionen � 3 x 4 = 300 Byte
 } flashparameter;
 
