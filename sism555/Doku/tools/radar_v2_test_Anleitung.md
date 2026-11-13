@@ -78,8 +78,14 @@ Menü nicht wie erwartet; Test `X` im Bericht).
 
 - **Typ:** Werksmenü (Testmenü 3, Strg+W) -> 4. Via-2 zeigt `Frequency: ... MHz` und 5 Menüpunkte, der bisherige
   Transceiver 3. Muss zum I2C-Scan passen (IC32 auf 0x5C nur bei Via-2).
-- **Frequenz:** Strg+T im Hauptmenü, Bereich 24150-24200 MHz (`Min_TXF_VIA2`/`Max_TXF_VIA2`), Streuung höchstens
-  2 MHz.
+- **Frequenz (B1):** Strg+T im Hauptmenü, jeder Wert im Band 24150-24200 MHz (`Min_TXF_VIA2`/`Max_TXF_VIA2`).
+  Bewertet wird der Median: einzelne Werte dürfen bis 3 MHz davon abweichen, höchstens 10 % der Werte um mehr als
+  1 MHz (beobachtet: einzelne Messungen 2-3 MHz zu tief). Ab 5.142 zusätzlich Median = Kanalfrequenz ± 2,5 MHz
+  (Totband der Nachführung 1,5 MHz plus 1 MHz, weil Strg+T auf ganze MHz abschneidet).
+- **Frequenz im Transceiver-Menü (B2):** ab 5.142 die Zeilen `Kanal n (...), Ziel x MHz` und `Frequenz x MHz`,
+  Kriterium Frequenz = Ziel ± 1,5 MHz; Kanal, Ziel und Stufe von IC32 stehen in `ergebnis.json` (`meta`). Bei älterer
+  Firmware (`Frequency: x MHz`) nur das Band. Das Menü verlässt das Skript immer mit `R` (eine Ebene zurück), nie mit
+  einer Ziffer: bei 5.142 ist `5` "Abgleich auf Kanal".
 - **Transceiver aus:** Werksmenü -> 6 -> 6 "I2C Devices", Adresse 66 (IC37). Register 3 (Ausgang Port 1) und
   Register 1 (Pegel Port 1), Bit 4 = HF_DIS muss 1 sein.
 - **Hochlauf:** Nur der Kaltstart gibt den Banner `Version x.y` aus. Nach einem kurzen Aussetzer (0,1-1 s stromlos,

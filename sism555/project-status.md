@@ -6928,3 +6928,22 @@ Abstand 5 MHz (24155...24200 MHz). Beschreibung: `Doku/HF_Kanal_Nachfuehrung.md`
 **Offen:** RE/-Zeit am Oszilloskop und Messzeitverlaengerung mit Fahrzeugen pruefen (HW-Kollege); Annahme RE/ =
 IC37 P0.7 (`AMP_BW`). Kennlinie/Einschwingzeit an weiteren Via-2-Modulen. Optionale Mail-Punkte (EN/-RS232,
 CS-A-Funk auf P1[15], RS232-2) nicht umgesetzt. Hinweis: `dtc_text.h` fehlen die Texte zu 17006-17008 (nicht von 5.142).
+
+## radar_v2_test.py fuer 5.142/5.143 und Kurztest 5.143 auf Board B (2026-11-13 14:13)
+
+**Skript angepasst:** Via-2-Transceivermenue ab 5.142 (9 Punkte, Statuszeilen `Kanal n (...), Ziel x MHz` und
+`Frequenz x MHz`); das Menue wird immer mit `R` verlassen (bei 5.142 war `5` "Abgleich auf Kanal"). B2 prueft
+Menue-Frequenz = Ziel +/- 1,5 MHz (Totband), B1 den Median von Strg+T = Ziel +/- 2,5 MHz (Totband + Abschneiden auf
+ganze MHz) und erlaubt einzelne Ausreisser bis 3 MHz (hoechstens 10 %). Aeltere Firmware ohne Kanal: nur Band.
+Beim Lesen von 5.142 gefunden und in 5.143 von der IF820-Sitzung behoben: "9 zurueck" verliess das Via-2-Menue
+nicht, `5` (Abgleich) dagegen schon.
+
+**Kurztest 5.143** (`Testreports/2026-11-13_14-13-22_radar_kurz/`): 14 von 15 bestanden. Kanal 4 automatisch, Ziel
+24170,0 MHz, Stufe 127; Menue 24169,2 / 24169,5 MHz (im Totband); Transceiver nach jedem Ablauf aus; kein I17005,
+keine unerwarteten Codes; Lichtsensor ca. 1030 lx, Dimm 150.
+
+**B1 nicht bestanden - Befund:** Strg+T misst 10 von 10 x 24173 MHz, also ca. 3,5 MHz ueber der Menue-Messung
+(Median nach Einschwingen, `hf_info()`). Kein Ausreisser, sondern ein fester Abstand zwischen zwei Messwegen; schon
+mit 5.138-5.141 Menue 24173 / Strg+T 24175. Vermutung: `hf_measurement()` misst 2 ms nach `transceiver(ein)`, bevor die
+Frequenz eingeschwungen ist, und schneidet `HF_const/result` auf ganze MHz ab. An die IF820-Sitzung gemeldet
+(Vorschlag: Strg+T ueber denselben Weg wie `hf_info()` messen). Kriterium bewusst nicht gelockert.

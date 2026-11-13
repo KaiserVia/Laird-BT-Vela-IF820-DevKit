@@ -38,8 +38,8 @@ C5 (Deep Sleep findet mit angeschlossenem RS232 nicht statt), D2 (eigener Modus 
 
 | Nr | Test | Ablauf | Bestanden, wenn |
 |---|---|---|---|
-| B1 | HF-Frequenzmessung wiederholbar | 20 x Strg+T im Abstand von 2 s | alle Werte 24150-24200 MHz, keiner 0, Streuung max. 2 MHz |
-| B2 | Frequenz im Transceiver-Menü | Menü 3 x öffnen und schließen | Wert passt zu B1 (±2 MHz) |
+| B1 | HF-Frequenzmessung wiederholbar | 10 x (kurz) bzw. 20 x (lang) Strg+T | alle Werte 24150-24200 MHz, keiner 0; jeder Wert max. 3 MHz vom Median, höchstens 10 % mehr als 1 MHz daneben. Ab 5.142: Median = Kanalfrequenz ± 2,5 MHz (Totband 1,5 + Abschneiden auf MHz) |
+| B2 | Frequenz im Transceiver-Menü | Menü öffnen, Statuszeilen lesen | ab 5.142: `Frequenz` = `Ziel` ± 1,5 MHz (Totband); vorher nur Band |
 | B3 | Frequenzkennlinie IC32 | Transceiver-Menü -> 2, Ablauf bis Schritt 257 laufen lassen (ca. 1 min), Ausgabe parsen | 257 Zeilen, Frequenz steigt (oder fällt) über den Bereich durchgehend, keine 0, Sprünge nur klein |
 | B4 | Kennlinie stellt das Poti wieder her | IC32-Register 0 vor und nach B3 lesen ("I2C Devices" -> 92) | Register 0 vorher = nachher |
 | B5 | Strg+T während der Online-Messung | Online messen starten, Strg+T, IC37 lesen geht dort nicht, daher: weiter messen lassen und mit einem Doppler-Signal (Hand vor dem Radar) prüfen, ob noch Messwerte kommen | Messung läuft nach Strg+T weiter. **Verdacht aus dem Code:** Strg+T wird in `mainmenu()` vor der Abfrage `!online` behandelt und schaltet den Transceiver danach aus. Möglich, dass das die laufende Messung bis zum nächsten Zyklus abschaltet |

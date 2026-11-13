@@ -28,7 +28,11 @@ HERE = Path(__file__).resolve().parent
 REPORTS = HERE / "Testreports"
 
 F_MIN_VIA2, F_MAX_VIA2 = 24150, 24200     # hard.h Min_TXF_VIA2 / Max_TXF_VIA2
-F_SPREAD_MAX = 2                          # MHz, Streuung wiederholter Messungen
+F_SPREAD_MAX = 2                          # MHz, Grundstreuung (Toleranz Kennlinie)
+F_OUTLIER_MAX = 3                         # MHz, einzelne Strg+T-Messung darf so weit vom Median liegen (beobachtet 2-3 MHz
+                                          # nach unten, 2 von 40 mit 5.141); mehr als 10 % Ausreisser gelten als Fehler
+F_TOTBAND = 1.5                           # MHz, ab 5.142: Nachfuehrung haelt die Frequenz Kanal +/- 1,5 MHz
+F_TRUNC = 1.0                             # MHz, Strg+T schneidet auf ganze MHz ab (HF_const/result)
 HF_DIS_P1 = 0x10                          # IC37 Port 1 Bit 4 (HF_DIS, 1 = Transceiver aus), hard.h HF_DIS = 1<<12
 IC37, IC32 = 0x42, 0x5C                   # 8-Bit-Adressen wie im Geraet (Eingabe dezimal: 66, 92)
 NO_DEVICE_ADR = 0x30                      # 48: dort antwortet auf allen bekannten Boards nichts
@@ -180,22 +184,48 @@ class Device:
         self.leave_werk()
         return buf
 
-    def transmenu(self):
-        """Werksmenue -> 4. Rueckgabe (typ, frequenz oder None, text). typ 'VIA2' / 'TRX' / None."""
+    TRANS_MENU = re.compile(r"1\.\.\.[359]\?")   # bisher 1...3?, Via-2 5.L1-5.141 1...5?, Via-2 ab 5.142 1...9?
+
+    def trans_open(self):
+        """Werksmenue -> 4 "Amplifier & Transceiver". Rueckgabe (ok, Text bis zur Menueabfrage)."""
         self.werk()
-        ok, buf = self.ask(b"4", re.compile(r"1\.\.\.[35]\?"), 8.0)
-        typ, f = None, None
-        if ok:
-            if "1...5?" in buf:
-                typ = "VIA2"
-                m = re.search(r"Frequency:\s*(\d+)\s*MHz", buf)
-                f = int(m.group(1)) if m else None
-                self.ask(b"5", WERK, 4.0)
-            else:
-                typ = "TRX"
-                self.ask(b"3", WERK, 4.0)
+        return self.ask(b"4", self.TRANS_MENU, 10.0)
+
+    def trans_leave(self):
+        # 'R' beendet jedes putmenu() mit -1 und damit die Menueschleife, unabhaengig von der Zahl der Punkte.
+        # Nicht die Ziffer des letzten Punkts senden: bei Via-2 5.142 ist '5' "Abgleich auf Kanal".
+        self.ask(b"R", WERK, 6.0)
         self.leave_werk()
-        return typ, f, buf
+
+    @staticmethod
+    def parse_trans(buf):
+        """Transceiver-Menue auswerten. typ 'VIA2' / 'TRX' / None; f, ziel in MHz (float) oder None."""
+        r = {"typ": None, "f": None, "ziel": None, "kanal": None, "kanal_modus": None, "stufe": None}
+        if "1...5?" in buf or "1...9?" in buf:
+            r["typ"] = "VIA2"
+        elif "1...3?" in buf:
+            r["typ"] = "TRX"
+        m = re.search(r"Frequency:\s*(\d+)\s*MHz", buf)                     # 5.L1-5.141
+        if m:
+            r["f"] = float(m.group(1))
+        m = re.search(r"Frequenz\s+(\d+[.,]\d)\s*MHz", buf)                 # ab 5.142 (hf_info, Median)
+        if m:
+            r["f"] = float(m.group(1).replace(",", "."))
+        m = re.search(r"Kanal\s+(\d+)\s+\((automatisch|fest)\),\s*Ziel\s+(\d+[.,]\d)\s*MHz", buf)
+        if m:
+            r["kanal"], r["kanal_modus"], r["ziel"] = int(m.group(1)), m.group(2), float(m.group(3).replace(",", "."))
+        m = re.search(r"Stufe\s+(\d+)", buf)
+        if m:
+            r["stufe"] = int(m.group(1))
+        return r
+
+    def transmenu(self):
+        """Transceiver-Menue oeffnen, auswerten, verlassen. Rueckgabe dict siehe parse_trans() plus 'text'."""
+        ok, buf = self.trans_open()
+        r = self.parse_trans(buf) if ok else self.parse_trans("")
+        r["text"] = buf
+        self.trans_leave()
+        return r
 
     def ctrl_t(self):
         """Strg+T im Hauptmenue. Rueckgabe Frequenz in MHz, 0 bei Messfehler, None ohne Ausgabe (kein Via-2)."""
@@ -314,14 +344,12 @@ class Device:
 
     def kennlinie(self):
         """Transceiver-Menue -> 2: Frequenz ueber alle Wiper-Stufen von IC32. Rueckgabe [(stufe, MHz)]."""
-        self.werk()
-        ok, _ = self.ask(b"4", "1...5?", 8.0)
-        if not ok:
-            self.leave_werk()
+        ok, buf = self.trans_open()
+        if not ok or self.parse_trans(buf)["typ"] != "VIA2":
+            self.trans_leave()
             return None
-        ok, buf = self.ask(b"2", "1...5?", 150.0)       # endet selbst nach Stufe 256, dann Menue erneut
-        self.ask(b"5", WERK, 4.0)
-        self.leave_werk()
+        ok, buf = self.ask(b"2", self.TRANS_MENU, 150.0)   # endet selbst nach Stufe 256, dann Menue erneut
+        self.trans_leave()
         return [(int(a), int(b)) for a, b in re.findall(r"^\s*(\d+)\s+(\d+)\s*$", buf, re.M)]
 
     def wait_boot(self, timeout=90.0):
@@ -353,6 +381,7 @@ class Tester:
     def __init__(self, a, rep: Report, dev: Device):
         self.a, self.rep, self.dev = a, rep, dev
         self.typ = None
+        self.ziel = None                   # Kanalfrequenz in MHz (ab 5.142), sonst None
         self.f_ref = []
         self.expected_codes = set()        # vom Test selbst erzeugte F/W-Codes (E1)
 
@@ -366,11 +395,11 @@ class Tester:
 
     # --- Bausteine ------------------------------------------------------------------------------------------------
     def check_type(self, tid, label):
-        typ, f, _ = self.dev.transmenu()
-        ok = typ == self.typ
-        detail = f"Transceiver-Menue {typ}" + (f", Frequency {f} MHz" if f is not None else "")
-        if typ == "VIA2":
-            ok = ok and f is not None and F_MIN_VIA2 <= f <= F_MAX_VIA2
+        r = self.dev.transmenu()
+        ok = r["typ"] == self.typ
+        detail = f"Transceiver-Menue {r['typ']}" + (f", Frequenz {r['f']} MHz" if r["f"] is not None else "")
+        if r["typ"] == "VIA2":
+            ok = ok and r["f"] is not None and F_MIN_VIA2 <= r["f"] <= F_MAX_VIA2
         return self.rep.check(tid, label, ok, detail)
 
     def check_ctrl_t(self, tid, label):
@@ -397,11 +426,19 @@ class Tester:
             vals.append(f)
             time.sleep(pause)
         good = [v for v in vals if v]
-        spread = (max(good) - min(good)) if good else None
-        ok = len(good) == n and all(F_MIN_VIA2 <= v <= F_MAX_VIA2 for v in good) and spread <= F_SPREAD_MAX
-        self.f_ref += good
-        detail = f"{n} Messungen, Min {min(good) if good else '-'} Max {max(good) if good else '-'} MHz, " \
-                 f"Mittel {statistics.mean(good):.1f}" if good else f"Werte {vals}"
+        if len(good) != n:
+            return self.rep.check(tid, f"HF-Frequenz {n}x wiederholbar", False, f"Messfehler/keine Ausgabe: {vals}")
+        med = statistics.median(good)
+        outl = [v for v in good if abs(v - med) > 1]
+        ok = all(F_MIN_VIA2 <= v <= F_MAX_VIA2 for v in good) and all(abs(v - med) <= F_OUTLIER_MAX for v in good) \
+            and len(outl) <= n // 10
+        target = ""
+        if self.ziel is not None:                              # ab 5.142: Kanal +/- Totband (+ Abschneiden auf MHz)
+            ok = ok and abs(med - self.ziel) <= F_TOTBAND + F_TRUNC
+            target = f", Ziel {self.ziel} MHz (+/- {F_TOTBAND + F_TRUNC})"
+        self.f_ref += [v for v in good if v not in outl]
+        detail = f"{n} Messungen, Median {med} MHz, Min {min(good)} Max {max(good)}, Ausreisser > 1 MHz: {outl} " \
+                 f"(erlaubt {n // 10}, je max. {F_OUTLIER_MAX} MHz){target}"
         return self.rep.check(tid, f"HF-Frequenz {n}x wiederholbar", ok, detail)
 
     # --- Testgruppen ----------------------------------------------------------------------------------------------
@@ -410,7 +447,11 @@ class Tester:
         self.rep.meta.update({"version": info["version"], "serno": info["serno"], "info_line": info["line"]})
         if not info["version"]:
             raise RuntimeError("Infoseite nicht lesbar")
-        typ, f, _ = self.dev.transmenu()
+        r = self.dev.transmenu()
+        typ, f = r["typ"], r["f"]
+        self.ziel = r["ziel"]                                  # ab 5.142 Kanalfrequenz, sonst None
+        self.rep.meta.update({"kanal": r["kanal"], "kanal_modus": r["kanal_modus"], "ziel_mhz": r["ziel"],
+                              "ic32_stufe": r["stufe"]})
         scan = self.dev.i2c_scan() or []
         has_ic32 = any(adr == "5C" for adr, _ in scan)
         self.typ = typ
@@ -420,8 +461,14 @@ class Tester:
                        f"Menue {typ}, IC32 (0x5C) {'vorhanden' if has_ic32 else 'fehlt'}; Scan: "
                        + ", ".join(self.rep.meta["i2c_scan"]))
         if typ == "VIA2":
-            self.rep.check("B2", "Frequenz im Transceiver-Menue", f is not None and F_MIN_VIA2 <= f <= F_MAX_VIA2,
-                           f"{f} MHz")
+            if self.ziel is not None:                          # ab 5.142: Median-Messung gegen Kanal +/- Totband
+                ok = f is not None and abs(f - self.ziel) <= F_TOTBAND
+                detail = f"{f} MHz, Kanal {r['kanal']} ({r['kanal_modus']}) Ziel {self.ziel} MHz +/- {F_TOTBAND}, " \
+                         f"Stufe {r['stufe']}"
+            else:
+                ok = f is not None and F_MIN_VIA2 <= f <= F_MAX_VIA2
+                detail = f"{f} MHz (Firmware ohne Kanal, nur Band {F_MIN_VIA2}-{F_MAX_VIA2})"
+            self.rep.check("B2", "Frequenz im Transceiver-Menue", ok, detail)
 
     def flash_update(self):
         """D1/D3 und C1 im Pfad FIRM_UP_RES: gleiche Firmware neu flashen, danach ohne Stromzyklus pruefen."""
