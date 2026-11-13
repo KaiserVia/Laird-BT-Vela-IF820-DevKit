@@ -192,8 +192,8 @@ void runcycle (void)				// Messzyklenbetrieb
 			{			
 			 putln(T_btdis);							// Text "Bluetooth getrennt ...
 			 if (fp.btmodem==IF820) bt_disconnect();	// IF820: Verbindung sauber trennen (Command-Mode + /DIS), statt nur CYSPP-Puls
+			 connect&=~(UART1|BT_LINK);		// Verbindung virtuell trennen (5.149: vor uart1_release, das bei BT_LINK nicht freigibt)
 			 uart1_release(MUX_BT);			// Release UART1
-			 connect&=~(UART1|BT_LINK);		// Verbindung virtuell trennen
 			 PINMODE3&=~PULLDOWN;					// PULL-UP - Bluetooth Modul abschalten
 			 bt_sm_off();									// 5.130: Zustand AUS (nach Wiedereinschalten -> BOOT-Event)
 			}	

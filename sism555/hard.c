@@ -562,6 +562,11 @@ void uart1_release (uchar requester)		// Release UART1 resource
 	uart1_request(MUX_BT, BT_BAUD);				// Auto-restore BT terminal (sets owner atomically)
  else if (fp.btmodem==IF820)
  {
+	// 5.149 (Review 2.1): laeuft eine BT-Sitzung (BT_LINK), Owner MUX_BT und UART1-Ausgabe behalten. Bisher nahmen
+	// Diagnosefunktionen (Event-Sniff, Modulbefehl, Transfertest) und BT-Menuefunktionen (Info, Name, PIN) mit ihrem
+	// uart1_release(MUX_BT) der Sitzung die Ausgabe (connect&=~UART1): der Kunde sah ein eingefrorenes Menue.
+	// Wer eine Sitzung beendet, loescht BT_LINK vorher (communication_change(), BT_TIMEOUT in measure.c).
+	if (connect & BT_LINK) return;
 	// 5.127 (TEST): IF820 - UART1 im Leerlauf NICHT abschalten. Mit Init_UART1(0) wurden RTS1/RXD1 zu
 	// GPIO-Eingaengen mit Pull-up -> das Modul (Flow Control F=01) sah CTS dauerhaft HIGH ("Host nicht
 	// bereit") und staute seine Events beim Verbinden/CCCD-Write (EZ-Serial-Guide 3.1.5.4). Verdacht: das

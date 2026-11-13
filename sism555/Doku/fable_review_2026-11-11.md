@@ -17,7 +17,10 @@ steht es dabei.
   lokalem Puffer statt `flbuf`), 4.1 (Datenmail löscht nur nach echtem Versand, Adressprüfung ohne `isalpha()`),
   4.2 (ohne externes Flash Parameter aus der LPC-Kopie, sonst Werkparameter; Kopie nicht mit Zufallsinhalt
   überschreiben). Details: `project-status.md`, Update 5.145.
-- Geplant: Paket C (2.4, 2.2, 2.1), danach Paket B (4.3). Zurückgestellt: 2.7 (Anwenderentscheidung), 1.3/4.4, 2.3.
+- **5.146-5.149 (2026-11-13), Paket C:** 2.4 (IF820 bleibt eingetragen, Neuerkennung im Minutentakt; 5.148 nach
+  10 min volle Erkennung inkl. Laird/RN4678), 2.2 (clear_comchange, Sicherheitsnetz im Minutentakt), 2.1 (uart1_release
+  bei laufender Sitzung).
+- Geplant: Paket B (4.3). Zurückgestellt: 2.7 (Anwenderentscheidung), 1.3/4.4, 2.3.
 - Weiter offen zu 1.2: Zwei Threads können noch gleichzeitig auf den I2C-Bus selbst zugreifen (Treiberebene).
 
 ## Reihenfolge, in der ich die Punkte angehen würde

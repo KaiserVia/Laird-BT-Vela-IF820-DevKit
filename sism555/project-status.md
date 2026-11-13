@@ -7044,3 +7044,16 @@ Abfrage alle 15 min. Zustand im `__noinit`-RAM mit Kennung (Deep-Sleep-Reset), b
 Erster Lauf: I11022 fehlte (Wert 0 wird von `puterror_dtc()` verschluckt) -> Wert -1. Auslieferungsbuild nach
 Stromzyklus: BLE-smoke und Classic-smoke bestanden. Nicht pruefbar ohne Board mit Laird/RN4678: der Fall "altes Modul
 gefunden" (dieselbe Erkennung wie bei neuen Boards).
+
+## Update 5.149 (TEST, 2026-11-13): Review 2.1 - laufende BT-Sitzung wird nicht mehr stumm
+
+**Symptom (Review):** `uart1_release(MUX_BT)` loeschte bei IF820 immer `connect&UART1`. Diagnosefunktionen (Event-Sniff,
+Modulbefehl, Transfertest) und BT-Menuefunktionen (Info, Name, PIN) geben am Ende so frei; lief dabei eine BT-Sitzung,
+empfing sie weiter, sendete aber nichts mehr (eingefrorenes Menue bis zum Trennen).
+**Fix:** `uart1_release()` (hard.c): IF820-Zweig kehrt bei `connect&BT_LINK` sofort zurueck (Owner MUX_BT und
+UART1-Ausgabe bleiben). BT_TIMEOUT (measure.c) loescht `BT_LINK` jetzt vor der Freigabe. Alle anderen Stellen, die eine
+Sitzung beenden, loeschen `BT_LINK` vorher bzw. geben gar nicht frei (geprueft).
+**Test Board B:** Event-Sniff ueber RS232 gestartet, ueber Classic (COM16) verbunden, PIN, Sniff ablaufen lassen, dann "H"
+ueber BT: 5.148 Sitzung **stumm**, 5.149 Sitzung **antwortet**. BLE-smoke, Classic-smoke, `bt-timeout` bestanden
+(Trennung nach 382 s BLE bzw. 334 s Classic; 334 s liegt knapp unter dem Skriptfenster 360-420 s, vermutlich
+angebrochene erste Minute des Minutentakts - beobachten).
