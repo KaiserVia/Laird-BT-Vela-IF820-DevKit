@@ -240,7 +240,9 @@ int main (void)
 	 }
 	 flash_erase (fp.md_page,1);		// Muss wg. reset aller Messdatenzeiger
 	 fp.sprache=(fp.sprache&0x03)|(LANGUAGE<<4)|(OEM<<2);		// 5.L1 (Joachim 5.60): Sprachpaket/OEM nach Firmware-Update eintragen
-  } // end if firmware update	
+	 if (fp.autotime_off>1) fp.autotime_off=0;		// 5.139: Geraete, die noch das alte fillbytes[2] mitbringen (nie
+																			// initialisiert), einmalig beim Update auf einen gueltigen Wert zwingen
+  } // end if firmware update
 	
 	wait_min=Def_wait;				// Setze 3 Warteminuten f�r n�chste GPS, Email, SMS Aktivit�t XXX
 	mailtosend=0;							// reset Email Versandauftr�ge

@@ -226,7 +226,20 @@
 #define		RADAR_UNBEKANNT	0			// noch nicht bestimmt
 #define		RADAR_TRX			1				// bisheriger Transceiver (Analogversorgung EN_ANA, IC37 HF_EN/ANT_EN1/ANT_EN2)
 #define		RADAR_VIA2		2				// Via-2-Empfaenger (IC37 HF_DIS, Digitalpoti IC32 auf 0x5C, HF-Frequenzmessung)
-#define		IS_VIA2				(fp.radar==RADAR_VIA2)
+#define		RADAR_MASK		0x03		// 5.s2: fp.radar ist das Hardware-Byte, Bit 1:0 Radar-Empfaenger, Bit 3:2 Mainboard
+#define		RADAR_TYP			(fp.radar&RADAR_MASK)
+#define		IS_VIA2				(RADAR_TYP==RADAR_VIA2)
+
+// 5.s2: Mainboard-Version in fp.radar Bit 3:2, per Selbsttest beim Hochfahren bestimmt (board_detect() in lightsens.c).
+// Merkmal ist der Lichtsensor: V1 hat die Fotodiode SFH213 und immer den bisherigen Transceiver, V2 den VEML7700 (IC1,
+// I2C 0x10) und den bisherigen Transceiver oder Via-2. Gespeichert wie die anderen Baugruppen: beim Hochfahren nur
+// kurz pruefen, bei "unbekannt" oder Abweichung voller Test. Parameterlayout unveraendert, alte Parameter haben hier 0.
+#define		BOARD_MASK		0x0C
+#define		BOARD_UNBEKANNT	0x00		// noch nicht bestimmt
+#define		BOARD_V1			0x04		// Mainboard V1, Fotodiode
+#define		BOARD_V2			0x08		// Mainboard V2, Lichtsensor VEML7700
+#define		BOARD_TYP			(fp.radar&BOARD_MASK)
+#define		IS_BOARD_V2		(BOARD_TYP==BOARD_V2)
 
 // Voreinstellungen Werksinitialisierung
 #define		Def_sprache	  0				// Erste indizierte Sprache
@@ -469,6 +482,14 @@ typedef struct FlashSavedParameter { 	// Parameter, die dauerhaft im Flash gesic
  uchar fill2[6];								// F�llbytes damit GPS Datenfeld, die letzen 300 Bytes im 2k Block belegt
  gpsgeo	gp[GPS_POS];						// GPS Datenfeld 25 Positionen � 3 x 4 = 300 Byte
 } flashparameter;
+
+// 5.139: Baubruch bei Abweichung ist gewollt. sizeof(flashparameter) ist mit der aktuellen Feldreihenfolge
+// auf 2048 Byte (= PARA_LEN) eingefroren, mit Keil ARMCC/ARM Cortex-M Alignment gemessen (sism.map, Symbol
+// "fp"). Die vorhandene Laufzeitpruefung in InitParameter() (flash.c, "sizeof(fp)>PARA_LEN") erkennt nur ein
+// WACHSEN der Struktur; wird sie durch ein entferntes/verkleinertes Feld kleiner, verschieben sich alle
+// Felder danach im Flash lautlos - das faengt nur diese Compile-Zeit-Pruefung ab. Bei absichtlicher
+// Groessenaenderung den Wert 2048 hier bewusst mit anpassen, nicht nur entfernen.
+typedef char fp_layout_frozen_check[(sizeof(flashparameter)==2048) ? 1 : -1];
 
 extern char const fp_cp_area[4096];					// Bereich f�r Kopie Parameterblock
 

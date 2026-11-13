@@ -6725,3 +6725,156 @@ Reboot"). Das Skript erkennt den Hochlauf deshalb auch an der Zeile `BEREIT (Hoc
 angeschlossenem RS232 ist `RS232_LINK` gesetzt, das Geraet schlaeft nicht), Messung mit Doppler-Signal,
 Verstaerkerabgleich. Verdacht aus dem Code, offen: Strg+T waehrend der Online-Messung schaltet den Transceiver danach
 aus (`mainmenu()` behandelt STRT vor der Abfrage `!online`).
+## Update 5.s2 (TEST, 2026-11-13, Branch `DevelopLightSensor`): Mainboard V1/V2 erkennen und speichern
+
+**Anforderung (Anwender):** Die Firmware erkennt selbst, ob sie auf Mainboard V1 oder V2 laeuft, wie bei BT, LTE und
+GPS: einmal pruefen und speichern, beim Hochfahren nur kurz pruefen, bei Abweichung komplett neu erkennen.
+Hardware: V1 hat die Fotodiode und immer den bisherigen Transceiver; V2 hat den VEML7700 und laeuft mit dem
+bisherigen Transceiver oder mit Via-2. Merkmal fuer die Mainboard-Version ist deshalb der Lichtsensor, der
+Radar-Empfaenger bleibt eine eigene Erkennung (`fp.radar`, 5.L1).
+
+**Umsetzung:**
+- Speicherort: Im Parameterblock ist kein Fuellbyte mehr frei. `fp.radar` ist jetzt das Hardware-Byte: Bit 1:0
+  Radar-Empfaenger wie bisher (`RADAR_TYP`, `IS_VIA2`), Bit 3:2 Mainboard (`BOARD_TYP`: 0 unbekannt, `BOARD_V1`,
+  `BOARD_V2`, `IS_BOARD_V2`; hard.h). Layout unveraendert; bestehende Geraete haben Bit 3:2 = 0 und machen beim ersten
+  Start den vollen Test. Alle Leser von `fp.radar` (i2cm.c, hard.c) maskieren jetzt.
+- `board_detect()` (lightsens.c) laeuft in `InitI2C_Devices()` direkt nach der Radar-Erkennung, also nur beim
+  Hochfahren (nicht nach Deep-Sleep- oder Update-Reset, dort gilt der gespeicherte Stand):
+  - gespeichert V2 und Sensor quittiert einen Schreibzugriff -> fertig (ein I2C-Zugriff);
+  - gespeichert V1 und auf 0x10 antwortet nichts -> fertig;
+  - sonst voller Test: ALS_CONF (Shutdown) schreiben und zuruecklesen, bis zu 3 Versuche (`LS_DETECT_TRY`); nur
+    wenn genau der geschriebene Wert zurueckkommt, gilt V2.
+  - Wechsel gegenueber einem bekannten Stand -> Info **I17006** (Wert 1 = V1, 2 = V2), Sensorzustand (Verstaerkung,
+    letzter Messwert) neu beginnen.
+- `lightsens_present()` greift nicht mehr auf den I2C-Bus zu, sondern liest nur noch `IS_BOARD_V2` (vorher wurde nach
+  jedem Deep-Sleep-Reset neu geprobt).
+- Testmenue 3->6 zeigt zusaetzlich die Zeile `Mainboard = V1/V2/unbekannt`.
+
+**Sensor fehlt oder defekt (Anwenderwunsch, gleicher Stand 5.s2):**
+- **V2, VEML7700 antwortet nicht -> W17007.** Beim Hochfahren: gespeichert V2, aber der volle Test findet keinen
+  Sensor. Das Mainboard ist mit seinem Parameter-Flash dasselbe geblieben, also ist der Sensor defekt; das Board bleibt
+  V2 (Wert 1). Im Betrieb: 5 Messversuche in Folge ohne Antwort (`LS_ERR_MAX`, ca. 1 min; Wert 2). Danach
+  Ersatzregelung (siehe unten). Antwortet der Sensor wieder, endet der Zustand. Testmenue 3->6 zeigt
+  `VEML7700 DEFEKT (W17007)`.
+- **V1 und V2, kein Signal ueber 48 Betriebsstunden -> W17008** (einmal je Episode, Wert 1 = V1, 2 = V2, 3 = unbekannt; nie 0, weil `puterror_dtc()` Wert 0
+  stillschweigend verwirft). Kein Signal
+  heisst: V1 Fotodiode A/D-Wert dauernd <= 2 oder >= 1020 (vorlaeufige Schwellen `LS_ADC_SIG_LO/HI`, am Geraet
+  festzulegen), V2 Rohwert dauernd < 3 (ca. 0,1 lx) oder Anschlag bei x1/8. Eine Halle mit gleichbleibendem
+  Kunstlicht loest nichts aus (konstanter Wert, aber kein Anschlag). Fehlalarm nur bei dauerhaft voelliger
+  Dunkelheit - dort ist die Mindesthelligkeit ohnehin richtig. Zeitbasis `fp.hcount`, Frist beginnt nach jedem
+  Kaltstart neu. Testmenue 3->6 zeigt `Signal vor N h`. Danach Ersatzregelung, bis wieder ein Signal kommt.
+- **Entscheidungsbaum (Anwendervorgabe; erst 100 % fest, verworfen: blendet nachts):**
+  1. Sensor geht -> nach dem Sensor regeln.
+  2. Sensor geht nicht (W17007 oder W17008), Uhr gestellt -> nach Uhrzeit: 7:00-18:59 80 %, sonst 40 %
+     (`LS_DIM_TAG/NACHT`, `LS_TAG_VON/BIS`, Ortszeit der Geraeteuhr).
+  3. Sensor geht nicht, Uhr nicht gestellt -> dauerhaft 50 % (`LS_DIM_NOCLK`), **W17009** einmal je Einschalten.
+  "Uhr gestellt" heisst: seit dem Kaltstart von Backend, GPS, Netz oder manuell gestellt (`g_timesrc`). Weil
+  `g_timesrc` bei jedem Deep-Sleep-Reset auf "ungestellt" zurueckfaellt, merkt sich lightsens.c das im
+  `__noinit`-RAM (`ls_clk`). Nach einem Stromausfall gilt die Uhr bis zum naechsten Abgleich als ungestellt (50 %),
+  auch wenn die RTC weiterlief. Testmenue 3->6 zeigt `Regelung = Sensor / Ersatz nach Uhrzeit / Ersatz fest 50 %`.
+  Nebenbefund (nicht geaendert): `g_timesrc`/`g_timesync_h` (rtc.c) gehen bei jedem Deep-Sleep-Reset verloren, damit
+  greift auch der Quellen-Rang in `clock_set()` nach dem Aufwachen nicht mehr.
+
+**Grenze:** Ein V2-Board, dessen VEML7700 schon beim allerersten Start (Stand unbekannt) defekt ist, wird als V1
+erkannt und meldet erst nach 48 h W17008 (Wert 1). Die Kombination V1 + Via-2 wird nicht als Fehler gemeldet.
+Testmenue und Messzyklus koennen gleichzeitig auf den Sensor zugreifen (wie in 5.s1).
+
+**Status:** Build ohne Fehler/Warnungen (sism.bin 176560 Byte).
+
+**Geraetetest (2026-11-13 ca. 10:40, Board 26SC9983 / B, V2):** Flashen + Stromzyklus 5 s: erster Start mit
+gespeichertem Stand "unbekannt" (5.138 hatte Bit 3:2 = 0) -> voller Test erkennt V2, keine Meldung im Hochlauf.
+Testmenue 3->6: `Mainboard = V2  Signal vor 0 h`, `Regelung = Sensor`, 309 lx (Verst. x1, Dimm 125). Zweiter
+Stromzyklus 3 s: weiterhin V2, keine Meldung (schneller Weg). Nach Korrektur der Meldungswerte (siehe unten) neu
+gebaut, geflasht, Stromzyklus: unveraendert V2/Sensor/310 lx.
+- **A/D-Wert des Fotodioden-Eingangs auf V2 (ohne SFH213): 1021...1023**, also oberer Anschlag. Die alte Kennlinie
+  liest das als "stockdunkel" (Dimm 2-3). **Folge fuer die Vergangenheit: V2-Boards mit Firmware bis 5.137 liefen
+  dauerhaft mit ca. 1 % Anzeigehelligkeit.** `LS_ADC_SIG_HI` = 1020 passt dazu (V1 ohne Diode vermutlich ebenso).
+- **Gefunden und behoben:** `puterror_dtc()` (sio.c) gibt bei Wert 0 nichts aus und protokolliert nichts. W17007 beim
+  Hochfahren (Wert 0) und W17008 bei unbekanntem Mainboard (Wert 0) waeren verloren gegangen. Werte jetzt W17007
+  1 = Hochlauf, 2 = Betrieb; W17008 1 = V1, 2 = V2, 3 = unbekannt.
+- **Nicht geprueft** (am V2-Board ohne Eingriff nicht ausloesbar): W17007/W17008/W17009 und die Ersatzregelung,
+  V1-Erkennung (kein V1-Board am Relais), Wechsel V2 -> V1. `radar_v2_test.py` (F3) liest die erweiterte
+  Testmenue-Zeile weiter (Regex endet bei `Dimm`).
+
+## Update 5.s3 (TEST, 2026-11-13, Branch `DevelopLightSensor`): Lichtsensor-Fehlerfall fest 30 %, ohne Uhrzeit
+
+Anwendervorgabe: Es gibt nur zwei Faelle - **Lichtsensor geht** (Regelung nach dem Sensor) oder **Fehlerfall**
+(V2 VEML7700 antwortet nicht W17007, oder V1/V2 48 h ohne Signal W17008) -> feste Helligkeit **30 %**
+(`LS_DIM_FEHLER` in lightsens.h, "kann spaeter leicht geaendert werden"). Der Entscheidungsbaum aus 5.s2 (Uhrzeit:
+tags 80 %, nachts 40 %; Uhr nicht gestellt fest 50 % mit W17009) ist verworfen und ausgebaut (`ls_clk`, `ls_noclk`,
+`LS_DIM_TAG/NACHT/NOCLK`, `LS_TAG_VON/BIS`, rtc.h). W17009 im Katalog als veraltet markiert (nur 5.s2, nie
+ausgeliefert, Nummer bleibt gesperrt). Testmenue 3->6: `Regelung = Sensor` bzw. `Fehlerfall, feste Helligkeit`.
+Der Nebenbefund zu `g_timesrc` (geht bei jedem Deep-Sleep-Reset verloren, Update 5.s2) bleibt offen.
+Am Geraet nicht erneut getestet (Fehlerfall am V2-Board ohne Eingriff nicht ausloesbar).
+
+## Update 5.139 (TEST, 2026-11-13): Flash-Parameter-Absicherung
+
+Anlass: Review der Flash-Parameter-Aenderungen aus 5.L1/5.L2/5.s1/5.s2 (Joachim-Integration + Lichtsensor) im
+Vergleich mit 5.55 (`C:\viaTraffic\GitHub\Projects\sism555`). Aufbau und Groesse von `fp` sind unveraendert
+(`sizeof(flashparameter)` bleibt 2048 Byte = `PARA_LEN`), nur das alte Fuellbyte `fuellbyte1` ist seit 5.L1 als
+`fp.radar` belegt - das war schon vorher so dokumentiert und bestaetigt sich. Zwei Nebenwirkungen gefunden und
+behoben:
+
+**1. `fp.sprache`: LANGUAGE/OEM-Bits entfernt.** 5.L1 (Joachim 5.60) hatte `fp.sprache` um Sprachpaket (`LANGUAGE`,
+Bits 6:4) und OEM (Bits 3:2) erweitert, geschrieben in `werkparameter()` (flash.c) und nach jedem Firmware-Update
+(main.c). Diese Bits wurden nirgends gelesen - reiner Schreibwert. Problem: Aeltere Firmware (5.55, auch noch
+5.137) nutzt `fp.sprache` **ungemaskt** als Index in `T_spritm[]`/`T_ja[]`/`T_nein[]`
+(`sicom.c`/`sio.c`). Ein Geraet, das mit 5.L1-5.138 lief und dann auf eine aeltere Version zurueckgeflasht wird,
+haette dort einen Wert >2 stehen - Zugriff ausserhalb der Sprachtabellen (fehlerhafte Sprachauswahl, in `sio.c`
+betrifft das auch die Ja/Nein-Abfrage). Fix: Die Bits nicht mehr schreiben, `fp.sprache` traegt wieder nur den
+Sprachindex (0-2). Der bestehende Fix in main (`fp.sprache&0x03` in `sicom.c`/`sio.c`, 5.L1) bleibt als
+Sicherheitsnetz, falls ein Geraet die alten Bits noch gesetzt hat. **Nicht reparierbar: Geraete, die zwischen
+5.L1 und jetzt bereits auf eine Firmware vor diesem Fix zurueckgeflasht wurden** - das muesste am Geraet durch
+einmalige Neuwahl der Sprache im Menue behoben werden.
+
+**2. `fp.autotime_off`: nie initialisiert.** Das Feld (seit 5.16-5.29 Teil der Struktur, vorher Fuellbyte) wurde in
+`werkparameter()` nie explizit gesetzt - neue UND bestehende Geraete behalten dort den Zufallswert, den das
+RAM beim allerersten Werksstart zufaellig hatte (`fp` ist `__noinit`). `rtc.c:280` prueft nur `==1`, das
+Risiko war klein (1/256), aber real: traf der Zufallswert zufaellig auf 1, lief die automatische Zeitumstellung
+unbemerkt nicht. Fix: `werkparameter()` setzt `fp.autotime_off=0` (ein) explizit; zusaetzlich normalisiert der
+Firmware-Update-Zweig in `main.c` (laeuft einmalig nach jedem Update, `fp` ist zu diesem Zeitpunkt schon aus dem
+Flash geladen) einen etwaigen Altwert >1 auf 0 - trifft genau die Geraete, die das Feld noch nie gesetzt
+bekommen haben.
+
+**3. Compile-Zeit-Pruefung gegen unbemerktes Verschieben.** Die bestehende Laufzeitpruefung in `InitParameter()`
+(flash.c: `sizeof(fp)>PARA_LEN`) erkennt nur ein Wachsen der Struktur. Wird sie durch ein entferntes/verkleinertes
+Feld kleiner, verschieben sich alle Felder danach im Flash lautlos, ohne dass irgendeine Pruefung anschlaegt. Neu
+in `hard.h` direkt nach der Struktur: `typedef char fp_layout_frozen_check[(sizeof(flashparameter)==2048) ? 1 :
+-1];` - Baubruch, falls sich die Groesse aendert (gewollt; bei einer bewusst gewuenschten Groessenaenderung den
+Wert 2048 mit anpassen). 2048 Byte mit dem aktuellen Build bestaetigt (`Listings/sism.map`, Symbol `fp`, Data 2048).
+
+**Nicht angefasst:** Die freien Bits 7:4 in `fp.radar` (Bits 3:2 reserviert fuer den Mainboard-Typ aus 5.s2, noch
+nicht in `main` gemergt) bleiben frei. Eine erneute Nutzung dieses Bytes fuer Diagnosezwecke (OEM/Sprachpaket o.ae.)
+sollte, falls spaeter gebraucht, bewusst und mit eigenem Versionshinweis erfolgen, nicht durch stille
+Wiederverwendung eines "freien" Bytes wie beim jetzt entfernten Fall.
+
+**Build:** 0 Fehler, 0 Warnungen. `sism.bin` 175520 Byte. Noch nicht am Geraet getestet.
+
+## Update 5.140 (TEST, 2026-11-13): fp.sprache-Rueckbau aus 5.139 rueckgaengig gemacht
+
+**Anwenderentscheidung:** Punkt 1 aus Update 5.139 (Entfernen der LANGUAGE/OEM-Bits aus `fp.sprache`) wird
+zurueckgenommen. Die Bits bleiben bewusst erhalten - sie zeigen, welche Sprachpaket-/OEM-Variante der
+Update-Datei auf ein Geraet gehoert, und das ist wichtiger als die Abwaertskompatibilitaet beim
+Zurueckflashen. `werkparameter()` (flash.c) und der Firmware-Update-Zweig in `main.c` schreiben wieder
+`(LANGUAGE<<4)|(OEM<<2)|Sprachindex` wie vor 5.139.
+
+**Bewusst akzeptierte Einschraenkung:** Ein Geraet, das mit 5.L1-5.138/5.140 lief und danach auf eine
+Firmware vor 5.L1 (z. B. 5.55, 5.137) zurueckgeflasht wird, hat in `fp.sprache` einen Wert >2 stehen - diese
+aelteren Firmwares lesen das Byte ungemaskt als Index (`T_spritm[]`/`T_ja[]`/`T_nein[]` in `sicom.c`/`sio.c`).
+Abhilfe am Geraet: Sprache im Menue einmal neu waehlen, danach ist der Wert wieder gueltig (0-2). Nicht
+geplant, dies per Firmware zu automatisieren, da gerade die Variantenkennung erhalten bleiben soll.
+
+Die anderen beiden Punkte aus 5.139 (`fp.autotime_off`-Initialisierung, Compile-Zeit-Pruefung
+`sizeof(flashparameter)==2048`) bleiben unveraendert bestehen.
+
+**Build:** 0 Fehler, 0 Warnungen. Noch nicht am Geraet getestet.
+
+## Update 5.141 (TEST, 2026-11-13): Zusammenfuehrung main 5.140 + DevelopLightSensor 5.s3
+
+`main` (5.139/5.140: Flash-Parameter-Absicherung, `fp.sprache`, `fp.autotime_off`, Compile-Zeit-Pruefung
+`sizeof(flashparameter)==2048`) in `DevelopLightSensor` gemergt, danach `main` per Fast-Forward nachgezogen.
+Konflikte nur in `T_version` (neu 5.141, Kommentare beider Seiten erhalten), `project-status.md` (beide Seiten
+angehaengt, alles behalten) und `sism.bin`/`sism.hex` (neu gebaut). Inhaltlich keine Ueberschneidung: 5.139/5.140
+aendern `werkparameter()`, `main.c` (Firmware-Update-Zweig) und `hard.h` (Layout-Pruefung); 5.s2/5.s3 nutzen
+`fp.radar` Bit 3:2 ohne Layout-Aenderung, die Layout-Pruefung (2048 Byte) besteht. Lichtsteuerung siehe
+`Doku/lightcontrol.md`. Am Geraet noch nicht getestet.
