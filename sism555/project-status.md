@@ -6508,3 +6508,31 @@ wirbt das Modul nicht mehr - unveraendert eingefroren. Der Tausch hat den BLE-Ha
 **Nachtrag 15:15 - 11SC1234 defekt:** Kurz nach dem Test pfeift das Board hoerbar (Anwender), wie zuvor 26SC9993.
 Keine weiteren Tests. Die Hardware-Experten pruefen das Board am Montag 2026-11-16. Offen fuer die Pruefung: welche
 Bauteile getauscht wurden, Versorgung des Moduls (3P0V/VDDIO), 32-kHz-Quarz mit 10 MOhm parallel.
+
+## Dauerlauf 12 h auf Board B (26SC9983), Firmware 5.137 (2026-11-12 16:59 bis 2026-11-13 04:31)
+
+Aufbau: Steuerskript (`dauerlauf.py`, nur im Scratchpad) wiederholt 19 Runden aus vier Bloecken: `online-bt` (BLE und
+Classic je 2x waehrend MQTT online), `soak` (Ymodem-Downloads 505856 Byte), `interleave` (10 Runden BLE/Classic im
+Wechsel), `boot-race` (Relais). Nach einem fehlgeschlagenen Block 10 s stromlos, dann weiter. Board: R125 nach GND,
+kein P0.19-Draht, LTE mit SIM.
+
+| Block | Ergebnis |
+|---|---|
+| Downloads (Ymodem) | **44/44 bestanden, 0 Retries.** Runde 1: 13 BLE (6,69-6,78 KB/s) + 13 Classic (7,32-7,80 KB/s) im Wechsel; danach je Runde 1 BLE-Download. Der BLE-Download-Abbruch mit stummem Modul vom 2026-11-10 trat **nicht** wieder auf. |
+| `interleave` | 380 Verbindungszyklen, **2 Einzelfehler** (1x Classic nach BLE in Runde 4, 1x BLE nach Classic in Runde 15), jeweils im naechsten Zyklus wieder ok, Modul nicht haengend. |
+| `boot-race` | 19/19 bestanden, alle im Erstversuch. |
+| `online-bt` | Runden 1-3: BT waehrend online **12/12** (BLE 6, Classic 6). Ab Runde 4 (20:12) nicht mehr pruefbar, siehe unten. Runde 16: 1 BLE-Schritt waehrend online bestanden. Kein BT-Fehler beobachtet. |
+
+**Testskript-Fehler (kein Geraetefehler):** Die 18 "fehlgeschlagenen" `soak`-Bloecke ab Runde 2 brachen jeweils nach
+dem ersten, bestandenen Download mit `FileNotFoundError ... soak.csv` ab: mit `--soak-skip-write` schreibt
+`run_soak()` die CSV in den Report-Ordner `..._unbekannt_soak`, der nicht angelegt wird. Noch nicht behoben.
+
+**MQTT ab 20:12 instabil (offen, vermutlich serverseitig):** Bis 19:48 hielt jede Serververbindung. Ab 20:12 meldet die
+Firmware nach jedem `MQTT Server connected` 1-8 s spaeter `MQTTS disconnect`, Neuversuch jede Minute, bis zum Ende
+des Laufs (auch nach Stromzyklen). Funk gut (CSQ=21), `MQTT:Fail=0`. Das Testskript sieht das Geraet vor dem BT-Schritt
+nicht online und wertet den Schritt als Fehler, ohne BT zu pruefen. Ursache nicht geklaert; da Stromzyklen nichts
+aendern, liegt eher eine Server- oder Kontoaenderung nahe (zur selben Zeit arbeitete eine andere Sitzung an der
+viacloud-Geraeteaktualisierung). Am Server bzw. mit einem zweiten Geraet pruefen.
+
+**Fazit:** BT auf B ist mit 5.137 und R125 nach GND ueber 11,5 h stabil (Downloads, Wechsel, Kaltstarts). BT waehrend
+LTE ist nur fuer die ersten ca. 3 h belegt (13/13), danach wegen des MQTT-Problems nicht pruefbar.
