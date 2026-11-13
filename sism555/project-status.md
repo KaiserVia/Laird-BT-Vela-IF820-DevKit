@@ -6765,3 +6765,14 @@ gebaut, geflasht, Stromzyklus: unveraendert V2/Sensor/310 lx.
 - **Nicht geprueft** (am V2-Board ohne Eingriff nicht ausloesbar): W17007/W17008/W17009 und die Ersatzregelung,
   V1-Erkennung (kein V1-Board am Relais), Wechsel V2 -> V1. `radar_v2_test.py` (F3) liest die erweiterte
   Testmenue-Zeile weiter (Regex endet bei `Dimm`).
+
+## Update 5.s3 (TEST, 2026-11-13, Branch `DevelopLightSensor`): Lichtsensor-Fehlerfall fest 30 %, ohne Uhrzeit
+
+Anwendervorgabe: Es gibt nur zwei Faelle - **Lichtsensor geht** (Regelung nach dem Sensor) oder **Fehlerfall**
+(V2 VEML7700 antwortet nicht W17007, oder V1/V2 48 h ohne Signal W17008) -> feste Helligkeit **30 %**
+(`LS_DIM_FEHLER` in lightsens.h, "kann spaeter leicht geaendert werden"). Der Entscheidungsbaum aus 5.s2 (Uhrzeit:
+tags 80 %, nachts 40 %; Uhr nicht gestellt fest 50 % mit W17009) ist verworfen und ausgebaut (`ls_clk`, `ls_noclk`,
+`LS_DIM_TAG/NACHT/NOCLK`, `LS_TAG_VON/BIS`, rtc.h). W17009 im Katalog als veraltet markiert (nur 5.s2, nie
+ausgeliefert, Nummer bleibt gesperrt). Testmenue 3->6: `Regelung = Sensor` bzw. `Fehlerfall, feste Helligkeit`.
+Der Nebenbefund zu `g_timesrc` (geht bei jedem Deep-Sleep-Reset verloren, Update 5.s2) bleibt offen.
+Am Geraet nicht erneut getestet (Fehlerfall am V2-Board ohne Eingriff nicht ausloesbar).

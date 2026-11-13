@@ -513,7 +513,7 @@ void licht_test (void)		// Test des Lichtsensors
  if (lightsens_defekt()) putstr("  VEML7700 DEFEKT (W17007)");
  if (lightsens_nosig_h()>=0) { putstr("  Signal vor "); putnumber((uint)lightsens_nosig_h(),0); putstr(" h"); }
  newline();
- putstr("Regelung = "); putstr(lightsens_modetext()); newline();	// 5.s2: Sensor / Ersatz nach Uhrzeit / fest 50 %
+ putstr("Regelung = "); putstr(lightsens_modetext()); newline();	// Sensor oder Fehlerfall
  put2str(T_licht,T_ist);
  clear_all();								// Led und Schalter aus
 	

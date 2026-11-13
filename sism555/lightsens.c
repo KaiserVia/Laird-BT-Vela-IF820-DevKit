@@ -45,7 +45,6 @@
 #include "i2cm.h"
 #include "sio.h"
 #include "dtc_codes.h"
-#include "rtc.h"
 
 // VEML7700 Register (Kommandocodes)
 #define		VEML_CONF			0x00			// ALS_CONF_0: Verstaerkung, Integrationszeit, Shutdown
@@ -72,8 +71,6 @@ static uint ls_sig_h		__noinit;		// 5.s2: fp.hcount beim letzten Signal (Lichtse
 static uchar ls_err			__noinit;		// 5.s2: V2 Messversuche in Folge ohne Antwort
 static uchar ls_bad			__noinit;		// 5.s2: 1 = V2 VEML7700 defekt (W17007 gemeldet)
 static uchar ls_stuck		__noinit;		// 5.s2: 1 = W17008 gemeldet
-static uchar ls_clk			__noinit;		// 5.s2: 1 = Uhr seit dem Kaltstart gestellt (g_timesrc geht bei jedem Deep-Sleep-Reset verloren)
-static uchar ls_noclk		__noinit;		// 5.s2: 1 = W17009 gemeldet
 static uchar ls_mode		__noinit;		// 5.s2: aktuelle Regelung LS_MODE_xxx
 
 static void ls_reset_state (void)	// Sensorzustand neu beginnen (Kaltstart, ungueltige Daten, Mainboard gewechselt)
@@ -84,7 +81,7 @@ static void ls_reset_state (void)	// Sensorzustand neu beginnen (Kaltstart, ungu
  ls_calls=LS_EVERY;																	// sofort messen, sobald die Anzeige dunkel ist
  ls_sig_h=fp.hcount;																// 48-h-Frist beginnt neu
  ls_err=0; ls_bad=0; ls_stuck=0;
- ls_clk=0; ls_noclk=0; ls_mode=LS_MODE_SENSOR;
+ ls_mode=LS_MODE_SENSOR;
 }
 
 static void ls_state_ok (void)		// __noinit-Daten gueltig? Sonst neu beginnen
@@ -214,21 +211,11 @@ bool lightsens_diode_check (uint adc)	// 5.s2: V1 Fotodiode ueberwachen: 0 (offe
  return (!ls_stuck);
 }
 
-uint lightsens_fallback (void)		// 5.s2: Ersatz-Dimmfaktor, wenn der Sensor nicht geht
+uint lightsens_fallback (void)		// Fehlerfall: Sensor geht nicht -> feste Helligkeit (5.s3, ohne Uhrzeit)
 {
- uchar h;
-
  ls_state_ok();
- if (g_timesrc!=SRC_NONE) ls_clk=1;				// Uhr wurde seit dem Kaltstart gestellt (Backend, GPS, Netz, manuell)
- if (!ls_clk)
- {
-  if (!ls_noclk) { ls_noclk=1; puterror (DTC_MA_LS_NOCLK, -1); }	// W17009 einmal je Kaltstart
-  ls_mode=LS_MODE_FEST;
-  return (LS_DIM_NOCLK);										// Uhr nicht gestellt: dauerhaft 50 %
- }
- ls_mode=LS_MODE_UHR;
- h=HOUR;																		// Ortszeit der Geraeteuhr
- return (((h>=LS_TAG_VON) && (h<LS_TAG_BIS)) ? LS_DIM_TAG : LS_DIM_NACHT);
+ ls_mode=LS_MODE_FEHLER;
+ return (LS_DIM_FEHLER);
 }
 
 uchar lightsens_mode (void)
@@ -240,9 +227,8 @@ text * lightsens_modetext (void)
 {
  switch (lightsens_mode())
  {
-  case LS_MODE_UHR:  return ("Ersatz nach Uhrzeit");
-  case LS_MODE_FEST: return ("Ersatz fest 50 % (Uhr nicht gestellt)");
-  default:           return ("Sensor");
+  case LS_MODE_FEHLER: return ("Fehlerfall, feste Helligkeit");
+  default:             return ("Sensor");
  }
 }
 
@@ -284,7 +270,7 @@ int lightsens_dimm (void)				// Dimmfaktor aus dem VEML7700, -1 = kein Sensor
   }
   else { ls_err=0; ls_bad=0; }							// Sensor antwortet (wieder)
  }
- if (ls_bad || ls_stuck) return ((int)lightsens_fallback());	// 5.s2: Sensor geht nicht -> Uhrzeit oder fest
+ if (ls_bad || ls_stuck) return ((int)lightsens_fallback());	// Sensor geht nicht -> Fehlerfall, feste Helligkeit
  ls_mode=LS_MODE_SENSOR;
  if (!ls_valid) return ((int)dimm);					// noch kein Messwert: Dimmfaktor halten
  return ((int)lightsens_lux2dimm(ls_clux));

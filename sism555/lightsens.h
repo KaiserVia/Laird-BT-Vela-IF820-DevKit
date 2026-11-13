@@ -28,21 +28,17 @@
 #define		LS_ADC_SIG_HI	1020			// V1: A/D-Wert, ab dem der Eingang als am Anschlag gilt (dunkel); auf V2 ohne Fotodiode
 																	// gemessen 1021...1023 (Board 26SC9983, 2026-11-13)
 
-// 5.s2: Entscheidungsbaum Anzeigehelligkeit (Anwendervorgabe 2026-11-13)
-//   Sensor geht                          -> nach dem Sensor regeln
-//   Sensor geht nicht, Uhr gestellt      -> nach Uhrzeit: tags LS_DIM_TAG, nachts LS_DIM_NACHT
-//   Sensor geht nicht, Uhr nicht gestellt -> dauerhaft LS_DIM_NOCLK
-// "Sensor geht nicht" = V2 VEML7700 antwortet nicht (W17007) oder V1/V2 48 h ohne Signal (W17008).
-#define		LS_DIM_TAG		(RES_PWM*80/100)	// 80 %
-#define		LS_DIM_NACHT	(RES_PWM*40/100)	// 40 %
-#define		LS_DIM_NOCLK	(RES_PWM*50/100)	// 50 %
-#define		LS_TAG_VON		7				// Tag von 7:00 (Ortszeit der Geraeteuhr) ...
-#define		LS_TAG_BIS		19			// ... bis 18:59
+// Anzeigehelligkeit (Anwendervorgabe 2026-11-13, 5.s3): nur zwei Faelle
+//   Lichtsensor geht -> nach dem Sensor regeln
+//   Fehlerfall       -> feste Helligkeit LS_DIM_FEHLER
+// Fehlerfall = V2 VEML7700 antwortet nicht (W17007) oder V1/V2 48 h ohne Signal (W17008).
+// (5.s2 regelte im Fehlerfall nach Uhrzeit 80/40 % bzw. fest 50 % ohne Uhr, W17009 - verworfen)
+#define		LS_DIM_FEHLER	(RES_PWM*30/100)	// 30 %
 
-enum { LS_MODE_SENSOR=0, LS_MODE_UHR, LS_MODE_FEST };
+enum { LS_MODE_SENSOR=0, LS_MODE_FEHLER };
 
-extern int lightsens_dimm (void);			// Dimmfaktor aus dem VEML7700 bzw. Ersatz (Uhrzeit/fest), -1 = V1 -> Fotodiode
-extern uint lightsens_fallback (void);	// 5.s2: Ersatz-Dimmfaktor nach Uhrzeit oder fest (W17009 ohne gestellte Uhr)
+extern int lightsens_dimm (void);			// Dimmfaktor aus dem VEML7700, im Fehlerfall LS_DIM_FEHLER, -1 = V1 -> Fotodiode
+extern uint lightsens_fallback (void);	// Fehlerfall: feste Helligkeit LS_DIM_FEHLER
 extern uchar lightsens_mode (void);		// 5.s2: aktuelle Regelung LS_MODE_xxx
 extern text * lightsens_modetext (void);	// 5.s2: aktuelle Regelung als Text
 extern void board_detect (void);			// 5.s2: Mainboard V1/V2 beim Hochfahren pruefen (aus InitI2C_Devices), Ergebnis in fp.radar Bit 3:2
