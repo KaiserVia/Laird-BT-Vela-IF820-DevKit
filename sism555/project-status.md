@@ -6878,3 +6878,17 @@ angehaengt, alles behalten) und `sism.bin`/`sism.hex` (neu gebaut). Inhaltlich k
 aendern `werkparameter()`, `main.c` (Firmware-Update-Zweig) und `hard.h` (Layout-Pruefung); 5.s2/5.s3 nutzen
 `fp.radar` Bit 3:2 ohne Layout-Aenderung, die Layout-Pruefung (2048 Byte) besteht. Lichtsteuerung siehe
 `Doku/lightcontrol.md`. Am Geraet noch nicht getestet.
+
+## Kurztest 5.141 auf Board B (26SC9983, 2026-11-13 13:13)
+
+5.141 per `flash_xmodem.py` geflasht, danach `radar_v2_test.py --profil kurz` (Bericht
+`Doku/tools/Testreports/2026-11-13_13-13-44_radar_kurz/`). 14 von 15 Pruefungen bestanden: Via-2 erkannt, passend zum
+I2C-Scan; Kaltstart; Transceiver nach jedem Ablauf aus; F20002 bei fehlendem Baustein; Lichtsensor 965 lx, Dimm 149;
+kein I17005, keine unerwarteten F/W-Codes. Die neue Belegung von `fp.radar` (Bit 3:2 Mainboard-Version) stoert die
+Typ-Erkennung nicht.
+
+**B1 (Frequenz wiederholbar) nicht bestanden:** 9 x 24176 MHz, 1 x 24173 MHz, Streuung 3 MHz bei erlaubten 2 MHz.
+Nachmessung 30 x Strg+T: 29 x 24176, 1 x 24174. Alle Werte im Band 24150-24200 MHz. Mit 5.138 am Vormittag waren es
+40 x 24175 (Raum damals ca. 300 lx, jetzt 965 lx - Geraet vermutlich waermer). Einzelne Messungen 2-3 MHz zu tief;
+Ursache offen (Einschwingen nach `transceiver(ein)`, `hf_measurement()` wartet nur 2 ms; Joachims Kennlinie verwirft
+deshalb die ersten Messungen). Kein Hinweis auf einen Fehler aus der Zusammenfuehrung.
