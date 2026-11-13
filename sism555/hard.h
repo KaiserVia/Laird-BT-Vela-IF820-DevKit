@@ -483,6 +483,14 @@ typedef struct FlashSavedParameter { 	// Parameter, die dauerhaft im Flash gesic
  gpsgeo	gp[GPS_POS];						// GPS Datenfeld 25 Positionen � 3 x 4 = 300 Byte
 } flashparameter;
 
+// 5.139: Baubruch bei Abweichung ist gewollt. sizeof(flashparameter) ist mit der aktuellen Feldreihenfolge
+// auf 2048 Byte (= PARA_LEN) eingefroren, mit Keil ARMCC/ARM Cortex-M Alignment gemessen (sism.map, Symbol
+// "fp"). Die vorhandene Laufzeitpruefung in InitParameter() (flash.c, "sizeof(fp)>PARA_LEN") erkennt nur ein
+// WACHSEN der Struktur; wird sie durch ein entferntes/verkleinertes Feld kleiner, verschieben sich alle
+// Felder danach im Flash lautlos - das faengt nur diese Compile-Zeit-Pruefung ab. Bei absichtlicher
+// Groessenaenderung den Wert 2048 hier bewusst mit anpassen, nicht nur entfernen.
+typedef char fp_layout_frozen_check[(sizeof(flashparameter)==2048) ? 1 : -1];
+
 extern char const fp_cp_area[4096];					// Bereich f�r Kopie Parameterblock
 
 // Globale Variable

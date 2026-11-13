@@ -6776,3 +6776,75 @@ tags 80 %, nachts 40 %; Uhr nicht gestellt fest 50 % mit W17009) ist verworfen u
 ausgeliefert, Nummer bleibt gesperrt). Testmenue 3->6: `Regelung = Sensor` bzw. `Fehlerfall, feste Helligkeit`.
 Der Nebenbefund zu `g_timesrc` (geht bei jedem Deep-Sleep-Reset verloren, Update 5.s2) bleibt offen.
 Am Geraet nicht erneut getestet (Fehlerfall am V2-Board ohne Eingriff nicht ausloesbar).
+
+## Update 5.139 (TEST, 2026-11-13): Flash-Parameter-Absicherung
+
+Anlass: Review der Flash-Parameter-Aenderungen aus 5.L1/5.L2/5.s1/5.s2 (Joachim-Integration + Lichtsensor) im
+Vergleich mit 5.55 (`C:\viaTraffic\GitHub\Projects\sism555`). Aufbau und Groesse von `fp` sind unveraendert
+(`sizeof(flashparameter)` bleibt 2048 Byte = `PARA_LEN`), nur das alte Fuellbyte `fuellbyte1` ist seit 5.L1 als
+`fp.radar` belegt - das war schon vorher so dokumentiert und bestaetigt sich. Zwei Nebenwirkungen gefunden und
+behoben:
+
+**1. `fp.sprache`: LANGUAGE/OEM-Bits entfernt.** 5.L1 (Joachim 5.60) hatte `fp.sprache` um Sprachpaket (`LANGUAGE`,
+Bits 6:4) und OEM (Bits 3:2) erweitert, geschrieben in `werkparameter()` (flash.c) und nach jedem Firmware-Update
+(main.c). Diese Bits wurden nirgends gelesen - reiner Schreibwert. Problem: Aeltere Firmware (5.55, auch noch
+5.137) nutzt `fp.sprache` **ungemaskt** als Index in `T_spritm[]`/`T_ja[]`/`T_nein[]`
+(`sicom.c`/`sio.c`). Ein Geraet, das mit 5.L1-5.138 lief und dann auf eine aeltere Version zurueckgeflasht wird,
+haette dort einen Wert >2 stehen - Zugriff ausserhalb der Sprachtabellen (fehlerhafte Sprachauswahl, in `sio.c`
+betrifft das auch die Ja/Nein-Abfrage). Fix: Die Bits nicht mehr schreiben, `fp.sprache` traegt wieder nur den
+Sprachindex (0-2). Der bestehende Fix in main (`fp.sprache&0x03` in `sicom.c`/`sio.c`, 5.L1) bleibt als
+Sicherheitsnetz, falls ein Geraet die alten Bits noch gesetzt hat. **Nicht reparierbar: Geraete, die zwischen
+5.L1 und jetzt bereits auf eine Firmware vor diesem Fix zurueckgeflasht wurden** - das muesste am Geraet durch
+einmalige Neuwahl der Sprache im Menue behoben werden.
+
+**2. `fp.autotime_off`: nie initialisiert.** Das Feld (seit 5.16-5.29 Teil der Struktur, vorher Fuellbyte) wurde in
+`werkparameter()` nie explizit gesetzt - neue UND bestehende Geraete behalten dort den Zufallswert, den das
+RAM beim allerersten Werksstart zufaellig hatte (`fp` ist `__noinit`). `rtc.c:280` prueft nur `==1`, das
+Risiko war klein (1/256), aber real: traf der Zufallswert zufaellig auf 1, lief die automatische Zeitumstellung
+unbemerkt nicht. Fix: `werkparameter()` setzt `fp.autotime_off=0` (ein) explizit; zusaetzlich normalisiert der
+Firmware-Update-Zweig in `main.c` (laeuft einmalig nach jedem Update, `fp` ist zu diesem Zeitpunkt schon aus dem
+Flash geladen) einen etwaigen Altwert >1 auf 0 - trifft genau die Geraete, die das Feld noch nie gesetzt
+bekommen haben.
+
+**3. Compile-Zeit-Pruefung gegen unbemerktes Verschieben.** Die bestehende Laufzeitpruefung in `InitParameter()`
+(flash.c: `sizeof(fp)>PARA_LEN`) erkennt nur ein Wachsen der Struktur. Wird sie durch ein entferntes/verkleinertes
+Feld kleiner, verschieben sich alle Felder danach im Flash lautlos, ohne dass irgendeine Pruefung anschlaegt. Neu
+in `hard.h` direkt nach der Struktur: `typedef char fp_layout_frozen_check[(sizeof(flashparameter)==2048) ? 1 :
+-1];` - Baubruch, falls sich die Groesse aendert (gewollt; bei einer bewusst gewuenschten Groessenaenderung den
+Wert 2048 mit anpassen). 2048 Byte mit dem aktuellen Build bestaetigt (`Listings/sism.map`, Symbol `fp`, Data 2048).
+
+**Nicht angefasst:** Die freien Bits 7:4 in `fp.radar` (Bits 3:2 reserviert fuer den Mainboard-Typ aus 5.s2, noch
+nicht in `main` gemergt) bleiben frei. Eine erneute Nutzung dieses Bytes fuer Diagnosezwecke (OEM/Sprachpaket o.ae.)
+sollte, falls spaeter gebraucht, bewusst und mit eigenem Versionshinweis erfolgen, nicht durch stille
+Wiederverwendung eines "freien" Bytes wie beim jetzt entfernten Fall.
+
+**Build:** 0 Fehler, 0 Warnungen. `sism.bin` 175520 Byte. Noch nicht am Geraet getestet.
+
+## Update 5.140 (TEST, 2026-11-13): fp.sprache-Rueckbau aus 5.139 rueckgaengig gemacht
+
+**Anwenderentscheidung:** Punkt 1 aus Update 5.139 (Entfernen der LANGUAGE/OEM-Bits aus `fp.sprache`) wird
+zurueckgenommen. Die Bits bleiben bewusst erhalten - sie zeigen, welche Sprachpaket-/OEM-Variante der
+Update-Datei auf ein Geraet gehoert, und das ist wichtiger als die Abwaertskompatibilitaet beim
+Zurueckflashen. `werkparameter()` (flash.c) und der Firmware-Update-Zweig in `main.c` schreiben wieder
+`(LANGUAGE<<4)|(OEM<<2)|Sprachindex` wie vor 5.139.
+
+**Bewusst akzeptierte Einschraenkung:** Ein Geraet, das mit 5.L1-5.138/5.140 lief und danach auf eine
+Firmware vor 5.L1 (z. B. 5.55, 5.137) zurueckgeflasht wird, hat in `fp.sprache` einen Wert >2 stehen - diese
+aelteren Firmwares lesen das Byte ungemaskt als Index (`T_spritm[]`/`T_ja[]`/`T_nein[]` in `sicom.c`/`sio.c`).
+Abhilfe am Geraet: Sprache im Menue einmal neu waehlen, danach ist der Wert wieder gueltig (0-2). Nicht
+geplant, dies per Firmware zu automatisieren, da gerade die Variantenkennung erhalten bleiben soll.
+
+Die anderen beiden Punkte aus 5.139 (`fp.autotime_off`-Initialisierung, Compile-Zeit-Pruefung
+`sizeof(flashparameter)==2048`) bleiben unveraendert bestehen.
+
+**Build:** 0 Fehler, 0 Warnungen. Noch nicht am Geraet getestet.
+
+## Update 5.141 (TEST, 2026-11-13): Zusammenfuehrung main 5.140 + DevelopLightSensor 5.s3
+
+`main` (5.139/5.140: Flash-Parameter-Absicherung, `fp.sprache`, `fp.autotime_off`, Compile-Zeit-Pruefung
+`sizeof(flashparameter)==2048`) in `DevelopLightSensor` gemergt, danach `main` per Fast-Forward nachgezogen.
+Konflikte nur in `T_version` (neu 5.141, Kommentare beider Seiten erhalten), `project-status.md` (beide Seiten
+angehaengt, alles behalten) und `sism.bin`/`sism.hex` (neu gebaut). Inhaltlich keine Ueberschneidung: 5.139/5.140
+aendern `werkparameter()`, `main.c` (Firmware-Update-Zweig) und `hard.h` (Layout-Pruefung); 5.s2/5.s3 nutzen
+`fp.radar` Bit 3:2 ohne Layout-Aenderung, die Layout-Pruefung (2048 Byte) besteht. Lichtsteuerung siehe
+`Doku/lightcontrol.md`. Am Geraet noch nicht getestet.
