@@ -1223,10 +1223,14 @@ void communication_change (void)					// Bearbeitung Schnittstellenwechsel, �nd
 
 void hf_measurement (void)			// 5.L1 (Joachim 5.60): Via-2 Sendefrequenz messen und ausgeben
 {
- uint result, HiF=0;
+ uint khz, HiF=0;
 
- osDelay(2);	result = 	mess_hf();								// Kurz warten und messen
- if (result) HiF=HF_const/result;								// Sendefrequenz in MHz
+ // 5.144: gleicher Messweg wie Transceivermenue und Nachfuehrung (hftrack.c): DPWR nach dem Einschalten, Leermessung,
+ // Median aus HFT_N Messungen. Vorher osDelay(2) und eine Einzelmessung: 2 ms nach dem Einschalten lag die Frequenz auf
+ // Board B reproduzierbar ca. 3,5 MHz hoeher als im Messbetrieb (Strg+T 24173, Menue 24169,5 MHz, 5.143).
+ // Ausgabe weiter in ganzen MHz (gerundet), damit Auswertungen das Format behalten.
+ khz=hf_measure_khz ();										// schaltet den Transceiver selbst ein und aus
+ if (khz) HiF=(khz+500)/1000;								// Sendefrequenz in MHz
  newline(); putnumber (HiF,0); putc(' '); putln(T_MHz);
 }
 

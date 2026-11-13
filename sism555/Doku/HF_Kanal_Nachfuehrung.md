@@ -33,6 +33,11 @@ gemessen, bis zwei Messpunkte höchstens 0,3 MHz auseinanderliegen (50 ms Pause,
 Steigend, stark nichtlinear: Stufe 0 = 24157, 64 = 24162, 128 = 24171, 192 = 24191, 224 = 24214, 256 = 24270 MHz.
 Unten ca. 0,1 MHz pro Stufe, oben bis 2,5 MHz pro Stufe. Ab etwa Stufe 205 liegt die Frequenz über 24200 MHz.
 
+## Strg+T (ab 5.144)
+
+Strg+T im Hauptmenue misst ueber denselben Weg (Median nach DPWR) und zeigt ganze MHz. Bis 5.143 mass es 2 ms nach dem
+Einschalten und lag dadurch ca. 3,5 MHz hoeher als die Frequenz im Messbetrieb.
+
 ## Werksabgleich (Werksmenü Strg+W im Testmenü -> 4 -> 5 "Adjust To Channel Frequency")
 
 Bisektion über den Wiper von IC32 (Richtung aus Stufe 0 und 128, Stufe 256 wird nicht angefahren), danach Kontrolle.

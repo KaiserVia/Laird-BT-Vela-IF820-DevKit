@@ -6924,3 +6924,14 @@ Via-2-Transceivermenue nicht (Menue kam nur erneut), "5" (Abgleich auf Kanal) ve
 das Menue auf 8 Punkte erweitert, `putmenu(T_tmenu2,'9')`. **Fix:** Abbruch bei `'9'`.
 **Test Board B:** 5.143 geflasht; "9" fuehrt zurueck ins Werksmenue, nach "5" (Abgleich Stufe 127, 24169,9 MHz) bleibt das
 Geraet im Transceivermenue.
+
+## Update 5.144 (TEST, 2026-11-13): Strg+T misst wie Menue und Nachfuehrung
+
+**Symptom (Joachim-Sitzung, radar_v2_test kurz auf 5.143):** Strg+T zeigte reproduzierbar ca. 3,5 MHz mehr als das
+Transceivermenue (24173 gegen 24169,5 MHz bei Ziel 24170), keine Einzelausreisser.
+**Ursache:** `hf_measurement()` mass 2 ms nach dem Einschalten mit einer Einzelmessung. Direkt nach dem Einschalten
+liegt die Frequenz hoeher; Fahrzeugmessung und Nachfuehrung messen erst nach DPWR bzw. der RE/-Zeit. (Abschneiden
+in `HF_const/result` scheidet aus, es verschiebt nach unten.)
+**Fix:** `hf_measurement()` nutzt `hf_measure_khz()` (DPWR, Leermessung, Median aus 7). Ausgabe weiter in ganzen MHz,
+jetzt gerundet.
+**Test Board B:** 5.143 Strg+T 10x: 24171-24173, Menue 24169,2 MHz. 5.144 Strg+T 10x: 24169-24170, Menue 24169,2 MHz.
