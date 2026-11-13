@@ -6525,7 +6525,9 @@ kein P0.19-Draht, LTE mit SIM.
 
 **Testskript-Fehler (kein Geraetefehler):** Die 18 "fehlgeschlagenen" `soak`-Bloecke ab Runde 2 brachen jeweils nach
 dem ersten, bestandenen Download mit `FileNotFoundError ... soak.csv` ab: mit `--soak-skip-write` schreibt
-`run_soak()` die CSV in den Report-Ordner `..._unbekannt_soak`, der nicht angelegt wird. Noch nicht behoben.
+`run_soak()` die CSV in den Report-Ordner `..._unbekannt_soak`, der nicht angelegt wird. **Behoben 2026-11-13:**
+Der Ordner wird beim ersten Geraetekontakt umbenannt (Inhalt wandert mit), `run_soak()` hielt aber den alten Pfad;
+jetzt wird der CSV-Pfad vor jedem Schreiben neu bestimmt (`soak_csv()`). Am Geraet noch nicht erneut gelaufen.
 
 **MQTT ab 20:12 instabil (offen, vermutlich serverseitig):** Bis 19:48 hielt jede Serververbindung. Ab 20:12 meldet die
 Firmware nach jedem `MQTT Server connected` 1-8 s spaeter `MQTTS disconnect`, Neuversuch jede Minute, bis zum Ende

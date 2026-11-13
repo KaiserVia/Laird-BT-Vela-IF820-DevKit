@@ -4105,8 +4105,12 @@ async def run_soak(args) -> int:
                     result["result"] = "failed"
                     write_suite_report("soak", result, "VIASIS Dauer-Messreihe", "Flash-Schreiben fehlgeschlagen.")
                     return 1
-        report_dir = RUN_REPORT_DIR or REPORT_DIR
-        csv_path = report_dir / "soak.csv"
+        def soak_csv():
+            # Pfad jedes Mal neu bestimmen: Der Report-Ordner heisst anfangs "..._unbekannt_soak" und wird beim
+            # ersten Geraetekontakt umbenannt (Inhalt wandert mit). Mit --soak-skip-write passiert das erst im
+            # ersten Download - ein einmal gemerkter Pfad zeigte danach ins Leere (FileNotFoundError, 2026-11-13).
+            return (RUN_REPORT_DIR or REPORT_DIR) / "soak.csv"
+        csv_path = soak_csv()
         columns = ["zeit", "verstrichen_h", "pc_laufzeit_h", "nr", "geraet", "transport", "status", "bytes",
                    "dauer_s", "bps", "retries", "langsam", "rssi", "ctswait", "lost_ms", "ctsdrop", "txstuck"]
         csv_path.write_text(";".join(columns) + "\n", encoding="utf-8")
@@ -4137,6 +4141,7 @@ async def run_soak(args) -> int:
                    ym.get("retries", ""), int(bool(ym.get("slow"))) if ym else "",
                    BLE_INFO.get("rssi", "") if transport == "ble" else "", session.get("ctswait", ""),
                    session.get("lost_ms", ""), session.get("ctsdrop", ""), session.get("txstuck", "")]
+            csv_path = soak_csv()
             with csv_path.open("a", encoding="utf-8") as handle:
                 handle.write(";".join(str(item) for item in row) + "\n")
             entry = stats.setdefault((device, transport), {"n": 0, "fehler": 0, "bps": []})
