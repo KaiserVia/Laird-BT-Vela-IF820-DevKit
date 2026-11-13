@@ -17,6 +17,8 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
   (git worktree), nicht hier umschalten:
   - `Integrate-Joachim-SW` -> `C:\viaTraffic\GitHub\Projects\Joachim-Integration` (Übernahme von Joachims 5.60, `sism560_V2`)
   - `DevelopLightSensor` -> `C:\viaTraffic\GitHub\Projects\LightSensor`
+  - **2026-11-13: beide in `main` gemergt (5.L2 + 5.s1 -> 5.138).** Weiterarbeit an diesen Branches vorher mit
+    `git merge main` nachziehen, sonst laufen die Stände wieder auseinander.
   - `branch-550` -> `C:\viaTraffic\GitHub\Projects\branch-550` (alter Stand 5.50)
 - **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
   (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen

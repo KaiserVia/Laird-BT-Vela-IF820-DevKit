@@ -6615,3 +6615,54 @@ Geraetetest 5.L1). **Fix:** `typ=0` vorbelegt (sictst.c); ohne Antwort kommt jet
 Transceiver wird nicht geschaltet. Nur Testmenue, Messbetrieb unveraendert.
 
 Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet (Board B laeuft mit 5.L1).
+
+## Update 5.s1 (TEST, 2026-11-12, Branch `DevelopLightSensor`): Lichtsensor VEML7700 steuert die Anzeigehelligkeit
+
+**Ziel:** Auf Mainboard V2 (Stand 10.11.2026) ist der I2C-Lichtsensor IC1 VEML7700 (Vishay) in beiden Varianten
+bestueckt, an I2C0 (P0.27 SDA / P0.28 SCL, Pull-ups R144/R145 2,2 kOhm), feste 7-Bit-Adresse 0x10 (im Code 8-Bit
+`0x20`), kein Interrupt-Pin. Er soll die Helligkeit der LED-Anzeige steuern. Die Firmware muss weiter auf V1 laufen. Versionen auf diesem Branch heissen 5.s1, 5.s2 ... (parallele Entwicklung auf
+anderen Branches, Anwenderentscheidung 2026-11-12; `T_version[8]` reicht bis 5.s9999).
+Der zweite Sensor IC38 TSL25721 ist nicht bestueckt und wird nicht unterstuetzt.
+
+**Bisher:** `get_dimmung()` (libtool.c) liest je Messzyklus die Fotodiode SFH213 per A/D (`get_brightness()`, schaltet
+dazu die LEDs kurz ab), rechnet per Polynom in `dimm` (3...200) um und glaettet (1/4 je Aufruf); `set_pwm()` setzt
+daraus die Anzeige- und externe PWM.
+
+**Umsetzung (neue Dateien `lightsens.c/.h`, im Keil-Projekt eingetragen):**
+- `get_dimmung()` fragt zuerst `lightsens_dimm()`. Antwortet der VEML7700 beim ersten Aufruf nach einem Reset nicht
+  (V1), kommt -1 zurueck und es bleibt bei der Fotodiode. Glaettung, `set_pwm()` und LED-Spot unveraendert.
+- Gemessen wird nur bei dunkler Anzeige (`PINSEL4&PWM6` aus und `PWM_TRB` HIGH) und nur bei jedem 8. Aufruf
+  (`LS_EVERY`, ca. 4...12 s), weil die LEDs durch die Aussparung in der Frontscheibe auf den Sensor leuchten.
+- Die Messung blockiert 150 ms (`LS_WAIT`, Integrationszeit 100 ms). Nicht ueber zwei Aufrufe verteilt, weil die CPU
+  ohne Verkehr nach jedem Messzyklus in den Deep Sleep geht und per Watchdog-Reset (`SLEEP_RES`) aufwacht.
+  Messwert, Verstaerkung und Aufrufzaehler liegen deshalb im `__noinit`-RAM (Kennung `LS_MAGIC`).
+- Verstaerkung automatisch x2/x1/x1/4/x1/8 (uebersteuert ab Rohwert 60000 -> unempfindlicher, unter 1500 ->
+  empfindlicher). Aufloesung nach aktuellem Datenblatt (0,0336 lx/Zaehlwert bei x2/100 ms), keine
+  Linearitaetskorrektur ueber 1000 lx.
+- Kennlinie logarithmisch: bis 1 lx `dimm`=3 (wie die alte Kennlinie bei Dunkelheit), ab 10000 lx 200 (100 %).
+  Endpunkte als `#define` in `lightsens.h` (`LS_LUX_MIN/MAX`, `LS_DIM_MIN/MAX`), noch keine Parameter.
+- Bis zum ersten Messwert bleibt `dimm` unveraendert (Kaltstart 100).
+- Testmenue "Lichtsensor" (`licht_test()`, sictst.c): mit VEML7700 je Messung eine Zeile mit Lux, Rohwert,
+  Verstaerkung und berechnetem Dimmfaktor; ohne Sensor wie bisher der A/D-Wert.
+
+**Status:** Build ohne Fehler/Warnungen. Am Geraet noch nicht getestet. Offen: Kennlinie am Geraet abstimmen
+(Endpunkte, ggf. als Parameter), pruefen, ob der Sensor bei dunkler Anzeige noch Restlicht von den LEDs sieht.
+
+## Update 5.138 (TEST, 2026-11-13): Zusammenfuehrung main + Joachim (5.L2) + Lichtsensor (5.s1)
+
+Auf `main` (Ordner `Laird_BT_Vela-IF820-DevKit`) per Merge-Commit zusammengefuehrt, Reihenfolge: zuerst
+`Integrate-Joachim-SW` (5.L2: Joachims 5.60, Mainboard V2, Via-2-Radarempfaenger), dann `DevelopLightSensor`
+(5.s1: VEML7700 steuert die Anzeigehelligkeit). Beide Branches zweigten von 5.137 (`3e9cc1a`) ab.
+
+**Konflikte:** nur `T_version` (neu "5.138", Kommentar beider Seiten erhalten), `project-status.md` (beide Seiten
+haben nur angehaengt, alles behalten) und `sism.bin`/`sism.hex` (neu gebaut). `libtool.c` und `sictst.c` hat Git
+automatisch zusammengefuehrt; inhaltlich geprueft: der Lichtsensor aendert `get_dimmung()` und `licht_test()`,
+Joachim andere Funktionen (Transceiver, I2C-Digitalpotis, Testmenue); keine Ueberschneidung. I2C-Adressen getrennt
+(VEML7700 0x10, IC32 0x5C). `sism.uvprojx` enthaelt `lightsens.c`.
+
+**Build:** 0 Fehler, 0 Warnungen. `sism.bin` 175512 Byte, `sism.hex` stimmt mit `sism.bin` ueberein, Kopie in
+`fw_5.138/`. Hinweis: `fromelf` konnte `sism.bin` beim ersten Lauf nicht schreiben (Datei im Konfliktzustand), nach
+Loeschen neu erzeugt.
+
+**Status:** Am Geraet noch nicht getestet. Nicht enthalten: ungespeicherte Aenderung an `project-status.md` im
+Worktree `LightSensor` (nicht committet).

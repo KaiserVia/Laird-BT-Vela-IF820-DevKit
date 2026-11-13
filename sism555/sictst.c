@@ -25,6 +25,7 @@
 #include "libtool.h"
 #include "USB_tools.h"
 #include "sictst.h"
+#include "lightsens.h"
 #include "sictxt.h"
 #include "dtc_codes.h"
 
@@ -511,6 +512,30 @@ void licht_test (void)		// Test des Lichtsensors
  put2str(T_licht,T_ist);
  clear_all();								// Led und Schalter aus
 	
+ if (lightsens_present())					// 5.s1: VEML7700 (Mainboard V2), je Messung eine Zeile
+ {
+  uint raw=0;
+  uchar gain=0;
+  int clux;
+  putstr("VEML7700"); newline();
+  while (1)
+  {
+   ResetWDT ();										// Watchdog Timer reset
+   clux=lightsens_measure(&raw,&gain);	// blockiert 150 ms je Bereich, Anzeige ist aus
+   if (clux<0) putstr("Lesefehler");
+   else
+   {
+    putnumber((uint)clux/100,6); putc('.'); putnumber((uint)clux%100,0xC2); putstr(" lx  roh ");
+    putnumber(raw,5); putstr("  Verst. "); putstr(lightsens_gaintext(gain));
+    putstr("  Dimm "); putnumber(lightsens_lux2dimm((uint)clux),3);
+   }
+   newline();
+   if (getkey(500)>=0) break;				// Abbruch bei Zeichenempfang/Schnittstellenwechsel
+  }
+  newline();
+  return;
+ }
+
  while (1)					
  {
 	ResetWDT ();											// Watchdog Timer reset  

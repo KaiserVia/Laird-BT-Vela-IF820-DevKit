@@ -24,6 +24,7 @@
 #include "btio.h"
 #include "rtc.h"
 #include "i2cm.h"
+#include "lightsens.h"
 #include "flash.h"
 #include "ramcode.h"
 #include "xmodem.h"
@@ -278,8 +279,14 @@ void num_to_LED (uint wert, int farbe)	// Numerischen Wert in 7 Segment Anzeiges
 void get_dimmung (void)		// Umgebungshelligkeit messen und Dimmfaktor bestimmen
 {
  uchar spot_dim;										// Dimmung f�r LED Spot					 
- uint bright=get_brightness ();			// Umgebungshelligkeit messen
- uint sensor=(200000+bright*bright-bright*bright*bright/1515-525*bright)/1000; 
+ uint bright, sensor;
+ int ls=lightsens_dimm ();					// 5.s1: VEML7700 (Mainboard V2), -1 = kein Sensor
+ if (ls>=0) sensor=(uint)ls;				// Dimmfaktor aus dem Lichtsensor (nur bei dunkler Anzeige gemessen)
+ else																// Mainboard V1: Fotodiode SFH213 wie bisher
+ {
+  bright=get_brightness ();					// Umgebungshelligkeit messen
+  sensor=(200000+bright*bright-bright*bright*bright/1515-525*bright)/1000;
+ }
  dimm+=(sensor>>2)-(dimm>>2);				// Expo. Gl�ttung
  if (fp.ledspot)			   						// LED Warnleuchte?
  {
