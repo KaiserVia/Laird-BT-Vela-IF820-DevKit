@@ -12,14 +12,14 @@ Gerätefirmware **sism555** (LPC1766, Keil-Projekt `sism555/sism.uvprojx`).
 Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
 
 - **Git-Repo:** `KaiserVia/Laird-BT-Vela-IF820-DevKit`
-- **Aktueller Branch (dieser Ordner):** `main`. Am 2026-11-12 zusammengeführt: `main`, `LTE-Update` und
-  `connection-pin` stehen auf demselben Stand (5.137, PR #2). Weitere Branches liegen in **eigenen Ordnern**
-  (git worktree), nicht hier umschalten:
+- **Aktueller Branch (dieser Ordner):** `main`. Stand 2026-11-13: **alle Branches** (`main`, `LTE-Update`,
+  `connection-pin`, `Integrate-Joachim-SW`, `DevelopLightSensor`) auf demselben Stand 5.141 (PR #2, #3, #4).
+  `branch-550` und `mainboardv2-get-alive` gelöscht (waren vollständig enthalten; lokaler 5.50-Build gesichert in
+  `sism555/fw_5.50/`). Weitere Branches liegen in **eigenen Ordnern** (git worktree), nicht hier umschalten:
   - `Integrate-Joachim-SW` -> `C:\viaTraffic\GitHub\Projects\Joachim-Integration` (Übernahme von Joachims 5.60, `sism560_V2`)
   - `DevelopLightSensor` -> `C:\viaTraffic\GitHub\Projects\LightSensor`
   - **2026-11-13: beide in `main` gemergt (5.L2 + 5.s1 -> 5.138).** Weiterarbeit an diesen Branches vorher mit
     `git merge main` nachziehen, sonst laufen die Stände wieder auseinander.
-  - `branch-550` -> `C:\viaTraffic\GitHub\Projects\branch-550` (alter Stand 5.50)
 - **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
   (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen
   GND-Verbindung dafür aufgetrennt wurde) und dürfen nicht auf Boards ohne Draht (mit der Weiche auf 1,
