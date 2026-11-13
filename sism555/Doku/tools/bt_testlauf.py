@@ -56,7 +56,7 @@ def read_board(port: str) -> dict | None:
         return None
     text = out.decode("cp1252", errors="replace")
     serno = re.search(r"Seriennummer:\s*(\S+)", text)
-    version = re.search(r"Version (\d+\.\d+)", text)
+    version = re.search(r"Version (\d+\.[A-Za-z]?\d+)", text)
     interfaces = re.search(r"Schnittstellen:\s*(.+)", text)
     if not serno:
         log("Board antwortet nicht mit der Informationsseite (Hauptmenue erreichbar? Board an?).")

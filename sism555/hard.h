@@ -62,6 +62,13 @@
 #define GSMPWR			(1<<29)		// P1.29 M10 Versorgung 
 #define VBUS				(1<<30)		// USB Host Versorgung
 #define	DIR					(1u<<31)	// Bewegungsrichtung 
+// 5.L1: Dieselben Pins haben auf dem Mainboard mit Via-2-Radarempfaenger (Joachim 5.56-5.60) eine andere Bedeutung.
+// Welche Belegung gilt, bestimmt fp.radar (Selbsttest radar_detect() in i2cm.c). EN_ANA und USB_RPWR werden nur beim
+// bisherigen Transceiver als Ausgang geschaltet, DIS_MESS und DIS_IF nur bei Via-2 (Init_Radar_Ports() in hard.c).
+#define DIS_BT			(1<<16)		// Via-2-Board: PWR-EN\-BT, HIGH = BT-Modul aus (nicht getrieben, Pull-down = ein)
+#define DA_SS				(1<<20)		// Via-2-Board: Enable D/A-Wandler (statt EN_ANA)
+#define DIS_MESS		(1<<21)		// Via-2-Board: HIGH = Ausgabe Fhf/8388608 aus
+#define FMin				(1<<26)		// Via-2-Board: Messeingang HF-Frequenz/8388608, CAP0.0 (statt USB_RPWR)
 
 #define MUX_B_b			23				// Bitposition MUX B Select IC36, IC39
 
@@ -81,6 +88,7 @@
 
 // GPIO Port 4 Pin Definitionen
 #define CSFLASH1		(1<<28)		// Chip select Flash 1	
+#define DIS_IF			(1<<29)		// Via-2-Board: LOW = Transceiver-Verstaerker ein (EN\-IF)
 
 // GPIO Pinsel 0 Definitionen
 #define SCK					(2<<14)		// SSP1 - SCK
@@ -143,6 +151,8 @@
 #define		MAXPPM				50				// Maximal zul�ssige Abweichung RTC/CPU Oszillator in ppm	
 #define 	Min_TXF    		24000    	// kleinste zul�ssige Sendefrequenz in MHz
 #define 	Max_TXF     	24250   	// gr��te zul�ssige Sendefrequenz in MHz
+#define 	Min_TXF_VIA2	24150    	// 5.L1: kleinste zulaessige Sendefrequenz in MHz mit Via-2
+#define 	Max_TXF_VIA2	24200   	// 5.L1: groesste zulaessige Sendefrequenz in MHz mit Via-2
 #define		SPGMUL12			75				// Batteriespannungsumrechnung Multiplikator
 #define		SPGDIV12			10				// Batteriespannungsumrechnung Teiler
 #define 	SPGMUL5				6600			// Multiplikator Spannungsumrechnung in mV bei 1:2 Teiler
@@ -210,6 +220,13 @@
 #define		HF_EN			(1<<10)				// 1 wenn Transceiver ein
 #define		ANT_EN1		(1<<12)				// Transceiver 1 enable
 #define		ANT_EN2		(1<<13)				// Transceiver 2 enable
+#define		HF_DIS		(1<<12)				// Via-2: 1 = Transceiver aus (EN\-MD-RF, IC37 P1.4, gleiches Bit wie ANT_EN1)
+
+// 5.L1: Radar-Empfaenger in fp.radar, per Selbsttest beim Hochfahren bestimmt (radar_detect() in i2cm.c)
+#define		RADAR_UNBEKANNT	0			// noch nicht bestimmt
+#define		RADAR_TRX			1				// bisheriger Transceiver (Analogversorgung EN_ANA, IC37 HF_EN/ANT_EN1/ANT_EN2)
+#define		RADAR_VIA2		2				// Via-2-Empfaenger (IC37 HF_DIS, Digitalpoti IC32 auf 0x5C, HF-Frequenzmessung)
+#define		IS_VIA2				(fp.radar==RADAR_VIA2)
 
 // Voreinstellungen Werksinitialisierung
 #define		Def_sprache	  0				// Erste indizierte Sprache
@@ -264,8 +281,11 @@
 #define		MIN_MESSCYCLE	2*BASECYCLE		// K�rzester Messzyklus 500 ms
 #define		MAX_MESSCYCLE	20*BASECYCLE	// L�ngster Messzyklus 5 s
 #define		MAX_LED_HOLD	40*BASECYCLE	// L�ngste Anzeigezeit 10 s
-#define		DPWR					40						// ms Wartezeit nach Einschaltung Transceiver
+#define		DPWR_TRX			40						// ms Wartezeit nach Einschaltung Transceiver (bisheriger Transceiver)
+#define		DPWR_VIA2			15						// ms Wartezeit nach Einschaltung Transceiver (Via-2)
+#define		DPWR					(IS_VIA2 ? DPWR_VIA2 : DPWR_TRX)	// 5.L1: abhaengig vom Radar-Empfaenger
 #define		DTXFEN				5							// ms Wartezeit nach Enable Transceiver
+#define		DTXFEN_T			(IS_VIA2 ? 0 : DTXFEN)	// 5.L1: Via-2 hat keine getrennte Freigabestufe
 #define		IFDIV	(3.6 * 299792456 / 2 / 1000)	// Teiler zur Bestimmung der Geschwindigkeitskonstanten ( 44 pro Hz/km/h)              
 #define   MILE					1609					// engl. Mile in Meter
 #define		LenTm					24						// Messpuffergr��e / Anzahl Dopplerperioden 
@@ -277,6 +297,8 @@
 #define		GPS_MAX_LIM		60						// Nach 60 Minuten Positionsbestimmung abschalten
 #define		GPS_POS				25						// Maximal 25 GPS Positionen im Parameterblock sichern
 #define		BT_TIMEOUT		6							// 6 Minuten Bluetooth Timeout ohne Zeichenempfang		
+#define		HF_DIV				8388608				// Via-2: 1024 x 8192 Modulteiler Frequenzausgang
+#define		HF_const			(192*8388608)	// Via-2: 8 * 24 * HF_DIV
 
 // UART1 MUX Owner State Machine
 enum { MUX_NONE=0, MUX_BT, MUX_GSM, MUX_GPS };	// UART1 resource owner states
@@ -288,7 +310,7 @@ extern void  uart1_release (uchar requester);							// Release UART1, auto-resto
 // Makrokommandos
 #define		En_Capture	 	T2IR|=T2IR; T2CCR|=CAP0I|CAP0FE|CAP1FE	// Reset and enable captures und Interrupt f�r Periodendauermessung														
 #define		En_Count			T2IR|=T2IR; T3IR|=T3IR;	T2CCR|=CAP0I|CAP0FE; T3CCR|=CAP0I|CAP0FE|CAP1I|CAP1FE		// Res. u. Def. Timer 2/3 Capt. u. Int.												 			
-#define		Dis_CapCnt		T2CCR=T2CCR=0														// Disable Timer 2 und 3 captures und Interrupt	
+#define		Dis_CapCnt		T3CCR=T2CCR=0														// Disable Timer 2 und 3 captures und Interrupt	
 #define 	MUX_GSM_Select FIO0CLR=CSBF; FIO0SET=CSAF 						// MUX GSM Kanal init & auswahl
 #define 	MUX_BT_Select  FIO0CLR=CSAF|CSBF					 						// MUX BT Kanal init & auswahl
 #define		MUX_GPS_Select FIO0CLR=CSAF; FIO0SET=CSBF 						// MUX GPS Typ 1 Kanal init & Auswahl
@@ -396,7 +418,8 @@ typedef struct FlashSavedParameter { 	// Parameter, die dauerhaft im Flash gesic
  uint hcount;										// Betriebsstunden  
  uchar mqtt_packetsize;					// Messdaten Packetgr��e
  uchar mqtt_pdbq;								// Erweiterte Debug Protokollfunktion
- uchar autotime_off;					uchar fuellbyte1;						// F�llt ersten 1k Block (nicht �berschreibbare Parameter)
+ uchar autotime_off;
+ uchar radar;										// 5.L1: Radar-Empfaenger RADAR_xxx (vorher fuellbyte1, fuellt ersten 1k Block, Layout unveraendert)
  uint btpin;										// Bluetooth Pin-/Pairing Nummer
 
  uchar pKennung;								// Pr�fkennung Parameterblock !!! Ab hier �berschreibt der Parameter Upload
@@ -618,6 +641,8 @@ extern void shift_to_LED (text * const sequence);	// numerische LED Anzeige
 extern void Ledaus (void);							// Abschaltung LED Anzeige
 extern void wait_uarts_empty (void);		// Warte bis alle Zeichen auf uarts versendet
 extern void DeepSleep (void);						// Bringe CPU in Deep power down
+extern uint mess_hf (void);							// 5.L1: Via-2 HF-Sendefrequenz messen (Captureabstand von 8 Perioden)
+extern void Init_Radar_Ports (void);		// 5.L1: Pins abhaengig vom Radar-Empfaenger setzen
 
 #endif /* HARD_H_*/
 

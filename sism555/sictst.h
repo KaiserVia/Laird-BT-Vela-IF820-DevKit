@@ -8,7 +8,9 @@
 typedef int (*funcp)(void);											// Prototyp Funktionszeiger
 
 extern void i2c_scan (void);										// Check I2C bus for ackknowledging devices
-extern void set_dpp (uchar adr, uchar feature);	// Digitalpoti einstellen
+extern void set_single_dpp (uchar adr);					// 5.L1: 1-fach Digitalpoti einstellen (Via-2 IC32)
+extern void f_characteristic (uchar adr);				// 5.L1: Modul-Frequenzkennlinie mit Digitalpoti (Via-2 IC32)
+extern void set_dpp (uchar adr, uchar feature);	// 4-fach MCP Digitalpoti einstellen
 extern void test_i2c_device (void);							// Test PCA9555 Expander und MCP4662 DPPs
 extern void flash_test (void);									// Test Atmel Flash Speicher
 extern void test_rtc (uchar silent);						// Vergleichstest Echtzeituhr- und Haupt- Oszillator

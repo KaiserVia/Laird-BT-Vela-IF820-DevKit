@@ -6538,3 +6538,80 @@ viacloud-Geraeteaktualisierung). Am Server bzw. mit einem zweiten Geraet pruefen
 
 **Fazit:** BT auf B ist mit 5.137 und R125 nach GND ueber 11,5 h stabil (Downloads, Wechsel, Kaltstarts). BT waehrend
 LTE ist nur fuer die ersten ca. 3 h belegt (13/13), danach wegen des MQTT-Problems nicht pruefbar.
+
+## Update 5.L1 (TEST, 2026-11-12): Integration Joachim 5.56-5.60 (Mainboard V2, Via-2-Radarempfaenger)
+
+Branch `Integrate-Joachim-SW`, Worktree `C:\viaTraffic\GitHub\Projects\Joachim-Integration`. Quelle: Joachims Stand
+`C:\viaTraffic\GitHub\Projects\sism560_V2\sism560_V2` (5.60), gemeinsame Basis `C:\viaTraffic\GitHub\Projects\sism555`
+(5.55). Analyse und Entscheidungen: `Doku/Integration_Joachim_V2.md`.
+
+**Ziel (Anwendervorgabe):** eine Firmware fuer alle Hardware-Staende. Wie LTE (`fp.gsm`), BT (`fp.btmodem`) und GPS
+(`fp.gps`) wird jetzt auch der Radar-Empfaenger per Selbsttest erkannt und gespeichert; die Revisionsbuchstaben
+(`J2`/`V2`) spielen fuer die Firmware keine Rolle.
+
+**Umsetzung:**
+- `fp.radar` (RADAR_UNBEKANNT/RADAR_TRX/RADAR_VIA2) ersetzt `fuellbyte1` im ersten 1k-Block - Layout und Groesse des
+  Parameterblocks unveraendert.
+- `radar_detect()` (i2cm.c) bei jedem `InitI2C_Devices()`: antwortet IC32 (Digitalpoti 0x5C, nur Via-2), ist es Via-2;
+  sonst wird ueber IC37 nur P1.4 (Via-2: HF_DIS) als Ausgang LOW geschaltet und nochmal gefragt. Kein LPC-Pin mit
+  wechselnder Bedeutung wird vor der Erkennung getrieben. Weicht das Ergebnis vom gespeicherten Typ ab: Info I17005.
+- `Init_Radar_Ports()` (hard.c): Via-2 -> P1.20 (DA_SS) und P1.26 (FMin) Eingang, P1.21 DIS_MESS Ausgang HIGH,
+  P4.29 DIS_IF Ausgang LOW. Bisheriger Transceiver -> EN_ANA und USB_RPWR Ausgang wie bisher. `Init_Ports()` schaltet
+  EN_ANA/USB_RPWR nicht mehr pauschal als Ausgang; bei Update-/Sleep-Reset (ohne I2C-Init) gilt `fp.radar` aus dem RAM.
+- Je nach Typ: `transceiver()` (Via-2: IC37 HF_DIS, Joachims Fassung; txrcon nur Bits 0-7), Power-down (`EINT0`) und
+  `reboot()` (Via-2: IC37 P1=0x10 statt 0), `DPWR` 15/40 ms, `DTXFEN` nur beim bisherigen Transceiver, `t_amp_en`
+  Via-2 25/15 ms, Sendefrequenz-Bereich Via-2 24150-24200 MHz, Messbeginn in `runcycle()` (Via-2: IC37 statt EN_ANA).
+- Via-2 neu (Joachim): HF-Frequenzmessung `mess_hf()` (Timer 0, CAP0.0 an P1.26), `hf_measurement()` (Taste STRT im
+  Hauptmenue), Transceiver-Menue mit Frequenzanzeige, "Module Frequency Characteristic" (`f_characteristic`), "Set Module
+  Frequency" (`set_single_dpp`); Verstaerkerabgleich `set_dpp` mit zwei Messkanaelen ohne MUX IC39.
+- Fuer alle Boards (Joachim): `fp.sprache` = (LANGUAGE<<4)|(OEM<<2)|Sprachindex, alle Leser maskieren `&0x03`, nach
+  Firmware-Update werden Sprachpaket/OEM nachgetragen; GSM CTS-Wartezeit 250 statt 200 Versuche, PWRKEY-Puls 600 ms;
+  Anzeige-Treiber bei POR/Brown-out frueh aus (Wartezeit 150+100 statt 250 ms); `Dis_CapCnt` setzt jetzt auch `T3CCR`
+  zurueck (vorher `T2CCR=T2CCR=0`); Statuszeile `;COMchg`; `test_i2c_device()` schaltet den Transceiver danach aus.
+- Bewusst **nicht** uebernommen: Joachims Entfernen des Ereignisses `REBOOT`/`T_reb[]` (bleibt), Entfernen von
+  `MQTT_fast_disconnect` in `reboot()` (bleibt), BT-Versorgung per `DIS_BT` (P1.16 bleibt ungetrieben, Pull-down = BT
+  ein; eigene BT-Abschaltung waere ein neues Thema, z. B. als Modul-Reset), Entfernen der `CSFLASH2`-Umschaltung in der
+  GPS-Erkennung, kuerzere POR-Wartezeit 50 -> 30 ms.
+
+**Annahmen, am Geraet zu pruefen:** auf dem bisherigen Board antwortet nichts auf I2C 0x5C; auf dem Via-2-Board ist
+IC37 ohne EN_ANA erreichbar; Via-2-Empfaenger und neues Mainboard treten nur zusammen auf.
+
+Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet.
+
+
+## Test 5.L1 am Geraet (Board B 26SC9983, 2026-11-13)
+
+Board B (26SC9983, Infoseite "V2", LTE, R125 nach GND, kein P0.19-Draht) mit 5.L1 per `flash_xmodem.py` (COM3)
+geflasht, danach 5 s stromlos ueber das Relais. Vorher lief 5.s1 (Lichtsensor).
+
+- **Erkennung: Via-2.** Board B hat also den Via-2-Empfaenger. Transceiver-Menue (Werksmenue Strg+W -> 4) zeigt die
+  Via-2-Fassung (5 Punkte, "Module Frequency Characteristic", "Set Module Frequency") und misst **24173 MHz**;
+  Strg+T im Hauptmenue misst **24174 MHz** (Bereich 24150-24200 MHz).
+- I2C-Scan: IC37 (0x42), IC58 (0x44), IC54 (0x46), IC35 (0x58), **IC32 (0x5C)** und 0x20 (VEML7700-Lichtsensor,
+  von 5.s1 bekannt). "I2C Devices" -> 92 liest die Register von IC32.
+- Hochlauf normal: BT `/PING` ok, `[BT-Zustand] BEREIT`, Banner "Version 5.L1". Protokoll nur I32 (Update) und
+  I1 (Eingeschaltet), keine Fehler; kein I17005, wie erwartet (erste Erkennung aus "unbekannt").
+- Online messen 20 s ohne Fehler (keine Fahrzeuge vor dem Radar, also keine Messwerte).
+- `bt_testlauf.py --profil kurz --nur reboot-check` zweimal bestanden (dropout und power, je BLE und Classic).
+
+**Werkzeug:** `bt_testlauf.py` und `ble_mainboard_test.py` erkannten Versionen mit Buchstaben (5.L1, 5.s1) nicht
+("Firmware None", "Banner NICHT gesehen" auch nach Stromzyklus). Die Versions-Regexe lassen jetzt einen Buchstaben
+nach dem Punkt zu; danach Banner nach Stromzyklus wieder erkannt. "Banner NICHT gesehen" beim kurzen Aussetzer und
+"BT-Init nicht gesehen" gab es schon mit 5.137 (fruehere Berichte), kein neuer Befund.
+
+**Befund im Code (Joachim 5.60 uebernommen, nicht behoben):** `test_i2c_device()` (sictst.c) benutzt `typ`
+uninitialisiert, wenn das Geraet nicht antwortet (Fehlercode-Auswahl und `transceiver(aus)`). Nur Testmenue; mit der
+naechsten Version `typ=0` vorbelegen.
+
+**Offen:** Board mit dem bisherigen Transceiver (Erkennung RADAR_TRX, kein Zugriff auf 0x5C, EN_ANA-Pfad) und der
+Wechsel des Empfaengers (I17005) sind noch nicht geprueft. Board B danach mit 5.L1 belassen.
+
+## Update 5.L2 (TEST, 2026-11-13): `test_i2c_device()` ohne uninitialisierte Variable
+
+**Symptom:** Werksmenue -> Component tests -> "I2C Devices" mit einer Adresse, unter der kein Baustein antwortet:
+Auswahl der Fehlermeldung (DPP oder Expander) und `transceiver(aus)` hingen von einem zufaelligen Speicherwert ab.
+**Ursache:** `typ` wurde nur gesetzt, wenn der Baustein antwortet (aus Joachim 5.60 uebernommen, Befund beim
+Geraetetest 5.L1). **Fix:** `typ=0` vorbelegt (sictst.c); ohne Antwort kommt jetzt immer die Expander-Meldung, der
+Transceiver wird nicht geschaltet. Nur Testmenue, Messbetrieb unveraendert.
+
+Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet (Board B laeuft mit 5.L1).

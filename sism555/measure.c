@@ -95,7 +95,7 @@ int measure (uchar speichern)	// Geschwindigkeitsmessung
 	} 
   
 	if (t_mess==0) break; 						// Absolute Messzeit�berwachung
-	if((int)(LenTm-(((t_mess+DPWR+DTXFEN+t_amp_en)*LenTm)/t_mess_max))>tmi)   
+	if((int)(LenTm-(((t_mess+DPWR+DTXFEN_T+t_amp_en)*LenTm)/t_mess_max))>tmi)   
    break; // Dynamische �berwachung Anzahl gemessener Dopplerperioden
  }	 // end while
  
@@ -134,7 +134,8 @@ void runcycle (void)				// Messzyklenbetrieb
  int speed=0, refresh=0;		// Messergebniss und Anzeigeauffrischung
  int cyclerest;							// Restzeit des 250ms Basiszyklus
 	
- FIO1SET = EN_ANA;						// Analogversorgung/Transceiver ein
+ if (IS_VIA2) write_i2c_dev (IC37,3,((0x00<<8)|0x02));	// 5.L1: Via-2 IC37 Enable Transceiver
+ else FIO1SET = EN_ANA;			// Analogversorgung/Transceiver ein
  get_dimmung ();							// Dimmfaktor bestimmen
  set_pwm(0,0);								// Externe und interne PWM setzen 	
  osDelay (50);								// warte bis Spannung ok

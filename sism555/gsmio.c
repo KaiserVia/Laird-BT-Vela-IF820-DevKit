@@ -61,7 +61,7 @@ int gsm_power (uchar mode)		// GSM Modem ein-/ausschalten
 {																		// �bergabe mode - 	Bit 0 - 0/1 = Funkmodem aus-/ein
 																		//									Bit 1 - 0/1 = MUX GSM Kanal deselect/select
  uchar power_restart=0;			// Flag f�r Modem Neustart
- uchar retry=200;						// Wiederholungen	
+ uchar retry=250;						// Wiederholungen (5.L1, Joachim 5.60: 200 -> 250)
  
  if (!mode)						// GSM abschalten, mode=0
  { 
@@ -90,7 +90,7 @@ int gsm_power (uchar mode)		// GSM Modem ein-/ausschalten
    FIO0CLR = GSM_DTR;				// DTR LO - Disable Modem Sleep 			
    osDelay (100);						// UC15 nur 0,03s Angabe
    FIO1CLR = PWRKEY;				// GSM PWRKEY Signal LOW
-	 osDelay (500); 		
+	 osDelay (600); 						// 5.L1 (Joachim 5.60): PWRKEY-Puls 500 -> 600 ms
    FIO1SET = PWRKEY;				// GSM PWRKEY Signal wieder HI	
    power_restart=1;					// Modem wurde neu gestartet 		
 	 gsmpower=1;			    		// GSM Power Status ein

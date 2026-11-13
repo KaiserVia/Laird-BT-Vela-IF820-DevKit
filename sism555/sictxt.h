@@ -271,8 +271,11 @@ extern text T_secret[];
 #define T_color			"- Color "
 #define T_expwm			"PWM extern"
 #define T_tmenu			"\n1. Adjust amplifier\n2. Transceiver on"
+#define T_tmenu2		"\n1. Adjust Amplifier\n2. Module Frequency Characteristic\n3. Set Module Frequency\n4. Transceiver On"	// 5.L1 Via-2
+#define T_plsmin2		"Change with +/- key."		// 5.L1 Via-2 Einzelpoti
 #define T_vtg				"Voltage"
 #define	T_imp				" imp1/s imp2/s imp3/s imp4/s"
+#define	T_imp2			" imp1/s imp2/s"					// 5.L1 Via-2: zwei Messkanaele
 #define T_value 		"\nValue"
 #define T_sbaud			"Select Baud rate\n1. 9600\n2. 115200\n3. 307200\n4. 460800"
 #define T_smodem		"Select Modem\n1. Bluetooth\n2. GSM/GPRS\n3. GPS"

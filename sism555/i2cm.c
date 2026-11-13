@@ -24,6 +24,7 @@
 #include "i2cm.h"
 #include "sio.h"
 #include "sictxt.h"
+#include "dtc_codes.h"
 
 
 const i2cdevices i2cdev[Anz_I2C_Devices]  = {	{0, 0, 0, 16, 0x80, "Unknown" },
@@ -31,6 +32,7 @@ const i2cdevices i2cdev[Anz_I2C_Devices]  = {	{0, 0, 0, 16, 0x80, "Unknown" },
 																			{0x44, 58, EXPD, 8, 0x48, "PCA9555"},
 																			{0x46, 54, EXPS, 4, 0x48, "PCA9554"},
 																			{0x58, 35, DPP, 11, 0x80, "MCP4461"},
+																			{0x5C, 32, DPP, 11, 0x80, "MCP4561"},
 																			{0x8A, 0, 0, 16, 0x80, "TCA6507"},
 																			{0x64, 61, RTC, 16, 0x80, "PTRTC"}};
 
@@ -105,9 +107,51 @@ int read_i2cdev (uchar dadr, uchar adrcom, uchar anz)		// I2C Device mit repeate
  return(-1);																				// R�ckgabe Misserfolg
 }
 
+uchar radar_detect (void)			// 5.L1: Radar-Empfaenger per Selbsttest bestimmen
+{															// Rueckgabe RADAR_VIA2 oder RADAR_TRX
+ // Merkmal: nur der Via-2-Empfaenger hat das Digitalpoti IC32 (0x5C). Der Test treibt keinen LPC-Pin, dessen Bedeutung
+ // zwischen den Hardwarestaenden wechselt. Antwortet IC32 nicht sofort, wird ueber IC37 nur P1.4 (Via-2: HF_DIS) als
+ // Ausgang LOW geschaltet (Transceiver ein) und nochmal gefragt. Auf dem bisherigen Board ist P1.4 ANT_EN1 und die
+ // Analogversorgung EN_ANA zu diesem Zeitpunkt aus - unschaedlich; InitI2C_Devices() setzt IC37 danach neu.
+ if (read_i2cdev (IC32,0x0C,2)>=0) return (RADAR_VIA2);						// Wiper 0 lesen, Antwort -> Via-2
+ if (write_i2c_dev (IC37,3,((0x0000<<8)|0x02)))										// IC37 Ausgangsregister P0/P1 = 0
+ {
+  write_i2c_dev (IC37,3,(((0xFFFF&~HF_DIS)<<8)|0x06));							// nur P1.4 als Ausgang
+  osDelay (DPWR_VIA2);																							// Versorgung abwarten
+  if (read_i2cdev (IC32,0x0C,2)>=0)
+  {
+   write_i2c_dev (IC37,3,((HF_DIS<<8)|0x02));											// Transceiver wieder aus
+   return (RADAR_VIA2);
+  }
+  write_i2c_dev (IC37,3,((HF_DIS<<8)|0x02));
+ }
+ return (RADAR_TRX);
+}
+
 int InitI2C_Devices (void)		// I2C Bausteine initialisieren
 {
  int result=1;
+ uchar typ;
+
+ typ=radar_detect();												// 5.L1: Radar-Empfaenger bei jedem Hochfahren pruefen
+ if (typ!=fp.radar)													// anders als gespeichert (oder noch unbekannt)?
+ {
+  if ((fp.radar==RADAR_TRX)||(fp.radar==RADAR_VIA2)) puterror (DTC_MA_RADAR_TYPE, typ);	// I17005 Wechsel melden
+  fp.radar=typ;															// neuen Typ merken (wird mit dem Parameterblock gesichert)
+ }
+ Init_Radar_Ports();												// Pins passend zum Empfaenger
+
+ if (IS_VIA2)																// Via-2: keine Analogversorgung EN_ANA, Transceiver per HF_DIS
+ {
+  if (write_i2c_dev (IC37,3,((HF_DIS<<8)|0x02)))					// IC37 P1.4 HF_DIS=1 -> Transceiver aus
+  {
+   write_i2c_dev (IC37,3,((0x0000<<8)|0x06));								// IC37 P0 und P1 Ausgaenge
+   fp.i2cdev|=IC37_b;																				// IC37 Initialisierung eintragen
+  }
+  else return (-1);
+ }
+ else
+ {
 	
  FIO1SET = EN_ANA;						// Analogversorgung/Transceiver ein	
  osDelay (50);								// warte bis Spannung ok
@@ -118,6 +162,7 @@ int InitI2C_Devices (void)		// I2C Bausteine initialisieren
   fp.i2cdev|=IC37_b;		// IC37 Initialisierung eintragen  
  }
  else return (-1);			// Misserfolg, IC37 zwingend notwendig f�r Analogsteuerung
+ } // end bisheriger Transceiver
  
  if (write_i2c_dev (IC58,3,((0<<16)|(0<<8)|0x06)))				// IC58 PCA9555 Ports alles Ausg�nge
  {	 
