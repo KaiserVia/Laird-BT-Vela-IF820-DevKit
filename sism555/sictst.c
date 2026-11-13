@@ -263,7 +263,7 @@ void test_i2c_device (void)				// Test I2C Devices
 {																	// Extern: i2cdev structure mit Device Parametern
  int result;											// Hilfsvariable I2C Abfrageergebnis
  int adr;													// Hilfsvariable Deviceadresse
- uchar i, typ, reg;								// Laufvariable, Hilfsvariable Device Typ und Register
+ uchar i, typ=0, reg;								// Laufvariable, Hilfsvariable Device Typ und Register; 5.L2: typ vorbelegt (Device antwortet nicht)
  uchar idl;												// Hilfsvariable Index Deviceliste mit Zusatzinfos	
  
  adr=getnumber ((char *)T_devadr , 1, 255);		// I2C Adresse einlesen

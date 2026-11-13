@@ -6575,3 +6575,13 @@ naechsten Version `typ=0` vorbelegen.
 
 **Offen:** Board mit dem bisherigen Transceiver (Erkennung RADAR_TRX, kein Zugriff auf 0x5C, EN_ANA-Pfad) und der
 Wechsel des Empfaengers (I17005) sind noch nicht geprueft. Board B danach mit 5.L1 belassen.
+
+## Update 5.L2 (TEST, 2026-11-13): `test_i2c_device()` ohne uninitialisierte Variable
+
+**Symptom:** Werksmenue -> Component tests -> "I2C Devices" mit einer Adresse, unter der kein Baustein antwortet:
+Auswahl der Fehlermeldung (DPP oder Expander) und `transceiver(aus)` hingen von einem zufaelligen Speicherwert ab.
+**Ursache:** `typ` wurde nur gesetzt, wenn der Baustein antwortet (aus Joachim 5.60 uebernommen, Befund beim
+Geraetetest 5.L1). **Fix:** `typ=0` vorbelegt (sictst.c); ohne Antwort kommt jetzt immer die Expander-Meldung, der
+Transceiver wird nicht geschaltet. Nur Testmenue, Messbetrieb unveraendert.
+
+Build: 0 Fehler, 0 Warnungen. Nicht am Geraet getestet (Board B laeuft mit 5.L1).

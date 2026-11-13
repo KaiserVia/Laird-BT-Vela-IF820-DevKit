@@ -63,7 +63,8 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - **2026-11-12 - 5.L1 (TEST), Branch `Integrate-Joachim-SW`:** Joachims Stand 5.60 (Mainboard V2, Via-2-Radarempfänger)
   integriert. Der Radar-Empfänger wird wie LTE/BT/GPS per Selbsttest erkannt (`fp.radar`, `radar_detect()` in i2cm.c);
   Pins, Transceiver, HF-Messung und Menüs richten sich danach. 2026-11-13 auf Board B (26SC9983) geprüft: als Via-2
-  erkannt, Sendefrequenz 24173 MHz, BT reboot-check bestanden; Board mit bisherigem Transceiver noch offen. Analyse:
+  erkannt, Sendefrequenz 24173 MHz, BT reboot-check bestanden; Board mit bisherigem Transceiver noch offen.
+  5.L2: nur `test_i2c_device()` korrigiert (uninitialisiertes `typ`). Analyse:
   `sism555/Doku/Integration_Joachim_V2.md`. Parallel-Branch `DevelopLightSensor` (VEML7700, Versionen 5.s1 ...) im
   Worktree `Projects\LightSensor`. Neue Worktrees brauchen `sism555\Objects\sism.sct` aus dem Hauptordner (nicht im Git).
 
