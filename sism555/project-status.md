@@ -6694,3 +6694,46 @@ meldet "Version 5.138", danach 10 s stromlos ueber das Relais.
 - Nicht geprueft: `online-bt` (MQTT-Server trennt seit 2026-11-12 20:12 sofort, siehe Dauerlauf), laengere Laeufe.
 - Auffaellig, nicht untersucht: Die Geraeteuhr steht auf 13.03.2026 (am 2026-11-12 noch 21.10.2026, "ungestellt").
 Board B bleibt mit 5.138.
+
+## Update 5.139 (TEST, 2026-11-13): Flash-Parameter-Absicherung
+
+Anlass: Review der Flash-Parameter-Aenderungen aus 5.L1/5.L2/5.s1/5.s2 (Joachim-Integration + Lichtsensor) im
+Vergleich mit 5.55 (`C:\viaTraffic\GitHub\Projects\sism555`). Aufbau und Groesse von `fp` sind unveraendert
+(`sizeof(flashparameter)` bleibt 2048 Byte = `PARA_LEN`), nur das alte Fuellbyte `fuellbyte1` ist seit 5.L1 als
+`fp.radar` belegt - das war schon vorher so dokumentiert und bestaetigt sich. Zwei Nebenwirkungen gefunden und
+behoben:
+
+**1. `fp.sprache`: LANGUAGE/OEM-Bits entfernt.** 5.L1 (Joachim 5.60) hatte `fp.sprache` um Sprachpaket (`LANGUAGE`,
+Bits 6:4) und OEM (Bits 3:2) erweitert, geschrieben in `werkparameter()` (flash.c) und nach jedem Firmware-Update
+(main.c). Diese Bits wurden nirgends gelesen - reiner Schreibwert. Problem: Aeltere Firmware (5.55, auch noch
+5.137) nutzt `fp.sprache` **ungemaskt** als Index in `T_spritm[]`/`T_ja[]`/`T_nein[]`
+(`sicom.c`/`sio.c`). Ein Geraet, das mit 5.L1-5.138 lief und dann auf eine aeltere Version zurueckgeflasht wird,
+haette dort einen Wert >2 stehen - Zugriff ausserhalb der Sprachtabellen (fehlerhafte Sprachauswahl, in `sio.c`
+betrifft das auch die Ja/Nein-Abfrage). Fix: Die Bits nicht mehr schreiben, `fp.sprache` traegt wieder nur den
+Sprachindex (0-2). Der bestehende Fix in main (`fp.sprache&0x03` in `sicom.c`/`sio.c`, 5.L1) bleibt als
+Sicherheitsnetz, falls ein Geraet die alten Bits noch gesetzt hat. **Nicht reparierbar: Geraete, die zwischen
+5.L1 und jetzt bereits auf eine Firmware vor diesem Fix zurueckgeflasht wurden** - das muesste am Geraet durch
+einmalige Neuwahl der Sprache im Menue behoben werden.
+
+**2. `fp.autotime_off`: nie initialisiert.** Das Feld (seit 5.16-5.29 Teil der Struktur, vorher Fuellbyte) wurde in
+`werkparameter()` nie explizit gesetzt - neue UND bestehende Geraete behalten dort den Zufallswert, den das
+RAM beim allerersten Werksstart zufaellig hatte (`fp` ist `__noinit`). `rtc.c:280` prueft nur `==1`, das
+Risiko war klein (1/256), aber real: traf der Zufallswert zufaellig auf 1, lief die automatische Zeitumstellung
+unbemerkt nicht. Fix: `werkparameter()` setzt `fp.autotime_off=0` (ein) explizit; zusaetzlich normalisiert der
+Firmware-Update-Zweig in `main.c` (laeuft einmalig nach jedem Update, `fp` ist zu diesem Zeitpunkt schon aus dem
+Flash geladen) einen etwaigen Altwert >1 auf 0 - trifft genau die Geraete, die das Feld noch nie gesetzt
+bekommen haben.
+
+**3. Compile-Zeit-Pruefung gegen unbemerktes Verschieben.** Die bestehende Laufzeitpruefung in `InitParameter()`
+(flash.c: `sizeof(fp)>PARA_LEN`) erkennt nur ein Wachsen der Struktur. Wird sie durch ein entferntes/verkleinertes
+Feld kleiner, verschieben sich alle Felder danach im Flash lautlos, ohne dass irgendeine Pruefung anschlaegt. Neu
+in `hard.h` direkt nach der Struktur: `typedef char fp_layout_frozen_check[(sizeof(flashparameter)==2048) ? 1 :
+-1];` - Baubruch, falls sich die Groesse aendert (gewollt; bei einer bewusst gewuenschten Groessenaenderung den
+Wert 2048 mit anpassen). 2048 Byte mit dem aktuellen Build bestaetigt (`Listings/sism.map`, Symbol `fp`, Data 2048).
+
+**Nicht angefasst:** Die freien Bits 7:4 in `fp.radar` (Bits 3:2 reserviert fuer den Mainboard-Typ aus 5.s2, noch
+nicht in `main` gemergt) bleiben frei. Eine erneute Nutzung dieses Bytes fuer Diagnosezwecke (OEM/Sprachpaket o.ae.)
+sollte, falls spaeter gebraucht, bewusst und mit eigenem Versionshinweis erfolgen, nicht durch stille
+Wiederverwendung eines "freien" Bytes wie beim jetzt entfernten Fall.
+
+**Build:** 0 Fehler, 0 Warnungen. `sism.bin` 175520 Byte. Noch nicht am Geraet getestet.

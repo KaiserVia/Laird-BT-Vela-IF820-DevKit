@@ -275,7 +275,10 @@ uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
  clean_cpy (T_version, fp.pVersion, sizeof(fp.pVersion));				// Neue Programmversion nach Parameterblock 
  clean_cpy (T_def_hw_rev,fp.hwVersion,sizeof(fp.hwVersion));		// Default Hardware Revision setzen
  fp.i2cdev=0;											// Reset installierte I2C Baugruppen   
- fp.sprache=(LANGUAGE<<4)|(OEM<<2)|Def_sprache;	// 5.L1 (Joachim 5.60): Sprachpaket, OEM und Sprachindex
+ fp.sprache=Def_sprache;					// Nur Sprachindex (5.139: LANGUAGE/OEM-Bits wieder entfernt - wurden nirgends
+																					// gelesen und machten fp.sprache fuer aeltere Firmware beim Zurueckflashen
+																					// ungueltig, siehe project-status.md Update 5.139)
+ fp.autotime_off=0;								// 5.139: Automatische Zeit ein (Default) - vorher nie explizit gesetzt
  fp.psets=Def_paraset;						// Default Anzahl Parameters�tze
  for (i=0;i<MAXTAST;i++) 					// F�r alle definierbaren Tastverh�ltnisse
   fp.hell[i]=Def_hell;						// Helligkeit = Tastverh�ltniss einstellen
