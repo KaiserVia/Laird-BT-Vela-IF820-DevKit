@@ -679,13 +679,13 @@ void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
 
 void Init_Radar_Ports (void)	// 5.L1: Pins abhaengig vom Radar-Empfaenger (fp.radar) setzen
 {															// Unbekannt: P1.20, P1.21, P1.26, P4.29 bleiben Eingang
- if (fp.radar==RADAR_VIA2)
+ if (RADAR_TYP==RADAR_VIA2)			// 5.s2: Bit 3:2 von fp.radar = Mainboard
  {
   FIO1DIR&=~(DA_SS|FMin);					// P1.20 D/A-Wandler und P1.26 HF-Messeingang nicht treiben
   FIO1SET=DIS_MESS; FIO1DIR|=DIS_MESS;	// Ausgabe Fhf/8388608 aus
   FIO4CLR=DIS_IF;   FIO4DIR|=DIS_IF;		// Transceiver-Verstaerker ein
  }
- else if (fp.radar==RADAR_TRX)
+ else if (RADAR_TYP==RADAR_TRX)
  {
   FIO1DIR&=~DIS_MESS; FIO4DIR&=~DIS_IF;	// P1.21 Testkopplung und P4.29 wie bisher Eingang
   FIO1SET=USB_RPWR;										// USB 5V Regler ein

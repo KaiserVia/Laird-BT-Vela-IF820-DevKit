@@ -30,11 +30,22 @@
 //            Linearitaetskorrektur fuer > 1000 lx ist nicht umgesetzt, die
 //            Anzeige ist dort ohnehin nahezu voll hell.
 //-----------------------------------------------------------------------------
+//  ERKENNUNG (5.s2): Der VEML7700 ist das Merkmal fuer Mainboard V2. Die
+//            Version steht in fp.radar Bit 3:2 (BOARD_xxx in hard.h) und wird
+//            wie bei BT/LTE/GPS nur beim Hochfahren geprueft (board_detect(),
+//            nicht nach Deep-Sleep- oder Update-Reset): passt der gespeicherte
+//            Stand (ein I2C-Zugriff), geht es sofort weiter; sonst voller Test
+//            (Konfiguration schreiben und zuruecklesen, bis LS_DETECT_TRY mal),
+//            bei einem Wechsel Info I17006 und Neustart des Sensorzustands.
+//-----------------------------------------------------------------------------
 //  CREATED :   2026-11-12 (5.s1)
 //-----------------------------------------------------------------------------
 
 #include "lightsens.h"
 #include "i2cm.h"
+#include "sio.h"
+#include "dtc_codes.h"
+#include "rtc.h"
 
 // VEML7700 Register (Kommandocodes)
 #define		VEML_CONF			0x00			// ALS_CONF_0: Verstaerkung, Integrationszeit, Shutdown
@@ -51,16 +62,46 @@ static const ushort ls_gcode[LS_GAINS] = {0x0800, 0x0000, 0x1800, 0x1000};	// AL
 static const ushort ls_res[LS_GAINS]   = {336, 672, 2688, 5376};						// Aufloesung bei 100 ms in 1/10 mlx je Zaehlwert
 static text * const ls_gtext[LS_GAINS] = {"x2", "x1", "x1/4", "x1/8"};
 
-enum { LS_UNKNOWN=0, LS_ABSENT, LS_PRESENT };	// Sensor nach jedem Reset neu pruefen
-
-static uchar ls_state=LS_UNKNOWN;
-
 // Ueberstehen den Deep-Sleep-Reset (SLEEP_RES), gueltig nur mit ls_magic==LS_MAGIC
 static uint ls_magic		__noinit;
 static uint ls_clux			__noinit;		// letzter gueltiger Messwert in 1/100 lx
 static uint ls_calls		__noinit;		// Aufrufe von lightsens_dimm() seit der letzten Messung
 static uchar ls_gain		__noinit;		// Index Verstaerkung
 static uchar ls_valid		__noinit;		// 1 = ls_clux gueltig
+static uint ls_sig_h		__noinit;		// 5.s2: fp.hcount beim letzten Signal (Lichtsensor lebt)
+static uchar ls_err			__noinit;		// 5.s2: V2 Messversuche in Folge ohne Antwort
+static uchar ls_bad			__noinit;		// 5.s2: 1 = V2 VEML7700 defekt (W17007 gemeldet)
+static uchar ls_stuck		__noinit;		// 5.s2: 1 = W17008 gemeldet
+static uchar ls_clk			__noinit;		// 5.s2: 1 = Uhr seit dem Kaltstart gestellt (g_timesrc geht bei jedem Deep-Sleep-Reset verloren)
+static uchar ls_noclk		__noinit;		// 5.s2: 1 = W17009 gemeldet
+static uchar ls_mode		__noinit;		// 5.s2: aktuelle Regelung LS_MODE_xxx
+
+static void ls_reset_state (void)	// Sensorzustand neu beginnen (Kaltstart, ungueltige Daten, Mainboard gewechselt)
+{
+ ls_magic=LS_MAGIC;
+ ls_gain=1;																					// Start mit x1
+ ls_valid=0;
+ ls_calls=LS_EVERY;																	// sofort messen, sobald die Anzeige dunkel ist
+ ls_sig_h=fp.hcount;																// 48-h-Frist beginnt neu
+ ls_err=0; ls_bad=0; ls_stuck=0;
+ ls_clk=0; ls_noclk=0; ls_mode=LS_MODE_SENSOR;
+}
+
+static void ls_state_ok (void)		// __noinit-Daten gueltig? Sonst neu beginnen
+{
+ if ((ls_magic!=LS_MAGIC) || (ls_gain>=LS_GAINS)) ls_reset_state();
+}
+
+static void ls_signal (bool seen)	// 5.s2: Signal gesehen? Sonst nach LS_STUCK_H Betriebsstunden einmal W17008
+{
+ if (seen) { ls_sig_h=fp.hcount; ls_stuck=0; return; }
+ if (!ls_stuck && ((uint)(fp.hcount-ls_sig_h)>=LS_STUCK_H))
+ {
+  ls_stuck=1;
+  puterror (DTC_MA_LS_NOSIGNAL, BOARD_TYP ? BOARD_TYP>>2 : 3);	// Wert 1 = V1 (Fotodiode), 2 = V2 (VEML7700), 3 = unbekannt
+																		// (nie 0: puterror_dtc() verwirft Wert 0 ohne Ausgabe/Protokoll)
+ }
+}
 
 static bool ls_write_conf (bool on)	// ALS_CONF schreiben: Verstaerkung, 100 ms, an/aus
 {
@@ -87,6 +128,7 @@ static int ls_measure_once (uint *raw, uchar *gain)	// Eine Messung (blockiert L
  if (r<0) return (-1);
  *raw=(uint)r;
  *gain=ls_gain;
+ ls_signal ((r>=LS_RAW_SIG) && !((r>=65535) && (ls_gain==LS_GAINS-1)));	// 5.s2: 0 oder Anschlag bei x1/8 = kein Signal
  if ((r>=LS_RAW_HIGH) && (ls_gain<LS_GAINS-1)) { ls_gain++; return (-2); }	// uebersteuert -> unempfindlicher
  clux=(uint)r*ls_res[ls_gain]/100;				// 1/10 mlx -> 1/100 lx (max. 65535*5376 passt in 32 Bit)
  if ((r<LS_RAW_LOW) && ls_gain) ls_gain--;	// naechste Messung empfindlicher
@@ -121,21 +163,104 @@ text * lightsens_gaintext (uchar gain)
  return ((gain<LS_GAINS) ? ls_gtext[gain] : "?");
 }
 
-bool lightsens_present (void)		// VEML7700 vorhanden? Erster Aufruf nach Reset prueft (Sensor wird dabei abgeschaltet)
-{
- if (ls_state==LS_UNKNOWN)
+static bool ls_verify (void)			// Voller Test: ALS_CONF (Shutdown) schreiben und zuruecklesen
+{																	// true nur, wenn der Baustein auf 0x10 genau den VEML7700-Wert liefert
+ int r;
+ uchar t;
+
+ for (t=0; t<LS_DETECT_TRY; t++)
  {
-  if ((ls_magic!=LS_MAGIC) || (ls_gain>=LS_GAINS))	// Kaltstart oder ungueltige Daten
-  {
-   ls_magic=LS_MAGIC;
-   ls_gain=1;																				// Start mit x1
-   ls_valid=0;
-   ls_calls=LS_EVERY;															// sofort messen, sobald die Anzeige dunkel ist
-  }
-  if ((fp.i2cdev&I2CB0) && ls_write_conf(false)) ls_state=LS_PRESENT;	// antwortet -> Mainboard V2
-  else ls_state=LS_ABSENT;																						// kein ACK -> V1, Fotodiode
+  if (t) osDelay (5);
+  if (!ls_write_conf(false)) continue;										// kein ACK
+  r=read_i2cdev (VEML7700, VEML_CONF, 2);
+  if (r<0) continue;
+  r=((r&0xFF)<<8)|((r>>8)&0xFF);													// LSB zuerst
+  if (r==(int)(ls_gcode[ls_gain]|VEML_SD)) return (true);	// Verstaerkung, 100 ms, Shutdown wie geschrieben
  }
- return (ls_state==LS_PRESENT);
+ return (false);
+}
+
+void board_detect (void)				// 5.s2: Mainboard V1/V2 beim Hochfahren pruefen (I2C-Bus muss bereit sein)
+{
+ uchar alt=BOARD_TYP, neu;
+
+ ls_state_ok();																					// Kaltstart oder ungueltige Daten
+
+ if ((alt==BOARD_V2) && ls_write_conf(false)) { ls_err=0; ls_bad=0; return; }	// schnell: Sensor antwortet wie gespeichert
+ if ((alt==BOARD_V1) && !ls_write_conf(false)) return;	// schnell: weiterhin kein Sensor
+ neu=ls_verify() ? BOARD_V2 : BOARD_V1;									// unbekannt oder Abweichung: voller Test
+ if ((alt==BOARD_V2) && (neu==BOARD_V1))								// gespeichert V2, Sensor antwortet nicht: Das Mainboard (mit dem
+ {																											// Parameter-Flash) ist dasselbe geblieben, also VEML7700 defekt
+  if (!ls_bad) puterror (DTC_MA_LS_DEFEKT, 1);					// W17007 Wert 1 = beim Hochfahren (nicht 0, siehe ls_signal)
+  ls_bad=1; ls_err=LS_ERR_MAX;
+  return;																								// bleibt V2, feste Helligkeit LS_DIM_DEFEKT
+ }
+ if (neu==alt) return;																	// Einzelfehler beim schnellen Zugriff, Stand bestaetigt
+ if (alt!=BOARD_UNBEKANNT) puterror (DTC_MA_BOARD_TYPE, neu>>2);	// I17006 Wechsel melden (1 = V1, 2 = V2)
+ fp.radar=(fp.radar&~BOARD_MASK)|neu;										// merken (wird mit dem Parameterblock gesichert)
+ ls_reset_state();																			// Sensorzustand neu beginnen
+}
+
+text * board_text (void)
+{
+ return (BOARD_TYP==BOARD_V2 ? "V2" : BOARD_TYP==BOARD_V1 ? "V1" : "unbekannt");
+}
+
+bool lightsens_diode_check (uint adc)	// 5.s2: V1 Fotodiode ueberwachen: 0 (offen) oder Anschlag = kein Signal
+{																				// false = 48 h ohne Signal (W17008) -> Ersatzregelung
+ ls_state_ok();
+ ls_signal ((adc>LS_ADC_SIG_LO) && (adc<LS_ADC_SIG_HI));
+ if (!ls_stuck) ls_mode=LS_MODE_SENSOR;
+ return (!ls_stuck);
+}
+
+uint lightsens_fallback (void)		// 5.s2: Ersatz-Dimmfaktor, wenn der Sensor nicht geht
+{
+ uchar h;
+
+ ls_state_ok();
+ if (g_timesrc!=SRC_NONE) ls_clk=1;				// Uhr wurde seit dem Kaltstart gestellt (Backend, GPS, Netz, manuell)
+ if (!ls_clk)
+ {
+  if (!ls_noclk) { ls_noclk=1; puterror (DTC_MA_LS_NOCLK, -1); }	// W17009 einmal je Kaltstart
+  ls_mode=LS_MODE_FEST;
+  return (LS_DIM_NOCLK);										// Uhr nicht gestellt: dauerhaft 50 %
+ }
+ ls_mode=LS_MODE_UHR;
+ h=HOUR;																		// Ortszeit der Geraeteuhr
+ return (((h>=LS_TAG_VON) && (h<LS_TAG_BIS)) ? LS_DIM_TAG : LS_DIM_NACHT);
+}
+
+uchar lightsens_mode (void)
+{
+ return ((ls_magic==LS_MAGIC) ? ls_mode : LS_MODE_SENSOR);
+}
+
+text * lightsens_modetext (void)
+{
+ switch (lightsens_mode())
+ {
+  case LS_MODE_UHR:  return ("Ersatz nach Uhrzeit");
+  case LS_MODE_FEST: return ("Ersatz fest 50 % (Uhr nicht gestellt)");
+  default:           return ("Sensor");
+ }
+}
+
+int lightsens_nosig_h (void)		// Betriebsstunden seit dem letzten Signal, -1 = unbekannt
+{
+ if (ls_magic!=LS_MAGIC) return (-1);
+ return ((int)(fp.hcount-ls_sig_h));
+}
+
+bool lightsens_defekt (void)		// V2 und VEML7700 antwortet nicht (W17007)
+{
+ return (IS_BOARD_V2 && (ls_magic==LS_MAGIC) && ls_bad);
+}
+
+bool lightsens_present (void)		// VEML7700 vorhanden? Nach der gespeicherten Mainboard-Version, ohne I2C-Zugriff
+{
+ ls_state_ok();																					// z. B. erster Aufruf ohne board_detect()
+ return (IS_BOARD_V2 && (fp.i2cdev&I2CB0));
 }
 
 int lightsens_dimm (void)				// Dimmfaktor aus dem VEML7700, -1 = kein Sensor
@@ -152,7 +277,15 @@ int lightsens_dimm (void)				// Dimmfaktor aus dem VEML7700, -1 = kein Sensor
   clux=ls_measure_once(&raw, &gain);
   if (clux==-2) ls_calls=LS_EVERY;					// uebersteuert -> beim naechsten Aufruf neu messen
   else ls_calls=0;													// gemessen oder Lesefehler (letzten Wert behalten,
- }																						// naechster Versuch nach LS_EVERY Aufrufen)
+  if (clux==-1)															// naechster Versuch nach LS_EVERY Aufrufen)
+  {
+   if (ls_err<LS_ERR_MAX) ls_err++;
+   if ((ls_err>=LS_ERR_MAX) && !ls_bad) { ls_bad=1; puterror (DTC_MA_LS_DEFEKT, 2); }	// W17007 Wert 2 = im Betrieb
+  }
+  else { ls_err=0; ls_bad=0; }							// Sensor antwortet (wieder)
+ }
+ if (ls_bad || ls_stuck) return ((int)lightsens_fallback());	// 5.s2: Sensor geht nicht -> Uhrzeit oder fest
+ ls_mode=LS_MODE_SENSOR;
  if (!ls_valid) return ((int)dimm);					// noch kein Messwert: Dimmfaktor halten
  return ((int)lightsens_lux2dimm(ls_clux));
 }

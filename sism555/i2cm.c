@@ -25,6 +25,7 @@
 #include "sio.h"
 #include "sictxt.h"
 #include "dtc_codes.h"
+#include "lightsens.h"						// 5.s2: board_detect()
 
 
 const i2cdevices i2cdev[Anz_I2C_Devices]  = {	{0, 0, 0, 16, 0x80, "Unknown" },
@@ -134,12 +135,13 @@ int InitI2C_Devices (void)		// I2C Bausteine initialisieren
  uchar typ;
 
  typ=radar_detect();												// 5.L1: Radar-Empfaenger bei jedem Hochfahren pruefen
- if (typ!=fp.radar)													// anders als gespeichert (oder noch unbekannt)?
+ if (typ!=RADAR_TYP)													// anders als gespeichert (oder noch unbekannt)?
  {
-  if ((fp.radar==RADAR_TRX)||(fp.radar==RADAR_VIA2)) puterror (DTC_MA_RADAR_TYPE, typ);	// I17005 Wechsel melden
-  fp.radar=typ;															// neuen Typ merken (wird mit dem Parameterblock gesichert)
+  if ((RADAR_TYP==RADAR_TRX)||(RADAR_TYP==RADAR_VIA2)) puterror (DTC_MA_RADAR_TYPE, typ);	// I17005 Wechsel melden
+  fp.radar=(fp.radar&~RADAR_MASK)|typ;															// neuen Typ merken (wird mit dem Parameterblock gesichert)
  }
  Init_Radar_Ports();												// Pins passend zum Empfaenger
+ board_detect();													// 5.s2: Mainboard V1/V2 (Lichtsensor) pruefen, Ergebnis in fp.radar Bit 3:2
 
  if (IS_VIA2)																// Via-2: keine Analogversorgung EN_ANA, Transceiver per HF_DIS
  {

@@ -226,7 +226,20 @@
 #define		RADAR_UNBEKANNT	0			// noch nicht bestimmt
 #define		RADAR_TRX			1				// bisheriger Transceiver (Analogversorgung EN_ANA, IC37 HF_EN/ANT_EN1/ANT_EN2)
 #define		RADAR_VIA2		2				// Via-2-Empfaenger (IC37 HF_DIS, Digitalpoti IC32 auf 0x5C, HF-Frequenzmessung)
-#define		IS_VIA2				(fp.radar==RADAR_VIA2)
+#define		RADAR_MASK		0x03		// 5.s2: fp.radar ist das Hardware-Byte, Bit 1:0 Radar-Empfaenger, Bit 3:2 Mainboard
+#define		RADAR_TYP			(fp.radar&RADAR_MASK)
+#define		IS_VIA2				(RADAR_TYP==RADAR_VIA2)
+
+// 5.s2: Mainboard-Version in fp.radar Bit 3:2, per Selbsttest beim Hochfahren bestimmt (board_detect() in lightsens.c).
+// Merkmal ist der Lichtsensor: V1 hat die Fotodiode SFH213 und immer den bisherigen Transceiver, V2 den VEML7700 (IC1,
+// I2C 0x10) und den bisherigen Transceiver oder Via-2. Gespeichert wie die anderen Baugruppen: beim Hochfahren nur
+// kurz pruefen, bei "unbekannt" oder Abweichung voller Test. Parameterlayout unveraendert, alte Parameter haben hier 0.
+#define		BOARD_MASK		0x0C
+#define		BOARD_UNBEKANNT	0x00		// noch nicht bestimmt
+#define		BOARD_V1			0x04		// Mainboard V1, Fotodiode
+#define		BOARD_V2			0x08		// Mainboard V2, Lichtsensor VEML7700
+#define		BOARD_TYP			(fp.radar&BOARD_MASK)
+#define		IS_BOARD_V2		(BOARD_TYP==BOARD_V2)
 
 // Voreinstellungen Werksinitialisierung
 #define		Def_sprache	  0				// Erste indizierte Sprache

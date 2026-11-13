@@ -285,7 +285,9 @@ void get_dimmung (void)		// Umgebungshelligkeit messen und Dimmfaktor bestimmen
  else																// Mainboard V1: Fotodiode SFH213 wie bisher
  {
   bright=get_brightness ();					// Umgebungshelligkeit messen
-  sensor=(200000+bright*bright-bright*bright*bright/1515-525*bright)/1000;
+  if (lightsens_diode_check (bright))	// 5.s2: Fotodiode liefert Signal (sonst W17008 nach 48 h)
+   sensor=(200000+bright*bright-bright*bright*bright/1515-525*bright)/1000;
+  else sensor=lightsens_fallback ();	// 5.s2: Ersatz nach Uhrzeit oder fest 50 %
  }
  dimm+=(sensor>>2)-(dimm>>2);				// Expo. Gl�ttung
  if (fp.ledspot)			   						// LED Warnleuchte?

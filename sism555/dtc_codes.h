@@ -77,6 +77,10 @@
 #define DTC_MA_I2C_DPP          17003   /* I2C DPP fehlt */
 #define DTC_MA_TCA6507          17004   /* LED-Treiber TCA6507 fehlt */
 #define DTC_MA_RADAR_TYPE       17005   /* Radar-Empfaenger anders als gespeichert (Info, Wert = neuer Typ) */
+#define DTC_MA_BOARD_TYPE       17006   /* Mainboard V1/V2 anders als gespeichert (Info, Wert = neue Version 1/2) */
+#define DTC_MA_LS_DEFEKT        17007   /* V2: Lichtsensor VEML7700 antwortet nicht (Wert 1 = Hochlauf, 2 = Betrieb) */
+#define DTC_MA_LS_NOSIGNAL      17008   /* Lichtsensor ohne Signal seit LS_STUCK_H Betriebsstunden (Wert 1 = V1, 2 = V2, 3 = unbekannt) */
+#define DTC_MA_LS_NOCLK         17009   /* Lichtsensor geht nicht und Uhr nicht gestellt: Anzeige fest 50 % */
 
 /* --- Subsystem 18: Hardware/libtool (libtool.c) -------------------- */
 #define DTC_LIB_GSM_ERR         18001   /* GSM-Fehler in libtool */

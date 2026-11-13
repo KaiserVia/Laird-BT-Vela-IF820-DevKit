@@ -509,6 +509,11 @@ void licht_test (void)		// Test des Lichtsensors
 {
 
  putln(T_ende);							// Text "Ende mit Return
+ putstr("Mainboard = "); putstr(board_text());				// 5.s2: gespeicherte Mainboard-Version
+ if (lightsens_defekt()) putstr("  VEML7700 DEFEKT (W17007)");
+ if (lightsens_nosig_h()>=0) { putstr("  Signal vor "); putnumber((uint)lightsens_nosig_h(),0); putstr(" h"); }
+ newline();
+ putstr("Regelung = "); putstr(lightsens_modetext()); newline();	// 5.s2: Sensor / Ersatz nach Uhrzeit / fest 50 %
  put2str(T_licht,T_ist);
  clear_all();								// Led und Schalter aus
 	
@@ -528,6 +533,7 @@ void licht_test (void)		// Test des Lichtsensors
     putnumber((uint)clux/100,6); putc('.'); putnumber((uint)clux%100,0xC2); putstr(" lx  roh ");
     putnumber(raw,5); putstr("  Verst. "); putstr(lightsens_gaintext(gain));
     putstr("  Dimm "); putnumber(lightsens_lux2dimm((uint)clux),3);
+    putstr("  AD "); putnumber(get_brightness(),4);	// 5.s2: Fotodioden-Eingang (auf V2 ohne Fotodiode)
    }
    newline();
    if (getkey(500)>=0) break;				// Abbruch bei Zeichenempfang/Schnittstellenwechsel
