@@ -6960,3 +6960,13 @@ Geraet im Transceivermenue.
 **Kurztest 5.144** (`Testreports/2026-11-13_14-17-55_radar_kurz/`): 15 von 15 bestanden. Strg+T misst jetzt ueber
 `hf_measure_khz()` (eingeschwungen, Median, gerundet): 10 x 24169-24170 MHz, Median 24170 bei Ziel 24170,0; Menue
 24169,5 / 24169,2 MHz. Der Abstand zwischen den Messwegen ist damit weg.
+## Update 5.144 (TEST, 2026-11-13): Strg+T misst wie Menue und Nachfuehrung
+
+**Symptom (Joachim-Sitzung, radar_v2_test kurz auf 5.143):** Strg+T zeigte reproduzierbar ca. 3,5 MHz mehr als das
+Transceivermenue (24173 gegen 24169,5 MHz bei Ziel 24170), keine Einzelausreisser.
+**Ursache:** `hf_measurement()` mass 2 ms nach dem Einschalten mit einer Einzelmessung. Direkt nach dem Einschalten
+liegt die Frequenz hoeher; Fahrzeugmessung und Nachfuehrung messen erst nach DPWR bzw. der RE/-Zeit. (Abschneiden
+in `HF_const/result` scheidet aus, es verschiebt nach unten.)
+**Fix:** `hf_measurement()` nutzt `hf_measure_khz()` (DPWR, Leermessung, Median aus 7). Ausgabe weiter in ganzen MHz,
+jetzt gerundet.
+**Test Board B:** 5.143 Strg+T 10x: 24171-24173, Menue 24169,2 MHz. 5.144 Strg+T 10x: 24169-24170, Menue 24169,2 MHz.
