@@ -197,8 +197,16 @@ void runcycle (void)				// Messzyklenbetrieb
 			 PINMODE3&=~PULLDOWN;					// PULL-UP - Bluetooth Modul abschalten
 			 bt_sm_off();									// 5.130: Zustand AUS (nach Wiedereinschalten -> BOOT-Event)
 			}	
-			else bt_time--;								// Verbindungszeitz�hler Bluetooth herunter z�hlen 
-		 }			 
+			else bt_time--;								// Verbindungszeitz�hler Bluetooth herunter z�hlen
+		 }
+		 // 5.147 (Review 2.2) Sicherheitsnetz: CYSPP-Pin (low aktiv) und Software-Zustand vergleichen. Ging ein BT-Verbinden
+		 // oder -Trennen verloren (z. B. in clear_comchange()), loest die naechste Minute communication_change() aus.
+		 // Nur mit versorgtem Modul (nach BT_TIMEOUT liest CYSPP ohne Verbindung LOW) und ohne aktiven Thread.
+		 if ((fp.btmodem==IF820) && (interfaces&BT_LINK) && !bt_cyspp_out && BT_MODULE_ON && !osActiveThread)
+		 {
+		  int st=get_com_status();
+		  if ((st>=0) && ((((st&BT_LINK)==0)) != ((connect&BT_LINK)!=0))) thread_comchange=1;
+		 }
 		 if (mqtt_state) t_mqtt_status++;				// Erh�he Minutenz�hler f�r MQTT Status Versand
 		 if (!MIN) fp.hcount++;					// Wenn MIN=0 Betriebsstundenz�hler erh�hen	 
 		 if (mqtt_md_simu&&(!osActiveThread)) md_simulation ((MIN&0x1F)+1, 0);		// Erzeuge Messdaten im Speicher		

@@ -598,9 +598,16 @@ void clear_comchange (void)		// Bereinige Schnittstellenwechsel z. B. nach Modem
  {
   state=get_com_status();  					// Status serielle Schnittstellen aktualisieren	 
 	if (state>=0)														// Baustein gelesen?
-  {		
-	 if (!osActiveThread) comstate=state;		// Kein Verbindungsthread aktiv - Status aktualisieren
-	 else thread_comchange=1;								// comchange merken 	
+  {
+	 // 5.147 (Review 2.2): Zweck ist, die Stoerflanke beim Ein-/Ausschalten von GSM/GPS zu verwerfen. Faellt in dasselbe
+	 // Fenster ein echtes BT-Verbinden/-Trennen (CYSPP, low aktiv) oder ein RS232-Wechsel, ging es bisher verloren:
+	 // Trennen verloren -> putb() wartet auf CTS, RS232 traege bis BT_TIMEOUT; Verbinden verloren -> kein Banner/PIN.
+	 // Weicht der gelesene Zustand vom Software-Zustand ab, deshalb communication_change() ausloesen statt verwerfen.
+	 // War es doch nur die Stoerflanke, findet communication_change() beim erneuten Lesen keinen Unterschied.
+	 uchar bt_differs=(interfaces&BT_LINK) && !bt_cyspp_out &&
+	                  (((state&BT_LINK)==0) != ((connect&BT_LINK)!=0));
+	 if (osActiveThread || bt_differs || ((state^comstate)&RS232_LINK)) thread_comchange=1;	// comchange merken
+	 else comstate=state;										// Kein Verbindungsthread aktiv, nur Stoerflanke - Status aktualisieren
 	}	
  }	 
  comchange=0;												// reset Flag Schnittstellenwechsel 

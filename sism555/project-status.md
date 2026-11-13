@@ -7012,3 +7012,18 @@ IF820), F11010, BT aus bis zum naechsten Stromzyklus; beim Sichern stand "kein B
 **Test Board B:** Testbuild (`BT_TEST_LATE 1`) nach Stromzyklus: "detection skipped", "-> IF820 kept, retry every
 minute", W11020, keine Laird/RN4678-Befehle; nach dem ersten Minutentakt I11021 (1 Versuch), danach BLE-smoke bestanden.
 Auslieferungsbuild (`BT_TEST_LATE 0`) nach Stromzyklus: BLE-smoke und Classic-smoke bestanden.
+
+## Update 5.147 (TEST, 2026-11-13): Review 2.2 - verschlucktes BT-Verbinden/-Trennen
+
+**Symptom (Review):** `clear_comchange()` verwirft nach dem Ein-/Ausschalten von GSM/GPS die Stoerflanke am Schnittstellen-
+Interrupt. Fiel ein echtes BT-Verbinden/-Trennen in dasselbe Fenster, war es weg: Trennen verloren -> `putb()` wartet auf
+CTS, RS232 traege bis BT_TIMEOUT (6 min); Verbinden verloren -> kein Banner/PIN, kein Timeout raeumt auf.
+**Fix:**
+- `clear_comchange()` (libtool.c): weicht der gelesene CYSPP-Zustand vom Software-Zustand (`connect&BT_LINK`) ab oder hat
+  sich RS232 geaendert, `thread_comchange=1` statt verwerfen. War es nur die Stoerflanke, findet `communication_change()`
+  beim erneuten Lesen keinen Unterschied.
+- Sicherheitsnetz im Minutentakt (measure.c): bei IF820, versorgtem Modul und ohne aktiven Thread CYSPP gegen
+  `connect&BT_LINK` vergleichen, bei Abweichung `thread_comchange=1`.
+**Test Board B:** BLE-smoke, Classic-smoke; `gsm-mux` 2/2 (BLE waehrend offenem Modem-Terminal wie seit 2026-11-04
+erwartet ohne PIN-Prompt, danach BLE 2/2 und Classic; Schritt #02 einmal "Modem antwortet nicht", bekannt);
+`online-bt` BLE 1/1, Classic 1/1 (online nach 118 s). Das Verlieren selbst ist nicht deterministisch provozierbar.
