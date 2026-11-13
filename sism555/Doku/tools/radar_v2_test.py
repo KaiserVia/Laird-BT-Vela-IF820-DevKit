@@ -32,7 +32,7 @@ F_SPREAD_MAX = 2                          # MHz, Grundstreuung (Toleranz Kennlin
 F_OUTLIER_MAX = 3                         # MHz, einzelne Strg+T-Messung darf so weit vom Median liegen (beobachtet 2-3 MHz
                                           # nach unten, 2 von 40 mit 5.141); mehr als 10 % Ausreisser gelten als Fehler
 F_TOTBAND = 1.5                           # MHz, ab 5.142: Nachfuehrung haelt die Frequenz Kanal +/- 1,5 MHz
-F_TRUNC = 1.0                             # MHz, Strg+T schneidet auf ganze MHz ab (HF_const/result)
+F_TRUNC = 1.0                             # MHz, Strg+T zeigt ganze MHz (bis 5.143 abgeschnitten, ab 5.144 gerundet)
 HF_DIS_P1 = 0x10                          # IC37 Port 1 Bit 4 (HF_DIS, 1 = Transceiver aus), hard.h HF_DIS = 1<<12
 IC37, IC32 = 0x42, 0x5C                   # 8-Bit-Adressen wie im Geraet (Eingabe dezimal: 66, 92)
 NO_DEVICE_ADR = 0x30                      # 48: dort antwortet auf allen bekannten Boards nichts

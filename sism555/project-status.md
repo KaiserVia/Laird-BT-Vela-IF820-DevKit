@@ -6944,8 +6944,9 @@ keine unerwarteten Codes; Lichtsensor ca. 1030 lx, Dimm 150.
 
 **B1 nicht bestanden - Befund:** Strg+T misst 10 von 10 x 24173 MHz, also ca. 3,5 MHz ueber der Menue-Messung
 (Median nach Einschwingen, `hf_info()`). Kein Ausreisser, sondern ein fester Abstand zwischen zwei Messwegen; schon
-mit 5.138-5.141 Menue 24173 / Strg+T 24175. Vermutung: `hf_measurement()` misst 2 ms nach `transceiver(ein)`, bevor die
-Frequenz eingeschwungen ist, und schneidet `HF_const/result` auf ganze MHz ab. An die IF820-Sitzung gemeldet
+mit 5.138-5.141 Menue 24173 / Strg+T 24175. Ursache (geklaert mit 5.144, siehe unten): `hf_measurement()` misst 2 ms nach
+`transceiver(ein)`, die Frequenz liegt da noch hoeher. Das Abschneiden auf ganze MHz war es nicht (wuerde nach
+unten verschieben). An die IF820-Sitzung gemeldet
 (Vorschlag: Strg+T ueber denselben Weg wie `hf_info()` messen). Kriterium bewusst nicht gelockert.
 ## Update 5.143 (TEST, 2026-11-13): Via-2-Transceivermenue "zurueck" korrigiert
 
@@ -6955,3 +6956,7 @@ Via-2-Transceivermenue nicht (Menue kam nur erneut), "5" (Abgleich auf Kanal) ve
 das Menue auf 8 Punkte erweitert, `putmenu(T_tmenu2,'9')`. **Fix:** Abbruch bei `'9'`.
 **Test Board B:** 5.143 geflasht; "9" fuehrt zurueck ins Werksmenue, nach "5" (Abgleich Stufe 127, 24169,9 MHz) bleibt das
 Geraet im Transceivermenue.
+
+**Kurztest 5.144** (`Testreports/2026-11-13_14-17-55_radar_kurz/`): 15 von 15 bestanden. Strg+T misst jetzt ueber
+`hf_measure_khz()` (eingeschwungen, Median, gerundet): 10 x 24169-24170 MHz, Median 24170 bei Ziel 24170,0; Menue
+24169,5 / 24169,2 MHz. Der Abstand zwischen den Messwegen ist damit weg.
