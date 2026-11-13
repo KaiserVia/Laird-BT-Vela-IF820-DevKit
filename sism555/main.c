@@ -174,12 +174,15 @@ int main (void)
     if (fp.btmodem)	{								// BT definiert?
 		 if (fp.btmodem==IF820) bt_release();	// CYSPP (IC54 Bit7) auf Eingang -> Modul kann Leitung fuer SPP-Connect treiben
 		 									// (PCA9554 haelt sein Register ueber Reflash; sonst bleibt CYSPP evtl. als Ausgang HIGH haengen)
-		 if (test_BT())	interfaces|=BT_LINK;		// Modem antwortet?
+		 if (!BT_TEST_LATE && test_BT())	interfaces|=BT_LINK;		// Modem antwortet? (5.146: Testschalter BT_TEST_LATE, btio.h)
 		 else if ((fp.btmodem==IF820) && bt_link_busy_wait(3000))	// 5.128: antwortet nicht, weil schon verbunden
 		  interfaces|=BT_LINK;                    // (Datenmodus) -> IF820 behalten, KEINE Neuerkennung (siehe btio.c)
 		 else {                                     // BT antwortet nicht (z. B. geaenderte Zielbaud)
-		   fp.btmodem=0; init_bluetooth();         // -> neu erkennen (Zwei-Baud) + ggf. auf IF820_BAUD umstellen
-		   if (fp.btmodem) interfaces|=BT_LINK; else syserror++; } }	
+		   init_bluetooth();                       // -> neu erkennen (Zwei-Baud) + ggf. auf IF820_BAUD umstellen
+		                                           // 5.146 (Review 2.4): fp.btmodem nicht vorab loeschen - init_bluetooth()
+		                                           // behaelt ein eingetragenes IF820, wenn es (noch) nicht antwortet
+		   if (fp.btmodem && ((fp.btmodem!=IF820) || (interfaces&BT_LINK))) interfaces|=BT_LINK;
+		   else syserror++; } }	                 // IF820 ohne Antwort: bt_redetect_minute() sucht im Minutentakt weiter
 		else if (fp.serno[0]) init_bluetooth();	// BT nicht konfiguriert aber Seriennummer vorhanden? -> automatisch konfigurieren
 		 
 		if (fp.gsm)											// GSM installiert?

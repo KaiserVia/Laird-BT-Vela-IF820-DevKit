@@ -844,6 +844,24 @@ static void bt_sm_unhide (const char *why)
  bt_state=BT_ST_AUS; bt_sm_set(BT_ST_BEREIT,why);
 }
 
+// 5.146 (Review 2.4): IF820 eingetragen, aber beim Hochlauf nicht erkannt (interfaces ohne BT_LINK, steht im
+// __noinit-RAM und uebersteht den Deep-Sleep-Reset) -> einmal pro Minute erneut /PING. Bisher blieb BT in diesem Fall
+// bis zum naechsten Stromzyklus tot (auch der naechtliche Neustart half nicht).
+void bt_redetect_minute (void)                 // measure.c, Minutentakt, nur ohne aktiven Thread
+{
+ static ushort tries=0;
+ if ((fp.btmodem!=IF820) || (interfaces&BT_LINK)) { tries=0; return; }
+ if ((uart1_owner==MUX_GSM) || (connect&(BT_LINK|MQTT_LINK|GSM_LINK))) return;	// UART1 nicht stoeren
+ tries++;
+ bt_release();                                 // CYSPP sicher Eingang
+ if (test_BT())
+ {
+  interfaces|=BT_LINK;
+  puterror_dtc(DTC_BT_IF820_REDETECT, tries);  // I11021, Wert = Versuche
+  tries=0;
+ }
+}
+
 void bt_sm_minute (void)                       // measure.c, Minutentakt: Sicherheitsnetz fuer bt_sm_unhide()
 { if (bt_sm_hidden==1 && fp.btmodem==IF820) bt_sm_unhide("sichtbar (Minutentakt)"); }
 
@@ -1481,6 +1499,8 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
  int32_t result=0;
  uint32_t pin=0; uint32_t detbaud=0;
  uint8_t retry=4;
+ uint8_t prev=fp.btmodem;               // 5.146 (Review 2.4): eingetragenes Modul vor der Erkennung
+ uchar skipdet=0;                       // 5.146: nur fuer Testschalter BT_TEST_LATE (btio.h)
 
  ResetWDT();
  if (uart1_owner==MUX_GSM) return;      // UART1 gerade von GSM belegt -> nicht stoeren (Konfliktschutz)
@@ -1512,14 +1532,18 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
 
   // --- Erkennung A: konfiguriertes Modul? /PING @460800 MIT Handshake ---
   cts_bypass=0;
-  if ((FIO2PIN&CTS)==0)                 // CTS schon LOW -> Modul meldet sich bereit
+#if BT_TEST_LATE
+  { static uchar late_done=0;           // 5.146 Testschalter: erste Erkennung ausfallen lassen (btio.h)
+    if ((prev==IF820) && !late_done) { late_done=1; skipdet=1; bt_msg(" TEST BT_TEST_LATE: detection skipped"); } }
+#endif
+  if (!skipdet && ((FIO2PIN&CTS)==0))   // CTS schon LOW -> Modul meldet sich bereit
   {
    bt_msg(" Detection: probe 460800 with handshake");
    Init_BT_ch(IF820_BAUD); bt_command(T_CR,T_pingok,-60);
    if (bt_command(T_ping,T_pingok,300)) detbaud=IF820_BAUD;
   }
   // --- Erkennung B: sonst Werks-/Fehlzustand -> Baud-Scan OHNE CTS ---
-  if (!detbaud)
+  if (!detbaud && !skipdet)
   {
    static const uint32_t bdscan[] = { IF820_FACTORY_BAUD, IF820_BAUD, 921600, 307200, 230400, 9600 };
    uchar k;
@@ -1642,6 +1666,15 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
   }
   bt_msg(" -> no IF820 found");
   cts_bypass=0;                         // kein IF820 -> Legacy-Fallback (Laird/RN4678)
+  if (prev==IF820)                      // 5.146 (Review 2.4): war ein IF820 eingetragen, nicht auf Laird/RN4678 umschwenken
+  {                                     // (deren Befehle AT&F1/$$$/SF,1 gingen an das IF820) und den Eintrag behalten,
+   fp.btmodem=IF820;                    // sonst stuende nach dem naechsten Sichern "kein BT-Modul" im Flash. Typischer Fall:
+   interfaces&=~BT_LINK;                // Modul startet nach kurzem Stromausfall zu spaet. bt_redetect_minute() (Minutentakt)
+   bt_msg(" -> IF820 kept, retry every minute");	// prueft weiter, bis es antwortet.
+   puterror_dtc(DTC_BT_IF820_LATE, 1);  // W11020
+   bt_release(); uart1_release(MUX_BT); connect=concpy; clear_comchange();
+   return;
+  }
  }
  bt_release();          // CYSPP sicher als Eingang (falls Reconfig Command-Mode erzwang, IF820 aber nicht erkannt)
  bt_msg(" Fallback: no IF820 -> quick Laird/RN4678 detection");

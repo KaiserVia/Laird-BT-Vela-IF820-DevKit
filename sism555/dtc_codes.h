@@ -32,6 +32,8 @@
 #define DTC_BT_RN_NF           11017   /* RN4678-Modul nicht erkannt (Info) */
 #define DTC_BT_REBOOT_VERIFY    11018   /* Reboot-Verifikation (/RBT) fehlgeschlagen */
 #define DTC_BT_REBOOT_VERIFY_OK 11019   /* Reboot-Verifikation nach Retries erfolgreich (Info) */
+#define DTC_BT_IF820_LATE       11020   /* 5.146: IF820 eingetragen, antwortet beim Hochlauf nicht - bleibt eingetragen, Minutentakt sucht weiter */
+#define DTC_BT_IF820_REDETECT   11021   /* 5.146: IF820 nachtraeglich erkannt (Info, Wert = Versuche im Minutentakt) */
 
 /* --- Subsystem 12: GSM/LTE (gsmio.c) ------------------------------ */
 #define DTC_GSM_NO_RESP         12001   /* Modem keine Antwort */

@@ -6993,3 +6993,22 @@ Hand gesetzte RE/-Zeit (20 ms) blieben erhalten (danach wieder automatisch). BLE
 `online-bt` BLE 1/1 und Classic 1/1 (online nach 48 s; MQTT haelt wieder). Nicht am Geraet pruefbar: 4.1 (kein
 SMTP-Server eingerichtet) und 4.2 (Flash nicht abklemmbar), nur am Code geprueft. "Zeitquelle: ungestellt" nach dem
 Update ist alt (`g_timesrc` wird bei jedem Neustart zurueckgesetzt), Uhr laeuft richtig.
+
+## Update 5.146 (TEST, 2026-11-13): Review 2.4 - IF820 nach verpasster Erkennung im Minutentakt neu suchen
+
+**Symptom (Review, passt zu "1x Modul stumm nach 0,5 s stromlos", Testlauf 2026-11-02):** Antwortete das IF820 beim
+Einschalten nicht, setzte `main.c` `fp.btmodem=0`, `init_bluetooth()` probierte danach Laird/RN4678 (AT&F1, $$$, SF,1 an das
+IF820), F11010, BT aus bis zum naechsten Stromzyklus; beim Sichern stand "kein BT-Modul" im Flash.
+**Fix:**
+- `init_bluetooth()`: war ein IF820 eingetragen und wird keins gefunden -> Eintrag behalten, `interfaces` ohne `BT_LINK`,
+  kein Laird/RN4678-Rueckfall, W11020.
+- `main.c`: `fp.btmodem` nicht mehr vorab loeschen; BT gilt nur bei erfolgreicher Erkennung als vorhanden.
+- `bt_redetect_minute()` (btio.c, Minutentakt in measure.c, nur ohne aktiven Thread und ohne UART1-Belegung durch
+  GSM/MQTT/BT): IF820 eingetragen, aber nicht in `interfaces` -> `test_BT()`; Erfolg -> `BT_LINK`, I11021 (Wert =
+  Versuche). Zustand steht in `interfaces` (`__noinit`), uebersteht den Deep-Sleep-Reset.
+- Neue Codes W11020, I11021; `dtc_text.h` jetzt mit `tools/gen_dtc.py` aus der CSV erzeugt (enthaelt damit auch
+  17006-17009).
+- Testschalter `BT_TEST_LATE` (btio.h, Auslieferung 0): laesst die erste Erkennung beim Hochlauf ausfallen.
+**Test Board B:** Testbuild (`BT_TEST_LATE 1`) nach Stromzyklus: "detection skipped", "-> IF820 kept, retry every
+minute", W11020, keine Laird/RN4678-Befehle; nach dem ersten Minutentakt I11021 (1 Versuch), danach BLE-smoke bestanden.
+Auslieferungsbuild (`BT_TEST_LATE 0`) nach Stromzyklus: BLE-smoke und Classic-smoke bestanden.
