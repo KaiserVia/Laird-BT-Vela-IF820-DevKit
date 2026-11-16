@@ -891,6 +891,89 @@ void bt_redetect_minute (void)                 // measure.c, Minutentakt, nur oh
  }
 }
 
+// 5.150: Stromzyklus des IF820, der das Modul wirklich zuruecksetzt.
+// Befund Langzeittest 2026-11-13 (und 2026-11-10): Das Modul fror mitten im BLE-Download ein (vermutlich "lockup under
+// heavy UART loading" der Modul-FW 1.4.12.12), hielt CYSPP LOW und antwortete nicht mehr. BT_TIMEOUT schaltete es zwar
+// per T10 ab (P1.16 Pull-up) und eine Minute spaeter wieder ein, es kam aber kein BOOT - erst ein echter Stromzyklus des
+// Geraets half. Verdacht: Waehrend T10 aus war, blieben die UART1-Leitungen aktiv (seit 5.127 bleibt UART1 im Leerlauf
+// an, TXD HIGH) und hielten das eingefrorene Modul ueber die Eingaenge halb versorgt.
+// Jetzt: CYSPP Eingang, UART1 aus und MUX auf den unbenutzten Kanal (Modul von den LPC-Leitungen getrennt; haelt GSM
+// UART1, ist der BT-Kanal ohnehin getrennt), T10 aus, off_ms warten, ein, UART1 wieder in den Leerlauf, /PING.
+// Rueckgabe TRUE, wenn das Modul danach antwortet.
+#define BT_PWR_OFF_MS    10000                 // erste Stromlos-Zeit
+#define BT_PWR_OFF2_MS   30000                 // zweiter Versuch
+#define BT_FREEZE_MS     10000                 // CTS so lange am Stueck HIGH waehrend einer Sitzung -> eingefroren
+
+static bool bt_power_cycle_once (uint off_ms)
+{
+ uint t0;
+ bool isolated=FALSE, ok=FALSE;
+ uchar i;
+ bt_release();                                 // CYSPP Eingang (nie treiben, auch nicht beim Abschalten)
+ __disable_irq();
+ if ((uart1_owner==MUX_NONE) || (uart1_owner==MUX_BT)) { uart1_owner=MUX_NONE; isolated=TRUE; }
+ __enable_irq();
+ if (isolated) Init_UART1(0);                  // UART1 aus, Pins Eingang, MUX auf unbenutzten Kanal -> Modul getrennt
+ PINMODE3&=~PULLDOWN;                          // P1.16 Pull-up -> T10 aus, Modul stromlos
+ t0=mstimer;
+ while ((uint)(mstimer-t0) < off_ms) { ResetWDT(); osDelay(250); }
+ PINMODE3|=PULLDOWN;                           // T10 ein
+ if (isolated && (uart1_owner==MUX_NONE))      // GSM hat UART1 inzwischen nicht uebernommen
+ { MUX_BT_Select; Init_UART1(IF820_BAUD); connect&=~UART1; }	// Leerlauf wie uart1_release() (5.127)
+ for (i=0; (i<3) && !ok; i++)                  // Modul startet ca. 2,5 s, dann /PING (bis ca. 9 s)
+ { t0=mstimer; while ((uint)(mstimer-t0) < 3000) { ResetWDT(); osDelay(250); }
+   if (uart1_owner!=MUX_GSM) ok=test_BT(); }
+ return (ok);
+}
+
+bool bt_power_cycle (void)                     // measure.c: BT_TIMEOUT und bt_freeze_poll()
+{
+ if (fp.btmodem!=IF820) return (FALSE);
+ if (bt_power_cycle_once(BT_PWR_OFF_MS)) { bt_sm_set(BT_ST_BEREIT,"Modul nach Stromzyklus bereit"); return (TRUE); }
+ puterror_dtc(DTC_BT_PWRCYCLE_FAIL, 1);        // W11024 Wert 1: nach 10 s stromlos keine Antwort
+ if (bt_power_cycle_once(BT_PWR_OFF2_MS)) { bt_sm_set(BT_ST_BEREIT,"Modul nach Stromzyklus bereit"); return (TRUE); }
+ puterror_dtc(DTC_BT_PWRCYCLE_FAIL, 2);        // W11024 Wert 2: auch nach 30 s nicht
+ interfaces&=~BT_LINK;                         // Neuerkennung im Minutentakt (5.146) und volle Erkennung nach 10 min (5.148)
+ return (FALSE);
+}
+
+// 5.150: Eingefrorenes IF820 waehrend einer Sitzung erkennen. Ein laufendes Modul nimmt Daten an (CTS nur kurz HIGH, ms);
+// steht CTS BT_FREEZE_MS am Stueck HIGH, gilt es als eingefroren. Bisher hielt die Firmware die Sitzung dann bis
+// BT_TIMEOUT (6 min) und RS232 wurde traege (putb() spiegelt nach BT und wartet auf CTS).
+void bt_freeze_poll (void)                     // measure.c, Hauptschleife (neben bt_sniff_poll())
+{
+ static uint fz_t0=0;
+ static uchar fz_on=0;
+#if BT_TEST_FREEZE
+ static uint ts0=0;
+ static uchar ts=0;
+#endif
+ if ((fp.btmodem!=IF820) || !(connect&BT_LINK) || (uart1_owner!=MUX_BT) || !BT_MODULE_ON)
+ {
+  fz_on=0;
+#if BT_TEST_FREEZE
+  ts=0;
+#endif
+  return;
+ }
+#if BT_TEST_FREEZE
+ if (!ts) { ts=1; ts0=mstimer; }                // Testschalter: Sitzung 30 s alt -> wie CTS HIGH behandeln
+ if ((uint)(mstimer-ts0) < 30000) { fz_on=0; return; }
+#else
+ if (!(FIO2PIN&CTS)) { fz_on=0; return; }      // CTS LOW: Modul empfangsbereit
+#endif
+ if (!fz_on) { fz_on=1; fz_t0=mstimer; return; }
+ if ((uint)(mstimer-fz_t0) < BT_FREEZE_MS) return;
+ fz_on=0;
+ connect&=~(UART1|BT_LINK);                    // Sitzung beenden wie BT_TIMEOUT, aber ohne /DIS an das tote Modul
+ bt_pininit=0;
+ putln(T_btdis);                               // "Bluetooth getrennt ..."
+ puterror_dtc(DTC_BT_FROZEN, BT_FREEZE_MS/1000);	// W11023, Wert = Sekunden CTS HIGH
+ bt_sm_set(BT_ST_AUS,"Modul eingefroren (CTS HIGH) - Stromzyklus");
+ bt_power_cycle();
+ bxi=rxi;                                      // Reste der Sitzung nicht als Eingabe auswerten (wie 5.82)
+}
+
 void bt_sm_minute (void)                       // measure.c, Minutentakt: Sicherheitsnetz fuer bt_sm_unhide()
 { if (bt_sm_hidden==1 && fp.btmodem==IF820) bt_sm_unhide("sichtbar (Minutentakt)"); }
 

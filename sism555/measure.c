@@ -194,8 +194,9 @@ void runcycle (void)				// Messzyklenbetrieb
 			 if (fp.btmodem==IF820) bt_disconnect();	// IF820: Verbindung sauber trennen (Command-Mode + /DIS), statt nur CYSPP-Puls
 			 connect&=~(UART1|BT_LINK);		// Verbindung virtuell trennen (5.149: vor uart1_release, das bei BT_LINK nicht freigibt)
 			 uart1_release(MUX_BT);			// Release UART1
-			 PINMODE3&=~PULLDOWN;					// PULL-UP - Bluetooth Modul abschalten
 			 bt_sm_off();									// 5.130: Zustand AUS (nach Wiedereinschalten -> BOOT-Event)
+			 if (fp.btmodem==IF820) bt_power_cycle();	// 5.150: echter Stromzyklus (Leitungen getrennt, 10 s, /PING) statt nur
+			 else PINMODE3&=~PULLDOWN;		// P1.16 bis zum naechsten Minutentakt hochzuziehen; PULL-UP - Bluetooth Modul abschalten
 			}	
 			else bt_time--;								// Verbindungszeitz�hler Bluetooth herunter z�hlen
 		 }
@@ -376,6 +377,7 @@ void runcycle (void)				// Messzyklenbetrieb
 	// 5.81: BT-Event-Sniff (Testmenue-Diagnose) liest ueber einen eigenen, von bxi
 	// unabhaengigen Index nicht-blockierend nach - beeinflusst mainmenu()/PIN-Abfrage nicht.
 	bt_sniff_poll ();
+	bt_freeze_poll ();					// 5.150: eingefrorenes IF820 (CTS dauerhaft HIGH) erkennen -> Stromzyklus
 	bt_monitor_poll ();					// 5.115 TEMPORAER (Rueckbau, siehe CLAUDE.md): CYSPP/CONNECTION-Hintergrund-Monitor (Testmenue 7)
 
 	// FIX (5.93): Wiederfreigabe fuer rbuf1 an dieselbe Bedingung gekoppelt wie das Draining,

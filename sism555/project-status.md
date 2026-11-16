@@ -7099,3 +7099,29 @@ Download 4 ohne PIN-Prompt, weil die Firmware im Debugmodus gerade das Modem wie
 Danach BLE-smoke bestanden. **Ergebnis: Fensterende ist nicht der Ausloeser**, der Haenger trat nicht auf.
 Vorfall beim Zuruecksetzen (Testskript): Tasten landeten bei offener BT-Sitzung im falschen Menue, Ausschaltzeit blieb
 08:37 und Mittwoch wurde abgewaehlt - von Hand korrigiert und geprueft (Mo-Fr, 08:00-18:00, Debug aus).
+
+## Update 5.150 (TEST, 2026-11-16): IF820 eingefroren - erkennen und mit echtem Stromzyklus zuruecksetzen
+
+**Symptom (Langzeittest 2026-11-13 18:00, gleiches Bild 2026-11-10 11:37):** Mitten im BLE-Download riss die Verbindung ab,
+die Firmware blieb auf DATEN (CYSPP LOW), Ymodem brach mit F13010 ab, nach 6 min BT_TIMEOUT (W11015). Danach kam das IF820
+nie wieder (kein BOOT, 2026-11-10: CYSPP weiter LOW, kein `/PING`), erst ein echter Stromzyklus des Geraets half.
+**Eingrenzung (2026-11-16):** Saubere Abbrueche (`--drop-after-blocks`, 3x) und echter Verbindungsverlust (PC-Bluetooth
+aus, Anwender) loesen den Haenger nicht aus - die Firmware erkennt dann sofort "Linkverlust", CYSPP geht HIGH, Modul
+bleibt sichtbar. Im Haengerfall war also das **Modul eingefroren** (vermutlich "lockup under heavy UART loading" der
+Modul-FW 1.4.12.12, behoben in 1.4.18.18), nicht der PC weg. Das Fensterende des Modems (18:00) ist nicht der Ausloeser
+(Nachstelltest, siehe Langzeittest-Kapitel). Im Normalfall bootet das Modul nach BT_TIMEOUT sauber (BOOT-Event), im
+Haengerfall nicht - Verdacht: UART1 blieb waehrend T10 aus aktiv (TXD HIGH, seit 5.127) und hielt das eingefrorene Modul
+ueber die Eingaenge halb versorgt.
+**Fix:**
+- `bt_power_cycle()` (btio.c): CYSPP Eingang, UART1 aus und MUX auf den unbenutzten Kanal (`Init_UART1(0)`, nur wenn GSM
+  UART1 nicht haelt), T10 aus (P1.16 Pull-up), 10 s, ein, UART1 in den Leerlauf, `/PING` (bis 3x). Keine Antwort ->
+  W11024 (1), zweiter Versuch 30 s, sonst W11024 (2) und `interfaces` ohne BT_LINK (Neuerkennung 5.146/5.148).
+  BT_TIMEOUT (measure.c) nutzt das statt "P1.16 bis zum naechsten Minutentakt hochziehen".
+- `bt_freeze_poll()` (btio.c, Hauptschleife): waehrend einer Sitzung (BT_LINK, Owner MUX_BT, Modul versorgt) CTS 10 s am
+  Stueck HIGH -> eingefroren: Sitzung beenden wie BT_TIMEOUT (ohne `/DIS` an das tote Modul), W11023, `bt_power_cycle()`.
+- Neue Codes W11023, W11024; Testschalter `BT_TEST_FREEZE` (btio.h, Auslieferung 0).
+**Test Board B:** Testbuild (`BT_TEST_FREEZE 1`, Sitzung nach 30 s als eingefroren behandelt): W11023, Sitzung beendet,
+Stromzyklus, danach BLE-smoke bestanden. Auslieferungsbuild: BLE/Classic-smoke; `bt-timeout` 3x, jeweils "Modul nach
+Stromzyklus bereit" 13 s nach der Trennung, kein W11024; 20/20 BLE/Classic-Downloads ohne W11023 (kein Fehlalarm).
+**Offen:** Echtes Einfrieren nicht ausloesbar - Wirkung erst im naechsten Langzeittest belegbar. Eigentliche Ursache:
+Modul-FW 1.4.18.18 (Flashzugang ueber DVK oder R124-Pad/RST noetig, Hardware-/Prozessfrage).
