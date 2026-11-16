@@ -7057,3 +7057,45 @@ Sitzung beenden, loeschen `BT_LINK` vorher bzw. geben gar nicht frei (geprueft).
 ueber BT: 5.148 Sitzung **stumm**, 5.149 Sitzung **antwortet**. BLE-smoke, Classic-smoke, `bt-timeout` bestanden
 (Trennung nach 382 s BLE bzw. 334 s Classic; 334 s liegt knapp unter dem Skriptfenster 360-420 s, vermutlich
 angebrochene erste Minute des Minutentakts - beobachten).
+
+## Langzeittest Wochenende 2026-11-13 bis 2026-11-16, Board B (26SC9983), Firmware 5.149
+
+Steuerskript (Scratchpad `weekend.py`), 34 Runden zu ca. 2 h, je Runde: Frequenzstatus, `online-bt` (2x), 21 min
+Online-Messen (HF-Nachfuehrung), Frequenzstatus, 45 min Downloads BLE/Classic, `interleave` 10, `power-sweep`
+(0,1/0,5/1/2 s, Classic jede 2.), `gsm-mux`, jede 3. Runde `bt-timeout`.
+
+| Test | Ergebnis |
+|---|---|
+| Downloads (Ymodem 505856 Byte) | 666 bestanden, 23 fehlgeschlagen - alle 23 in einem Block (Haenger, siehe unten) |
+| `interleave` | 659/660 Zyklen (1x Windows konnte COM16 nicht oeffnen) |
+| `power-sweep` | 594/594, W11020/I11021 nie noetig |
+| `gsm-mux` | 68/68 (BLE bei offenem Modem-Terminal erwartungsgemaess ohne PIN) |
+| HF Via-2 | 68 Messungen 24169,5-24170,6 MHz, Stufe immer 127, keine Nachregelung noetig (Labortemperatur) |
+| `bt-timeout` | BLE immer im Fenster (360-417 s); Classic-Teil vom 20-min-Limit des Steuerskripts abgeschnitten (Skriptfehler) |
+| `online-bt` | bis Sa 04:35 6/6 bestanden, danach nicht online |
+
+**`online-bt` ab Samstag nicht online - keine Stoerung:** Zeitplanung des Modems Mo-Fr 08:00-18:00 (Cloud-
+Konfiguration). Am Wochenende und heute vor 08:00 kein Verbindungsversuch, `device_setup.py --check --net` 07:43:
+"NOT REGISTERED" bei korrekten Einstellungen. Um 08:03 online nach 69 s, `online-bt` BLE 1/1, Classic 1/1. Warum es
+Freitag nach 18:00 und Samstag bis 04:35 trotzdem ging, ist nicht geklaert (MQTT-Debug und/oder Uhrzeit vor der
+Netzzeit-Korrektur I17052 um 04:37).
+
+**Protokoll:** 78x I31 Watchdog-Reset, alle in den `power-sweep`-Bloecken - erwartet (Spannungsausfall-ISR wartet in
+einer Schleife, kehrt die Spannung nach 0,1-0,5 s zurueck, loest der Watchdog aus). 7x F18001 bei `gsm-mux`/`online-bt`.
+
+**Befund (offen): Modul haengt nach BLE-Verbindungsverlust waehrend eines Downloads.** Fr 2026-11-13 18:00:39 verlor
+der PC mitten im BLE-Download die Verbindung. Die Firmware merkte es nicht (CYSPP blieb LOW, keine `[BT-Zustand]`-Zeile),
+Ymodem brach mit F13010 ab, nach 6 min BT_TIMEOUT (W11015, Modul "abgeschaltet"). Danach blieb das IF820 30 min
+unsichtbar (BLE nicht gefunden, Classic-Port Timeout), erst der Stromzyklus des Steuerskripts half. Gleiches Bild wie
+2026-11-10 auf B (11:37). Haeufigkeit ca. 1 in 690 Downloads. Vermutung (ungeprueft): das "Abschalten" bei BT_TIMEOUT
+setzt nur den Pull an P1.16 um, seit 5.127 bleibt UART1 im Leerlauf aktiv - das Modul koennte ueber die Signalleitungen
+versorgt bleiben und nie zuruecksetzen.
+
+**Nachstelltest Fensterende (2026-11-16, Hinweis Anwender: 18:00 = Ende des Modemfensters):** Modem-Ausschaltzeit am
+Geraet auf 08:37 gesetzt, MQTT-Debug an, Geraet online (PUBACK), BLE-Downloads 08:30-08:40. Beim BT-Verbinden sendet die
+Firmware `/leave` und schaltet das Modem ab (BT-Vorrang, `MQTT_fast_disconnect(1)`); Download 5 lief ueber 08:37 und
+bestand, das Fensterende bewirkte nichts (Modem war schon aus). Download 1 (direkt nach `/leave`) Timeout am Blockstart,
+Download 4 ohne PIN-Prompt, weil die Firmware im Debugmodus gerade das Modem wieder einschaltete - beide ohne Haenger.
+Danach BLE-smoke bestanden. **Ergebnis: Fensterende ist nicht der Ausloeser**, der Haenger trat nicht auf.
+Vorfall beim Zuruecksetzen (Testskript): Tasten landeten bei offener BT-Sitzung im falschen Menue, Ausschaltzeit blieb
+08:37 und Mittwoch wurde abgewaehlt - von Hand korrigiert und geprueft (Mo-Fr, 08:00-18:00, Debug aus).
