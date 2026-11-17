@@ -7122,6 +7122,39 @@ ueber die Eingaenge halb versorgt.
 - Neue Codes W11023, W11024; Testschalter `BT_TEST_FREEZE` (btio.h, Auslieferung 0).
 **Test Board B:** Testbuild (`BT_TEST_FREEZE 1`, Sitzung nach 30 s als eingefroren behandelt): W11023, Sitzung beendet,
 Stromzyklus, danach BLE-smoke bestanden. Auslieferungsbuild: BLE/Classic-smoke; `bt-timeout` 3x, jeweils "Modul nach
-Stromzyklus bereit" 13 s nach der Trennung, kein W11024; 20/20 BLE/Classic-Downloads ohne W11023 (kein Fehlalarm).
+Stromzyklus bereit" 13 s nach der Trennung, kein W11024; 20/20 BLE/Classic-Downloads ohne W11023. **Korrektur
+2026-11-16 nachmittags:** diese 20 Downloads waren nur 5120 Byte gross (Messdatenspeicher nach dem Flashen fast leer) -
+kein Nachweis unter Dauerlast. Der Langzeittest ab 14:53 schreibt vorher 50000 Messwerte (ca. 500 KB je Download).
 **Offen:** Echtes Einfrieren nicht ausloesbar - Wirkung erst im naechsten Langzeittest belegbar. Eigentliche Ursache:
 Modul-FW 1.4.18.18 (Flashzugang ueber DVK oder R124-Pad/RST noetig, Hardware-/Prozessfrage).
+
+## Langzeittest 5.150 auf Board B (2026-11-16 14:53 bis 2026-11-17 07:00) - Einfrieren erkannt und selbst behoben
+
+Steuerskript wie am Wochenende, Schwerpunkt Downloads (vorher 50000 Messwerte geschrieben, 505856 Byte je Download).
+Erster Anlauf 12:41-14:52 verworfen: nur 5120-Byte-Downloads (Messdatenspeicher fast leer).
+
+| Test | Ergebnis |
+|---|---|
+| Downloads BLE/Classic | 333 bestanden, 2 fehlgeschlagen (beide gehoeren zum Einfrieren unten) |
+| `interleave` | 9/9 Bloecke |
+| `power-sweep` | 4/4 |
+| `gsm-mux` | 4/4 (BLE bei offenem Modem-Terminal erwartungsgemaess "unstable") |
+| `online-bt` | 1/1 (nur einmal im Modemfenster) |
+| `bt-timeout` | 2/2 |
+| W11023 | genau einmal, echter Fall; kein Fehlalarm unter Last |
+
+**Einfrieren um 20:39 - diesmal selbst aufgeloest:** 20:39:08 BLE-Download bricht bei 27 % ab ("Not connected"),
+Modul eingefroren (CYSPP LOW). 20:39:32 F13010 (Ymodem-Abbruch). 20:40:21 **W11023**, Sitzung beendet, `bt_power_cycle()`.
+20:40:34 "Modul nach Stromzyklus bereit" (13 s, kein W11024; Sitzungszaehler ctsDrop=553, lost_ms=28693 = das Einfrieren).
+20:41:30 naechste BLE-Verbindung, Download bestanden, danach normal weiter. Am 2026-11-13 dauerte derselbe Fehler
+30 min und brauchte einen Stromzyklus des Geraets. **Ergebnis:** 5.150 wirkt - das eingefrorene IF820 wird erkannt und
+per Stromzyklus mit getrennten Leitungen zurueckgesetzt (Verdacht Rueckspeisung ueber UART1 damit bestaetigt).
+Haeufigkeit diesmal 1 in ca. 335 Downloads. Ursache (Modul-FW 1.4.12.12) bleibt; Abhilfe Modul-FW 1.4.18.18.
+Testskript-Schwaeche: Die Auffaelligkeiten-Suche liest nur die Testskript-Ausgabe, nicht den RS232-Mitschnitt (W11023
+nur im Trace gefunden) - fuer den naechsten Lauf ergaenzen.
+
+**Hardware-Vorschlag (2026-11-16, Anwender):** IF820-Reset statt Stromlos-Schalten auf Testboard 99SC9923 (A): R107 = 0 Ohm,
+T10/R100/R108 raus, Draht PWR-EN/-BT (P1.16) -> RST (Pin 34), R124 10 kOhm Pull-up (im Schaltplan bestueckt, Doku sagte
+"nicht bestueckt" - am Board pruefen). Optional LP_MODE (P12, Pin 30) an P2.4 (`V_TRB`, auf aktuellem Frontend NC) fuer
+Sleep/Hibernate im Batteriebetrieb. Firmware 5.151: LOW-Puls auf P1.16 (Reset) vor dem bisherigen Ablauf - wirkt dann auf
+umgebauten (Reset) und alten Boards (Stromlos) ohne Variantenerkennung. P1.16 und P2.4 als Open-Drain (Modul 3,0 V).
