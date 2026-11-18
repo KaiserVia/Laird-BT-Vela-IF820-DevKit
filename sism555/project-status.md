@@ -7190,3 +7190,10 @@ weiter); im Wiederholungslauf mit eigenem RS232-Mitschnitt waren BOOT und I11025
 **Offen:** Gegenprobe auf einem nicht umgebauten Board (B: Reset ohne Wirkung, Rueckfall Stromzyklus); BT_TIMEOUT-Pfad
 (6 min Leerlauf) auf A; RST-Pegel im Normalbetrieb am Oszilloskop (Pull-down gegen R124). Moegliche Erweiterung: Reset beim
 Hochlauf nach LPC-Reset/Firmware-Update (Modul laeuft bisher einfach weiter), LP_MODE an P2.4.
+
+**Gegenprobe 5.151 auf Board B (26SC9983, nicht umgebaut, T10) am 2026-11-18:** BLE- und Classic-smoke bestanden.
+Testmenue 8->8 3x "Kein BOOT" (Puls ohne Wirkung, Modul lief weiter). Prueflauf `BT_TEST_FREEZE`: W11023 -> Reset ohne
+BOOT -> Rueckfall Stromzyklus -> "Modul nach Stromzyklus bereit"; BLE-smoke danach bestanden. Normale 5.151 wieder
+aufgespielt, BLE- und Classic-smoke bestanden. Damit ist belegt: dieselbe 5.151 laeuft auf beiden Bauarten.
+Offen bleiben BT_TIMEOUT-Pfad auf A und RST-Pegel am Oszilloskop. Uhr von B stand nach dem Stromausfall auf 13.11.2026
+("ungestellt"), wird ueber LTE im Modemfenster gestellt.

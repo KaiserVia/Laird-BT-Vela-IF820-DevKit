@@ -72,7 +72,7 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - **2026-11-18 - 5.151 (TEST), `main`:** IF820-Reset ueber RST: Board A (99SC9923) umgebaut (T10 raus, P1.16 -> RST
   Pin 34, R124 10k). `bt_hw_reset()` treibt P1.16 20 ms LOW; BT_TIMEOUT/W11023 versuchen zuerst den Reset (I11025), sonst
   Stromzyklus wie 5.150. Auf A: Reset 21/21 (/PING nach 2,6 s), eingefrorenes Modul in 2,6 s statt 13 s zurueck. Offen:
-  Gegenprobe auf nicht umgebautem Board, BT_TIMEOUT-Pfad, RST-Pegel am Oszilloskop.
+  BT_TIMEOUT-Pfad, RST-Pegel am Oszilloskop. Gegenprobe auf B (ohne Draht) bestanden: Rueckfall auf Stromzyklus.
 - **2026-11-13 - 5.142 (TEST), `main`:** Via-2 Frequenzkanal (10 x 5 MHz, 24155-24200, automatisch aus der letzten
   Ziffer der Seriennummer), Werksabgleich IC32 auf den Kanal, Nachführung 2 min nach dem Einschalten und alle 15 min
   (`hftrack.c`), RE/-Zeit einstellbar, Standard 15 ms (vorher effektiv 30 ms). Auf Board B geprüft (Abgleich, Nachführung
