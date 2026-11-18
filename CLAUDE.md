@@ -69,6 +69,10 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-18 - 5.151 (TEST), `main`:** IF820-Reset ueber RST: Board A (99SC9923) umgebaut (T10 raus, P1.16 -> RST
+  Pin 34, R124 10k). `bt_hw_reset()` treibt P1.16 20 ms LOW; BT_TIMEOUT/W11023 versuchen zuerst den Reset (I11025), sonst
+  Stromzyklus wie 5.150. Auf A: Reset 21/21 (/PING nach 2,6 s), eingefrorenes Modul in 2,6 s statt 13 s zurueck. Offen:
+  Gegenprobe auf nicht umgebautem Board, BT_TIMEOUT-Pfad, RST-Pegel am Oszilloskop.
 - **2026-11-13 - 5.142 (TEST), `main`:** Via-2 Frequenzkanal (10 x 5 MHz, 24155-24200, automatisch aus der letzten
   Ziffer der Seriennummer), Werksabgleich IC32 auf den Kanal, Nachführung 2 min nach dem Einschalten und alle 15 min
   (`hftrack.c`), RE/-Zeit einstellbar, Standard 15 ms (vorher effektiv 30 ms). Auf Board B geprüft (Abgleich, Nachführung
@@ -348,7 +352,7 @@ Umverdrahtung) — reine Firmware-Korrektur. `HW_Massnahmen_Bewertung_2026-08.md
   1-Sekunden-Timeout sofort beenden. Fokus liegt daher auf den BLE-Verbindungsparametern, nicht auf
   Antenne/Stromversorgung. Das PPCP-Setzen (5.66) wurde in 5.75 wieder entfernt (nur noch Anzeige per
   `/RLH`); seit 5.132 fordert die Firmware Intervall und Supervision-Timeout per `/UCP` an.
-- **`RST_L` (Pin 34) hängt am Mainboard an nichts.** Netz `N$160` enthält nur `IC37.RST` und
+- **`RST_L` (Pin 34) hängt am Mainboard an nichts** (Ausnahme seit 2026-11-18: Board A, RST an P1.16, 5.151). Netz `N$160` enthält nur `IC37.RST` und
   `R124` Pad 1; **R124 (10 kΩ nach VDDIO) ist in beiden Varianten nicht bestückt**. Folgen:
   (a) der LPC kann das Modul **nicht** zurücksetzen — deshalb hilft bei einem hängenden Modul
   nur ein Power-Cycle des Gesamtgeräts, und ein LPC-Reflash nimmt das IF820 nicht mit;

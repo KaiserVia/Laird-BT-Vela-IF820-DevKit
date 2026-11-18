@@ -37,6 +37,7 @@
 #define DTC_BT_FROZEN           11023   /* 5.150: IF820 eingefroren (CTS waehrend Sitzung dauerhaft HIGH), Stromzyklus (Wert = s) */
 #define DTC_BT_PWRCYCLE_FAIL    11024   /* 5.150: IF820 antwortet nach Stromzyklus nicht (Wert 1 = nach 10 s, 2 = auch nach 30 s) */
 #define DTC_BT_FULL_REDETECT    11022   /* 5.148: volle BT-Erkennung nach 10 min ohne IF820-Antwort (Info, Wert = gefundener Modultyp, ohne Wert = keiner) */
+#define DTC_BT_HW_RESET         11025   /* 5.151: IF820 per RST (P1.16) zurueckgesetzt (Info, Wert = ms bis /PING) */
 
 /* --- Subsystem 12: GSM/LTE (gsmio.c) ------------------------------ */
 #define DTC_GSM_NO_RESP         12001   /* Modem keine Antwort */

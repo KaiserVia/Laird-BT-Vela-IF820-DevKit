@@ -72,6 +72,7 @@ static const dtc_entry_t dtc_table[] = {
   {11022,'I',"Volle BT-Erkennung nach 10 min"},
   {11023,'W',"IF820 eingefroren"},
   {11024,'W',"IF820 nach Stromzyklus stumm"},
+  {11025,'I',"IF820 per Reset zurueckgesetzt"},
   {12001,'F',"Modem keine Antwort"},
   {12002,'F',"SIM-PIN-Problem"},
   {12003,'F',"GSM Verbindung Timeout"},

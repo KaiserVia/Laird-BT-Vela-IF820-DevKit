@@ -7158,3 +7158,35 @@ T10/R100/R108 raus, Draht PWR-EN/-BT (P1.16) -> RST (Pin 34), R124 10 kOhm Pull-
 "nicht bestueckt" - am Board pruefen). Optional LP_MODE (P12, Pin 30) an P2.4 (`V_TRB`, auf aktuellem Frontend NC) fuer
 Sleep/Hibernate im Batteriebetrieb. Firmware 5.151: LOW-Puls auf P1.16 (Reset) vor dem bisherigen Ablauf - wirkt dann auf
 umgebauten (Reset) und alten Boards (Stromlos) ohne Variantenerkennung. P1.16 und P2.4 als Open-Drain (Modul 3,0 V).
+
+## Update 5.151 (2026-11-18) - IF820-Reset ueber RST (P1.16), getestet auf dem umgebauten Board 99SC9923
+
+**Umbau A (99SC9923, Anwender):** T10 entfernt, Modul fest versorgt, PWR-EN/-BT (P1.16) direkt an IF820-RST (Pin 34),
+R124 10 kOhm Pull-up. Mit 5.150 (P1.16 nur Pull-down/Pull-up, nie aktiv getrieben) laeuft das Board normal: BLE- und
+Classic-smoke bestanden, boot-race 8/8. Der interne Pull-down des LPC zieht RST gegen R124 also nicht herunter. Einen
+Reset loest 5.150 auf diesem Board aber nie aus (Pull-up statt Pull-down aendert nichts).
+
+**5.151:** `bt_hw_reset()` (btio.c): CYSPP Eingang, P1.16 20 ms aktiv LOW, dann wieder Eingang (nie HIGH treiben, LPC 3,3 V
+gegen Modul 3,0 V), bis 4 s auf das BOOT-Event warten (`bt_boot_seen`, gesetzt in `bt_sm_event()`), dann `/PING`.
+Ohne BOOT -> FALSE: auf alten Boards (T10) haelt der LOW-Puls T10 nur ein, das Modul startet nicht neu -> keine
+Bauarten-Erkennung noetig. Eingebunden:
+- `bt_power_cycle()` (BT_TIMEOUT, W11023): zuerst Reset, bei Erfolg **I11025** (Wert = ms bis /PING), sonst wie 5.150
+  Stromzyklus 10/30 s. Auf alten Boards kostet das 4 s Wartezeit mehr.
+- `bt_redetect_minute()`: in der ersten Minute ohne Antwort einmal Reset.
+- Testmenue 8->8 "IF820 Reset (RST, P1.16)" mit Zeitmessung (nur ohne BT-Verbindung).
+
+**Test auf A (2026-11-18):**
+| Test | Ergebnis |
+|---|---|
+| Einzelreset 8->8 | 21/21, BOOT nach 2515-2516 ms, /PING nach 2625-2655 ms |
+| BLE-/Classic-smoke nach der Serie | bestanden |
+| Prueflauf `BT_TEST_FREEZE` (Sitzung gilt nach 30 s als eingefroren) | W11023 -> BOOT -> I11025 nach **2624 ms** (5.150: 13 s per Stromzyklus); BLE-smoke danach bestanden |
+| normale 5.151 danach | BLE- und Classic-smoke bestanden |
+
+Beim ersten Freeze-Prueflauf fehlten die Zeilen nach W11023 im Mitschnitt von `ble_mainboard_test.py` (Geraet lief normal
+weiter); im Wiederholungslauf mit eigenem RS232-Mitschnitt waren BOOT und I11025 da. Prueflauf-Firmware:
+`fw_5.151_testfreeze/` (nicht ausliefern).
+
+**Offen:** Gegenprobe auf einem nicht umgebauten Board (B: Reset ohne Wirkung, Rueckfall Stromzyklus); BT_TIMEOUT-Pfad
+(6 min Leerlauf) auf A; RST-Pegel im Normalbetrieb am Oszilloskop (Pull-down gegen R124). Moegliche Erweiterung: Reset beim
+Hochlauf nach LPC-Reset/Firmware-Update (Modul laeuft bisher einfach weiter), LP_MODE an P2.4.

@@ -719,6 +719,7 @@ uchar bt_transport=BT_TR_KEIN;                 // BT_TR_* der laufenden bzw. let
 uint  bt_conn_interval=0;                      // BLE-Intervall (1,25 ms je Schritt), 0 = unbekannt
 uint  bt_dis_reason=0xFFFF;                    // R= des letzten DIS/BTDIS, 0xFFFF = keiner gesehen
 static uchar bt_tr_stale=0;                    // Transport stammt aus der vorigen Sitzung (nach Trennen bis C/BTCON)
+static uchar bt_boot_seen=0;                   // 5.151: BOOT-Event gesehen (bt_hw_reset() wartet darauf)
 static const char * const bt_st_txt[]={"AUS","BEREIT","VERBUNDEN","DATEN"};
 static const char * const bt_tr_txt[]={"-","BLE","Classic"};
 
@@ -756,7 +757,7 @@ static void bt_sm_event (const char *line)    // eine vollstaendige Zeile "@E,<l
  if (line[0]!='@' || line[1]!='E' || line[2]!=',' || strlen(line)<9) return;
  p=line+8;                                     // "@E,xxxx," -> Name
  if (!strncmp(p,"BOOT,",5) || !strcmp(p,"BOOT"))
- { bt_transport=BT_TR_KEIN; bt_conn_interval=0; bt_sm_set(BT_ST_BEREIT,"Modul gestartet"); }
+ { bt_boot_seen=1; bt_transport=BT_TR_KEIN; bt_conn_interval=0; bt_sm_set(BT_ST_BEREIT,"Modul gestartet"); }
  else if (!strncmp(p,"C,",2))                  // gap_connected: BLE verbunden, Datenkanal noch zu
  { bt_transport=BT_TR_BLE; bt_conn_interval=hex_after(line,",I="); if (bt_conn_interval==0xFFFF) bt_conn_interval=0;
    bt_dis_reason=0xFFFF; bt_sm_connected("C"); }
@@ -852,6 +853,50 @@ static void bt_sm_unhide (const char *why)
 // Findet sie nichts, bleibt IF820 eingetragen und es wird nur noch alle BT_REDET_SLOW Minuten gefragt.
 // Zustand im __noinit-RAM (Deep-Sleep-Reset nach jedem Messzyklus), beim Einschalten per bt_redetect_init() neu.
 static void bt_msg (char *m);                    // Vorwaertsdeklaration (Definition weiter unten)
+static void bt_event_line (char c);              // dto.
+static void bt_msgnum (char *m, uint32_t v);    // dto.
+
+// 5.151: Hardware-Reset des IF820 ueber RST (Pin 34). Umbau Testboard 99SC9923 (2026-11-18): T10 entfernt, Modul fest
+// versorgt (R107 0 Ohm), PWR-EN/-BT (P1.16) direkt an RST, R124 10 kOhm Pull-up. P1.16 wird nur kurz aktiv LOW getrieben,
+// sonst Eingang (nie HIGH: LPC 3,3 V, Modul-VDDIO 3,0 V); der Pull-down in PINMODE3 bleibt wie bisher (haelt auf alten
+// Boards T10 ein, auf umgebauten liegt er gegen R124 - RST bleibt HIGH, geprueft mit 5.150).
+// Auf alten Boards (T10) ist der LOW-Puls wirkungslos (T10 bleibt ein), das Modul meldet kein BOOT -> FALSE, der Aufrufer
+// faellt auf den Stromzyklus (5.150) zurueck. Eine Unterscheidung der Bauarten ist damit nicht noetig.
+// Rueckgabe TRUE, wenn innerhalb BT_RST_BOOT_MS ein BOOT-Event kam UND das Modul danach /PING beantwortet.
+#define BT_RST_MS        20                    // Dauer RST LOW
+#define BT_RST_BOOT_MS   4000                  // Wartezeit auf das BOOT-Event (Einschalten: ca. 2,5 s)
+uint bt_rst_boot_ms=0, bt_rst_ping_ms=0;       // Messwerte des letzten Resets (Testmenue 8->8)
+
+static bool bt_hw_reset (void)
+{
+ uint t0;
+ uchar i;
+ bool ok=FALSE;
+ if ((fp.btmodem!=IF820) || (uart1_owner==MUX_GSM)) return (FALSE);	// BOOT/PING brauchen UART1 auf BT
+ bt_release();                                 // CYSPP Eingang
+ if (uart1_owner==MUX_NONE) MUX_BT_Select;     // Leerlauf: UART1 ist aktiv (5.127), nur den Kanal sicherstellen
+ bxi1=rxi1; ev_n=0; bt_boot_seen=0;            // Altlasten verwerfen
+ bt_rst_boot_ms=0; bt_rst_ping_ms=0;
+ FIO1CLR=DIS_BT; FIO1DIR|=DIS_BT;              // RST LOW
+ osDelay(BT_RST_MS);
+ FIO1DIR&=~DIS_BT;                             // loslassen, R124 zieht RST hoch -> Modul startet
+ t0=mstimer;
+ while (!bt_boot_seen && ((uint)(mstimer-t0) < BT_RST_BOOT_MS))
+ {
+  ResetWDT(); osDelay(20);
+  while (bxi1!=rxi1) bt_event_line(rbuf1[++bxi1]);   // BOOT-Event (setzt bt_boot_seen, Zustand BEREIT)
+  if (rbuf1_full && bxi1==rxi1) { rbuf1_full=0; NVIC_EnableIRQ(UART1_IRQn); }   // wie measure.c
+ }
+ if (!bt_boot_seen) return (FALSE);            // altes Board (T10) oder Modul tot
+ bt_rst_boot_ms=mstimer-t0;
+ for (i=0; (i<3) && !ok; i++)
+ {
+  if (i) { ResetWDT(); osDelay(500); }
+  if (uart1_owner!=MUX_GSM) ok=test_BT();
+ }
+ if (ok) bt_rst_ping_ms=mstimer-t0;
+ return (ok);
+}
 #define BT_REDET_MAGIC  0x52444554
 #define BT_REDET_FULL   10                     // Minuten bis zur vollen Erkennung
 #define BT_REDET_SLOW   15                     // danach Abfrage alle 15 Minuten
@@ -872,6 +917,7 @@ void bt_redetect_minute (void)                 // measure.c, Minutentakt, nur oh
  if (rd_full && (rd_tries%BT_REDET_SLOW)) return;	// nach der vollen Erkennung nur noch alle 15 Minuten
  bt_release();                                 // CYSPP sicher Eingang
  ok=(BT_TEST_LATE<2) && test_BT();             // Testschalter 2: IF820 antwortet nie
+ if (!ok && (rd_tries==1) && (BT_TEST_LATE<2)) ok=bt_hw_reset();	// 5.151: einmal per RST wecken (wirkt nur mit RST-Draht)
  if (ok)
  {
   interfaces|=BT_LINK;
@@ -929,6 +975,8 @@ static bool bt_power_cycle_once (uint off_ms)
 bool bt_power_cycle (void)                     // measure.c: BT_TIMEOUT und bt_freeze_poll()
 {
  if (fp.btmodem!=IF820) return (FALSE);
+ if (bt_hw_reset())                            // 5.151: zuerst Reset ueber RST (nur mit RST-Draht, sonst sofort FALSE nach BT_RST_BOOT_MS)
+ { puterror_dtc(DTC_BT_HW_RESET, bt_rst_ping_ms); bt_sm_set(BT_ST_BEREIT,"Modul nach Reset bereit"); return (TRUE); }	// I11025, Wert = ms bis /PING
  if (bt_power_cycle_once(BT_PWR_OFF_MS)) { bt_sm_set(BT_ST_BEREIT,"Modul nach Stromzyklus bereit"); return (TRUE); }
  puterror_dtc(DTC_BT_PWRCYCLE_FAIL, 1);        // W11024 Wert 1: nach 10 s stromlos keine Antwort
  if (bt_power_cycle_once(BT_PWR_OFF2_MS)) { bt_sm_set(BT_ST_BEREIT,"Modul nach Stromzyklus bereit"); return (TRUE); }
@@ -969,7 +1017,7 @@ void bt_freeze_poll (void)                     // measure.c, Hauptschleife (nebe
  bt_pininit=0;
  putln(T_btdis);                               // "Bluetooth getrennt ..."
  puterror_dtc(DTC_BT_FROZEN, BT_FREEZE_MS/1000);	// W11023, Wert = Sekunden CTS HIGH
- bt_sm_set(BT_ST_AUS,"Modul eingefroren (CTS HIGH) - Stromzyklus");
+ bt_sm_set(BT_ST_AUS,"Modul eingefroren (CTS HIGH) - Reset/Stromzyklus");
  bt_power_cycle();
  bxi=rxi;                                      // Reste der Sitzung nicht als Eingabe auswerten (wie 5.82)
 }
@@ -1503,6 +1551,21 @@ void bt_module_cmd (void)
  uart1_release(MUX_BT);
 }
 
+// 5.151: Testmenue 8->8 - ein Reset ueber RST mit Zeitmessung. Nur ohne BT-Verbindung (ueber RS232/USB): waehrend einer
+// Sitzung landen Modulmeldungen in rbuf, das BOOT-Event waere nicht zu sehen.
+static void bt_hw_reset_test (void)
+{
+ bool ok;
+ if (connect&BT_LINK) { putln("Nur ohne BT-Verbindung (ueber RS232/USB)."); return; }
+ putln("IF820 Reset ueber RST (P1.16 20 ms LOW) ...");
+ ok=bt_hw_reset();
+ if (ok) { bt_msgnum("Reset ok: BOOT nach ms ", bt_rst_boot_ms); bt_msgnum("          /PING ok nach ms ", bt_rst_ping_ms); }
+ else if (bt_boot_seen) bt_msgnum("BOOT nach ms (kein /PING) ", bt_rst_boot_ms);
+ else bt_msg("Kein BOOT - Board ohne RST-Draht oder Modul stumm.");
+ newline();
+ uart1_release(MUX_BT);
+}
+
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
@@ -1514,16 +1577,17 @@ void bt_diag_menu (void)
  put_menuitem("Force-Disconnect (/DIS)",'5');
  put_menuitem("CYSPP manuell HIGH/Freigeben",'6');
  put_menuitem("Modulbefehl senden (Phase 0)",'7');  // TEMPORAER (5.129), siehe bt_module_cmd()
- select('9',1);                                    // "9. zurueck" + "Ihre Auswahl 1...9?" wie in allen Menues
+ put_menuitem("IF820 Reset (RST, P1.16)",'8');     // 5.151
+ select('9',1);                                   // "9. zurueck" + "Ihre Auswahl 1...9?" wie in allen Menues
  for (tries=0; tries<20; tries++)
  {
   if (comchange)                            // echten Schnittstellenwechsel richtig verarbeiten
   { if (!osActiveThread) communication_change(); else clear_comchange(); }
   c = getc(TERMINAL_CHAR_TIMEOUT);
-  if ((c>='1' && c<='7') || c=='9') break;
+  if ((c>='1' && c<='9')) break;
   if (c<0) osDelay(50);                    // kurz warten, dann erneut versuchen (statt Busy-Spin)
  }
- if ((c>='1' && c<='7') || c=='9') { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
+ if ((c>='1' && c<='9')) { putc((char)c); newline(); }   // Eingabe-Echo hinter dem Prompt
  else { newline(); putln("  -> keine gueltige Eingabe (staendiger Schnittstellenwechsel?), abgebrochen."); }
  if (tries>0 || comchange_count!=cc0)              // TEMPORAER (5.69): comchange-Diagnose nur noch bei Auffaelligkeit
  { bt_key("comchange_count"); putnumber(comchange_count,0); putstr(" (Delta="); putnumber(comchange_count-cc0,0);
@@ -1535,6 +1599,7 @@ void bt_diag_menu (void)
  else if (c=='5') bt_force_disconnect_test();
  else if (c=='6') bt_cyspp_manual_control();
  else if (c=='7') bt_module_cmd();
+ else if (c=='8') bt_hw_reset_test();
  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
  // HINWEIS (5.89): Der fruehere Flush hier (5.88, "bxi=rxi vor mainmenu()") ist nicht mehr
  // noetig - Command-Mode-/Protokollbytes (Event-Sniff, Factory-Reset, Contention-Test) landen
