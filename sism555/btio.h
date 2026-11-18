@@ -238,6 +238,12 @@ extern void bt_cyspp_manual_control (void);  // TEMPORAER: CYSPP von Hand HIGH t
 // 0 = alter Ablauf (Modul wirbt ab Einschalten). Siehe btio.c bt_sm_hide().
 #define BT_CYSPP_SM      1
 extern void bt_sm_hide (void);            // main.c: frueh im Hochlauf
+// 5.r1 (Branch rst-start): 1 = IF820 beim Einschalten per RST (P1.16) gehalten bis bt_rst_start(), bei Watchdog/Reboot/
+// Brown-out 20-ms-Puls (nie bei laufender Verbindung); wirkt nur auf Boards mit RST-Draht. 0 = wie 5.151.
+#define BT_RST_START     1
+extern void bt_rst_hold (void);           // main.c: direkt nach Init_Ports(), nur Power-On
+extern void bt_rst_start (void);          // main.c: anstelle bt_sm_hide()
+extern void bt_rst_free (void);           // main.c: Sicherheitsnetz vor bt_sm_boot_done()
 extern bool bt_power_cycle (void);        // 5.150: IF820 stromlos (Leitungen getrennt, 10/30 s), TRUE = antwortet danach
 extern void bt_freeze_poll (void);        // 5.150: eingefrorenes IF820 waehrend einer Sitzung erkennen (CTS dauerhaft HIGH)
 extern void bt_redetect_init (void);      // 5.148: Zustand der Neuerkennung beim Einschalten zuruecksetzen

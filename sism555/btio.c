@@ -867,6 +867,27 @@ static void bt_msgnum (char *m, uint32_t v);    // dto.
 #define BT_RST_BOOT_MS   4000                  // Wartezeit auf das BOOT-Event (Einschalten: ca. 2,5 s)
 uint bt_rst_boot_ms=0, bt_rst_ping_ms=0;       // Messwerte des letzten Resets (Testmenue 8->8)
 
+static uchar bt_rst_held=0;                    // 5.r1: 1 = RST seit dem LPC-Start LOW gehalten (bt_rst_hold())
+
+// RST loslassen (falls LOW) und bis BT_RST_BOOT_MS auf das BOOT-Event warten. Vorher: UART1 auf BT, rbuf1 geleert.
+// Rueckgabe TRUE = BOOT gesehen, Zeit in bt_rst_boot_ms.
+static bool bt_rst_release_wait (void)
+{
+ uint t0;
+ FIO1DIR&=~DIS_BT;                             // loslassen, R124 zieht RST hoch -> Modul startet
+ bt_rst_held=0;
+ t0=mstimer;
+ while (!bt_boot_seen && ((uint)(mstimer-t0) < BT_RST_BOOT_MS))
+ {
+  ResetWDT(); osDelay(20);
+  while (bxi1!=rxi1) bt_event_line(rbuf1[++bxi1]);   // BOOT-Event (setzt bt_boot_seen, Zustand BEREIT)
+  if (rbuf1_full && bxi1==rxi1) { rbuf1_full=0; NVIC_EnableIRQ(UART1_IRQn); }   // wie measure.c
+ }
+ if (!bt_boot_seen) return (FALSE);            // altes Board (T10) oder Modul tot
+ bt_rst_boot_ms=mstimer-t0;
+ return (TRUE);
+}
+
 static bool bt_hw_reset (void)
 {
  uint t0;
@@ -879,16 +900,8 @@ static bool bt_hw_reset (void)
  bt_rst_boot_ms=0; bt_rst_ping_ms=0;
  FIO1CLR=DIS_BT; FIO1DIR|=DIS_BT;              // RST LOW
  osDelay(BT_RST_MS);
- FIO1DIR&=~DIS_BT;                             // loslassen, R124 zieht RST hoch -> Modul startet
  t0=mstimer;
- while (!bt_boot_seen && ((uint)(mstimer-t0) < BT_RST_BOOT_MS))
- {
-  ResetWDT(); osDelay(20);
-  while (bxi1!=rxi1) bt_event_line(rbuf1[++bxi1]);   // BOOT-Event (setzt bt_boot_seen, Zustand BEREIT)
-  if (rbuf1_full && bxi1==rxi1) { rbuf1_full=0; NVIC_EnableIRQ(UART1_IRQn); }   // wie measure.c
- }
- if (!bt_boot_seen) return (FALSE);            // altes Board (T10) oder Modul tot
- bt_rst_boot_ms=mstimer-t0;
+ if (!bt_rst_release_wait()) return (FALSE);
  for (i=0; (i<3) && !ok; i++)
  {
   if (i) { ResetWDT(); osDelay(500); }
@@ -896,6 +909,47 @@ static bool bt_hw_reset (void)
  }
  if (ok) bt_rst_ping_ms=mstimer-t0;
  return (ok);
+}
+
+// 5.r1 (Branch rst-start): Reset beim LPC-Start (Schalter BT_RST_START, btio.h). Ziel: definierter Modulzustand nach
+// jedem Neustart und beim Einschalten kein Werben, bis die Firmware bereit ist.
+// - Einschalten (POR): bt_rst_hold() direkt nach Init_Ports() legt RST LOW, das Modul startet gar nicht erst. fp ist
+//   hier noch nicht geladen -> ohne Typpruefung: auf alten Boards (T10) haelt aktives LOW T10 genauso ein wie der
+//   Pull-down in PINMODE3, fuer RN4678/BT730 gilt dasselbe (P1.16 LOW = Modul ein).
+// - bt_rst_start() an der Stelle von bt_sm_hide(): RST loslassen (bzw. bei Watchdog/Reboot/Brown-out 20 ms pulsen,
+//   aber nie bei laufender BT-Verbindung) und auf BOOT warten, dann wie bisher /AX + SBTP C=0 (bt_sm_hide()).
+//   Ohne RST-Draht kommt beim Einschalten das BOOT des normalen Modulstarts, sonst kein BOOT -> weiter wie bisher.
+// - bt_rst_free() gibt RST in jedem Fall frei (auch auf Pfaden ohne bt_rst_start(), z. B. Firmware-Update/Sleep).
+// Waehrend RST LOW treibt das Modul CYSPP/CONNECTION nicht; comstate wird erst nach bt_rst_start() gelesen.
+void bt_rst_hold (void)                        // main.c, direkt nach Init_Ports(), nur Power-On
+{
+#if BT_RST_START
+ FIO1CLR=DIS_BT; FIO1DIR|=DIS_BT;              // RST LOW (FIO1DIR erst nach Init_Ports(), das FIO1DIR neu setzt)
+ bt_rst_held=1;
+#endif
+}
+
+void bt_rst_free (void)                        // main.c, vor bt_sm_boot_done(): Sicherheitsnetz
+{ if (bt_rst_held) { FIO1DIR&=~DIS_BT; bt_rst_held=0; } }
+
+void bt_rst_start (void)                       // main.c, frueh im Hochlauf (anstelle bt_sm_hide())
+{
+#if BT_RST_START
+ uchar held=bt_rst_held;
+ if ((fp.btmodem==IF820) && (i_reset!=FIRM_UP_RES) && (i_reset!=SLEEP_RES) && (uart1_owner!=MUX_GSM)
+     && (held || !bt_link_busy()))            // ohne Halten: bei laufender Verbindung nicht zuruecksetzen
+ {
+  bt_release();                                // CYSPP Eingang
+  if (uart1_owner==MUX_NONE) { MUX_BT_Select; Init_UART1(IF820_BAUD); connect&=~UART1; }	// Leerlauf wie 5.127
+  bxi1=rxi1; ev_n=0; bt_boot_seen=0; bt_rst_boot_ms=0;
+  if (!held) { FIO1CLR=DIS_BT; FIO1DIR|=DIS_BT; osDelay(BT_RST_MS); }	// RST-Puls
+  if (bt_rst_release_wait())
+   bt_msgnum(held ? " IF820 RST beim Einschalten gehalten, BOOT nach ms " : " IF820 RST-Puls beim Neustart, BOOT nach ms ", bt_rst_boot_ms);
+  else bt_msg(" IF820 RST beim Start: kein BOOT (Board ohne RST-Draht?)");
+ }
+ bt_rst_free();
+#endif
+ bt_sm_hide();
 }
 #define BT_REDET_MAGIC  0x52444554
 #define BT_REDET_FULL   10                     // Minuten bis zur vollen Erkennung

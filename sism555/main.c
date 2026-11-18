@@ -69,7 +69,8 @@ int main (void)
 	while (i<3) certs[i++][0]=0;					// Zertifikatsliste nullen 
  }
 	
- Init_Ports();													// Initialisiere Portpins 
+ Init_Ports();													// Initialisiere Portpins
+ if (RSID&POR) bt_rst_hold();						// 5.r1: IF820 per RST anhalten, bis bt_rst_start() es freigibt (btio.c)
  InitTimer ();													// Initialisiere Timer
  Init_UART0 ();													// Initialisiert Schnittstelle UART0 (Terminal)
  InitRTC ();														// Initialisierung der Echtzeituhr		
@@ -113,7 +114,8 @@ int main (void)
 		syserror++;	
   } } // end if I2C Bus erfolgreich initialisiert
 	bt_release();																// 5.131: CYSPP sicher Eingang, bevor bt_sm_hide() den Pin liest
-	bt_sm_hide();																// 5.131: IF820 unsichtbar bis zum Ende des Hochlaufs - so frueh wie moeglich
+	bt_rst_start();															// 5.r1: RST loslassen/pulsen, BOOT abwarten, dann bt_sm_hide()
+																							// 5.131: IF820 unsichtbar bis zum Ende des Hochlaufs - so frueh wie moeglich
 																							// (vor den Flash-Loeschungen unten, die Sekunden dauern; nur RAM, siehe btio.c)
 	
 	if (RSID&(POR|BODR))								// Power On oder Brownout Reset?
@@ -269,6 +271,7 @@ int main (void)
  // Bisher nur ueber test_BT()/init_bluetooth() im POR-Zweig: nach Reboot (BOOTTASK 3:15), Watchdog ohne GSM und
  // Brown-out blieb UART1 aus -> IF820 sah CTS HIGH, BT tot bis zum Stromzyklus (Testlauf 2026-11-02).
  if ((fp.btmodem==IF820) && (uart1_owner==MUX_NONE)) uart1_release(MUX_NONE);
+ bt_rst_free();						// 5.r1: RST sicher frei (auch auf Pfaden ohne bt_rst_start())
  bt_sm_boot_done();				// 5.130: Zustand BEREIT; 5.131: Modul wieder sichtbar (/A, SBTP C=1)
 
  if (!(RSID&(POR|WDTR|EXTR))) protocol(BROWNOUT_ERROR);	// Brownout reset

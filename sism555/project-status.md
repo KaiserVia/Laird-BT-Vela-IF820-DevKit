@@ -7197,3 +7197,34 @@ BOOT -> Rueckfall Stromzyklus -> "Modul nach Stromzyklus bereit"; BLE-smoke dana
 aufgespielt, BLE- und Classic-smoke bestanden. Damit ist belegt: dieselbe 5.151 laeuft auf beiden Bauarten.
 Offen bleiben BT_TIMEOUT-Pfad auf A und RST-Pegel am Oszilloskop. Uhr von B stand nach dem Stromausfall auf 13.11.2026
 ("ungestellt"), wird ueber LTE im Modemfenster gestellt.
+
+## Update 5.r1 (Branch `rst-start`, Worktree `Projects\RST-Start`, 2026-11-18): IF820-Reset beim LPC-Start
+
+**Ziel:** definierter Modulzustand nach jedem Neustart und beim Einschalten kein Werben, bis die Firmware bereit ist.
+Bisher lief das IF820 bei Watchdog, naechtlichem Neustart (BOOTTASK 3:15) und Brown-out einfach weiter (alte Verbindung,
+alte RAM-Einstellungen, ggf. eingefroren); beim Einschalten warb es kurz, bis `bt_sm_hide()` `/AX` schickte.
+
+**Umsetzung (Schalter `BT_RST_START` in btio.h, 0 = wie 5.151):**
+- `bt_rst_hold()` direkt nach `Init_Ports()`, nur bei Power-On: RST (P1.16) LOW. `fp` ist dort noch nicht geladen -> ohne
+  Typpruefung; auf alten Boards (T10) und bei RN4678/BT730 haelt aktives LOW das Modul genauso ein wie der Pull-down.
+- `bt_rst_start()` anstelle von `bt_sm_hide()` in main.c: UART1 in den Leerlauf (MUX BT), RST loslassen (Power-On) bzw.
+  20 ms pulsen (Watchdog/Reboot/Brown-out, **nicht** bei laufender BT-Verbindung, nicht bei Firmware-Update/Sleep-Reset),
+  bis 4 s auf BOOT warten, dann wie bisher `bt_sm_hide()` (`/AX`, `SBTP C=0`). Kein BOOT -> Meldung, weiter wie 5.151.
+- `bt_rst_free()` vor `bt_sm_boot_done()`: RST in jedem Fall frei.
+- `bt_hw_reset()` nutzt dieselbe Warteschleife (`bt_rst_release_wait()`).
+
+**Test auf A (99SC9923, RST-Draht) am 2026-11-18:**
+| Test | Ergebnis |
+|---|---|
+| Kaltstart (Relais, 5 s aus) | "RST beim Einschalten gehalten, BOOT nach ms 2518", unsichtbar nach 3,5 s, Banner nach 18,0 s |
+| Vergleich 5.151, Kaltstart 2x | unsichtbar nach 2,76 s, Banner nach 16,97 s |
+| Naechtlicher Neustart 3:15 (`--mode nightly`) | "RST-Puls beim Neustart, BOOT nach ms 2519"; BLE 2x + Classic bestanden |
+| reboot-check dropout (Brown-out) 2x | Puls, BOOT nach 2519 ms; BLE/Classic bestanden |
+| reboot-check power 2x | gehalten, BOOT nach 2518 ms; BLE/Classic bestanden |
+
+**Bewertung:** Der Hochlauf dauert ca. 1 s laenger (Banner 18,0 statt 17,0 s). Beim Einschalten war das sichtbare
+Fenster mit 5.151 schon klein (Modul-BOOT ca. 2,5 s, `/AX` bei 2,76 s); der eigentliche Gewinn ist der frische
+Modulzustand nach Watchdog/Reboot/Brown-out.
+
+**Offen:** Gegenprobe auf Board ohne RST-Draht (B: erwartet "kein BOOT" bei Neustart = 4 s mehr, beim Einschalten das
+BOOT des normalen Modulstarts); Watchdog-Reset bei laufender BT-Verbindung (darf nicht zuruecksetzen) nicht getestet.
