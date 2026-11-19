@@ -927,6 +927,7 @@ static void bt_msgnum (char *m, uint32_t v);    // dto.
 #define BT_RST_BOOT_MS   4000                  // Wartezeit auf das BOOT-Event (Einschalten: ca. 2,5 s)
 uint bt_rst_boot_ms=0, bt_rst_ping_ms=0;       // Messwerte des letzten Resets (Testmenue 8->8)
 
+volatile uchar bt_asleep=0;                    // 5.r4: IF820 bewusst im Tiefschlaf (CYSPP liest dann LOW), siehe BT_MODULE_ON
 static uchar bt_rst_held=0;                    // 5.r1: 1 = RST seit dem LPC-Start LOW gehalten (bt_rst_hold())
 
 // RST loslassen (falls LOW) und bis BT_RST_BOOT_MS auf das BOOT-Event warten. Vorher: UART1 auf BT, rbuf1 geleert.
@@ -936,6 +937,7 @@ static bool bt_rst_release_wait (void)
  uint t0;
  FIO1DIR&=~DIS_BT;                             // loslassen, R124 zieht RST hoch -> Modul startet
  bt_rst_held=0;
+ bt_asleep=0;                                  // 5.r4: RST weckt aus dem Tiefschlaf (Flash L=0)
  t0=mstimer;
  while (!bt_boot_seen && ((uint)(mstimer-t0) < BT_RST_BOOT_MS))
  {
@@ -1082,6 +1084,7 @@ static bool bt_power_cycle_once (uint off_ms)
  t0=mstimer;
  while ((uint)(mstimer-t0) < off_ms) { ResetWDT(); osDelay(250); }
  PINMODE3|=PULLDOWN;                           // T10 ein
+ bt_asleep=0;                                  // 5.r4: Stromzyklus beendet auch den Tiefschlaf
  if (isolated && (uart1_owner==MUX_NONE))      // GSM hat UART1 inzwischen nicht uebernommen
  { MUX_BT_Select; Init_UART1(IF820_BAUD); connect&=~UART1; }	// Leerlauf wie uart1_release() (5.127)
  for (i=0; (i<3) && !ok; i++)                  // Modul startet ca. 2,5 s, dann /PING (bis ca. 9 s)
@@ -1688,7 +1691,7 @@ static void bt_hw_reset_test (void)
 // LP_MODE an GND; bei offenem LP_MODE (interner Pull-up = HIGH) bleibt das Modul wach (/PING antwortet weiter).
 static void bt_deep_sleep_test (void)
 {
- int c, l;
+ int l;
  uint t0;
  bool asleep;
  if (connect&BT_LINK) { putln("Nur ohne BT-Verbindung (ueber RS232/USB)."); return; }
@@ -1696,6 +1699,7 @@ static void bt_deep_sleep_test (void)
  concpy=connect;
  l=bt_get_sleep();
  if (l<0) bt_msg("Schlafstufe im Flash: keine Antwort"); else bt_msgnum("Schlafstufe im Flash (GSLP$): L=", (uint32_t)l);
+ bt_asleep=1;                                 // 5.r4: vor dem Befehl - CYSPP geht ca. 120 ms danach LOW (keine Schein-Verbindung)
  if (!bt_command("SSLP,L=02\r","SSLP,0000",400))     // 5.r3: mit LP_MODE an GND schlaeft das Modul
   bt_msg("SSLP,L=2 ohne Antwort (Modul schlaeft vermutlich sofort ein).");  // ein, bevor die Antwort kommt
  else bt_msg("Tiefschlaf angefordert (nur RAM).");
@@ -1709,7 +1713,8 @@ static void bt_deep_sleep_test (void)
  bt_msg("Taste druecken = per RST wecken (spaetestens nach 30 min automatisch).");
  newline();
  t0=mstimer;
- do { ResetWDT(); c=getc(TERMINAL_CHAR_TIMEOUT); if (c<0) osDelay(50); } while ((c<0) && ((uint)(mstimer-t0) < 1800000));
+ bxi=rxi;                                     // 5.r4: Puffer direkt pruefen statt getc() - ein anstehender comchange
+ while ((bxi==rxi) && ((uint)(mstimer-t0) < 1800000)) { ResetWDT(); osDelay(50); }   // liess getc() jede Taste verwerfen
  bxi=rxi;                                     // Tastendruck nicht ans Menue durchreichen
  putln("Wecken per RST ...");
  bt_hw_reset_test();

@@ -253,7 +253,9 @@ extern void bt_redetect_minute (void);    // 5.146: IF820 nach verpasster Erkenn
 extern void bt_sm_minute (void);          // measure.c: Minutentakt (Sicherheitsnetz)
 extern void bt_sm_lock (void);            // 5.132: sicom.c firmware(): unsichtbar waehrend des Updates (Haupt-Thread)
 extern void bt_sm_unlock (void);          // 5.132: firmware() ohne Neustart beendet
-#define BT_MODULE_ON     ((PINMODE3&PULLDOWN)==PULLDOWN)   // 5.130: Modul versorgt (measure.c schaltet es nach BT_TIMEOUT per Pull-up ab)
+extern volatile uchar bt_asleep;          // 5.r4: Firmware hat das IF820 bewusst schlafen gelegt (SSLP L=2), Wecken nur per RST
+// 5.r4: im Tiefschlaf (LP_MODE an GND, L=2) liest CYSPP LOW wie bei stromlosem Modul -> ebenfalls "nicht an"
+#define BT_MODULE_ON     (((PINMODE3&PULLDOWN)==PULLDOWN) && !bt_asleep)   // 5.130: Modul versorgt (measure.c schaltet es nach BT_TIMEOUT per Pull-up ab)
 extern uchar bt_state, bt_transport;
 extern uint  bt_conn_interval, bt_dis_reason;
 extern void bt_sm_link (uchar up);        // communication_change(): Pin LOW (1) / HIGH (0)

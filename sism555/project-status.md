@@ -7294,3 +7294,30 @@ BT, `getc()` verwirft wegen `comchange` jede RS232-Taste. Das Modul selbst schla
 des blockierenden Testpunkts nicht). Kein BT-Thema.
 
 **Offen:** Fertigungsfall (Werksreset 8->4 + Kaltstart), Strommessung im Tiefschlaf, beides nach der Entscheidung zu R138.
+
+## Update 5.r4 (Branch `rst-start`, 2026-11-19): Tiefschlaf gilt nicht als BT-Verbindung
+
+**Korrektur zu 5.r3:** R138 ist auf Board A **nicht bestueckt** (Anwender). Die R138-Erklaerung in 5.r3 ist damit falsch.
+Wahrscheinlichste Ursache: Im Tiefschlaf (HID-Off, "no active resources until the FW restarts", Guide 3.1.5) haelt das Modul
+seinen CYSPP-Pin nicht mehr; die Leitung liest LOW wie bei stromlosem Modul (Fehler 4, 5.130). Gemessen ist nur: CYSPP
+geht ca. 120 ms nach `SSLP,L=02` auf LOW. Hardware-Abhilfe gibt es nicht (kein Pull an CYSPP erlaubt, DVK-Befund).
+
+**Fix (Firmware):**
+- `bt_asleep` (btio.c): 1 = Firmware hat das Modul bewusst schlafen gelegt. Steckt in `BT_MODULE_ON` (btio.h), damit wirkt
+  es an allen drei CYSPP-Auswertungen: Verbindungserkennung (`communication_change()`, libtool.c), Sicherheitsnetz im
+  Minutentakt (measure.c), Einfrier-Erkennung (`bt_freeze_poll()`). Geloescht von jedem RST-Puls (`bt_rst_release_wait()`)
+  und vom Stromzyklus.
+- Testmenue 8->8->2 setzt `bt_asleep` vor `SSLP,L=02`; die Weck-Taste wird direkt im Empfangspuffer erkannt (vorher
+  `getc()`, das bei anstehendem `comchange` jede Taste verwarf).
+- Der kuenftige Energiesparmodus muss `bt_asleep` genauso setzen, bevor er das Modul schlafen legt.
+
+**Test auf A (99SC9923, RST an P1.16, LP_MODE an GND):**
+| Test | Ergebnis |
+|---|---|
+| Testmenue 8->8->2, 2x | `/PING` ohne Antwort = schlaeft; 20 s ohne Ausgabe, Taste kommt an; Wecken per RST: BOOT 2516/2515 ms, /PING 2655/2625 ms; Hauptmenue danach normal |
+| BLE-smoke | bestanden (Verbinden 7,5 s) |
+| Classic-smoke | bestanden |
+
+W11015 im Testpunkt kommt von CR/`/PING` an das schlafende Modul (CTS HIGH) und ist dort erwartet.
+
+**Offen:** Fertigungsfall (Werksreset 8->4 + Kaltstart, loescht Kopplungen - Anwenderfreigabe), Strommessung im Tiefschlaf.
