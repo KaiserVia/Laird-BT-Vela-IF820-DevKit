@@ -7264,3 +7264,33 @@ Ein frisches Board aus der Fertigung muss nach dem Aufspielen der LPC-Firmware o
 3. **Fertigungsfall:** Werksreset (Testmenue 8->4, `/RFAC` -> L=1, 115200, F=00) und Kaltstart -> Firmware muss das Modul
    ohne Zutun erkennen und komplett konfigurieren (inkl. L=0). Achtung: Werksreset loescht die Kopplungen im Modul,
    Classic am PC evtl. neu koppeln.
+
+## Update 5.r3 (Branch `rst-start`, 2026-11-19): Test mit LP_MODE an GND - Tiefschlaf zieht CYSPP auf LOW (R138)
+
+**Umbau A (99SC9923):** LP_MODE (IF820 Pin 30) direkt an GND, zusaetzlich zum RST-Umbau aus 5.151.
+
+**Ergebnisse mit LP_MODE an GND:**
+| Test | Ergebnis |
+|---|---|
+| Kaltstart (5.r2) | RST gehalten, BOOT 2518 ms, "sleep level (flash): L=0 ok", Banner nach 18,2 s - wie vorher |
+| BLE-smoke | bestanden |
+| Classic-smoke | bestanden (1. Lauf) |
+| Testmenue 8->8->2 (5.r2) | `SSLP,L=02` ohne Antwort -> Testpunkt brach ab (Modul schlaeft sofort ein). In 5.r3 behoben: Testpunkt laeuft weiter |
+| Testmenue 8->8->2 (5.r3) | W11015 (CTS HIGH), `/PING` ohne Antwort = **Modul schlaeft**. Danach war RS232 taub, Tasten kamen nicht an; das automatische Wecken nach 30 min per RST lief (BOOT 2516 ms, /PING 2629 ms), RS232 danach wieder normal |
+| Testmenue 8->7, `SSLP,L=02`, `!` | CYSPP bit7 vorher HIGH, **ca. 120 ms nach dem Befehl LOW**; Modulantwort bricht ab (`@R,000A,S<.`). CONNECTION P0.19 bleibt HIGH |
+
+**Ursache:** BT_HOST_WAKE (IF820 Pin 29) ist ein Ausgang: HIGH = wach, LOW = schlaeft (DS S. 30, Fussnote 19). Er haengt
+ueber **R138 (10 kOhm)** am Netz `BLT-LINK`, also an der CYSPP-Leitung (`Doku/IF820_Pin_Referenz.md`, Punkt 5). Schlaeft
+das Modul, zieht er die Leitung LOW -> die Firmware sieht eine BT-Verbindung, die es nicht gibt, schaltet das Terminal auf
+BT, `getc()` verwirft wegen `comchange` jede RS232-Taste. Das Modul selbst schlaeft wie gewollt.
+
+**Folge fuer den Energiesparmodus:** so nicht nutzbar. Loesungen:
+1. **Hardware (empfohlen, auch fuer V2): R138 nicht bestuecken.** BT_HOST_WAKE wird von EZ-Serial nur im Schlafbetrieb
+   genutzt, CYSPP braucht ihn nicht. Optional fuer V2: BT_HOST_WAKE auf einen freien LPC-GPIO (Anzeige "Modul wach").
+2. Firmware-Umgehung: solange die Firmware das Modul bewusst schlafen gelegt hat, CYSPP LOW ignorieren. Moeglich, aber
+   fehleranfaellig (EINT1/IC54-Interrupt, Sicherheitsnetz im Minutentakt, Zustandsmaschine).
+
+**Nebenbefund:** W17010 "HF-Nachfuehrung gescheitert" nach den 30 min Testmenue-Wartezeit (Nachfuehrung lief waehrend
+des blockierenden Testpunkts nicht). Kein BT-Thema.
+
+**Offen:** Fertigungsfall (Werksreset 8->4 + Kaltstart), Strommessung im Tiefschlaf, beides nach der Entscheidung zu R138.

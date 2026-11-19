@@ -1696,8 +1696,9 @@ static void bt_deep_sleep_test (void)
  concpy=connect;
  l=bt_get_sleep();
  if (l<0) bt_msg("Schlafstufe im Flash: keine Antwort"); else bt_msgnum("Schlafstufe im Flash (GSLP$): L=", (uint32_t)l);
- if (!bt_command("SSLP,L=02\r","SSLP,0000",400)) { bt_msg("SSLP,L=2 ohne Antwort - abgebrochen."); newline(); uart1_release(MUX_BT); return; }
- bt_msg("Tiefschlaf angefordert (nur RAM).");
+ if (!bt_command("SSLP,L=02\r","SSLP,0000",400))     // 5.r3: mit LP_MODE an GND schlaeft das Modul
+  bt_msg("SSLP,L=2 ohne Antwort (Modul schlaeft vermutlich sofort ein).");  // ein, bevor die Antwort kommt
+ else bt_msg("Tiefschlaf angefordert (nur RAM).");
  t0=mstimer; while ((uint)(mstimer-t0) < 3000) { ResetWDT(); osDelay(100); }
  bt_command(T_CR,T_pingok,-60);                       // Weck-Byte waere bei EPDS wirksam, im Tiefschlaf nicht
  asleep=!bt_command(T_ping,T_pingok,300);
