@@ -328,6 +328,66 @@ bool bt_set_sec (void)               // Just-Works festschreiben -> RAM, dann /S
 }
 
 //-----------------------------------------------------------------------------
+// 5.r2: Schlafstufe des IF820 (SSLP). V2: LP_MODE an GND -> es gilt die Stufe aus dem Modul-Flash. Werkseinstellung ist
+// L=1 (EPDS: UART kann Bytes verlieren, Guide S. 35/36), also haelt die Firmware im Flash immer L=0 (nie schlafen).
+// Tiefschlaf L=2 nur im RAM (Testmenue 8->8, spaeter Energiesparmodus), Wecken per RST -> danach wieder L=0 aus dem
+// Flash. "$" am Befehlsnamen = Flash-Bereich (Guide 2.5.2): GSLP$ liest den Flash-Wert, SSLP$ schreibt RAM und Flash.
+//-----------------------------------------------------------------------------
+static void bt_msg (char *m);                    // Vorwaertsdeklarationen (Definition weiter unten)
+static void bt_msgnum (char *m, uint32_t v);
+
+int bt_get_sleep (void)              // -1 = keine Antwort, sonst Schlafstufe im Modul-Flash (0..2)
+{
+ char buf[64]; uchar n, t; char *p; uchar dconn=connect;
+ if (fp.btmodem!=IF820) return (-1);
+ for (t=0; t<3; t++)                                   // Raw-Read wie bt_get_echo(); erster Versuch kann leer sein
+ {                                                     // (oder ein schlafendes Modul erst wecken)
+  n=0; bxi1=rxi1; connect=UART1; putstr("GSLP$\r");
+  connect=dconn & ~UART1; osDelay(200);
+  while (bxi1!=rxi1 && n<sizeof(buf)-1) buf[n++]=rbuf1[++bxi1];
+  buf[n]=0; connect=dconn;
+  p=strstr(buf,",L=");
+  if (p && isdigit((int)p[3]) && isdigit((int)p[4])) return ((p[3]-'0')*16+(p[4]-'0'));	// L=00..02
+  osDelay(60);
+ }
+ return (-1);
+}
+
+static bool bt_sleep_off_ram (void)  // Werksmodul mit L=1 und LP_MODE an GND: wecken (UART wake-on-RX) und Schlaf im RAM aus
+{
+ uchar t;
+ for (t=0; t<5; t++)
+ {
+  bt_command(T_CR,T_pingok,-60);                       // Weck-Byte (Antwort egal)
+  if (bt_command("SSLP,L=00\r","SSLP,0000",300)) return (TRUE);
+  osDelay(50);
+ }
+ return (FALSE);
+}
+
+static int bt_sleep_check_set (void) // UART1 schon auf BT: 1 = L=0 im Flash (war schon / jetzt gesetzt), 0 = Fehler
+{
+ int l=bt_get_sleep();
+ if (l==0) return (1);
+ if (!bt_command("SSLP$,L=00\r","SSLP$,0000",400)) return (0);	// RAM + Flash, kein /SCFG/Neustart noetig
+ return (bt_get_sleep()==0) ? 1 : 0;
+}
+
+void bt_ensure_sleep_off (void)      // main.c: nach erfolgreichem test_BT() im Hochlauf (Modul getauscht/Werksreset)
+{
+ int l;
+ if ((fp.btmodem!=IF820) || (uart1_owner==MUX_GSM) || bt_link_busy()) return;
+ if (!Init_BT_ch(BT_BAUD)) { uart1_release(MUX_BT); return; }
+ concpy=connect;
+ l=bt_get_sleep();
+ if (l==0) bt_msg(" IF820 sleep level (flash): L=0 ok");
+ else if (bt_sleep_check_set()) bt_msgnum(" IF820 sleep level set to L=0 (flash), was ", (uint32_t)l);
+ else bt_msg(" IF820 WARNING: could not set sleep level L=0");
+ bxi1=rxi1;
+ uart1_release(MUX_BT);
+}
+
+//-----------------------------------------------------------------------------
 // Generische Device-Name-Verwaltung  (Name = VIASIS_<serno>)
 //-----------------------------------------------------------------------------
 int bt_get_name (void)               // 1 = Name == VIASIS_<serno>, 0 = anders, -1 = unbekannt
@@ -936,8 +996,12 @@ void bt_rst_start (void)                       // main.c, frueh im Hochlauf (ans
 {
 #if BT_RST_START
  uchar held=bt_rst_held;
- if ((fp.btmodem==IF820) && (i_reset!=FIRM_UP_RES) && (i_reset!=SLEEP_RES) && (uart1_owner!=MUX_GSM)
-     && (held || !bt_link_busy()))            // ohne Halten: bei laufender Verbindung nicht zuruecksetzen
+ // 5.r2: Gehalten wird beim Einschalten ohne Typpruefung -> dann IMMER loslassen und auf den Modulstart warten, auch
+ // wenn noch kein Modul eingetragen ist (frisches Board aus der Fertigung: sonst liefe init_bluetooth() in den
+ // Modulstart hinein). Ein Werksmodul meldet BOOT mit 115200 (nicht lesbar) -> nach BT_RST_BOOT_MS ist es trotzdem hoch.
+ if ((held && (uart1_owner!=MUX_GSM)) ||
+     ((fp.btmodem==IF820) && (i_reset!=FIRM_UP_RES) && (i_reset!=SLEEP_RES) && (uart1_owner!=MUX_GSM)
+      && !bt_link_busy()))                     // Puls: nie bei laufender Verbindung
  {
   bt_release();                                // CYSPP Eingang
   if (uart1_owner==MUX_NONE) { MUX_BT_Select; Init_UART1(IF820_BAUD); connect&=~UART1; }	// Leerlauf wie 5.127
@@ -945,7 +1009,7 @@ void bt_rst_start (void)                       // main.c, frueh im Hochlauf (ans
   if (!held) { FIO1CLR=DIS_BT; FIO1DIR|=DIS_BT; osDelay(BT_RST_MS); }	// RST-Puls
   if (bt_rst_release_wait())
    bt_msgnum(held ? " IF820 RST beim Einschalten gehalten, BOOT nach ms " : " IF820 RST-Puls beim Neustart, BOOT nach ms ", bt_rst_boot_ms);
-  else bt_msg(" IF820 RST beim Start: kein BOOT (Board ohne RST-Draht?)");
+  else bt_msg(" IF820 RST beim Start: kein BOOT gelesen (Werksmodul mit 115200 oder Board ohne RST-Draht)");
  }
  bt_rst_free();
 #endif
@@ -1620,6 +1684,45 @@ static void bt_hw_reset_test (void)
  uart1_release(MUX_BT);
 }
 
+// 5.r2: Testmenue 8->8, Auswahl 2 - Tiefschlaf (SSLP L=2, nur RAM) zum Strommessen, Wecken per RST. Wirkt nur mit
+// LP_MODE an GND; bei offenem LP_MODE (interner Pull-up = HIGH) bleibt das Modul wach (/PING antwortet weiter).
+static void bt_deep_sleep_test (void)
+{
+ int c, l;
+ uint t0;
+ bool asleep;
+ if (connect&BT_LINK) { putln("Nur ohne BT-Verbindung (ueber RS232/USB)."); return; }
+ if (!Init_BT_ch(BT_BAUD)) { putln("Modul nicht bereit (CTS HIGH)."); uart1_release(MUX_BT); return; }
+ concpy=connect;
+ l=bt_get_sleep();
+ if (l<0) bt_msg("Schlafstufe im Flash: keine Antwort"); else bt_msgnum("Schlafstufe im Flash (GSLP$): L=", (uint32_t)l);
+ if (!bt_command("SSLP,L=02\r","SSLP,0000",400)) { bt_msg("SSLP,L=2 ohne Antwort - abgebrochen."); newline(); uart1_release(MUX_BT); return; }
+ bt_msg("Tiefschlaf angefordert (nur RAM).");
+ t0=mstimer; while ((uint)(mstimer-t0) < 3000) { ResetWDT(); osDelay(100); }
+ bt_command(T_CR,T_pingok,-60);                       // Weck-Byte waere bei EPDS wirksam, im Tiefschlaf nicht
+ asleep=!bt_command(T_ping,T_pingok,300);
+ bt_msg(asleep ? "/PING ohne Antwort -> Modul schlaeft (Strom jetzt messen)." :
+                 "/PING antwortet -> Modul wach (LP_MODE HIGH/offen?).");
+ bxi1=rxi1;
+ uart1_release(MUX_BT);
+ bt_msg("Taste druecken = per RST wecken (spaetestens nach 30 min automatisch).");
+ newline();
+ t0=mstimer;
+ do { ResetWDT(); c=getc(TERMINAL_CHAR_TIMEOUT); if (c<0) osDelay(50); } while ((c<0) && ((uint)(mstimer-t0) < 1800000));
+ bxi=rxi;                                     // Tastendruck nicht ans Menue durchreichen
+ putln("Wecken per RST ...");
+ bt_hw_reset_test();
+}
+
+static void bt_rst_menu (void)               // Testmenue 8->8
+{
+ int c=-1; uchar tries;
+ putln("1 = Reset ueber RST, 2 = Tiefschlaf (SSLP L=2) + Wecken per RST, sonst zurueck");
+ for (tries=0; tries<20 && (c<'1' || c>'9'); tries++) { c=getc(TERMINAL_CHAR_TIMEOUT); if (c<0) osDelay(50); }
+ if (c=='1') bt_hw_reset_test();
+ else if (c=='2') bt_deep_sleep_test();
+}
+
 void bt_diag_menu (void)
 {
  int c=-1; uchar tries; uint cc0=comchange_count;   // TEMPORAER (5.69): Startwert fuer Delta-Anzeige
@@ -1631,7 +1734,7 @@ void bt_diag_menu (void)
  put_menuitem("Force-Disconnect (/DIS)",'5');
  put_menuitem("CYSPP manuell HIGH/Freigeben",'6');
  put_menuitem("Modulbefehl senden (Phase 0)",'7');  // TEMPORAER (5.129), siehe bt_module_cmd()
- put_menuitem("IF820 Reset (RST, P1.16)",'8');     // 5.151
+ put_menuitem("IF820 Reset/Tiefschlaf (RST, P1.16)",'8');     // 5.151, 5.r2 Tiefschlaf
  select('9',1);                                   // "9. zurueck" + "Ihre Auswahl 1...9?" wie in allen Menues
  for (tries=0; tries<20; tries++)
  {
@@ -1653,7 +1756,7 @@ void bt_diag_menu (void)
  else if (c=='5') bt_force_disconnect_test();
  else if (c=='6') bt_cyspp_manual_control();
  else if (c=='7') bt_module_cmd();
- else if (c=='8') bt_hw_reset_test();
+ else if (c=='8') bt_rst_menu();
  // c=='9' (zurueck) oder ungueltig -> einfach zurueck ins Testmenue, kein Diagnoseaufruf
  // HINWEIS (5.89): Der fruehere Flush hier (5.88, "bxi=rxi vor mainmenu()") ist nicht mehr
  // noetig - Command-Mode-/Protokollbytes (Event-Sniff, Factory-Reset, Contention-Test) landen
@@ -1791,6 +1894,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
    if (isdigit(fp.serno[0]) && pin) fp.btpin=atoi(fp.serno)*10000+pin;  // 6-stellige App-Layer-PIN
    bt_msgnum(" -> IF820 found at baud ",detbaud);
    put2str(T_bt,T_if820); putstr(T_dpkt); putnumber(IF820_BAUD,0); newline();
+   if (!bt_sleep_off_ram()) bt_msg(" sleep off (RAM, SSLP L=0): no answer");	// 5.r2: Werksmodul L=1 + LP_MODE an GND
    bt_command(T_dis,T_disok,500); osDelay(300);          // evtl. offene SPP-Verbindung schliessen
 
    // --- Schritt 1/2: Baud 460800 + Flow Control F=01 (STU setzt beides gemeinsam) ---
@@ -1859,6 +1963,12 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
     if (bt_set_sec()) { changed=1; bt_msg("   security set (/SCFG)"); }
     else              bt_msg("   WARNING: could not set security (non-fatal)");
    }
+
+   // --- Schritt 3g (5.r2): Schlaf aus im Modul-Flash (SSLP$ L=0) - Voraussetzung fuer LP_MODE an GND (V2) ---
+   // SSLP$ schreibt RAM und Flash sofort, kein /RBT noetig -> changed bleibt unberuehrt.
+   if (bt_get_sleep()==0) bt_msg(" Step 3g: sleep off (SSLP L=0) already ok");
+   else if (bt_sleep_check_set()) bt_msg(" Step 3g: sleep off (SSLP L=0) set (flash)");
+   else bt_msg(" Step 3g: WARNING: could not set sleep level L=0");
 
    // --- Schritt 4: nur bei Aenderung speichern/rebooten + verifizieren ---
    if (changed)

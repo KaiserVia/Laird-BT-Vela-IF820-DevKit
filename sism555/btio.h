@@ -244,6 +244,8 @@ extern void bt_sm_hide (void);            // main.c: frueh im Hochlauf
 extern void bt_rst_hold (void);           // main.c: direkt nach Init_Ports(), nur Power-On
 extern void bt_rst_start (void);          // main.c: anstelle bt_sm_hide()
 extern void bt_rst_free (void);           // main.c: Sicherheitsnetz vor bt_sm_boot_done()
+extern void bt_ensure_sleep_off (void);   // 5.r2: main.c, nach test_BT() - Schlafstufe L=0 im Modul-Flash (LP_MODE an GND)
+extern int  bt_get_sleep (void);          // 5.r2: Schlafstufe im Modul-Flash (GSLP$), -1 = keine Antwort
 extern bool bt_power_cycle (void);        // 5.150: IF820 stromlos (Leitungen getrennt, 10/30 s), TRUE = antwortet danach
 extern void bt_freeze_poll (void);        // 5.150: eingefrorenes IF820 waehrend einer Sitzung erkennen (CTS dauerhaft HIGH)
 extern void bt_redetect_init (void);      // 5.148: Zustand der Neuerkennung beim Einschalten zuruecksetzen

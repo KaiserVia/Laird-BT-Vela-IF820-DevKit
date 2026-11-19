@@ -7228,3 +7228,39 @@ Modulzustand nach Watchdog/Reboot/Brown-out.
 
 **Offen:** Gegenprobe auf Board ohne RST-Draht (B: erwartet "kein BOOT" bei Neustart = 4 s mehr, beim Einschalten das
 BOOT des normalen Modulstarts); Watchdog-Reset bei laufender BT-Verbindung (darf nicht zuruecksetzen) nicht getestet.
+
+## Update 5.r2 (Branch `rst-start`, 2026-11-19): Schlafstufe L=0 im IF820-Flash - Vorbereitung LP_MODE an GND (V2)
+
+**Ziel:** LP_MODE (Pin 30) soll in V2 fest an GND, damit das Modul spaeter per `SSLP,L=2` (Tiefschlaf, ca. 1,2 uA) schlafen
+kann (Energiesparmodus). Mit LP_MODE an GND gilt die Schlafstufe aus dem Modul-Flash; Werkseinstellung ist **L=1** (EPDS,
+UART kann Bytes verlieren, Guide S. 35/36). Unsere Firmware hat SSLP bisher nie gesetzt -> alle Module stehen auf L=1.
+Ein frisches Board aus der Fertigung muss nach dem Aufspielen der LPC-Firmware ohne Zutun laufen.
+
+**Umsetzung:**
+- `bt_get_sleep()`: `GSLP$` liest die Stufe im **Flash** ("$" = Flash-Bereich, Guide 2.5.2).
+- `bt_sleep_check_set()`: ist sie nicht 0 -> `SSLP$,L=00` (RAM und Flash sofort, kein /SCFG/Neustart), danach ruecklesen.
+- `bt_ensure_sleep_off()` im Hochlauf nach erfolgreichem `test_BT()` (main.c): faengt getauschte Module und Werksreset ab.
+- `init_bluetooth()`: direkt nach dem Finden zuerst `bt_sleep_off_ram()` (Weck-Byte CR + `SSLP,L=00`, bis 5 Versuche; das
+  Modul hat UART wake-on-RX) -> ein Werksmodul mit L=1 bleibt fuer die restliche Konfiguration wach. Schritt 3g schreibt L=0
+  in den Flash.
+- Fix zu 5.r1: Nach gehaltenem RST wartet `bt_rst_start()` jetzt immer auf den Modulstart, auch ohne eingetragenes Modul
+  (frisches Board: `init_bluetooth()` lief sonst in den Modulstart hinein). Ein Werksmodul meldet BOOT mit 115200 (nicht
+  lesbar) -> nach 4 s ist es trotzdem hoch.
+- Testmenue 8->8 jetzt mit Auswahl: 1 = Reset, 2 = Tiefschlaf (`SSLP,L=02` nur RAM, nach 3 s `/PING`: keine Antwort =
+  schlaeft), Taste = Wecken per RST (spaetestens nach 30 min).
+
+**Test auf A (99SC9923, LP_MODE noch offen) am 2026-11-19:**
+| Test | Ergebnis |
+|---|---|
+| 1. Kaltstart mit 5.r2 | `GSLP$` -> L=1, `SSLP$,L=00` ok, "sleep level set to L=0 (flash), was 1" |
+| 2. Kaltstart | "sleep level (flash): L=0 ok" (Flash-Wert bleibt) |
+| Testmenue 8->8->2 | L=0 im Flash, `SSLP,L=02` ok, `/PING` antwortet weiter (LP_MODE offen = HIGH, erwartet); Wecken per RST: BOOT 2515 ms, /PING 2655 ms |
+| BLE-smoke | bestanden |
+| Classic-smoke | 1. Lauf direkt nach BLE "unstable" (Verbinden 10,5 s, Banner nicht gesehen), Wiederholung bestanden |
+
+**Umbau A (danach):** LP_MODE (IF820 Pin 30) an GND. **Pruefen nach dem Umbau:**
+1. Kaltstart: BLE/Classic wie bisher (L=0 im Flash -> Modul schlaeft nie).
+2. Testmenue 8->8->2: `/PING` ohne Antwort = Tiefschlaf; Strom messen; Taste -> Reset, Modul wieder da.
+3. **Fertigungsfall:** Werksreset (Testmenue 8->4, `/RFAC` -> L=1, 115200, F=00) und Kaltstart -> Firmware muss das Modul
+   ohne Zutun erkennen und komplett konfigurieren (inkl. L=0). Achtung: Werksreset loescht die Kopplungen im Modul,
+   Classic am PC evtl. neu koppeln.
