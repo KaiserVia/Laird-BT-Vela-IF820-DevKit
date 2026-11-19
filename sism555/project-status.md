@@ -7321,3 +7321,36 @@ geht ca. 120 ms nach `SSLP,L=02` auf LOW. Hardware-Abhilfe gibt es nicht (kein P
 W11015 im Testpunkt kommt von CR/`/PING` an das schlafende Modul (CTS HIGH) und ist dort erwartet.
 
 **Offen:** Fertigungsfall (Werksreset 8->4 + Kaltstart, loescht Kopplungen - Anwenderfreigabe), Strommessung im Tiefschlaf.
+
+## Update 5.r5 (Branch `rst-start`, 2026-11-19): Fertigungsfall mit LP_MODE an GND - Werksmodul wird automatisch eingerichtet
+
+**Test:** Board A (RST an P1.16, LP_MODE an GND), Testmenue 8->4 (`/RFAC` bestaetigt), dann Kaltstart. Das Modul steht
+damit wie ab Fertigung auf 115200, F=00, Schlafstufe L=1.
+
+**Befund mit 5.r4 (zwei Fehler):**
+1. Kein "BT init" im Hochlauf: Das schlafende Werksmodul liest CYSPP LOW (CONNECTION P0.19 HIGH). `test_BT()` scheitert,
+   `bt_link_busy_wait()` haelt das fuer eine laufende Verbindung -> keine Erkennung, `bt_redetect_minute()` sieht
+   `interfaces&BT_LINK` und tut nichts.
+2. Nach Fix 1 (5.r5, erster Stand): Baud-Scan ohne Antwort auf allen Bauds. Guide 3.1.5.1: "In normal sleep mode the module
+   cannot receive commands; the host needs proper use of the LP_MODE pin". Die Annahme aus 5.r2 (Weck-Byte, "UART
+   wake-on-RX") war falsch - mit LP_MODE fest an GND ist ein Werksmodul per UART nicht ansprechbar.
+
+**Fix (5.r5):**
+- `bt_link_busy()`: beim IF820 (oder nichts eingetragen) zusaetzlich CONNECTION (P0.19) LOW verlangen. V2 hat den Draht.
+- `bt_rst_wake_factory()`: findet der Baud-Scan nichts, RST-Puls, BOOT mit 115200 lesen und **sofort** `SSLP,L=00` (RAM).
+  Direkt nach dem Start ist das Modul noch wach und nimmt den Befehl an. Danach laeuft die normale Einrichtung, `/SCFG`
+  speichert L=0 in den Flash.
+
+**Ergebnis 5.r5 (Kaltstart mit Werksmodul):**
+| Schritt | Ergebnis |
+|---|---|
+| Hochlauf | kein BOOT bei 460800 (Werksmodul), "BT init" nach 24,7 s, Baud-Scan ohne Antwort |
+| Factory wake | BOOT bei 115200 nach 2539 ms, `SSLP,L=00` sofort ok |
+| Einrichtung | 460800/F=01, Name, Sniff aus + CoD, Dauerwerbung, Echo aus, Paketierung, Just-Works, Schritt 3g L=0 ok, `/RBT` + Verifikation ok (I11019), "BT init done" nach 45 s |
+| 2. Kaltstart | normal: RST gehalten, BOOT 2518 ms, "sleep level (flash): L=0 ok", Banner 18,2 s |
+| BLE-smoke | bestanden |
+| Classic | nicht getestet: `/RFAC` hat die Classic-Adresse auf die Werksadresse `D4:05:A8:0B:DE:C9` zurueckgesetzt (vorher `CD:49:1B:93:00:5F`, COM12). Windows braucht eine neue Kopplung (Anwender). |
+
+**Fuer die Fertigung:** Ein frisches Board (Werksmodul, LPC-Firmware aufgespielt) braucht damit nur RST an P1.16 und
+CONNECTION an P0.19; LP_MODE kann fest an GND. Die Erkennung dauert ca. 45 s statt 18 s (nur beim ersten Start).
+Nicht geprueft: Board mit leerem LPC-Parameterspeicher (`fp.btmodem`=0); dort laeuft `init_bluetooth()` direkt, derselbe Weg.

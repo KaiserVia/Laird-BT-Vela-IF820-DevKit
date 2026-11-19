@@ -1817,9 +1817,13 @@ static int bt_scan_ping (uint32_t baud)   // 1 = "/PING,0000" gesehen, sonst 0
 // Dann beantwortet das IF820 keine Befehle. Testlauf 2026-11-02 (boot-race): Verbinden in den ersten ~30 s nach dem
 // Einschalten -> /PING beim Hochlauf scheitert -> Neuerkennung scheitert -> Laird/RN4678-Fallback sendet AT&F1/$$$ als
 // Nutzdaten an die Gegenstelle -> F11010, BT bis zum Stromzyklus tot.
+// 5.r5: IF820 (oder noch nichts eingetragen, frisches Board): zusaetzlich CONNECTION (P0.19) LOW verlangen. Ein schlafendes
+// Modul (Werksmodul L=1 bzw. L=2, LP_MODE an GND) liest CYSPP ebenfalls LOW, CONNECTION bleibt dabei HIGH (Board A
+// 2026-11-19). Sonst hielt der Hochlauf das Werksmodul fuer "verbunden" und richtete es nie ein. V2: P0.19 ist verdrahtet.
 bool bt_link_busy (void)
 {
  int st=get_com_status();
+ if ((fp.btmodem!=Laird) && (fp.btmodem!=Roving) && (FIO0PIN&CONN_PIN)) return (FALSE);   // keine Datenpipe
  return ((st>=0) && !bt_cyspp_out && !(st&BT_LINK));   // BT_LINK ist low aktiv
 }
 
@@ -1832,6 +1836,23 @@ bool bt_link_busy_wait (uint ms)   // wie bt_link_busy(), aber bis zu ms warten:
   osDelay(250); ResetWDT();
  }
  return(FALSE);
+}
+
+// 5.r5: Werksmodul (L=1) mit LP_MODE an GND schlaeft und nimmt laut Guide 3.1.5.1 im "normal sleep" keine Befehle an.
+// Versuch: per RST neu starten, BOOT mit der Werks-Baud lesen und sofort danach SSLP,L=00 (RAM) senden, solange es nach
+// dem Start noch wach ist. TRUE = Modul hat geantwortet und bleibt jetzt wach (Baud = IF820_FACTORY_BAUD).
+static bool bt_rst_wake_factory (void)
+{
+ uchar i; bool ok=FALSE;
+ Init_BT_ch(IF820_FACTORY_BAUD);              // UART1 115200, cts_bypass gesetzt (Werksmodul F=00)
+ bxi1=rxi1; ev_n=0; bt_boot_seen=0;
+ FIO1CLR=DIS_BT; FIO1DIR|=DIS_BT; osDelay(BT_RST_MS);	// RST-Puls
+ if (!bt_rst_release_wait()) { bt_msg(" Factory wake: no BOOT at 115200 after RST"); return (FALSE); }
+ bt_msgnum(" Factory wake: BOOT at 115200 after ms ", bt_rst_boot_ms);
+ for (i=0; (i<5) && !ok; i++)                 // sofort, ohne Wartezeit: SSLP L=0 im RAM
+  ok=bt_command("SSLP,L=00\r","SSLP,0000",-100);
+ bt_msg(ok ? " Factory wake: SSLP L=0 (RAM) ok, module stays awake" : " Factory wake: SSLP L=0 no answer");
+ return (ok);
 }
 
 void init_bluetooth (void)		// Bluetooth Modem initialisieren
@@ -1891,6 +1912,7 @@ void init_bluetooth (void)		// Bluetooth Modem initialisieren
    bt_msg(" Detection: baud scan without CTS (factory module)");
    for (k=0; k<sizeof(bdscan)/sizeof(bdscan[0]); k++)
     if (bt_scan_ping(bdscan[k])) { detbaud=bdscan[k]; break; }
+   if (!detbaud && bt_rst_wake_factory()) detbaud=IF820_FACTORY_BAUD;	// 5.r5: schlafendes Werksmodul per RST wecken
   }
 
   if (detbaud)                          // === IF820 gefunden ===
