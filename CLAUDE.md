@@ -20,6 +20,10 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
   - `DevelopLightSensor` -> `C:\viaTraffic\GitHub\Projects\LightSensor`
   - **2026-11-13: beide in `main` gemergt (5.L2 + 5.s1 -> 5.138).** Weiterarbeit an diesen Branches vorher mit
     `git merge main` nachziehen, sonst laufen die Stände wieder auseinander.
+  - `rst-start` -> `C:\viaTraffic\GitHub\Projects\RST-Start` (Versionen **5.r1, 5.r2 ...**, ab 5.151): IF820-Reset per
+    RST beim LPC-Start, LP_MODE an GND, Tiefschlaf, Werksmodul-Einrichtung. Gepusht, **noch nicht in `main`**.
+    Aktuell 5.r5 (Board A geflasht). Kapitel "Update 5.r1" bis "Update 5.r5" in `sism555/project-status.md` des
+    Worktrees; Konzept `sism555/Doku/Energiesparmodus_Konzept.md` (nur dort).
 - **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
   (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen
   GND-Verbindung dafür aufgetrennt wurde) und dürfen nicht auf Boards ohne Draht (mit der Weiche auf 1,
@@ -68,6 +72,17 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - `Zeitsync_Plan.md`, `Fehlerspeicher_Strategie.md`, `parameterspeicher.md`
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
+
+- **2026-11-19/23 - 5.r1 bis 5.r5 (TEST), Branch `rst-start`:** Ziel V2-Hardware: RST an P1.16 (R124 10k, kein T10),
+  **LP_MODE fest an GND** (0-Ohm-Bruecke), CONNECTION an P0.19. Board A (99SC9923) so umgebaut, laeuft mit 5.r5.
+  - 5.r1: RST beim Einschalten gehalten bis zum Verbergen, Puls bei Watchdog/Reboot/Brown-out.
+  - 5.r2: Schlafstufe **L=0 im Modul-Flash** sichergestellt (`GSLP$`/`SSLP$`); Testmenue 3->8->8: 1 = Reset, 2 = Tiefschlaf.
+  - 5.r4: Schlafendes Modul liest **CYSPP LOW** -> Merker `bt_asleep` in `BT_MODULE_ON`, sonst Schein-Verbindung, RS232 taub.
+  - 5.r5: `bt_link_busy()` verlangt zusaetzlich CONNECTION LOW; **Werksmodul** (L=1 nimmt im Schlaf keine Befehle an)
+    wird per RST geweckt und sofort nach BOOT mit `SSLP,L=00` wachgehalten -> Fertigungsfall automatisch (ca. 45 s).
+  - Geprueft auf A: Tiefschlaf + RST-Wecken, BLE, Classic, Fertigungsfall nach `/RFAC`. **`/RFAC` setzt die
+    BT-Adresse zurueck** (A jetzt `D4:05:A8:0B:DE:C9`, Classic **COM22**), danach am PC neu koppeln. Strom nicht gemessen.
+  - Energiesparschieber (Sparen/Normal/Volle Leistung) nur als Konzept, offene Entscheidungen dort.
 
 - **2026-11-18 - 5.151 (TEST), `main`:** IF820-Reset ueber RST: Board A (99SC9923) umgebaut (T10 raus, P1.16 -> RST
   Pin 34, R124 10k). `bt_hw_reset()` treibt P1.16 20 ms LOW; BT_TIMEOUT/W11023 versuchen zuerst den Reset (I11025), sonst
@@ -416,4 +431,4 @@ nicht gemacht, damit der Fix nicht mit den offenen BT-Themen vermischt wird.
 - Übergabe zwischen beiden läuft über **diese Datei plus die Doku unter `sism555/Doku/`**.
 
 ---
-*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-12.*
+*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-23.*
