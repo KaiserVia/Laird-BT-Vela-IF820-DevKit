@@ -7349,7 +7349,7 @@ damit wie ab Fertigung auf 115200, F=00, Schlafstufe L=1.
 | Einrichtung | 460800/F=01, Name, Sniff aus + CoD, Dauerwerbung, Echo aus, Paketierung, Just-Works, Schritt 3g L=0 ok, `/RBT` + Verifikation ok (I11019), "BT init done" nach 45 s |
 | 2. Kaltstart | normal: RST gehalten, BOOT 2518 ms, "sleep level (flash): L=0 ok", Banner 18,2 s |
 | BLE-smoke | bestanden |
-| Classic | nicht getestet: `/RFAC` hat die Classic-Adresse auf die Werksadresse `D4:05:A8:0B:DE:C9` zurueckgesetzt (vorher `CD:49:1B:93:00:5F`, COM12). Windows braucht eine neue Kopplung (Anwender). |
+| Classic | `/RFAC` hat die Classic-Adresse auf die Werksadresse `D4:05:A8:0B:DE:C9` zurueckgesetzt (vorher `CD:49:1B:93:00:5F`, COM12). Nach neuer Kopplung (Anwender, **COM22**) am 2026-11-23 bestanden (ohne RS232-Mitschnitt, Adapter nach PC-Umbau nicht angeschlossen); BLE-smoke am selben Tag erneut bestanden |
 
 **Fuer die Fertigung:** Ein frisches Board (Werksmodul, LPC-Firmware aufgespielt) braucht damit nur RST an P1.16 und
 CONNECTION an P0.19; LP_MODE kann fest an GND. Die Erkennung dauert ca. 45 s statt 18 s (nur beim ersten Start).
