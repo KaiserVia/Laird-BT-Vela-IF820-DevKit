@@ -322,6 +322,11 @@
 #define		RE_MS_LOW			25						// RE/-Zeit bei kleinster Messgeschwindigkeit < 5 km/h
 #define		RE_MS_MIN			5							// Einstellbereich RE/-Zeit
 #define		RE_MS_MAX			100
+// 5.152: Via-2 Mindestmesszeit nach RE/ (Mail HW-Kollege 2026-11-24: mind. 8 Perioden der kleinsten Messgeschwindigkeit,
+// bei 5 km/h 36 ms; vorher brach die Messung ohne Fahrzeug schon nach der RE/-Zeit ab, ca. 15,6 ms)
+#define		MESS_MIN_PER	8							// automatisch: Anzahl Dopplerperioden bei fp.vmm
+#define		MESS_MS_MIN		10						// Einstellbereich Mindestmesszeit in ms
+#define		MESS_MS_MAX		250
 
 // UART1 MUX Owner State Machine
 enum { MUX_NONE=0, MUX_BT, MUX_GSM, MUX_GPS };	// UART1 resource owner states
@@ -491,7 +496,8 @@ typedef struct FlashSavedParameter { 	// Parameter, die dauerhaft im Flash gesic
  int8_t utc;										// Zeitzone -11 < utc < 12
  uchar hfkanal;									// 5.142: Via-2 Frequenzkanal, 0 = automatisch aus Seriennummer, 1..10 = Kanal 0..9 (HF_KANAL_MHZ)
  uchar re_ms;										// 5.142: Via-2 RE/-Zeit (Verstaerkungsreduzierung nach Einschalten) in ms, 0 = automatisch (RE_MS_DEF/RE_MS_LOW)
- uchar fill2[4];								// F�llbytes damit GPS Datenfeld, die letzen 300 Bytes im 2k Block belegt
+ uchar mess_ms;									// 5.152: Via-2 Mindestmesszeit nach RE/ in ms, 0 = automatisch (MESS_MIN_PER Perioden bei fp.vmm)
+ uchar fill2[3];								// F�llbytes damit GPS Datenfeld, die letzen 300 Bytes im 2k Block belegt
  gpsgeo	gp[GPS_POS];						// GPS Datenfeld 25 Positionen � 3 x 4 = 300 Byte
 } flashparameter;
 

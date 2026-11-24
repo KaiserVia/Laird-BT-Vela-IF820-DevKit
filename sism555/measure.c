@@ -100,7 +100,7 @@ int measure (uchar speichern)	// Geschwindigkeitsmessung
 	} 
   
 	if (t_mess==0) break; 						// Absolute Messzeit�berwachung
-	if((int)(LenTm-(((t_mess+t_on_delay())*LenTm)/t_mess_max))>tmi)   	// 5.142: gleiche Einschaltzeit wie in set_measure_constants()
+	if((int)(LenTm-(((t_mess+mess_min_time())*LenTm)/t_mess_max))>tmi)   	// 5.152: Pruefung erst nach der Mindestmesszeit (vorher t_on_delay(), Via-2 = RE/-Zeit 15 ms)
    break; // Dynamische �berwachung Anzahl gemessener Dopplerperioden
  }	 // end while
  

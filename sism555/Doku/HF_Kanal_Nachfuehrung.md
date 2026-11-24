@@ -74,6 +74,9 @@ Automatisch: nach Stromzyklus +3,9 MHz (Stufe 146), nach 167 s Online-Messen Stu
   der Wert hängt von der kleinsten Messgeschwindigkeit `fp.vmm` und der Sendefrequenz ab).
 - Annahme: RE/ aus der Mail (Expander "IC29 P0_7") ist im Code IC37 Port 0 Bit 7 (`AMP_BW`). Der Kollege sollte die
   Zeit am Oszilloskop prüfen.
+- **5.152 Mindestmesszeit:** Ohne Fahrzeug endete die Messung nach der RE/-Zeit (ca. 15,6 ms). Jetzt laeuft sie mindestens
+  8 Perioden der kleinsten Messgeschwindigkeit (5 km/h: 36 ms) oder den festen Wert `fp.mess_ms` (10-250 ms, Menuepunkt 7,
+  zweite Abfrage nach der RE/-Zeit). Funktion `mess_min_time()`.
 - Bisheriger Transceiver: `t_amp_en` jetzt immer 20 ms (bisher nach Neustart 20, nach einer Menüänderung bis zum
   nächsten Neustart 10 ms).
 

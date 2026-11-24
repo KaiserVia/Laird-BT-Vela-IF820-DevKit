@@ -281,6 +281,7 @@ uint werkparameter (void)		// Setzt Parameter auf default Werkszustand
 																	// auf eine Firmware vor 5.L1 zurueckflasht, muss danach im Menue die
 																	// Sprache einmal neu waehlen (siehe project-status.md Update 5.139).
  fp.autotime_off=0;								// 5.139: Automatische Zeit ein (Default) - vorher nie explizit gesetzt
+ fp.mess_ms=0;									// 5.152: Via-2 Mindestmesszeit automatisch
  fp.psets=Def_paraset;						// Default Anzahl Parameters�tze
  for (i=0;i<MAXTAST;i++) 					// F�r alle definierbaren Tastverh�ltnisse
   fp.hell[i]=Def_hell;						// Helligkeit = Tastverh�ltniss einstellen

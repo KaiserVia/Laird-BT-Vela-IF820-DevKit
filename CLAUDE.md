@@ -84,6 +84,9 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
     BT-Adresse zurueck** (A jetzt `D4:05:A8:0B:DE:C9`, Classic **COM22**), danach am PC neu koppeln. Strom nicht gemessen.
   - Energiesparschieber (Sparen/Normal/Volle Leistung) nur als Konzept, offene Entscheidungen dort.
 
+- **2026-11-24 - 5.152 (TEST), `main`:** Via-2 Mindestmesszeit nach RE/ (Mail HW-Kollege): Messung ohne Fahrzeug endet nicht
+  mehr nach 15 ms, sondern nach 8 Perioden der kleinsten Messgeschwindigkeit (5 km/h: 36 ms) oder fest `fp.mess_ms`
+  (Transceivermenue Punkt 7). Nicht am Geraet geprueft. Offen: Vor-/Nachlauf RE/ und EN-TX (Rueckfrage 2026-11-23).
 - **2026-11-18 - 5.151 (TEST), `main`:** IF820-Reset ueber RST: Board A (99SC9923) umgebaut (T10 raus, P1.16 -> RST
   Pin 34, R124 10k). `bt_hw_reset()` treibt P1.16 20 ms LOW; BT_TIMEOUT/W11023 versuchen zuerst den Reset (I11025), sonst
   Stromzyklus wie 5.150. Auf A: Reset 21/21 (/PING nach 2,6 s), eingefrorenes Modul in 2,6 s statt 13 s zurueck. Offen:
@@ -431,4 +434,4 @@ nicht gemacht, damit der Fix nicht mit den offenen BT-Themen vermischt wird.
 - Übergabe zwischen beiden läuft über **diese Datei plus die Doku unter `sism555/Doku/`**.
 
 ---
-*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-23.*
+*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-24.*

@@ -122,6 +122,14 @@ uint t_on_delay (void)									// Wartezeit Einschalten -> Messbeginn (wie trans
  return (DPWR+DTXFEN_T+t_amp_en);
 }
 
+uint mess_min_time (void)								// 5.152: Mindestmesszeit nach RE/ in ms (Messung ohne Detektion endet nicht frueher)
+{
+ if (!IS_VIA2) return (t_on_delay());					// bisheriger Transceiver: unveraendert
+ if ((fp.mess_ms>=MESS_MS_MIN) && (fp.mess_ms<=MESS_MS_MAX)) return (fp.mess_ms);	// fest eingestellt
+ if (!fp.vmm || !IFConst) return (t_on_delay());
+ return ((MESS_MIN_PER*100000ul)/(fp.vmm*IFConst));	// automatisch: MESS_MIN_PER Perioden bei kleinster Messgeschwindigkeit
+}
+
 uint hf_tx_mhz (void)
 {
  return ((hft_magic==HFT_MAGIC) ? hft_mhz : 0);
@@ -333,5 +341,6 @@ void hf_info (void)												// Statusausgabe im Via-2-Transceivermenue
  putstr ("Frequenz "); if (f) { put_mhz (f); putstr ("  ("); if (f>=ziel) putc('+'); put_mhz (f-ziel); putc(')'); } else putstr ("Messfehler");
  putstr (", Stufe "); if (w>=0) putnumber ((uint)w, 0); else putc('?'); newline ();
  putstr ("RE/-Zeit "); putnumber (re_time(), 0); putstr (" ms"); putstr ((fp.re_ms>=RE_MS_MIN && fp.re_ms<=RE_MS_MAX) ? " (fest)" : " (automatisch)");
+ putstr (", min. Messzeit "); putnumber (mess_min_time(), 0); putstr (" ms"); putstr ((fp.mess_ms>=MESS_MS_MIN && fp.mess_ms<=MESS_MS_MAX) ? " (fest)" : " (automatisch)");	// 5.152
  putstr (", max. Messzeit "); putnumber (t_mess_max, 0); putstr (" ms"); newline ();
 }

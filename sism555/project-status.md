@@ -7197,3 +7197,23 @@ BOOT -> Rueckfall Stromzyklus -> "Modul nach Stromzyklus bereit"; BLE-smoke dana
 aufgespielt, BLE- und Classic-smoke bestanden. Damit ist belegt: dieselbe 5.151 laeuft auf beiden Bauarten.
 Offen bleiben BT_TIMEOUT-Pfad auf A und RST-Pegel am Oszilloskop. Uhr von B stand nach dem Stromausfall auf 13.11.2026
 ("ungestellt"), wird ueber LTE im Modemfenster gestellt.
+
+## Update 5.152 (TEST, 2026-11-24): Via-2 Mindestmesszeit nach RE/
+
+**Anlass:** Mail HW-Kollege 2026-11-24 ("AW: Nachlaufzeit des Signals RE/ gegenueber EN/-MD-RF"). RE/ funktioniert, aber
+die Messzeit (Zeit nach RE/ bis zum Ausschalten) betraegt ohne Fahrzeug nur ca. 15,6 ms. Gewuenscht: mindestens 8 Perioden
+der kleinsten Messgeschwindigkeit, bei 5 km/h 36 ms. Die maximale Messzeit ist in Ordnung.
+
+**Ursache:** Die dynamische Messzeitueberwachung in `measure()` (Anzahl Dopplerperioden gegen verstrichene Zeit) setzte
+erst nach `t_on_delay()` ein - beim Via-2 die RE/-Zeit (15 ms). Weil `transceiver(2)` diese Zeit vor dem Messbeginn schon
+abwartet, brach eine Messung ohne Detektion nach ca. 15 ms Messzeit ab.
+
+**Fix:** Neue Funktion `mess_min_time()` (hftrack.c) ersetzt `t_on_delay()` in der Ueberwachung:
+- fest eingestellt: `fp.mess_ms` 10-250 ms (neues Byte aus `fill2`, Struktur bleibt 2048 Byte, Werkinit setzt 0);
+- automatisch (0 oder ungueltig): `MESS_MIN_PER` = 8 Perioden bei `fp.vmm` (5 km/h ca. 36 ms);
+- bisheriger Transceiver: unveraendert `t_on_delay()`.
+- Einstellbar im Via-2-Transceivermenue Punkt 7 ("RE/ Time, Min. Measuring Time"): zuerst RE/-Zeit, dann Mindestmesszeit,
+  je 0 = automatisch. Die Statuszeile zeigt "min. Messzeit ... ms (fest/automatisch)".
+
+**Offen:** am Geraet nicht geprueft. Messzeit am Oszilloskop durch den HW-Kollegen (EN/-MD-RF bzw. RE/ high bis
+Transceiver aus). Die Fragen zu Vor-/Nachlaufzeit RE/ und EN-TX (Mail 2026-11-23) sind noch unbeantwortet und nicht umgesetzt.
