@@ -7217,3 +7217,10 @@ abwartet, brach eine Messung ohne Detektion nach ca. 15 ms Messzeit ab.
 
 **Offen:** am Geraet nicht geprueft. Messzeit am Oszilloskop durch den HW-Kollegen (EN/-MD-RF bzw. RE/ high bis
 Transceiver aus). Die Fragen zu Vor-/Nachlaufzeit RE/ und EN-TX (Mail 2026-11-23) sind noch unbeantwortet und nicht umgesetzt.
+
+**Geprueft auf Board B (26SC9983) am 2026-11-24:** 5.152 per XMODEM geflasht. Transceivermenue zeigt automatisch
+"min. Messzeit 35 ms (automatisch)" (Kanal 4, 24170 MHz, kleinste Messgeschwindigkeit 5 km/h), Punkt 7 nimmt 30 ms an
+-> "30 ms (fest)", B steht jetzt auf 30 ms. BLE- und Classic-smoke bestanden (Classic erst im dritten Lauf, die
+Windows-Suche fand das Geraet zweimal nicht). Nach Stromzyklus ueber Relais 2 (Relais hing zuerst mit Write-Timeout, nach Ab-/Anstecken wieder ok):
+Hochlauf sauber (BT BEREIT nach 30,8 s), Anzeige weiter "min. Messzeit 30 ms (fest)" - Wert bleibt im Flash.
+Nicht geprueft: Messzeit am Oszilloskop.
