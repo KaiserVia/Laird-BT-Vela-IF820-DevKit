@@ -87,6 +87,7 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - **2026-11-25 - 5.153 (TEST), `main`:** Via-2 RE/-Vorlauf (Standard 1 ms vor EN/-MD-RF) und RE/-Nachlauf (10 ms nach
   EN/-MD-RF), Parameter `fp.re_vor`/`fp.re_nach` im Transceivermenue Punkt 7 (99 = aus). Auf B geflasht, Menue + BLE ok;
   Pegel/Zeiten am Oszilloskop offen, Lesart der Mail unbestaetigt (Zeitdiagramm steht aus). EN-TX weiter offen.
+  5.154: Menue zeigt den aktuellen Wert [x], Enter ohne Eingabe behaelt ihn. Paket fuer den HW-Kollegen: `sism555/fw_5.154/`.
 - **2026-11-24 - 5.152 (TEST), `main`:** Via-2 Mindestmesszeit nach RE/ (Mail HW-Kollege): Messung ohne Fahrzeug endet nicht
   mehr nach 15 ms, sondern nach 8 Perioden der kleinsten Messgeschwindigkeit (5 km/h: 36 ms) oder fest `fp.mess_ms`
   (Transceivermenue Punkt 7). Auf Board B geprueft (steht auf 30 ms fest, bleibt nach Stromzyklus); Paket fuer

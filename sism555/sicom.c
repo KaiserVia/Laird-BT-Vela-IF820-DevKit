@@ -766,6 +766,12 @@ void set_symbols_switches(void)	// Setup LED Symbole und Schalter
  newline();	// Zeilenvorschub
 }
 
+static void get_keep (text *pk, uchar max, uchar *par)	// 5.154: Abfrage mit aktuellem Wert [x]; Enter ohne Eingabe
+{																												// (oder Timeout) laesst den Wert unveraendert
+ putstr (pk); putstr (" ["); putnumber (*par, 0); putc (']');
+ getuchar ("", 0, max, par);
+}
+
 void transmenu (void) 	// Transceiver & Verst�rker Men�
 {
  int c=0;								// Hilfsvariable Men�auswahl
@@ -787,10 +793,12 @@ void transmenu (void) 	// Transceiver & Verst�rker Men�
 	  case '3': set_single_dpp (IC32); break;				// Manuelle Einstellung Sendefrequenz
     case '4': transceiver_test (); break;				// Test Verstaerker/Transceiver mit gedimmtem Display
     case '5': hf_adjust (); break;								// 5.142: Abgleich auf die Kanalfrequenz (Bisektion IC32)
-    case '6': getuchar(T_hfkanal, 0, HF_KANAELE, &fp.hfkanal); set_measure_constants (); break;	// 5.142: Kanal, 0 = automatisch
+    case '6': get_keep(T_hfkanal, HF_KANAELE, &fp.hfkanal); set_measure_constants (); break;	// 5.142: Kanal, 0 = automatisch
     case '7':														// 5.142: RE/-Zeit, 5.153: Vorlauf/Nachlauf, 5.152: Mindestmesszeit
-     if ((getuchar(T_rems, 0, RE_MS_MAX, &fp.re_ms)>0) && (getuchar(T_revor, 0, RE_VN_AUS, &fp.re_vor)>0) &&
-         (getuchar(T_renach, 0, RE_VN_AUS, &fp.re_nach)>0)) getuchar(T_messms, 0, MESS_MS_MAX, &fp.mess_ms);
+     get_keep(T_rems, RE_MS_MAX, &fp.re_ms);					// 5.154: Enter ohne Eingabe behaelt den Wert, naechste Abfrage folgt
+     get_keep(T_revor, RE_VN_AUS, &fp.re_vor);
+     get_keep(T_renach, RE_VN_AUS, &fp.re_nach);
+     get_keep(T_messms, MESS_MS_MAX, &fp.mess_ms);
      set_measure_constants (); break;
     case '8': hf_track_now (true); break;				// 5.142: Nachfuehrung sofort (mit Ausgabe)
    }

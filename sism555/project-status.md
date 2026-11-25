@@ -7244,3 +7244,13 @@ Zeitdiagramm (Rueckfrage 2026-11-23) steht noch aus; umgesetzt ist die woertlich
 **Geprueft auf Board B (26SC9983):** geflasht, Menue und Statuszeile wie erwartet, Online messen 15 s ohne Haenger,
 BLE-smoke bestanden. **Nicht geprueft:** Pegel und Zeiten am Oszilloskop (HW-Kollege); ob die Lesart "Nachlauf = RE/
 bleibt nach dem Ausschalten HIGH" gemeint ist - sonst Ablauf anpassen.
+
+## Update 5.154 (TEST, 2026-11-25): Transceivermenue - Enter behaelt den Wert
+
+Anwenderwunsch: Im Via-2-Transceivermenue soll Enter ohne Eingabe den bisherigen Wert lassen und zur naechsten Abfrage
+gehen. Bisher brach Punkt 7 (5.153) nach der ersten leeren Eingabe die weiteren Abfragen ab. Neu `get_keep()` (sicom.c):
+zeigt den gespeicherten Wert in eckigen Klammern (`RE/ time ms (0 = auto 15/25) [0]=`), leere Eingabe oder Timeout
+laesst ihn unveraendert. Gilt fuer Punkt 6 (Kanal) und alle vier Abfragen von Punkt 7.
+
+Geprueft auf Board B: nur Enter -> alle Werte unveraendert; nur Nachlauf 12 -> Statuszeile "RE/-Nachlauf 12 ms", Rest
+unveraendert; Nachlauf 0 -> wieder Standard 10 ms.
