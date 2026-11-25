@@ -7311,3 +7311,38 @@ verloren sein. Danach 5.156 per RS232.
   ueber BT Classic jedes Mal in 0,7-1,7 s, PIN und Menue ok. Strom nicht gemessen.
 - **RS232 anstecken weckt das Geraet nicht:** IC54 meldet das Kabel (Bit 4, 5Fh statt 4Fh), die Firmware bleibt aber
   beim Schlafen und antwortet auf COM3 nicht. Ursache und Fix: Update 5.157.
+
+## Update 5.u1 (TEST, 2026-11-25, Branch `usb-verbindung`): USB-Kabelanschluss robuster
+
+Anlass: Viele Kunden haben Probleme mit dem USB-Kabelanschluss; mit aktivem Hub geht es, direkt am PC oder ueber einen
+passiven Hub nicht zuverlaessig. Analyse von Schaltplan (24.11.2026), Datenblatt und Code: `Doku/USB_Analyse_2026-11.md`
+(6 Hardware-, 7 Firmware-Befunde, Massnahmenliste, Pruefmatrix). Branch `usb-verbindung` (Worktree
+`Projects/USB-Verbindung`, Basis 5.156), Versionen 5.u1, 5.u2 ...
+
+Umgesetzt (Firmware-Punkte F1-F4 der Analyse):
+
+- **F1 kein Tiefschlaf bei USB-Kabel** (measure.c): Ohne RS232, Anzeige und Messergebnis ging das Geraet ca. 250 ms nach
+  dem Erkennen von VBUS in `DeepSleep()`. Das stoppt PLL0 und damit den 48-MHz-USB-Takt mitten in der Anmeldung; der
+  Watchdog-Reset meldet das Geraet ab, danach von vorn. Ob es klappte, hing daran, wie schnell PC/Hub das Geraet
+  einrichten. Am Pruefplatz nie aufgefallen, weil dort RS232 steckt (`connect` != 0). Jetzt kein Schlaf, solange
+  `fp.usb` gesetzt ist und VBUS anliegt.
+- **PCONP nach dem Aufwachen erhalten** (hard.c `DeepSleep()`): `SystemInit()` schrieb PCONP = 0x00C086CC, darin ist
+  PCUSB aus; bei Aufwachen ohne Reset blieb USB tot. Jetzt wird PCONP vor dem Schlaf gemerkt und danach zurueckgeschrieben.
+- **F2 VBUS entprellt** (USB_tools.c `usb_vbus_on()`): Sitzung endet erst nach 300 ms durchgehend LOW, nicht mehr beim
+  ersten LOW-Abtastwert.
+- **F3 neu anmelden**: Konfiguriert der PC nach 20 s nicht, `USBD_Disconnect`, 500 ms, `USBD_Connect` (Zaehler
+  `usb_enum_retries`). 20 s, weil die erste Treibereinrichtung unter Windows einige Sekunden dauert.
+- **F4 Deskriptor** (RTE/USB/USBD_Config_0.c, USB_tools.c `usb_serial_patch()`): Seriennummer eingeschaltet und gleich
+  der Geraete-Seriennummer `fp.serno` (nur Buchstaben/Ziffern, sonst `_`; leer -> "0"). MDK-Middleware 6.2 kann die
+  Seriennummer nicht zur Laufzeit setzen und legt die Strings konstant ins Flash; deshalb RAM-Kopie mit eingesetzter
+  Nummer, `usbd0_desc.string_descriptor` zeigt darauf. Hersteller "viaTraffic", Produkt "VIASIS" (vorher
+  "NXP"/"LPC USB VCom Port"), EP0 64 statt 16 Byte. VID/PID unveraendert (NXP 0x1FC9/0x80F7), eigene PID offen.
+
+Build ohne Fehler/Warnungen. Map-Vergleich mit 5.156: alle 400 `non_init`-Symbole (u. a. `fp` 0x2007C028) gleich.
+**Am Geraet noch nicht geprueft** (am Pruefplatz haengt kein Board per USB). Zu pruefen: Schnelltest aus der Analyse
+(Geraet ohne RS232, Anzeige aus, direkt an den PC; vorher 5.156 als Gegenprobe), COM-Nummer bleibt an anderem Port
+gleich, Firmware-Update ueber USB, USB-Stick (Host) unveraendert.
+
+Hinweis: Mit gestecktem USB-Kabel schlaeft das Geraet jetzt nie (auch an einem reinen Ladegeraet ohne Datenhost).
+Nicht umgesetzt (naechste Schritte): F5 DTR, F6 eigener USB-Zustand statt `USB_LINK` in `connect`, USB-Start
+unabhaengig von der Hauptschleife; Hardware H1-H6 (Analyse Abschnitt 4).
