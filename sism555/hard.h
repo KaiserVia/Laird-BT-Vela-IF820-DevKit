@@ -689,6 +689,10 @@ extern void shift_to_LED (text * const sequence);	// numerische LED Anzeige
 extern void Ledaus (void);							// Abschaltung LED Anzeige
 extern void wait_uarts_empty (void);		// Warte bis alle Zeichen auf uarts versendet
 extern void DeepSleep (void);						// Bringe CPU in Deep power down
+extern uint reset_src;						// 5.156: Kopie RSID fuer den Hochlauf, POR wenn fp nach Update/Sleep ungueltig war
+extern void sleep_stat_reset (void);			// 5.155: Schlafzaehler loeschen (Power-On/Brown-out), hftrack.c
+extern void sleep_stat_count (void);			// 5.156: Schlafphase zaehlen (vor dem Deep Sleep), hftrack.c
+extern uint sleep_stat (uint *ago_s);		// 5.155: Anzahl Schlafphasen seit dem Einschalten, Sekunden seit der letzten, hftrack.c
 extern uint mess_hf (void);							// 5.L1: Via-2 HF-Sendefrequenz messen (Captureabstand von 8 Perioden)
 extern void Init_Radar_Ports (void);		// 5.L1: Pins abhaengig vom Radar-Empfaenger setzen
 

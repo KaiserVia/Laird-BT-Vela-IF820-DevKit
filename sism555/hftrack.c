@@ -72,6 +72,33 @@ static uint rtc_s (void)									// RTC-Zeit in Sekunden ab Jahresbeginn
  return ((uint)LPC_RTC->DOY*86400u + (uint)HOUR*3600u + (uint)MIN*60u + (uint)SEC);	// HOUR/MIN/SEC: RTC-Register (alilpc.h)
 }
 
+// 5.155/5.156: Schlafzaehler fuer die Infoseite (Nachweis Tiefschlaf ohne Strommessung). Ueberstehen den Deep-Sleep-
+// Reset (SLEEP_RES), geloescht bei Power-On/Brown-out. Absichtlich hier und nicht in hard.c: neue __noinit-Variablen
+// in hard.c verschieben fp, das nach einem Firmware-Update aus dem RAM weiterbenutzt wird (Fehler in 5.155).
+#define		SLEEP_MAGIC		0x534C0156
+static uint sleep_magic	__noinit;
+static uint sleep_cnt		__noinit;			// Anzahl Schlafphasen seit dem Einschalten
+static uint sleep_last	__noinit;			// RTC-Sekunde der letzten Schlafphase
+
+void sleep_stat_reset (void)						// bei Power-On/Brown-out (main.c)
+{
+ sleep_magic=SLEEP_MAGIC; sleep_cnt=0; sleep_last=0;
+}
+
+void sleep_stat_count (void)						// vor jedem Deep Sleep (hard.c)
+{
+ if (sleep_magic!=SLEEP_MAGIC) sleep_stat_reset ();
+ sleep_cnt++; sleep_last=rtc_s();
+}
+
+uint sleep_stat (uint *ago_s)						// Anzahl Schlafphasen, *ago_s = Sekunden seit der letzten (0xFFFFFFFF unbekannt)
+{
+ uint now=rtc_s();
+ if (sleep_magic!=SLEEP_MAGIC) sleep_stat_reset ();
+ *ago_s=(sleep_cnt && (now>=sleep_last)) ? now-sleep_last : 0xFFFFFFFFu;
+ return (sleep_cnt);
+}
+
 static void hft_reset (void)							// Zustand neu, erste Nachfuehrung nach HFT_FIRST_S
 {
  hft_magic=HFT_MAGIC;

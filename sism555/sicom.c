@@ -211,7 +211,16 @@ void infomenu (uchar menu)	// Information als Men� oder Email Text ausgeben
  put2str(T_serialno,T_dpkt);								// Text "Seriennummer...	
  if (isalpha(*fp.serno))  putstr(fp.serno);	// G�ltige Seriennummer existiert? Ja, ausgeben 
  newline();																	// Leerzeile
- if (menu) putparameter (T_betr,fp.hcount,(5<<16),T_h);	// Anzahl Betriebsstunden ausgeben	
+ if (menu) putparameter (T_betr,fp.hcount,(5<<16),T_h);	// Anzahl Betriebsstunden ausgeben
+ if (menu)																	// 5.155: Schlafphasen seit dem Einschalten (Nachweis Tiefschlaf ohne Strommessung)
+ {
+  uint ago, n=sleep_stat (&ago);
+  putstr (fp.pwm ? "Tiefschlaf seit Einschalten: " : "Schlaf (kein Tiefschlaf, PWM-Modus 0) seit Einschalten: ");
+  putnumber (n, 0);
+  if (ago!=0xFFFFFFFFu) { putstr (" mal, zuletzt vor "); putnumber (ago, 0); putstr (" s"); }
+  else putstr (" mal");
+  newline();
+ }
  if (tasks&MESSTASK) akt_pset=pset+1;				// Abfragezeit ist Messzeit? Ja, task=Parametersatz+1  
  putparameter (T_parakt,akt_pset,(5<<16),T_nil);	// Aktiven Parametersatz oder Null ausgeben   
  if (isalpha(*fp.comment)) 

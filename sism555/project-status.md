@@ -7259,3 +7259,55 @@ unveraendert; Nachlauf 0 -> wieder Standard 10 ms.
 den Messungen schon auf LOW. Der Vorlauf ist an RE/ deshalb keine sichtbare Flanke, er verzoegert nur EN/-MD-RF um 1 ms
 nach dem Einschaltbefehl. Offene Frage an ihn: soll RE/ in Ruhe HIGH sein, und ist der Nachlauf (RE/ bleibt nach dem
 Ausschalten 10 ms HIGH) so gemeint. Anleitung mit Bedienung: `fw_5.154/Anleitung_RE_Timing.md` (nicht im Git).
+
+## Update 5.155 (TEST, 2026-11-25, ZURUECKGEZOGEN): Schlafzaehler auf der Infoseite
+
+Anlass: reparierte Platine 26SC9966 pruefen, "vor allem ob das Schlafen geht". Der Tiefschlaf (`DeepSleep()`, hard.c)
+endet per Watchdog-Reset und ist ohne Strommessung von aussen nicht sichtbar. 5.155 zaehlt die Schlafphasen seit dem
+Einschalten und zeigt sie auf der Infoseite (Hauptmenue 6): `Tiefschlaf seit Einschalten: N mal, zuletzt vor X s`
+(bei `fp.pwm==0` nur normaler Schlaf, Text sagt das).
+
+**Fehler:** Die drei Zaehler lagen als `__noinit`-Variablen in hard.c. Dort liegt auch `fp` (`__noinit`), und der
+Linker hat `fp` dadurch von 0x2007C028 auf 0x2007C034 verschoben (ebenso `flashsize`, `pagepk` und weitere). Nach einem
+Firmware-Update (`FIRM_UP_RES`) und nach dem Deep-Sleep-Reset benutzt die Firmware `fp` aus dem RAM weiter, ohne ihn
+neu zu laden. Auf 26SC9966 nach dem BT-Update 5.154 -> 5.155: Menue italienisch, Betriebsstunden 83886301 h, keine
+Seriennummer, Schnittstellen falsch; ein weiteres Update scheiterte (Flash-Geometrie verdreht). Gefaehrlich: beim
+naechsten Abschalten schreibt `EINT0_IRQHandler()` (flash.c) `fp` ins externe Flash, beim Einschalten wird die
+Parameterseite nach dem Laden geloescht (main.c) - die echten Werte stehen dann nur noch in der Sicherungskopie im
+LPC-Flash (Sektor 7, `parameter_to_progmem()`, wird vom Firmware-Update nicht angefasst).
+
+**Rettung 26SC9966:** Stromzyklus mit 5.155 -> Kennungen im externen Flash ungueltig -> Parameter aus der LPC-Kopie
+(Seriennummer, Sprache, Betriebsstunden 11 h, Parametersatz stimmen). Mess-/Protokolldaten im externen Flash koennen
+verloren sein. Danach 5.156 per RS232.
+
+## Update 5.156 (TEST, 2026-11-25): Korrektur 5.155, Parameter-Pruefung nach Update/Sleep
+
+- Schlafzaehler (`sleep_stat_reset()`, `sleep_stat_count()`, `sleep_stat()`) in **hftrack.c** statt hard.c.
+  Geprueft per Map-Vergleich mit einem Build von 5.154 (Git-Stand 05faf92): alle `__noinit`-Adressen identisch,
+  verschoben sind nur `rd_*` in btio.c (durch `rd_magic` abgesichert, starten frisch). Kommentar in hard.c: **keine
+  neuen `__noinit`-Variablen in hard.c**.
+- main.c: Nach `FIRM_UP_RES`/`SLEEP_RES` werden `fp.Kennung`/`fp.pKennung` geprueft. Ungueltig -> Hochlauf wie nach dem
+  Einschalten (`reset_src=POR`, `i_reset=0`): Parameter aus externem Flash bzw. LPC-Kopie, Schnittstellen neu erkennen,
+  Protokoll **F13001 Wert 2**. Dafuer `reset_src` (Kopie von RSID, normale Variable, nicht `__noinit`) statt RSID in
+  main.c und `Init_Ports()`.
+- Am Board: erste Fassung (Hochlauf wie Reboot) hat 5.155 -> 5.156 erkannt und die Parameter neu geladen, F13001 im
+  Protokoll; die Schnittstellen kamen aber aus dem RAM ("nur Bluetooth"). Deshalb jetzt wie Einschalten. **Diese
+  Endfassung ist am Board nicht mit ungueltigem fp ausgeloest worden** (nur normales Update + Stromzyklus: Parameter
+  und Schnittstellen in Ordnung).
+
+### Pruefung 26SC9966 (reparierte Platine, 2026-11-25)
+
+- `bt_testlauf.py --profil kurz` (5.154): reboot-check, power-sweep, boot-race, gsm-mux bestanden. nightly: BT ok,
+  aber kein Neustart um 3:15 - **Batteriespannung 11,40 V** (Testmenue 4) unter `LOWBATLIMIT` 11,5 V, dann laesst
+  rtc.c den Neustart absichtlich aus. Gleiches Netzteil wie bei A/B/C (dort lief der Neustart). Spannung am Board noch
+  mit Multimeter pruefen.
+- online-bt mit SIM: online nach 95 s, BLE/Classic waehrend LTE 3/3 mit `/leave`; nach der 3. Sitzung in 18 min nicht
+  wieder online (offen). bt-update: nicht aussagekraeftig (falscher Pfad bzw. 5.155) - mit 5.156 wiederholen.
+- RTC ok, 4 MB Flash erkannt.
+- Schlaf (RS232-Kabel ab, Zaehler ueber Classic gelesen): erst 0 - Mobilfunk-Zeitplan Mo-Fr 08-18 haelt MQTT online;
+  Uhr auf 19:00 gestellt, weiter 0 - **GPS findet am Tisch keine Position** (`radiostatus`, Strg+F: GPS Pend=37), und
+  `gps_pending` verhindert den Schlaf bis zum Abbruch nach 60 min (`GPS_MAX_LIM`).
+- Danach schlaeft es: Zaehler 63 (12:34) -> 142 (12:37), etwa einmal je Messzyklus 1,5 s; um 15:07 5909. Wecken
+  ueber BT Classic jedes Mal in 0,7-1,7 s, PIN und Menue ok. Strom nicht gemessen.
+- **RS232 anstecken weckt das Geraet nicht:** IC54 meldet das Kabel (Bit 4, 5Fh statt 4Fh), die Firmware bleibt aber
+  beim Schlafen und antwortet auf COM3 nicht. Ursache und Fix: Update 5.157.

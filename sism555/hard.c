@@ -78,6 +78,7 @@ uint v_const						__noinit;					// Konstante zur Geschwindigkeitsberechnung
 uint volatile t_mess		__noinit;					// Messzeitz�hler
 uint t_mess_max					__noinit;					// Maximale Messdauer
 ushort i_reset					__noinit;					// Zus�tzliche Reset Information
+uint reset_src;										// 5.156: Kopie RSID fuer den Hochlauf (bewusst NICHT __noinit, siehe DeepSleep)
 uint dimm								__noinit;					// LED Dimmfaktor 1 ... 200
 uint cap20,cap30,cap31	__noinit;					// Capture Count Werte Timer 2 und 3
 uchar gsmcall						__noinit;					// 1 wenn GSM Datenverbindung besteht
@@ -649,7 +650,7 @@ void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
 	FIO0CLR = GSM_DTR|PWR_GPS|TXD_2;						// GPS erstmal aus, GSM DTR low
   FIO1SET =	USB_PPWR|MUX_B|USB_RPWR;					// USB Port Versorgung aus, Uart1 MUXB, USB 5V Regler ein
 	FIO1CLR = PWRKEY|GSMPWR|LED1|MUX_A|EN_ANA;	// GSM/GPS erst aus, LED ein, Transceiver/Analogteil aus
-	if (RSID&POR)																// Power On Reset
+	if (reset_src&POR)																// Power On Reset
 	{	
 	 FIO2CLR = PWM_TRB|LE_TRB;									// Latch Enable LED Treiber
 	 FIO2SET = G_SHIFT|DIS_TRB;									// PWM Pin Treiber HI, 74HC595 Ausg�nge Tristate, 3V3 Treiber aus
@@ -661,7 +662,7 @@ void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
   }		
 	FIO4SET	= CSFLASH1;													// FLASH 1 deselect
 	
-  if ((RSID&WDTR)&&((i_reset==FIRM_UP_RES)||(i_reset==SLEEP_RES))) // WDTR Firmware update oder Sleep
+  if ((reset_src&WDTR)&&((i_reset==FIRM_UP_RES)||(i_reset==SLEEP_RES))) // WDTR Firmware update oder Sleep
 	{
 	 if (gps_pending||gsmpower)	FIO1SET = GSMPWR;					// GSM und GPS Versorgung weiter ein
 	 if (gps_pending&&(fp.gps!=3)) FIO0SET = PWR_GPS;			// GPS Typ 1 und 2 weiter ein
@@ -673,7 +674,7 @@ void Init_Ports (void)	// Initialisiert Ports und Pinfunktion
 	FIO1DIR = USB_PPWR|LED1|MUX_A|MUX_B|GSMPWR|PWRKEY;	// Port 1 Ausgaenge; 5.L1: EN_ANA/USB_RPWR erst in Init_Radar_Ports()
 	FIO2DIR = DIS_TRB|LE_TRB|G_SHIFT|PWM_TRB;																					// Port 2 Ausg�nge		
 	FIO4DIR	= CSFLASH1;						 																										// Port 4 Ausg�nge
-	if ((RSID&WDTR)&&((i_reset==FIRM_UP_RES)||(i_reset==SLEEP_RES)))	// 5.L1: ohne I2C-Init (Update/Sleep) gilt fp.radar
+	if ((reset_src&WDTR)&&((i_reset==FIRM_UP_RES)||(i_reset==SLEEP_RES)))	// 5.L1: ohne I2C-Init (Update/Sleep) gilt fp.radar
 	 Init_Radar_Ports();																							// aus dem RAM, sonst setzt InitI2C_Devices() die Pins
 	
 	PINMODE0 = (PULLDOWN<<14)|(PULLDOWN<<18);						// Pulldown P0.7/9 SPI1 SCK und MOSI
@@ -857,9 +858,13 @@ void wait_uarts_empty (void)	// Warte bis alle Zeichen auf uarts versendet
 	 break; 
 }
 
+// 5.156: KEINE neuen __noinit-Variablen in hard.c anlegen! Sie verschieben fp (ebenfalls __noinit), und nach einem
+// Firmware-Update (FIRM_UP_RES) liest die neue Firmware fp an der neuen Stelle aus dem RAM -> Parameter verdreht (5.155).
+// Der Schlafzaehler liegt deshalb in hftrack.c.
 void DeepSleep (void)										// Bringe CPU in Deep sleep mode
 {
- i_reset=SLEEP_RES;											// Setze Resetursache		
+ sleep_stat_count ();									// 5.155: Schlafphase zaehlen (hftrack.c)
+ i_reset=SLEEP_RES;											// Setze Resetursache
  if (fp.pwm) SCB_SCR|=(1<<2);						// Deep sleep Bit setzen
  PLL0CON &= ~(1<<1);										// Disconnect PLL0, siehe errata sheet
  PLL0FEED = 0xAA;										

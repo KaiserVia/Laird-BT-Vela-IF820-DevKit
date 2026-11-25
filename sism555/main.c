@@ -40,14 +40,27 @@ int main (void)
  uchar i=0;															// Laufvariable	
  uchar syserror=0;											// Sytemfehler f�r Smiley-Startanzeige	
  int result;	
+ uchar fp_reload=0;								// 5.156: fp nach Update/Sleep ungueltig -> neu geladen
 		
  SystemCoreClockUpdate ();							// Setze SystemCoreClock Information
+ reset_src=RSID;								// 5.156: Resetursache (bei ungueltigem fp unten auf POR gesetzt)
  if (RSID&(POR|EXTR|BODR)) osKernelInitialize (); 		// initialize RTOS Kernel bei Power-On
  osKernelStart();																			// Starte RTOS Kernel
-	
+
+ // 5.156: Nach Firmware-Update und Deep-Sleep-Reset wird fp aus dem RAM weiterbenutzt. Liegt fp in der neuen Firmware
+ // an einer anderen Adresse (5.155: neue __noinit-Variablen davor) oder ist der RAM-Inhalt sonst ungueltig, waren die
+ // Parameter verdreht, und das naechste Abschalten (EINT0) haette sie ins Flash geschrieben. Jetzt: Kennungen pruefen,
+ // bei Fehler wie nach dem Einschalten neu laden (externes Flash, sonst Sicherungskopie im LPC-Flash).
+ if (((i_reset==SLEEP_RES)||(i_reset==FIRM_UP_RES)) && ((fp.Kennung!=FLASHKENNUNG)||(fp.pKennung!=PARAKENNUNG)))
+ {
+  i_reset=0;													// wie Einschalten behandeln: auch die uebrigen __noinit-Variablen
+  reset_src=POR;										// (Schnittstellen, connect, ...) stammen aus dem falschen Layout
+  fp_reload=1;
+ }
+
  if ((i_reset!=SLEEP_RES)&(i_reset!=FIRM_UP_RES)) 		// Kein Firmware update oder Sleep Power Down Reset?
  {	
-  if (!(RSID&WDTR)|(i_reset==BOOT_RES))	// Nicht bei Watchdog Reset ausser Reboot
+  if (!(reset_src&WDTR)|(i_reset==BOOT_RES))	// Nicht bei Watchdog Reset ausser Reboot
   {																			// Wichtige Systemvariable initialisieren
 	 fp.sprache=0; 												// Sprachsteuerung initialisieren	
 	 fp.i2cdev=0;														// reset I2C Bus Devices  
@@ -77,9 +90,9 @@ int main (void)
  
  redirect_char_Out(putb);		// Zeichenausgabe an UART(s) leiten	
  																									
- if (!(RSID&WDTR)|(i_reset==BOOT_RES)) // Kein Watchdog reset ausser Reboot?
+ if (!(reset_src&WDTR)|(i_reset==BOOT_RES)) // Kein Watchdog reset ausser Reboot?
  {													
-	if (RSID&(POR|BODR))								// 5.L1 (Joachim 5.60): Power On oder Brownout Reset?
+	if (reset_src&(POR|BODR))								// 5.L1 (Joachim 5.60): Power On oder Brownout Reset?
 	{
 	 FIO2CLR =	DIS_TRB | G_SHIFT;			// EN\ 3V3 Anzeige - Treiber
 	 Ledaus();													// Anzeige gleich dunkel schalten
@@ -92,6 +105,7 @@ int main (void)
    putmstr(L_winit); 				// Meldung Werkinitialisierung
 	 syserror++;							// Im Normalbetrieb sollte keine Werkinitialisierung vorkommen	
 	}  
+	if (fp_reload) puterror (DTC_SI_PARAM_INIT, 2);	// 5.156: Parameter im RAM waren ungueltig, neu geladen (Protokoll)
 	Init_Peripheral ();				// Initialisiert Ports fuer Peripherie 
 	osDelay(100);							// 5.L1 (Joachim 5.60): Gesamtwartezeit wie bisher 250 ms
  }	
@@ -116,9 +130,10 @@ int main (void)
 	bt_sm_hide();																// 5.131: IF820 unsichtbar bis zum Ende des Hochlaufs - so frueh wie moeglich
 																							// (vor den Flash-Loeschungen unten, die Sekunden dauern; nur RAM, siehe btio.c)
 	
-	if (RSID&(POR|BODR))								// Power On oder Brownout Reset?
-	{		 
-	 FIO2CLR =	DIS_TRB | G_SHIFT;			// EN\ 3V3 Anzeige - Treiber	
+	if (reset_src&(POR|BODR))								// Power On oder Brownout Reset?
+	{
+	 sleep_stat_reset ();								// 5.155: Schlafzaehler fuer die Infoseite neu
+	 FIO2CLR =	DIS_TRB | G_SHIFT;			// EN\ 3V3 Anzeige - Treiber
 	 LED_188 (); 												// LED Einschaltanzeige "188" 
 	 FIO2CLR = LE_TRB|DIS_TRB|G_SHIFT;	// Latch Enable LED Treiber, 3V3 Treiber aus, 74HC595 Ausg�nge aktiv
    FIO2SET = PWM_TRB;									// PWM Pin Treiber HI	
@@ -147,7 +162,7 @@ int main (void)
  {	 
   if (i_reset!=FIRM_UP_RES)									// Kein Firmware update und kein power down?
 	{		   
-   if ((RSID&WDTR)&&(i_reset!=BOOT_RES))		// Watchdog Reset ausser Reboot?
+   if ((reset_src&WDTR)&&(i_reset!=BOOT_RES))		// Watchdog Reset ausser Reboot?
 	 {	
  	  if (comstate&RS232_LINK) connect=UART0;	// RS232 abgeschlossen?
 		else connect=0;													// sonst alle Verbindungen deaktivieren		
@@ -160,7 +175,7 @@ int main (void)
 		}	
 		protocol(WATCHDOG_RESET); 			// Watchdog reset protokollieren
    }		
-   else if (RSID&POR) 	// Power on reset? (jetzt exklusiv ohne Reboot)
+   else if (reset_src&POR) 	// Power on reset? (jetzt exklusiv ohne Reboot)
 	 {	 	 
     protocol(POWER_ON);						// Power on reset protokollieren
     poweron_min=MIN;											 
@@ -197,7 +212,7 @@ int main (void)
        if (result>0)								// Erfolg?
 			 {	 
 				MUX_BT_Select;							// MUX Bluetooth Leitungsauswahl    
-        if (RSID&POR)								// Nur bei Power On
+        if (reset_src&POR)								// Nur bei Power On
 				{	
 				 gpsintv=fp.gpsintv; 				// Kopiere Einstellung GPS Positionsbestimmungszeit 
          gpsfix=60*fp.gpsintv;	 		// Bestimme Position nach Power On 						
@@ -271,7 +286,7 @@ int main (void)
  if ((fp.btmodem==IF820) && (uart1_owner==MUX_NONE)) uart1_release(MUX_NONE);
  bt_sm_boot_done();				// 5.130: Zustand BEREIT; 5.131: Modul wieder sichtbar (/A, SBTP C=1)
 
- if (!(RSID&(POR|WDTR|EXTR))) protocol(BROWNOUT_ERROR);	// Brownout reset
+ if (!(reset_src&(POR|WDTR|EXTR))) protocol(BROWNOUT_ERROR);	// Brownout reset
   
  RSID|=RSID;									// Reset Identifikationsregister zur�ck setzen
  
