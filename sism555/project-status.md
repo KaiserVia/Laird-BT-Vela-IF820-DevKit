@@ -7370,3 +7370,19 @@ USB auf 5.u2 und spaeter updaten.)
 
 Beobachtet, noch offen: Beim XMODEM-Empfang ueber USB lehnt das Geraet 10-24 von 179 Bloecken ab (NAK, Wiederholung
 klappt), ueber RS232 nicht. Ein erster Update-Versuch 5.u1 -> 5.u2 brach ohne Log ab (Geraet blieb auf 5.u1).
+
+## Update 5.u3 (TEST, 2026-11-25, Branch `usb-verbindung`): USB-Empfang ohne Datenfehler
+
+**Symptom:** Beim XMODEM-Empfang ueber USB (Firmware-Update) lehnte das Geraet 10-28 von 179 Bloecken ab (NAK, CRC
+falsch), ueber RS232 nie.
+
+**Ursache (USB_tools.c, Empfangsschleife im USB-Thread):** `rbuf[++rxi] = USBD_CDC_ACM_GetChar(0)`. Der Compiler darf
+`rxi` vor dem Speichern des Bytes erhoehen. Anders als die UART-ISRs laeuft der USB-Empfang als Thread und kann zwischen
+beiden Schritten verdraengt werden (Round-Robin 1 ms); die Hauptschleife liest dann ein altes Byte. Ausserdem fehlte der
+`(uchar)`-Cast bei der Voll-Pruefung (`bxi!=rxi+1` ist bei rxi==255 nie falsch; UART0-ISR hat den Cast seit 5.111).
+
+**Fix:** Byte erst lesen und in `rbuf[(uchar)(rxi+1)]` schreiben, danach `rxi++`; die zwei Befehle mit gesperrtem
+UART0-Interrupt (die ISR schreibt `rxi` ebenfalls).
+
+**Geprueft (26SC9966, Update ueber USB):** mit dem alten Empfang 16-28 NAK je Update (4 Laeufe), mit dem neuen 0 NAK
+(3 Laeufe), Update dauert 23 s statt 29-32 s. Alle Updates kamen nach 3 s mit USB zurueck (5.u2).

@@ -145,7 +145,19 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
 			if (c) {																								// Bytes vorhanden
 				while (c--)
 				{		
-				 if (bxi!=rxi+1) rbuf[++rxi] = USBD_CDC_ACM_GetChar (0); 	// Byte(s) lesen		
+				 // 5.u3: (uchar)-Cast wie in der UART0-ISR (5.111): ohne Cast war rxi+1 bei rxi==255 nie gleich bxi.
+				 // Und: erst das Byte in den Puffer, DANN rxi weiterschalten. Bei "rbuf[++rxi]=GetChar()" darf der Compiler
+				 // rxi vor dem Speichern erhoehen; dieser Thread kann dazwischen verdraengt werden, die Hauptschleife liest
+				 // dann ein altes Byte (CRC-Fehler, NAKs beim XMODEM ueber USB). Die UART0-ISR schreibt rxi ebenfalls,
+				 // deshalb fuer die zwei Befehle gesperrt.
+				 if (bxi!=(uchar)(rxi+1))
+				 {
+				  uchar ch=(uchar)USBD_CDC_ACM_GetChar (0);	// Byte lesen
+				  NVIC_DisableIRQ(UART0_IRQn);
+				  rbuf[(uchar)(rxi+1)]=ch;
+				  rxi++;
+				  NVIC_EnableIRQ(UART0_IRQn);
+				 }
 				 else osThreadYield();			 															// Pufferüberlauf? -> Taskwechsel
 			  }	}	
       else osDelay(1);       /* 5.122: nicht mehr Dauer-Yield (Busy-Poll) - 1 ms Pause, andere Threads bekommen die Zeit */																		// kein(e) Zeichen Taskwechsel 
