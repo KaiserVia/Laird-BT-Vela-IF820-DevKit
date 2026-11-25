@@ -29,6 +29,8 @@ extern uchar hf_kanal (void);								// wirksamer Kanal 0...9 (fp.hfkanal oder a
 extern uchar hf_kanal_auto (void);						// true, wenn der Kanal aus der Seriennummer kommt
 extern uint hf_ziel_mhz (void);							// Zielfrequenz des wirksamen Kanals in MHz
 extern uint re_time (void);									// wirksame RE/-Zeit in ms (fp.re_ms oder automatisch)
+extern uint re_vor_time (void);							// 5.153: RE/-Vorlauf vor EN/-MD-RF in ms (0 = aus)
+extern uint re_nach_time (void);							// 5.153: RE/-Nachlauf nach EN/-MD-RF in ms (0 = aus)
 extern uint mess_min_time (void);							// 5.152: Mindestmesszeit nach RE/ in ms (fp.mess_ms oder automatisch)
 extern uint t_on_delay (void);							// Wartezeit vom Einschalten bis zur Messung in ms (Messzeitberechnung)
 extern uint hf_tx_mhz (void);								// zuletzt gemessene Sendefrequenz in MHz, 0 = unbekannt

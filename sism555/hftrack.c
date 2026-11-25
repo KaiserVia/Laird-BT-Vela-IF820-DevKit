@@ -130,6 +130,23 @@ uint mess_min_time (void)								// 5.152: Mindestmesszeit nach RE/ in ms (Messu
  return ((MESS_MIN_PER*100000ul)/(fp.vmm*IFConst));	// automatisch: MESS_MIN_PER Perioden bei kleinster Messgeschwindigkeit
 }
 
+static uint re_vn (uchar v, uint def)				// 5.153: 0 / ungueltig = Standard, 1..RE_VN_MAX fest, RE_VN_AUS = 0 ms
+{
+ if (v==RE_VN_AUS) return (0);
+ if ((v>=1) && (v<=RE_VN_MAX)) return (v);
+ return (def);
+}
+
+uint re_vor_time (void)								// 5.153: RE/-Vorlauf vor EN/-MD-RF in ms
+{
+ return (re_vn (fp.re_vor, RE_VOR_DEF));
+}
+
+uint re_nach_time (void)								// 5.153: RE/-Nachlauf nach EN/-MD-RF in ms
+{
+ return (re_vn (fp.re_nach, RE_NACH_DEF));
+}
+
 uint hf_tx_mhz (void)
 {
  return ((hft_magic==HFT_MAGIC) ? hft_mhz : 0);
@@ -341,6 +358,8 @@ void hf_info (void)												// Statusausgabe im Via-2-Transceivermenue
  putstr ("Frequenz "); if (f) { put_mhz (f); putstr ("  ("); if (f>=ziel) putc('+'); put_mhz (f-ziel); putc(')'); } else putstr ("Messfehler");
  putstr (", Stufe "); if (w>=0) putnumber ((uint)w, 0); else putc('?'); newline ();
  putstr ("RE/-Zeit "); putnumber (re_time(), 0); putstr (" ms"); putstr ((fp.re_ms>=RE_MS_MIN && fp.re_ms<=RE_MS_MAX) ? " (fest)" : " (automatisch)");
+ newline ();																// 5.153
+ putstr ("RE/-Vorlauf "); putnumber (re_vor_time(), 0); putstr (" ms, RE/-Nachlauf "); putnumber (re_nach_time(), 0); putstr (" ms");
  putstr (", min. Messzeit "); putnumber (mess_min_time(), 0); putstr (" ms"); putstr ((fp.mess_ms>=MESS_MS_MIN && fp.mess_ms<=MESS_MS_MAX) ? " (fest)" : " (automatisch)");	// 5.152
  putstr (", max. Messzeit "); putnumber (t_mess_max, 0); putstr (" ms"); newline ();
 }

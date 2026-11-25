@@ -77,6 +77,9 @@ Automatisch: nach Stromzyklus +3,9 MHz (Stufe 146), nach 167 s Online-Messen Stu
 - **5.152 Mindestmesszeit:** Ohne Fahrzeug endete die Messung nach der RE/-Zeit (ca. 15,6 ms). Jetzt laeuft sie mindestens
   8 Perioden der kleinsten Messgeschwindigkeit (5 km/h: 36 ms) oder den festen Wert `fp.mess_ms` (10-250 ms, Menuepunkt 7,
   zweite Abfrage nach der RE/-Zeit). Funktion `mess_min_time()`.
+- **5.153 RE/-Vorlauf/-Nachlauf:** Einschalten: RE/ LOW, nach dem Vorlauf (Standard 1 ms) EN/-MD-RF LOW. Ausschalten:
+  EN/-MD-RF HIGH, RE/ bleibt fuer den Nachlauf (Standard 10 ms) HIGH, dann LOW. `fp.re_vor`/`fp.re_nach`, 0 = Standard,
+  1-50 ms, 99 = aus; Menuepunkt 7.
 - Bisheriger Transceiver: `t_amp_en` jetzt immer 20 ms (bisher nach Neustart 20, nach einer Menüänderung bis zum
   nächsten Neustart 10 ms).
 

@@ -422,6 +422,8 @@ static int transceiver_trx (uchar mode)	// Transceiver Ein-/Ausschaltung, bisher
  return (1);	// Ergebnis ok
 }
 
+static uchar via2_on=0;						// 5.153: Transceiver ein mit voller Verstaerkung (RE/ HIGH) - nur dann RE/-Nachlauf
+
 static int transceiver_via2 (uchar mode)	// 5.L1: Transceiver Ein-/Ausschaltung Via-2 (Joachim 5.60)
 {									// Uebergabe mode wie transceiver()
  ushort analog;
@@ -435,6 +437,11 @@ static int transceiver_via2 (uchar mode)	// 5.L1: Transceiver Ein-/Ausschaltung 
   if (mode>1)
   {
    if (mode==3) {putparameter(T_ic37, analog&~(GAIN_A|GAIN_B), (0x05<<16)|0x84, T_nil); getc (0); }
+   if (re_vor_time())																						// 5.153: RE/-Vorlauf - RE/ LOW (AMP_BW 0), Transceiver noch aus
+   {
+    write_i2c_dev (IC37,3,((((analog|AMP_EN|GAIN_A|GAIN_B|BW_A)&~AMP_BW)|HF_DIS)<<8)|0x02);
+    if (mode==3) getc (0); else getkey(re_vor_time());
+   }
    analog=(analog|AMP_EN|GAIN_A|GAIN_B|BW_A)&~HF_DIS;		// Transceiver ein, Verstaerkung minimal
    write_i2c_dev (IC37,3,(analog<<8)|0x02);
    if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); }
@@ -444,11 +451,19 @@ static int transceiver_via2 (uchar mode)	// 5.L1: Transceiver Ein-/Ausschaltung 
   analog|=AMP_EN|AMP_BW|BW_A;
 	analog|=fp.txrcon&(GAIN_INH|GAIN_A|GAIN_B);										// volle Bandbreite, eingestellte Verstaerkung uebernehmen
   if (!write_i2c_dev (IC37,3,(analog<<8)|0x02)) return (-1);	   // Kein Erfolg Fehlerabbruch
+  via2_on=1;																										// 5.153: fuer den RE/-Nachlauf beim Ausschalten
   if (mode==3) {putparameter(T_ic37, analog, (0x05<<16)|0x84, T_nil); getc (0); }
  } // end if mode
  else
  {
 	FIO1SET=LED1;					// Status LED aus
+	if (re_nach_time() && via2_on)																// 5.153: RE/-Nachlauf - erst Transceiver aus, RE/ bleibt HIGH (AMP_BW 1)
+	{
+	 via2_on=0;
+	 if (!write_i2c_dev (IC37,3,((((analog&~(GAIN_A|GAIN_B))|HF_DIS|AMP_BW))<<8)|0x02)) return (-1);
+	 getkey(re_nach_time());
+	}
+	via2_on=0;
 	if (!write_i2c_dev (IC37,3,((((analog&~(GAIN_A|GAIN_B))|HF_DIS))<<8)|0x02)) return (-1); // Transceiver Ausschalten
  }
 

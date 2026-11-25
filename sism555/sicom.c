@@ -788,7 +788,10 @@ void transmenu (void) 	// Transceiver & Verst�rker Men�
     case '4': transceiver_test (); break;				// Test Verstaerker/Transceiver mit gedimmtem Display
     case '5': hf_adjust (); break;								// 5.142: Abgleich auf die Kanalfrequenz (Bisektion IC32)
     case '6': getuchar(T_hfkanal, 0, HF_KANAELE, &fp.hfkanal); set_measure_constants (); break;	// 5.142: Kanal, 0 = automatisch
-    case '7': if (getuchar(T_rems, 0, RE_MS_MAX, &fp.re_ms)>0) getuchar(T_messms, 0, MESS_MS_MAX, &fp.mess_ms); set_measure_constants (); break;	// 5.142: RE/-Zeit ms, 5.152: Mindestmesszeit ms, je 0 = automatisch
+    case '7':														// 5.142: RE/-Zeit, 5.153: Vorlauf/Nachlauf, 5.152: Mindestmesszeit
+     if ((getuchar(T_rems, 0, RE_MS_MAX, &fp.re_ms)>0) && (getuchar(T_revor, 0, RE_VN_AUS, &fp.re_vor)>0) &&
+         (getuchar(T_renach, 0, RE_VN_AUS, &fp.re_nach)>0)) getuchar(T_messms, 0, MESS_MS_MAX, &fp.mess_ms);
+     set_measure_constants (); break;
     case '8': hf_track_now (true); break;				// 5.142: Nachfuehrung sofort (mit Ausgabe)
    }
   }

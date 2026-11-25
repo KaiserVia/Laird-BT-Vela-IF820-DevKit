@@ -327,6 +327,13 @@
 #define		MESS_MIN_PER	8							// automatisch: Anzahl Dopplerperioden bei fp.vmm
 #define		MESS_MS_MIN		10						// Einstellbereich Mindestmesszeit in ms
 #define		MESS_MS_MAX		250
+// 5.153: Via-2 RE/-Vorlauf und -Nachlauf (Mail HW-Kollege 2026-11-18). Vorlauf: RE/ geht beim Einschalten so viele ms
+// VOR EN/-MD-RF auf LOW (Transceiver ein). Nachlauf: RE/ geht beim Ausschalten so viele ms NACH EN/-MD-RF (Transceiver aus)
+// wieder auf LOW. fp.re_vor/fp.re_nach: 0 = Standard, 1..RE_VN_MAX fest, RE_VN_AUS = aus (Verhalten bis 5.152)
+#define		RE_VOR_DEF		1							// Standard Vorlauf ms
+#define		RE_NACH_DEF		10						// Standard Nachlauf ms
+#define		RE_VN_MAX			50						// Einstellbereich ms
+#define		RE_VN_AUS			99						// Eingabewert "aus"
 
 // UART1 MUX Owner State Machine
 enum { MUX_NONE=0, MUX_BT, MUX_GSM, MUX_GPS };	// UART1 resource owner states
@@ -497,7 +504,9 @@ typedef struct FlashSavedParameter { 	// Parameter, die dauerhaft im Flash gesic
  uchar hfkanal;									// 5.142: Via-2 Frequenzkanal, 0 = automatisch aus Seriennummer, 1..10 = Kanal 0..9 (HF_KANAL_MHZ)
  uchar re_ms;										// 5.142: Via-2 RE/-Zeit (Verstaerkungsreduzierung nach Einschalten) in ms, 0 = automatisch (RE_MS_DEF/RE_MS_LOW)
  uchar mess_ms;									// 5.152: Via-2 Mindestmesszeit nach RE/ in ms, 0 = automatisch (MESS_MIN_PER Perioden bei fp.vmm)
- uchar fill2[3];								// F�llbytes damit GPS Datenfeld, die letzen 300 Bytes im 2k Block belegt
+ uchar re_vor;									// 5.153: Via-2 RE/-Vorlauf vor EN/-MD-RF in ms, 0 = Standard (RE_VOR_DEF), RE_VN_AUS = aus
+ uchar re_nach;									// 5.153: Via-2 RE/-Nachlauf nach EN/-MD-RF in ms, 0 = Standard (RE_NACH_DEF), RE_VN_AUS = aus
+ uchar fill2[1];								// F�llbytes damit GPS Datenfeld, die letzen 300 Bytes im 2k Block belegt
  gpsgeo	gp[GPS_POS];						// GPS Datenfeld 25 Positionen � 3 x 4 = 300 Byte
 } flashparameter;
 

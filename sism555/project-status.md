@@ -7224,3 +7224,23 @@ Transceiver aus). Die Fragen zu Vor-/Nachlaufzeit RE/ und EN-TX (Mail 2026-11-23
 Windows-Suche fand das Geraet zweimal nicht). Nach Stromzyklus ueber Relais 2 (Relais hing zuerst mit Write-Timeout, nach Ab-/Anstecken wieder ok):
 Hochlauf sauber (BT BEREIT nach 30,8 s), Anzeige weiter "min. Messzeit 30 ms (fest)" - Wert bleibt im Flash.
 Nicht geprueft: Messzeit am Oszilloskop.
+
+## Update 5.153 (TEST, 2026-11-25): Via-2 RE/-Vorlauf und -Nachlauf (einstellbar)
+
+**Anlass:** Mail HW-Kollege 2026-11-18: RE/ soll 1 ms vor EN/-MD-RF schalten (gemessen 5 ms) und 10 ms Nachlauf
+gegenueber EN/-MD-RF haben (gemessen keiner). Anwenderwunsch 2026-11-25: als Parameter, im Menue einstellbar. Das
+Zeitdiagramm (Rueckfrage 2026-11-23) steht noch aus; umgesetzt ist die woertliche Lesart der Mail:
+
+- **Vorlauf** (Einschalten im Messbetrieb, `transceiver(2)`): zuerst RE/ LOW (AMP_BW 0), Verstaerkung minimal,
+  Transceiver noch aus; nach dem Vorlauf EN/-MD-RF LOW (Transceiver ein); danach wie bisher RE/-Zeit, dann RE/ HIGH.
+- **Nachlauf** (Ausschalten): zuerst EN/-MD-RF HIGH (Transceiver aus), RE/ bleibt HIGH; nach dem Nachlauf RE/ LOW
+  (Ruhezustand). Nur wenn der Transceiver vorher eingeschaltet war (`via2_on`).
+- Parameter `fp.re_vor` / `fp.re_nach` (zwei Fuellbytes, Struktur bleibt 2048 Byte): 0 = Standard (1 ms / 10 ms),
+  1-50 ms fest, **99 = aus** (Verhalten bis 5.152). Werkinit setzt 0.
+- Menue: Via-2-Transceivermenue Punkt 7 "RE/ Timing, Min. Measuring Time" fragt nacheinander RE/-Zeit, Vorlauf,
+  Nachlauf, Mindestmesszeit ab. Statuszeile: "RE/-Vorlauf 1 ms, RE/-Nachlauf 10 ms, min. Messzeit ...".
+- Der Messzyklus wird um Vorlauf + Nachlauf laenger (Standard 11 ms).
+
+**Geprueft auf Board B (26SC9983):** geflasht, Menue und Statuszeile wie erwartet, Online messen 15 s ohne Haenger,
+BLE-smoke bestanden. **Nicht geprueft:** Pegel und Zeiten am Oszilloskop (HW-Kollege); ob die Lesart "Nachlauf = RE/
+bleibt nach dem Ausschalten HIGH" gemeint ist - sonst Ablauf anpassen.
