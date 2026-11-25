@@ -84,6 +84,11 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
     BT-Adresse zurueck** (A jetzt `D4:05:A8:0B:DE:C9`, Classic **COM22**), danach am PC neu koppeln. Strom nicht gemessen.
   - Energiesparschieber (Sparen/Normal/Volle Leistung) nur als Konzept, offene Entscheidungen dort.
 
+- **2026-11-25 - 5.156/5.157 (TEST), `main`:** Infoseite zeigt die Tiefschlafphasen seit dem Einschalten (Zaehler in
+  hftrack.c; 5.155 mit `__noinit` in hard.c verschob fp und ist zurueckgezogen), fp-Kennungen nach Update/Sleep-Reset
+  geprueft. 5.157: RS232 anstecken weckt das schlafende Geraet (Flanke ging im Sleep-Reset verloren), am Geraet noch
+  nicht nachgewiesen. 26SC9966 repariert: Tiefschlaf nachgewiesen, bt-update/reboot-check/power-sweep/boot-race/gsm-mux
+  bestanden, Neustart 3:15 ausgelassen (11,40 V < 11,5 V, am Board messen).
 - **2026-11-25 - 5.153 (TEST), `main`:** Via-2 RE/-Vorlauf (Standard 1 ms vor EN/-MD-RF) und RE/-Nachlauf (10 ms nach
   EN/-MD-RF), Parameter `fp.re_vor`/`fp.re_nach` im Transceivermenue Punkt 7 (99 = aus). Auf B geflasht, Menue + BLE ok;
   Pegel/Zeiten am Oszilloskop offen, Lesart der Mail unbestaetigt (Zeitdiagramm steht aus). EN-TX weiter offen.

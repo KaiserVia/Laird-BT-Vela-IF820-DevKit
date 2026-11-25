@@ -7311,3 +7311,23 @@ verloren sein. Danach 5.156 per RS232.
   ueber BT Classic jedes Mal in 0,7-1,7 s, PIN und Menue ok. Strom nicht gemessen.
 - **RS232 anstecken weckt das Geraet nicht:** IC54 meldet das Kabel (Bit 4, 5Fh statt 4Fh), die Firmware bleibt aber
   beim Schlafen und antwortet auf COM3 nicht. Ursache und Fix: Update 5.157.
+
+## Update 5.157 (TEST, 2026-11-25): RS232 waehrend des Tiefschlafs anstecken weckt das Geraet
+
+**Symptom (26SC9966, 5.156):** Kabel bei schlafendem Geraet angesteckt - COM3 stumm, Schlafzaehler steigt weiter
+(5909). IC54 meldet das Terminal (Bit 4, 5Fh statt 4Fh), Strg+F ueber BT: `Connect` ohne UART0.
+
+**Ursache:** Der Tiefschlaf endet mit dem Watchdog-Reset (`SLEEP_RES`). main.c liest dort `comstate=get_com_status()`
+neu ein. Kam das Kabel waehrend des Schlafs, steht RS232_LINK schon in `comstate`; `communication_change()` erkennt
+RS232 nur an der Aenderung `comstate_neu^comstate` und findet keine -> kein `connect|=UART0`, Geraet schlaeft weiter.
+BT ist nicht betroffen (vergleicht CYSPP gegen `connect`). Wahrscheinlich seit jeher so, frueher nur nicht aufgefallen.
+
+**Fix:** main.c nach dem Lesen: bei `SLEEP_RES`, IC54 gelesen, RS232_LINK gesetzt und `connect` ohne UART0 -> Bit in
+`comstate` loeschen und `comchange=1`. Keine neuen `__noinit`-Variablen, noinit-Adressen wie 5.156.
+
+**Am Board:** per `bt_testlauf.py --nur bt-update` (Classic) auf 26SC9966 eingespielt, bt-update bestanden, Version 5.157,
+RS232 nach Einschalten ok. **Der Fix selbst ist am Geraet nicht nachgewiesen** (Kabel ab, schlafen lassen, Kabel an).
+Uhr nach den Schlaftests wieder auf Ortszeit gestellt.
+
+Nebenbefund: Im Tiefschlaf ueberbrueckt 26SC9966 5 s stromlos (Relais) ohne Neustart (Zaehler lief weiter); erst ein
+laengerer Ausfall loeste den Einschalt-Reset aus. Fuer Stromzyklus-Tests bei schlafendem Geraet laenger abschalten.

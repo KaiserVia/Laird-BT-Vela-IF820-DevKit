@@ -155,8 +155,18 @@ int main (void)
  // der Werks-/Init-Zustand von IC54 ist (identisch i2cm.c) und andere BT-Module Bit7 nicht
  // als Ausgang nutzen -> fuer RN4678/BT730 wirkungslos, nie schaedlich.
  bt_release();																						// CYSPP freigeben, bevor der Interface-Status gelesen wird
- comstate=get_com_status();															// Status Datenschnittstellen einlesen
- Init_Ext_Intr();																				// Initialisiere externe Interrupts (ohne Freigabe)
+ result=get_com_status();															// Status Datenschnittstellen einlesen
+ comstate=result;
+ // 5.157: RS232 waehrend des Tiefschlafs angesteckt? Geschlafen wird nur ohne Terminal (connect ohne UART0). Liest
+ // IC54 jetzt RS232_LINK, ging die Flanke im Watchdog-Reset verloren: comstate hat das Bit schon, communication_change()
+ // fand keinen Unterschied, das Geraet schlief weiter und blieb auf RS232 stumm (26SC9966, 2026-11-25). Bit hier
+ // loeschen und Schnittstellenwechsel ausloesen -> Banner, connect|=UART0, kein Schlaf mehr.
+ if ((i_reset==SLEEP_RES) && (result>=0) && (comstate&RS232_LINK) && !(connect&UART0))
+ {
+  comstate&=~RS232_LINK;
+  comchange=1;
+ }
+ Init_Ext_Intr();																			// Initialisiere externe Interrupts (ohne Freigabe)
  
  if (i_reset!=SLEEP_RES) 										// Kein deep sleep watchdog reset?
  {	 
