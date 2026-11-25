@@ -30,6 +30,68 @@
 #include "libtool.h"
 #include "ramcode.h"
 #include "dtc_codes.h"
+#include "rl_usbd_lib.h"                     // 5.u1: usbd_desc_t (Seriennummer im RAM eintragen)
+
+// 5.u1: Robustere Anmeldung am PC (Doku/USB_Analyse_2026-11.md, F2/F3/F4)
+#define USB_VBUS_DEB_MS     300               // VBUS muss so lange durchgehend LOW sein, bis die Sitzung endet
+#define USB_ENUM_RETRY_MS   20000             // Host konfiguriert nicht: nach dieser Zeit ab- und wieder anmelden
+#define USB_RECONN_MS       500               // Pause zwischen Abmelden und neuem Anmelden
+#define USB_STR_BUF         256               // RAM-Kopie der String-Deskriptoren
+#define USB_SER_MAX         16                // Laenge des Platzhalters USBD0_STR_DESC_SER (USBD_Config_0.c)
+
+extern usbd_desc_t usbd0_desc;                // Deskriptor-Tabelle der Middleware (RAM, Zeiger aenderbar)
+static uint8_t usb_str[USB_STR_BUF];         // String-Deskriptoren mit eingetragener Seriennummer
+static uchar usb_vbus_low=0;                  // 1 = VBUS LOW gesehen, Zeit in usb_vbus_t
+static uint  usb_vbus_t;
+uint usb_enum_retries=0;                      // Zaehler: neu angemeldet, weil der Host nicht konfiguriert hat
+
+// 5.u1: VBUS entprellt. Ein einzelner LOW-Wert (Port bricht kurz ein, Wackler) beendet die Sitzung nicht mehr.
+static int usb_vbus_on (void)
+{
+ if (FIO1PIN&VBUS) { usb_vbus_low=0; return (1); }
+ if (!usb_vbus_low) { usb_vbus_low=1; usb_vbus_t=mstimer; }
+ return ((uint)(mstimer-usb_vbus_t) < USB_VBUS_DEB_MS);
+}
+
+// 5.u1: USB-Seriennummer = Geraete-Seriennummer. Windows erkennt das Geraet dann an jedem Port wieder (gleiche
+// COM-Nummer, keine neue Einrichtung). MDK-Middleware 6.2 hat dafuer keine Funktion und legt die Strings konstant
+// ins Flash; deshalb RAM-Kopie mit eingesetzter Seriennummer und usbd0_desc.string_descriptor darauf umbiegen.
+// Aufbau: [0] Sprach-ID, [1] Hersteller, [2] Produkt, [3] Seriennummer (Platzhalter), danach ggf. Klassen-Strings.
+// Jeder String: Laenge, Typ 3, UTF-16. Vor USBD_Initialize aufrufen.
+static void usb_serial_patch (void)
+{
+ static uint8_t *orig=0;
+ uint8_t *s; uint si=0, di=0, n=0, k, len;
+ char c;
+ if (!orig) orig=usbd0_desc.string_descriptor;  // Original im Flash merken (nur beim ersten Aufruf)
+ s=orig;
+ while (si+2<=USB_STR_BUF && s[si]>=2 && s[si+1]==USB_STRING_DESCRIPTOR_TYPE)  // alle Strings der Reihe nach
+ {
+  len=s[si];
+  if (n==3)                                       // Seriennummer: neu aufbauen
+  {
+   uint start=di;
+   if (di+2+2*USB_SER_MAX > USB_STR_BUF) return; // passt nicht: Original behalten
+   di+=2;
+   for (k=0; k<USB_SER_MAX && fp.serno[k]; k++)
+   {
+    c=fp.serno[k];
+    if (!((c>='0'&&c<='9')||(c>='A'&&c<='Z')||(c>='a'&&c<='z'))) c='_';  // nur unkritische Zeichen
+    usb_str[di++]=(uint8_t)c; usb_str[di++]=0;
+   }
+   if (di==start+2) { usb_str[di++]='0'; usb_str[di++]=0; }  // keine Seriennummer: "0"
+   usb_str[start]=(uint8_t)(di-start); usb_str[start+1]=USB_STRING_DESCRIPTOR_TYPE;
+  }
+  else
+  {
+   if (di+len > USB_STR_BUF) { if (n>3) break; return; }  // passt nicht: nach der Seriennummer abbrechen, sonst Original
+   for (k=0; k<len; k++) usb_str[di++]=s[si+k];
+  }
+  si+=len; n++;
+ }
+ if (n<4) return;                                 // Seriennummer nicht gefunden: Original behalten
+ usbd0_desc.string_descriptor=usb_str;
+}
 
 
 CDC_LINE_CODING LineCoding;									// VCP Übertragungsparameter
@@ -41,18 +103,32 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
  while (1)
  {	 
   osSignalWait (1,osWaitForever);							// Warte auf Signalereignis 
+  usb_serial_patch ();												// 5.u1: Seriennummer eintragen (vor USBD_Initialize)
 	
   if (puterror (DTC_USB_DEV_INIT, USBD_Initialize (0))==0)     	// USB Device 0 Initialization
 	 {
     if (puterror (DTC_USB_DEV_CONN, USBD_Connect (0))==0)       	// USB Device 0 Connect
     {		
 		 uchar usb_linked=0;								// 5.124: 1 sobald der Host das Geraet konfiguriert hat
+		 uint t0;
 		 //putstr(T_usbcon);
      // 5.124: USB_LINK erst setzen, wenn der Host das Geraet wirklich eingerichtet hat. Vorher war USB_LINK schon
      // gesetzt und diese Schleife hatte keinen Ausstieg: Ladegeraet/Powerbank (VBUS ohne Datenhost) oder Kabelzug
      // waehrend der Enumeration liessen USB_LINK dauerhaft stehen (GSM/LTE-Aufgaben gesperrt, measure.c:203).
      // Jetzt endet das Warten mit VBUS; ohne Host bleibt USB_LINK ungesetzt und der Dienst raeumt sauber auf.
-     while ((USBD_Configured (0)==0) && (FIO1PIN&VBUS)) osDelay(10);
+     // 5.u1: VBUS entprellt; konfiguriert der Host nach USB_ENUM_RETRY_MS nicht (Anmeldung haengt), ab- und wieder
+     // anmelden - Windows beginnt dann neu. Grosszuegig, weil die erste Treibereinrichtung einige Sekunden dauert.
+     usb_vbus_low=0; t0=mstimer;
+     while ((USBD_Configured (0)==0) && usb_vbus_on())
+     {
+      if ((uint)(mstimer-t0) >= USB_ENUM_RETRY_MS)
+      {
+       usb_enum_retries++;
+       USBD_Disconnect (0); osDelay (USB_RECONN_MS); USBD_Connect (0);
+       t0=mstimer;
+      }
+      else osDelay(10);
+     }
      if (USBD_Configured (0))								// Host hat konfiguriert?
      {
 		  usb_linked=1;
@@ -62,7 +138,7 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
  		 if (fp.vspcam) online=0;									// viaspeedcam online Modus beenden		
 #endif			
 		 putstr(T_usbcf);		 			
-		 while (FIO1PIN&VBUS)										// Solange Host-Versorgung angeschlossen
+		 while (usb_vbus_on())										// Solange Host-Versorgung angeschlossen (5.u1: entprellt)
 		 {
 			
 			c=USBD_CDC_ACM_DataAvailable(0); 												// Daten verfügbar?

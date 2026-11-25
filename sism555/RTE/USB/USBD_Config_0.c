@@ -30,7 +30,7 @@
 //     <o>Max Endpoint 0 Packet Size
 //     <i>Maximum packet size for Endpoint 0 (bMaxPacketSize0).
 //       <8=>8 Bytes <16=>16 Bytes <32=>32 Bytes <64=>64 Bytes
-#define USBD0_MAX_PACKET0               16
+#define USBD0_MAX_PACKET0               64
 
 //     <o.0..15>Vendor ID <0x0000-0xFFFF>
 //     <i>Vendor ID assigned by USB-IF (idVendor).
@@ -71,20 +71,20 @@
 
 //     <s.126>Manufacturer String
 //     <i>String Descriptor describing Manufacturer.
-#define USBD0_STR_DESC_MAN              L"NXP"
+#define USBD0_STR_DESC_MAN              L"viaTraffic"
 
 //     <s.126>Product String
 //     <i>String Descriptor describing Product.
-#define USBD0_STR_DESC_PROD             L"LPC USB VCom Port"
+#define USBD0_STR_DESC_PROD             L"VIASIS"
 
 //     <e.0>Serial Number
 //     <i>Enable Serial Number String.
 //     <i>If disabled Serial Number String will not be assigned to USB Device.
-#define USBD0_STR_DESC_SER_EN           0
+#define USBD0_STR_DESC_SER_EN           1
 
 //       <s.126>Serial Number String
 //       <i>String Descriptor describing device's Serial Number.
-#define USBD0_STR_DESC_SER              L"0001A0000000"
+#define USBD0_STR_DESC_SER              L"0000000000000000"
 
 //     </e>
 //   </h>

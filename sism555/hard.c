@@ -863,6 +863,7 @@ void wait_uarts_empty (void)	// Warte bis alle Zeichen auf uarts versendet
 // Der Schlafzaehler liegt deshalb in hftrack.c.
 void DeepSleep (void)										// Bringe CPU in Deep sleep mode
 {
+ uint pconp=PCONP;											// 5.u1: Peripherie-Versorgung merken (SystemInit schaltet u. a. USB/PCUSB ab)
  sleep_stat_count ();									// 5.155: Schlafphase zaehlen (hftrack.c)
  i_reset=SLEEP_RES;											// Setze Resetursache
  if (fp.pwm) SCB_SCR|=(1<<2);						// Deep sleep Bit setzen
@@ -881,6 +882,7 @@ void DeepSleep (void)										// Bringe CPU in Deep sleep mode
  ResetWDT ();														// Interrupt resume - Watchdog Timer reset	
  i_reset=0; 														// Interrupt Resume daher nullen		
  SystemInit();													// PLL neu starten
+ PCONP=pconp;														// 5.u1: Peripherie-Versorgung wie vor dem Schlaf
  InitWatchdog(LONG_WD_32);							// Watchdog Timeout 32 Sekunden setzen 
  SystemCoreClockUpdate ();							// Setze SystemCoreClock Information	
 }

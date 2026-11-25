@@ -488,7 +488,9 @@ void runcycle (void)				// Messzyklenbetrieb
 		 cyclerest=BASECYCLE-cycletime;					// Verbleibende Zeit des Basiszeitzyklus
 		 if (cyclerest>0) osDelay (cyclerest);	// Zeichenempfang unterbricht nicht Wartezeit
 		}	
-	  else if (refresh||acycle||connect||simpinset||gps_pending)	// Zyklus mit Ergebnis, Anzeige aktiv, Verbindung
+	  // 5.u1: kein Schlaf, solange USB-VBUS anliegt - DeepSleep() stoppt PLL0 und damit den 48-MHz-USB-Takt mitten in der
+	  // Anmeldung am PC, der Watchdog-Reset meldet das Geraet ab (Endlosschleife, Doku/USB_Analyse_2026-11.md F1)
+	  else if (refresh||acycle||connect||simpinset||gps_pending||((interfaces&USB_LINK)&&(FIO1PIN&VBUS)))	// Zyklus mit Ergebnis, Anzeige aktiv, Verbindung, USB-Kabel
 	  {			 
 	    cyclerest=BASECYCLE-cycletime;				// Verbleibende Zeit des Basiszeitzyklus	
 	    if (cyclerest>0)											// Schleifen-/Messdauer k�rzer als Basiszeit?
