@@ -7254,3 +7254,8 @@ laesst ihn unveraendert. Gilt fuer Punkt 6 (Kanal) und alle vier Abfragen von Pu
 
 Geprueft auf Board B: nur Enter -> alle Werte unveraendert; nur Nachlauf 12 -> Statuszeile "RE/-Nachlauf 12 ms", Rest
 unveraendert; Nachlauf 0 -> wieder Standard 10 ms.
+
+**Nachtrag 2026-11-25 (Anleitung fuer den HW-Kollegen):** Laut Code steht RE/ (AMP_BW, `fp.txrcon` Bit 7 = 0) zwischen
+den Messungen schon auf LOW. Der Vorlauf ist an RE/ deshalb keine sichtbare Flanke, er verzoegert nur EN/-MD-RF um 1 ms
+nach dem Einschaltbefehl. Offene Frage an ihn: soll RE/ in Ruhe HIGH sein, und ist der Nachlauf (RE/ bleibt nach dem
+Ausschalten 10 ms HIGH) so gemeint. Anleitung mit Bedienung: `fw_5.154/Anleitung_RE_Timing.md` (nicht im Git).

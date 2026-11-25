@@ -91,7 +91,7 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - **2026-11-24 - 5.152 (TEST), `main`:** Via-2 Mindestmesszeit nach RE/ (Mail HW-Kollege): Messung ohne Fahrzeug endet nicht
   mehr nach 15 ms, sondern nach 8 Perioden der kleinsten Messgeschwindigkeit (5 km/h: 36 ms) oder fest `fp.mess_ms`
   (Transceivermenue Punkt 7). Auf Board B geprueft (steht auf 30 ms fest, bleibt nach Stromzyklus); Paket fuer
-  den HW-Kollegen in `sism555/fw_5.152/` (Firmware, Anleitung, Mail). Vor-/Nachlauf RE/ siehe 5.153.
+  den HW-Kollegen in `sism555/fw_5.152/` (Firmware, Anleitung). Vor-/Nachlauf RE/ siehe 5.153.
 - **2026-11-18 - 5.151 (TEST), `main`:** IF820-Reset ueber RST: Board A (99SC9923) umgebaut (T10 raus, P1.16 -> RST
   Pin 34, R124 10k). `bt_hw_reset()` treibt P1.16 20 ms LOW; BT_TIMEOUT/W11023 versuchen zuerst den Reset (I11025), sonst
   Stromzyklus wie 5.150. Auf A: Reset 21/21 (/PING nach 2,6 s), eingefrorenes Modul in 2,6 s statt 13 s zurueck. Offen:
