@@ -2194,8 +2194,13 @@ async def run_download_test(args) -> int:
         await transport.write(b"1")
         if not await transport.rx.wait_for_marker("Anzahl Messwerte", args.menu_timeout):
             raise ConnectionError(f"Messwertanzahl nach Datenloeschung nicht gesehen: {bytes(transport.rx.buf)!r}")
-        count_feedback = bytes(transport.rx.buf)
-        count_match = re.search(rb"Anzahl Messwerte\s*=\s*(\d+)", count_feedback)
+        # USB (CDC) liefert "Anzahl Messwerte" und die Zahl teils in getrennten Paketen: bis 3 s auf die Zahl warten
+        for _ in range(30):
+            count_feedback = bytes(transport.rx.buf)
+            count_match = re.search(rb"Anzahl Messwerte\s*=\s*(\d+)", count_feedback)
+            if count_match is not None:
+                break
+            await asyncio.sleep(0.1)
         if count_match is None:
             raise ConnectionError(f"Messwertanzahl nach Datenloeschung nicht lesbar: {count_feedback!r}")
         remaining_records = int(count_match.group(1))
