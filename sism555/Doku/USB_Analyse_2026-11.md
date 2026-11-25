@@ -177,6 +177,37 @@ ableiten.
 - `USB_RPWR` (P1.26) ist auf Via-2-Boards Messeingang; betrifft nur die Stick-Versorgung (5V13 -> D8 -> IC47), nicht
   den Geraete-USB.
 
+### F8 - Kein Neustart nach Firmware-Update ueber USB (hoch, im Nachttest gefunden, behoben in 5.u2)
+
+`connect` (`__noinit`) traegt `USB_LINK` ueber Firmware-Update- und Watchdog-Reset. Die erste Ausgabe im Hochlauf ging
+an den nicht initialisierten USB-Stack, das Geraet hing in einer Watchdog-Schleife bis zum Stromzyklus. Kunden, die
+ueber USB updaten, erleben das als "Geraet tot nach Update". Fix: `USB_LINK` am Anfang von `main()` loeschen.
+
+### F9 - Datenfehler beim USB-Empfang (mittel, im Nachttest gefunden, behoben in 5.u3)
+
+`rbuf[++rxi] = USBD_CDC_ACM_GetChar(0)` im USB-Thread: `rxi` konnte vor dem Byte sichtbar werden, bei Taskwechsel
+las die Hauptschleife ein altes Byte. Folge: 10-28 NAK je XMODEM-Update ueber USB, bei laengeren Uebertragungen auch
+Abbruch moeglich. Dazu fehlender `(uchar)`-Cast bei der Voll-Pruefung. Fix: Byte schreiben, dann `rxi++`, mit
+gesperrtem UART0-Interrupt.
+
+### F11 - HardFault im Keil-USB-Treiber beim Schliessen des Ports (hoch, im Nachttest gefunden, behoben in 5.u18)
+
+Schliesst der PC den COM-Port, waehrend das Geraet ausgibt (Terminal zu, Programm beendet, Kabel-Software trennt), kann
+auf EP0 ein Datenpaket ankommen, waehrend der Treiber nur die leere Status-Phase erwartet (Puffer NULL). Der Keil-Treiber
+`USBD_LPC17xx.c` (LPC1700_DFP 2.0.0) schreibt das Paket ohne Laengenpruefung nach Adresse 0 -> HardFault -> Geraet steht
+32 s, Watchdog-Reset. Mit Firmware vor 5.u2 bleibt es danach ganz tot (F8). Im Test ca. 5 % je Schliessen waehrend einer
+Ausgabe - sehr wahrscheinlich die Hauptursache der Kundenmeldungen. Ein aktiver Hub aendert das Timing der Steuer-
+Transfers und kann das Fenster verkleinern.
+
+Fix: lokale, gepatchte Treiberkopie `USB_Driver_Patch/USBD_LPC17xx.c` (Paket in Zwischenpuffer, nur freien Rest kopieren).
+Nachweis: 300x Schliessen waehrend der Ausgabe mit 5.u17/5.u18 ohne einen Reset (vorher alle 3-20 Versuche).
+
+### F10 - USB erst 35-68 s nach dem Einschalten (Bedienung)
+
+Der USB-Dienst startet erst in `runcycle()`, nach BT-, LTE- und GPS-Erkennung. Wer das Geraet einschaltet und gleich
+das Kabel nutzt, sieht eine Minute lang keinen COM-Port. Ein frueherer Start braucht zuerst F6 (sonst geht `USB_LINK`
+in den `connect`-Umschaltungen der BT-Erkennung verloren).
+
 ## 4. Was wir machen muessen - Reihenfolge
 
 | # | Massnahme | Art | Aufwand | Wirkung auf "nur mit aktivem Hub" |

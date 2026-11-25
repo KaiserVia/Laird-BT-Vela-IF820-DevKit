@@ -93,6 +93,9 @@ def menu_check(dev):
             m = re.search(r"Version (\S+),", out); r["version"] = m.group(1) if m else None
             m = re.search(r"Seriennummer: (\S+)", out); r["serno"] = m.group(1) if m else None
             m = re.search(r"Tiefschlaf seit Einschalten: (\d+)", out); r["schlaf"] = int(m.group(1)) if m else None
+            m = re.search(r"USB-Diag: ([^\r\n]*)", out)          # nur Diagnose-Builds (5.u11)
+            if m:
+                r["diag"] = m.group(1).strip()
             s.write(b"9"); out = read_for(s, 2.0, b"1...6?")
             r["menu"] = "Hauptmen" in out
     except Exception as e:
