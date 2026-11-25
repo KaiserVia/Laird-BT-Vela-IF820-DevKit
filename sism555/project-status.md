@@ -7346,3 +7346,27 @@ gleich, Firmware-Update ueber USB, USB-Stick (Host) unveraendert.
 Hinweis: Mit gestecktem USB-Kabel schlaeft das Geraet jetzt nie (auch an einem reinen Ladegeraet ohne Datenhost).
 Nicht umgesetzt (naechste Schritte): F5 DTR, F6 eigener USB-Zustand statt `USB_LINK` in `connect`, USB-Start
 unabhaengig von der Hauptschleife; Hardware H1-H6 (Analyse Abschnitt 4).
+
+## Update 5.u2 (TEST, 2026-11-25, Branch `usb-verbindung`): Neustart nach Firmware-Update ueber USB
+
+**Symptom (Nachttest 26SC9966):** Nach einem Firmware-Update **ueber USB** startete das Geraet nicht neu: kein Banner
+auf RS232, kein USB-Port, auch nach Minuten nicht. Nur ein Stromzyklus half (der erste Stromzyklus brachte teils einen
+USB-Port nach 3 s, der sofort "funktioniert nicht" meldete; erst der zweite gab einen normalen Hochlauf). Aufgetreten
+beim Update 5.157 -> 5.u1 und 5.u1 -> 5.u1, also schon vor 5.u1 vorhanden.
+
+**Ursache:** `connect` ist `__noinit` und traegt `USB_LINK` ueber den Reset (FIRM_UP_RES, Watchdog-Reset) hinweg. Der
+USB-Stack ist nach dem Reset aber neu und nicht initialisiert. Die erste Ausgabe im Hochlauf ging per `putb()` an
+`USBD_CDC_ACM_PutChar()` des nicht initialisierten Stacks; das Geraet hing, der Watchdog startete es neu, `connect`
+blieb erhalten (WDTR-Zweig setzt `connect` nicht), Schleife bis zum Stromzyklus. Ueber RS232 trat es nicht auf, weil
+dann `USB_LINK` nicht gesetzt ist. Gleiches gilt fuer jeden Watchdog-Reset waehrend einer USB-Sitzung.
+
+**Fix (main.c, ganz am Anfang):** `connect&=~USB_LINK; concpy&=~USB_LINK;` nach jedem Reset. `USB_LINK` setzt nur der
+USB-Dienst, sobald der PC das Geraet konfiguriert hat.
+
+**Geprueft:** Update 5.u1 -> 5.u2 ueber USB: 3 s nach "Reprogram" Banner 5.u2 auf RS232, USB-Port wieder da und
+konfiguriert. Map: `non_init`-Symbole gleich wie 5.156. (Das Update wird noch von der alten Firmware ausgefuehrt; der
+Fix wirkt, weil die NEUE Firmware im Hochlauf `USB_LINK` loescht - auch Kunden mit alter Firmware koennen also ueber
+USB auf 5.u2 und spaeter updaten.)
+
+Beobachtet, noch offen: Beim XMODEM-Empfang ueber USB lehnt das Geraet 10-24 von 179 Bloecken ab (NAK, Wiederholung
+klappt), ueber RS232 nicht. Ein erster Update-Versuch 5.u1 -> 5.u2 brach ohne Log ab (Geraet blieb auf 5.u1).
