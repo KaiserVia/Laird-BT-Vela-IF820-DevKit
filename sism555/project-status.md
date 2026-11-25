@@ -7386,3 +7386,39 @@ UART0-Interrupt (die ISR schreibt `rxi` ebenfalls).
 
 **Geprueft (26SC9966, Update ueber USB):** mit dem alten Empfang 16-28 NAK je Update (4 Laeufe), mit dem neuen 0 NAK
 (3 Laeufe), Update dauert 23 s statt 29-32 s. Alle Updates kamen nach 3 s mit USB zurueck (5.u2).
+
+## Update 5.u18 (TEST, 2026-11-25/26, Branch `usb-verbindung`): HardFault im USB-Treiber beim Schliessen des Ports
+
+**Symptom:** Im Nachttest liess sich der USB-COM-Port in 0,5-2 % der Oeffnungen nicht oeffnen ("Ein an das System
+angeschlossenes Geraet funktioniert nicht", sofort oder nach 32 s). Das Geraeteprotokoll zeigte zu jedem dieser Faelle
+**I31 Watchdog reset**. Gezielt ausgeloest durch Oeffnen, Taste senden, **sofort Schliessen** (Geraet gibt noch aus):
+ca. 5 % je Schliessen. Mit 5.156 (ohne den Fix aus 5.u2) bleibt das Geraet danach tot (USB und RS232), bis zum
+Stromzyklus - sehr wahrscheinlich ein grosser Teil der Kundenmeldungen "USB geht nicht".
+
+**Eingrenzung (Diagnose-Builds 5.u11-5.u16, nicht committet):**
+- 5.u11: Ringpuffer-Zaehler auf der Infoseite - Puffer laeuft nie voll, Ringpuffer ist nicht die Ursache.
+- 5.u12: 1-ms-ISR gibt bei 28 s unbedientem Watchdog den PC ueber UART0 aus - keine Ausgabe, also lief keine ISR mehr.
+- 5.u14: USB-IRQ unter Timer-Prioritaet - weiterhin keine Ausgabe, also kein USB-ISR-Sturm.
+- 5.u15/5.u16: eigener HardFault-Handler mit Ausgabe ueber UART0:
+  `[HARDFAULT] pc=0001BC0A psr=61000028 (IRQ 24 = USB) cfsr=00000400 (IMPRECISERR) r3=5000C000 (USB) r4=00000004
+  r5=00000008 r6=00000000` -> in `USBD_ReadEP()` (Keil-Treiber `USBD_LPC17xx.c`, LPC1700_DFP 2.0.0), Endpunkt 0 OUT,
+  8-Byte-Paket, Zielpuffer **NULL**.
+
+**Ursache:** Der Treiber hat fuer EP0 OUT einen Transfer ohne Puffer aktiv (Status-Phase, Laenge 0). Kommt in dieser
+Phase ein Datenpaket (Windows bricht beim Schliessen/Oeffnen Steuer-Transfers ab und beginnt neue), schreibt
+`USBD_IRQ()` das ganze Paket ohne Laengenpruefung nach `transfer_info.data + transferred` = Adresse 0 -> Bus-Fehler ->
+HardFault (Standard-Handler: Endlosschleife) -> Watchdog-Reset nach 32 s.
+
+**Fix:** Lokale, gepatchte Kopie des Treibers `USB_Driver_Patch/USBD_LPC17xx.c` (+ `.h`) im Projekt; die RTE-Komponente
+"CMSIS Driver:USB Device" ist dafuer abgewaehlt (`OTG_LPC17xx.c` mit `USB_IRQHandler` kommt weiter ueber "USB Host").
+`USBD_IRQ()` liest jedes OUT-Paket in einen 64-Byte-Zwischenpuffer und kopiert hoechstens den freien Rest des Transfers,
+bei NULL-Puffer nichts. Die Datei ist im Kopf als geaenderte Fassung gekennzeichnet (zlib-Lizenz von ARM verlangt das).
+**Achtung beim Pack-Update** (LPC1700_DFP): Patch nachziehen oder pruefen, ob Keil den Fehler behoben hat.
+
+**Ausserdem in 5.u18 (Ersatz fuer 5.u3):** USB-Empfang ohne UART0-Interruptsperre je Byte (5.u3 erhoehte die
+Haenger-Rate, Vergleich je 300-1500 Oeffnungen), Byte vor `rxi` schreiben, voller Ringpuffer nach 100 ms verwerfen und
+zaehlen (`usb_rx_ovf`) statt den USB-Empfang zu stauen (wie UART0 seit 5.111).
+
+**Ergebnis 5.u17/5.u18 (26SC9966):** 300x Schliessen waehrend der Ausgabe: **0 HardFault, 0 Watchdog-Reset**
+(vorher alle 3-20 Versuche). Es bleiben vereinzelt (ca. 0,7 %) sofortige Oeffnungsfehler auf Windows-Seite nach einem
+Schliessen mit laufender Ausgabe; das naechste Oeffnen klappt, das Geraet laeuft durch.

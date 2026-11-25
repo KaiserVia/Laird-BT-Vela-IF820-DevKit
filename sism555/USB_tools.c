@@ -36,6 +36,7 @@
 #define USB_VBUS_DEB_MS     300               // VBUS muss so lange durchgehend LOW sein, bis die Sitzung endet
 #define USB_ENUM_RETRY_MS   20000             // Host konfiguriert nicht: nach dieser Zeit ab- und wieder anmelden
 #define USB_RECONN_MS       500               // Pause zwischen Abmelden und neuem Anmelden
+#define USB_RX_WAIT_MS      100               // 5.u10: so lange auf Platz im Ringpuffer warten, dann verwerfen
 #define USB_STR_BUF         256               // RAM-Kopie der String-Deskriptoren
 #define USB_SER_MAX         16                // Laenge des Platzhalters USBD0_STR_DESC_SER (USBD_Config_0.c)
 
@@ -44,6 +45,7 @@ static uint8_t usb_str[USB_STR_BUF];         // String-Deskriptoren mit eingetra
 static uchar usb_vbus_low=0;                  // 1 = VBUS LOW gesehen, Zeit in usb_vbus_t
 static uint  usb_vbus_t;
 uint usb_enum_retries=0;                      // Zaehler: neu angemeldet, weil der Host nicht konfiguriert hat
+uint usb_rx_ovf=0;                            // 5.u10: Zaehler verworfene USB-Empfangsbytes (Ringpuffer voll)
 
 // 5.u1: VBUS entprellt. Ein einzelner LOW-Wert (Port bricht kurz ein, Wackler) beendet die Sitzung nicht mehr.
 static int usb_vbus_on (void)
@@ -141,26 +143,35 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
 		 while (usb_vbus_on())										// Solange Host-Versorgung angeschlossen (5.u1: entprellt)
 		 {
 			
-			c=USBD_CDC_ACM_DataAvailable(0); 												// Daten verfügbar?
-			if (c) {																								// Bytes vorhanden
-				while (c--)
-				{		
-				 // 5.u3: (uchar)-Cast wie in der UART0-ISR (5.111): ohne Cast war rxi+1 bei rxi==255 nie gleich bxi.
-				 // Und: erst das Byte in den Puffer, DANN rxi weiterschalten. Bei "rbuf[++rxi]=GetChar()" darf der Compiler
-				 // rxi vor dem Speichern erhoehen; dieser Thread kann dazwischen verdraengt werden, die Hauptschleife liest
-				 // dann ein altes Byte (CRC-Fehler, NAKs beim XMODEM ueber USB). Die UART0-ISR schreibt rxi ebenfalls,
-				 // deshalb fuer die zwei Befehle gesperrt.
-				 if (bxi!=(uchar)(rxi+1))
-				 {
-				  uchar ch=(uchar)USBD_CDC_ACM_GetChar (0);	// Byte lesen
-				  NVIC_DisableIRQ(UART0_IRQn);
-				  rbuf[(uchar)(rxi+1)]=ch;
-				  rxi++;
-				  NVIC_EnableIRQ(UART0_IRQn);
-				 }
-				 else osThreadYield();			 															// Pufferüberlauf? -> Taskwechsel
-			  }	}	
-      else osDelay(1);       /* 5.122: nicht mehr Dauer-Yield (Busy-Poll) - 1 ms Pause, andere Threads bekommen die Zeit */																		// kein(e) Zeichen Taskwechsel 
+			// 5.u10: Empfang. Erst das Byte schreiben, dann rxi (5.u3: sonst war der Index vor dem Byte sichtbar,
+			// CRC-Fehler/NAKs beim XMODEM ueber USB). Voller Ringpuffer: bis USB_RX_WAIT_MS warten (beim XMODEM holt
+			// die Hauptschleife schnell ab, kein Datenverlust), danach neue Bytes verwerfen und zaehlen - wie die
+			// UART0-ISR (5.111). 5.u3 liess die Bytes bei vollem Puffer im USB-Puffer liegen: Liest die Firmware den
+			// Puffer nicht (z. B. Tasten, die kein Menue abholt), staute sich der USB-Empfang, der PC bekam dauerhaft
+			// NAK und das naechste Oeffnen des Ports scheiterte (Fehler 31, 0,5-1,4 % je Oeffnung im Test).
+			c=USBD_CDC_ACM_DataAvailable(0);
+			if (c>0)
+			{
+			 while (c--)
+			 {
+			  int ch;
+			  if (bxi==(uchar)(rxi+1))									// Ringpuffer voll?
+			  {
+			   uint tw=mstimer;
+			   while ((bxi==(uchar)(rxi+1)) && ((uint)(mstimer-tw) < USB_RX_WAIT_MS)) osDelay(1);
+			  }
+			  ch=USBD_CDC_ACM_GetChar (0);								// Byte immer abholen
+			  if (ch<0) break;
+			  if (bxi!=(uchar)(rxi+1))
+			  {
+			   rbuf[(uchar)(rxi+1)]=(char)ch;
+			   __DMB();
+			   rxi++;
+			  }
+			  else usb_rx_ovf++;											// verworfen (Puffer weiter voll)
+			 }
+			}
+			else osDelay(1);       /* 5.122: 1 ms Pause, andere Threads bekommen die Zeit */
 		 } // end while VBUS
 		 connect&=~USB_LINK;		 								// ab hier sendet putb() nicht mehr
 		 concpy=connect;												// Kopie sichern
