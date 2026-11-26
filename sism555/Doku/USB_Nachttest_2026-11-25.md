@@ -124,3 +124,27 @@ oeffnen/schliessen): **30/30 ok, 0 Port-Wechsel, Tiefschlaf-Zaehler 0.**
 6. **USB frueher starten (F10, heute 35-68 s nach dem Einschalten)**: gewuenscht? Braucht vorher F6 (eigener USB-Zustand).
 7. **Eigene USB-PID** beantragen? Strings: entschieden 2026-11-26, "via traffic"/"viasis" (5.u22).
 8. Merge nach `main`: wann, und Test auf weiteren Boards (A, B) und an anderen PCs (Matrix in der Analyse)?
+
+## Nachtrag 26.11.: Vergleich mit LPC1700_DFP 2.7.2
+
+Neuestes Pack von keil.com: **2.7.2 (2024-02-09), als "no longer maintained" markiert**, es kommt nichts mehr nach.
+Installiert und im Projekt: 2.0.0 (2014), darin `USBD_LPC17xx.c` **V2.00**; in 2.7.2 **V2.14**.
+
+| Unser Fehler | V2.14 |
+|---|---|
+| F11 EP0-OUT nach Adresse 0 (HardFault) | behoben (V2.12 "ReadEP/WriteEP mit data = NULL"): Daten werden gelesen und verworfen |
+| F12 Sperre in `USBD_ReadSetupPacket` | behoben: prueft `setup_received` vor der Sperre |
+| Paket laenger als Restpuffer (in 5.u18 mit begrenzt) | nicht begrenzt, im Test nie aufgetreten |
+
+Weitere Korrekturen seit V2.00, die uns betreffen koennen: V2.4 Lesen von gestalltem Endpunkt -> HardFault, **V2.8 SETUP
+gefolgt von OUT-Paket** (passt zum Oeffnen des Ports: SET_LINE_CODING = SETUP + Datenpaket; moeglicher Zusammenhang mit
+dem Restfehler, ungeprueft), V2.6/V2.7 Endpunkt-Konfiguration, Power-Control.
+
+Abhaengigkeiten: keine Pflicht auf CMSIS 5 im Pack eingetragen; API USB Device 2.1 = unsere 2.01. Der Treiber nutzt aber
+`__UNALIGNED_UINT32_READ/WRITE` aus CMSIS 5 (in CMSIS 4.2.0 nicht vorhanden) -> zwei Ersatz-Makros noetig.
+Rest des Packs: `startup_LPC17xx.s` gleich (V1.10), `system_LPC17xx.c` V1.13 -> V1.14 (Projektkopie in `RTE/Device` bleibt,
+solange man sie nicht aktualisiert), USB-Host V2.00 -> V2.6, I2C V2.01 -> V2.8, PIN/GPIO/GPDMA mit kleinen Aenderungen.
+
+Vorschlag: nur den USB-Device-Treiber V2.14 als lokale Kopie in `USB_Driver_Patch/` uebernehmen (statt unseres gepatchten
+V2.00), Ersatz-Makros dazu, eigene Laengenbegrenzung optional behalten; dann 300x Schliess-Ausloeser, Update/Download.
+Ganzes Pack erst, wenn auch USB-Host/I2C getestet werden sollen.

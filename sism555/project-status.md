@@ -7454,3 +7454,24 @@ Anwendervorgabe 2026-11-26: Hersteller-String "via traffic", Produkt-String "via
 `RTE/USB/USBD_Config_0.c`). Sonst keine Aenderung, `non_init`-Layout wie 5.156 (97 Symbole). Ueber USB geflasht auf
 26SC9966: Version 5.u22, Seriennummer 26SC9966, Windows meldet als Produkt (BusReportedDeviceDesc) "viasis". Den
 Hersteller-String zeigt Windows im Geraete-Manager nicht an (dort steht der Treiberhersteller).
+
+## Update 5.u23 (TEST, Branch usb-verbindung) - USB-Treiber aus LPC1700_DFP 2.7.2
+
+Anwenderentscheidung 2026-11-26: statt unseres gepatchten Treibers V2.00 die USB-Treiber des letzten Keil-Packs
+(LPC1700_DFP 2.7.2, von Keil nicht mehr gepflegt) als lokale Kopie in `USB_Driver_Patch/`: Geraet `USBD_LPC17xx.c`
+V2.14, Host `USBH_LPC17xx.c` V2.6, gemeinsames Modul `OTG_LPC17xx.c` V1.3 (alle drei noetig, gemeinsame Variablen
+`usb_role`/`usb_state`). Pack-Komponenten CMSIS Driver USB Device und USB Host abgewaehlt, kein Pack-Update auf den PCs
+noetig. Keil hat F11 (V2.12, ReadEP mit NULL) und F12 (ReadSetupPacket) selbst behoben.
+
+Eigene Anpassungen (im Code `viasis 5.u23`): Ersatz `__UNALIGNED_UINT32_READ/WRITE` (fehlt in CMSIS 4.2.0), Host-
+Capabilities ohne zweites Feld (CMSIS 4.2.0), Schalter `RTE_Drivers_USBD0/USBH0` in den Dateien gesetzt, Lesen auf den
+freien Pufferplatz begrenzt (wie 5.u18). **Fehler im Keil-Pack:** `USB_IRQHandler` ruft fuer LPC175x_6x mit Host+Geraet
+`USBH0_IRQ`/`USBD0_IRQ` auf, die es nicht gibt (hat nie gebaut) -> `USBH_IRQ`/`USBD_IRQ`.
+
+Build 0 Fehler/0 Warnungen, `non_init` wie 5.156. Pruefung auf 26SC9966:
+- A/B-Schliess-Ausloeser je 2x300: 5.u23 0 Oeffnungsfehler, 0 Neustarts, 0 HardFault; 5.u21 1 Oeffnungsfehler.
+- 5/5 Firmware-Updates ueber USB (0 NAK, USB nach 3,3 s zurueck), 3/3 Ymodem-Downloads (5000 Messwerte), 6/6
+  Stromzyklen (0,5/2/10 s, Menue vor und nach Leerlauf).
+- **Offen: USB-Stick (Host-Treiber ist ebenfalls neu).**
+
+Info fuer Joachim: `Doku/Info_Joachim_USB.md`. Werkzeug-Umstieg (AC6/RTX5/Middleware 8): `Doku/Werkzeug_Umstieg_Aufwand.md`.

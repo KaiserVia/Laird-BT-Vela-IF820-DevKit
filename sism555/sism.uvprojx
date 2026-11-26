@@ -621,6 +621,16 @@
               <FileType>1</FileType>
               <FilePath>.\USB_Driver_Patch\USBD_LPC17xx.c</FilePath>
             </File>
+            <File>
+              <FileName>OTG_LPC17xx.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\USB_Driver_Patch\OTG_LPC17xx.c</FilePath>
+            </File>
+            <File>
+              <FileName>USBH_LPC17xx.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\USB_Driver_Patch\USBH_LPC17xx.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -790,12 +800,6 @@
         </targetInfos>
       </component>
       <component Capiversion="2.02" Cclass="CMSIS Driver" Cgroup="I2C" Cvendor="Keil" Cversion="2.01" condition="LPC1700 CMSIS PIN">
-        <package name="LPC1700_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="Keil" version="2.0.0"/>
-        <targetInfos>
-          <targetInfo name="sism"/>
-        </targetInfos>
-      </component>
-      <component Capiversion="2.00" Cclass="CMSIS Driver" Cgroup="USB Host" Cvendor="Keil" Cversion="2.00" condition="LPC1700 CMSIS PIN">
         <package name="LPC1700_DFP" schemaVersion="1.2" url="http://www.keil.com/pack/" vendor="Keil" version="2.0.0"/>
         <targetInfos>
           <targetInfo name="sism"/>
