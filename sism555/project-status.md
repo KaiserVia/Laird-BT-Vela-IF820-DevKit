@@ -7440,3 +7440,10 @@ BUSY, USB-Interrupts kommen nicht mehr - USB tot bis zum Reset.
 sofortige Oeffnungsfehler 5 bzw. 0 je 300; 5.u18 1 je 300 im ersten Lauf, im zweiten Lauf USB-Totalausfall ab Versuch
 145. Die Rate der sofortigen Windows-Oeffnungsfehler schwankt stark zwischen Laeufen (0-8 je 300) und haengt nur am
 schnellen Wiederoeffnen (mit 3 s Pause 0/300).
+
+### Nachttest 26SC9966 (2026-11-26, 02:50-06:30, 5.u21)
+
+Dauerlauf Phase A: 129/129 Runden ok (Stromzyklen 0,5-30 s, Menue/Info ueber USB vor und nach Leerlauf), 43/43
+Ymodem-Downloads (0 Wiederholungen), 25/25 Firmware-Updates ueber USB (0 NAK, USB nach 3 s zurueck), Tiefschlaf 0.
+Phase B (1 h ohne Stromzyklus, Menue alle 2 min): 30/30 ok. Vorher 600x Schliessen waehrend der Ausgabe: 1 sofortiger
+Windows-Oeffnungsfehler, kein Absturz. Bericht: `Doku/USB_Nachttest_2026-11-25.md`.

@@ -18,12 +18,17 @@ Rohdaten: `Doku/tools/Testreports/usb/` (nicht im Git).
    statt 30 s.
 4. **Tiefschlaf bei gestecktem Kabel (F1)**, Seriennummer, VBUS-Entprellung, Neuanmeldung: 5.u1. F1 konnte am Tisch
    nicht ausgeloest werden (GPS-Suche haelt das Geraet 60 min wach, Kabel nicht automatisch steckbar).
-5. **Rest:** ca. 0,5-0,7 % der Oeffnungen kurz nach einem Schliessen mit laufender Ausgabe lehnt Windows einmal sofort
-   ab; das naechste Oeffnen klappt, das Geraet laeuft durch. Vermutung: das verworfene EP0-Paket ist das SETUP der
-   naechsten Anfrage (offen, siehe unten).
+5. **Rest:** wird der Port innerhalb ca. 1 s nach einem Schliessen mit laufender Ausgabe wieder geoeffnet, lehnt
+   Windows das Oeffnen gelegentlich einmal sofort ab (0-8 je 300, stark schwankend); das naechste Oeffnen klappt, das
+   Geraet laeuft durch. Mit 3 s Pause 0/300. Kein verworfenes EP0-Paket dabei (5.u20-Diagnose) - Ursache offen,
+   vermutlich Windows-seitig.
 
-Firmware-Kandidat: **5.u18** (Commit `f742d9d`). Versionen 5.u4-5.u17 und 5.u19 waren Vergleichs-/Diagnosebuilds und
-sind nicht im Git (Binaries unter `Testreports/usb/fw/`).
+6. **Zweiter Treiberfehler (F12): USB tot ohne Absturz.** `USBD_ReadSetupPacket()` gibt in einem Fehlerzweig seine
+   Sperre und den USB-Interrupt nicht frei -> USB antwortet nie mehr, das Geraet laeuft sonst weiter (RS232 ok). Mit
+   5.u18 im Test nach 145 Schliessvorgaengen eingetreten. Behoben in **5.u21**.
+
+**Firmware-Kandidat: 5.u21** (Commit `746df9a`). Versionen 5.u4-5.u17, 5.u19, 5.u20 waren Vergleichs-/Diagnosebuilds
+und sind nicht im Git (Binaries unter `Testreports/usb/fw/`).
 
 ## Ablauf und Ergebnisse
 
@@ -74,9 +79,27 @@ Das Geraeteprotokoll zeigte zu jedem Fehler `I31 Watchdog reset`. Gezielter Ausl
 5.u18: 3/300 beim Ausloeser, 2/292 beim Oeffnungstest - alle sofort (0,01 s), ohne Neustart, naechster Versuch ok.
 5.u19 (Ausgabe nach DTR-Fall gesperrt) brachte keine Besserung (2/300, 3/74) und ist verworfen.
 
-### 6. Dauerlauf 5.u18 (Nacht)
+### 6. Treiberfehler 2: USB tot (F12) -> 5.u21
 
-(wird am Morgen eingetragen)
+A/B-Vergleich 5.u21/5.u18 (je 2x300 Ausloeser, abwechselnd geflasht): 5.u21 0 Abstuerze, 5 bzw. 0 sofortige
+Oeffnungsfehler; 5.u18 1 Fehler im ersten Lauf, im zweiten Lauf ab Versuch 145 **USB tot** (jedes Oeffnen 3,5 min
+"Zeitlimit fuer die Semaphore", RS232 bedienbar). Ursache `USBD_ReadSetupPacket()` (siehe Kurzfassung 6). 5.u21 danach:
+600x Ausloeser, 1 sofortiger Oeffnungsfehler, kein Absturz, kein Ausfall.
+
+### 7. Dauerlaeufe
+
+| Stand | Runden | ok | Downloads | Updates (NAK) | Bemerkung |
+|---|---|---|---|---|---|
+| 5.u3 (17:07-19:10) | 100 | 91 | 29/31 | 18/20 (0) | Abstuerze (F11) |
+| 5.u18 (23:36-01:26) | 90 | 86 | 29/30 | 18/18 (0) | 4x sofortiger Oeffnungsfehler |
+| **5.u21 (02:50-05:30)** | **129** | **129** | **43/43** | **25/25 (0)** | Stromzyklen 0,5-30 s, Tiefschlaf 0 |
+
+Runde = Stromzyklus (0,5/1/2/5/10/30 s stromlos), Port muss stabil kommen, Menue/Info ueber USB vor und nach 10 s
+Leerlauf; jede 3. Runde Ymodem-Download (5000 Messwerte), jede 5. Runde Firmware-Update ueber USB. USB-Port 14-36 s
+nach dem Einschalten (Median 35 s).
+
+Phase B 5.u21 (05:30-06:30, Geraet laeuft ohne Stromzyklus, Menue/Info ueber USB alle 2 min, Port jedes Mal
+oeffnen/schliessen): **30/30 ok, 0 Port-Wechsel, Tiefschlaf-Zaehler 0.**
 
 ## Weitere Befunde
 
@@ -88,12 +111,12 @@ Das Geraeteprotokoll zeigte zu jedem Fehler `I31 Watchdog reset`. Gezielter Ausl
 
 ## Fragen fuer morgen
 
-1. **Treiber-Patch** (`USB_Driver_Patch/USBD_LPC17xx.c`, Pack-Komponente abgewaehlt): so in Ordnung? Alternative waere
+1. **Treiber-Patch** (`USB_Driver_Patch/USBD_LPC17xx.c`, Pack-Komponente abgewaehlt, zwei Korrekturen): so in Ordnung? Alternative waere
    ein neueres LPC1700_DFP, falls Keil den Fehler behoben hat (nicht geprueft, kein Netzzugriff auf Pack-Server genutzt).
 2. **HardFault-Handler dauerhaft?** Heute haengt das Geraet bei einem HardFault 32 s bis zum Watchdog. Vorschlag: eigener
    Handler, der PC/Fault-Register ins Protokoll schreibt und sofort neu startet.
-3. **Restfehler 0,5 %** (sofortige Windows-Ablehnung nach Schliessen waehrend Ausgabe): weiter verfolgen (SETUP-Paket im
-   Treiber erkennen) oder akzeptieren?
+3. **Restfehler** (sofortige Windows-Ablehnung nur beim Wiederoeffnen innerhalb ~1 s): akzeptieren oder mit
+   USB-Analysator weiter verfolgen?
 4. **F1 (Tiefschlaf) am Kunden-Szenario pruefen:** Geraet > 60 min laufen lassen (GPS gibt auf), dann USB-Kabel stecken -
    mit 5.156 und 5.u18 vergleichen. Braucht Hand am Kabel oder einen schaltbaren USB-Hub.
 5. **Hardware H1-H6** (Analyse Abschnitt 4) mit dem HW-Kollegen: vor allem USB-Umschalter Host/Geraet, Pulldowns,

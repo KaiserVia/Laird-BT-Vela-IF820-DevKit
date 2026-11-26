@@ -202,6 +202,14 @@ Transfers und kann das Fenster verkleinern.
 Fix: lokale, gepatchte Treiberkopie `USB_Driver_Patch/USBD_LPC17xx.c` (Paket in Zwischenpuffer, nur freien Rest kopieren).
 Nachweis: 300x Schliessen waehrend der Ausgabe mit 5.u17/5.u18 ohne einen Reset (vorher alle 3-20 Versuche).
 
+### F12 - USB tot ohne Absturz: Sperre im Keil-Treiber (hoch, im Nachttest gefunden, behoben in 5.u21)
+
+`USBD_ReadSetupPacket()` setzt `usbd_sie_busy` und sperrt den USB-Interrupt, kehrt aber bei "kein SETUP anstehend"
+zurueck, ohne beides freizugeben. Danach liefert jede Treiberfunktion BUSY, USB antwortet nie mehr; das Geraet laeuft
+sonst normal (RS232, BT). Bei Windows bleibt der COM-Port sichtbar, Oeffnen endet nach Minuten mit "Zeitlimit fuer die
+Semaphore". Nur Kabel ziehen oder Strom aus hilft. Im Test mit 5.u18 nach 145 Schliessvorgaengen waehrend der Ausgabe.
+Fix in derselben gepatchten Treiberkopie.
+
 ### F10 - USB erst 35-68 s nach dem Einschalten (Bedienung)
 
 Der USB-Dienst startet erst in `runcycle()`, nach BT-, LTE- und GPS-Erkennung. Wer das Geraet einschaltet und gleich
