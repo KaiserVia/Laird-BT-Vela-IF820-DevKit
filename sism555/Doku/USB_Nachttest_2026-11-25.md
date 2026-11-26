@@ -122,5 +122,5 @@ oeffnen/schliessen): **30/30 ok, 0 Port-Wechsel, Tiefschlaf-Zaehler 0.**
 5. **Hardware H1-H6** (Analyse Abschnitt 4) mit dem HW-Kollegen: vor allem USB-Umschalter Host/Geraet, Pulldowns,
    IC49-Beschaltung, VBUS-Teiler, Kabelbaum STV9.
 6. **USB frueher starten (F10, heute 35-68 s nach dem Einschalten)**: gewuenscht? Braucht vorher F6 (eigener USB-Zustand).
-7. **Eigene USB-PID** beantragen? Strings "viaTraffic"/"VIASIS" so recht?
+7. **Eigene USB-PID** beantragen? Strings: entschieden 2026-11-26, "via traffic"/"viasis" (5.u22).
 8. Merge nach `main`: wann, und Test auf weiteren Boards (A, B) und an anderen PCs (Matrix in der Analyse)?

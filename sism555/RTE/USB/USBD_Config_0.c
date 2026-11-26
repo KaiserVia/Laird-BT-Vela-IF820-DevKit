@@ -71,11 +71,11 @@
 
 //     <s.126>Manufacturer String
 //     <i>String Descriptor describing Manufacturer.
-#define USBD0_STR_DESC_MAN              L"viaTraffic"
+#define USBD0_STR_DESC_MAN              L"via traffic"
 
 //     <s.126>Product String
 //     <i>String Descriptor describing Product.
-#define USBD0_STR_DESC_PROD             L"VIASIS"
+#define USBD0_STR_DESC_PROD             L"viasis"
 
 //     <e.0>Serial Number
 //     <i>Enable Serial Number String.

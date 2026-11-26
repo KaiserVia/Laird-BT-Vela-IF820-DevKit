@@ -7447,3 +7447,10 @@ Dauerlauf Phase A: 129/129 Runden ok (Stromzyklen 0,5-30 s, Menue/Info ueber USB
 Ymodem-Downloads (0 Wiederholungen), 25/25 Firmware-Updates ueber USB (0 NAK, USB nach 3 s zurueck), Tiefschlaf 0.
 Phase B (1 h ohne Stromzyklus, Menue alle 2 min): 30/30 ok. Vorher 600x Schliessen waehrend der Ausgabe: 1 sofortiger
 Windows-Oeffnungsfehler, kein Absturz. Bericht: `Doku/USB_Nachttest_2026-11-25.md`.
+
+## Update 5.u22 (TEST, Branch usb-verbindung) - USB-Strings
+
+Anwendervorgabe 2026-11-26: Hersteller-String "via traffic", Produkt-String "viasis" (vorher "viaTraffic"/"VIASIS",
+`RTE/USB/USBD_Config_0.c`). Sonst keine Aenderung, `non_init`-Layout wie 5.156 (97 Symbole). Ueber USB geflasht auf
+26SC9966: Version 5.u22, Seriennummer 26SC9966, Windows meldet als Produkt (BusReportedDeviceDesc) "viasis". Den
+Hersteller-String zeigt Windows im Geraete-Manager nicht an (dort steht der Treiberhersteller).
