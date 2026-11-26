@@ -54,6 +54,37 @@ measure.c:310).
 
 **Massnahme:** Pulldowns nur auf der Host-Seite (hinter dem Umschalter aus H1, Seite A), nicht am LPC-Pin.
 
+**Belege (nachgetragen 2026-11-26):**
+
+1. **USB 2.0, Abschnitt 7.1.5.1** (Wortlaut in der USB-IF-ECN "Pull-up/pull-down resistors", gilt fuer USB 2.0):
+   "The pull-down terminators on **downstream ports** are resistors of 14.25 kOhm to 24.80 kOhm [vorher 15 kOhm +-5 %]
+   connected to ground." Pulldowns gehoeren also an den Host-/Hub-Port, das Geraet (upstream port) hat nur den
+   Pull-up 1,5 kOhm an D+ (Full Speed). Das Bild zur Terminierung zeigt RPD nur am "Host or Hub Port", RPU nur an der
+   "Full-speed Function".
+2. **Gleiche Stelle, Ruhepegel:** Die Terminierung muss am Geraet eine Ruhespannung (VIHZ) von **2,7 V bis 3,6 V**
+   ergeben, gemessen mit **einem** Pulldown von 15 kOhm. Die ECN nennt fuer den Pull-up 1575 Ohm als Obergrenze,
+   damit der Pegel "at 2.7 V or higher" bleibt, sogar mit dem kleinsten Pulldown 14,25 kOhm. Pull-up an einer Quelle
+   von 3,0-3,6 V (VTERM).
+3. **NXP LPC1769/68/67/66/65/64/63, Datenblatt Rev. 8 (14.11.2011), Abschnitt 14.1, S. 66/67:**
+   - Fig. 28 "USB interface on a self-powered device" und Fig. 29 (bus-powered): nur RS = 33 Ohm in D+ und D-,
+     R1 1,5 kOhm ueber SoftConnect an D+ - **keine Pulldowns, keine Kondensatoren**.
+   - Fig. 31 "USB host port configuration": die **2 x 15 kOhm** nach GND erscheinen nur hier, an der USB-A-Buchse.
+4. **Dasselbe Datenblatt, Tabelle 7 (Static characteristics, USB pins), S. 46:** Vth(rs)se (Schaltschwelle) 0,8 bis
+   **2,0 V**; VOH (getrieben) 2,8 bis 3,5 V, spezifiziert mit **RL = 15 kOhm nach GND**, also mit einem Pulldown, nicht
+   mit zwei parallel (7,5 kOhm); Ctrans bis 20 pF.
+
+**Rechnung fuer unser Board** (1,5 kOhm an 3,3 V, PC 15 kOhm, R137 15 kOhm): 15 k || 15 k = 7,5 kOhm,
+3,3 V x 7,5 / (7,5 + 1,5) = **2,75 V** statt 3,0 V ohne R137 - knapp ueber der Untergrenze 2,7 V aus Punkt 2. Mit
+ungünstigen, aber zulaessigen Werten (PC-Pulldown 14,25 kOhm, 3,0 V Versorgung) 3,0 V x 7,31 / (7,31 + 1,5) =
+**2,49 V**, also unter 2,7 V. Am Host-Pulldown haengt der Rest: ein PC mit 24,8 kOhm (nach ECN erlaubt) entschaerft,
+einer mit 14,25 kOhm verschaerft das. Das passt zum Bild "geht an manchen PCs, an anderen nicht".
+
+Quellen: USB-IF, USB 2.0 Specification mit ECNs, https://www.usb.org/document-library/usb-20-specification
+(ZIP, darin die ECN "Pull-up/pull-down resistors"; gelesene Kopie der ECN:
+https://git.ondrovo.com/gex/gex-thesis/raw/branch/master/references/USB/resistor_ecn.pdf). NXP-Datenblatt aktuell:
+https://www.nxp.com/docs/en/data-sheet/LPC1769_68_67_66_65_64_63.pdf (gelesen wurde Rev. 8 als Kopie unter
+https://www.ece.nus.edu.sg/ee3032/html/Common/lpc176x.pdf; Abbildungsnummern koennen in neueren Revisionen abweichen).
+
 ### H3 - ESD-Baustein IC49 ungleich beschaltet, zusaetzlich 22 pF (mittel, erst pruefen)
 
 Laut Schaltplan liegen drei Kanaele des USBLC6-4SC6Y (I/O1, I/O3, I/O4) auf D+ und nur einer (I/O2) auf D-. D+
@@ -256,4 +287,11 @@ Geraet (Fehler 43)"? Gegenprobe: dasselbe mit gestecktem RS232-Kabel (kein Schla
 2. Welche Platinen haben die Kunden mit Problemen (Mainboard V1 oder V2)? Gleiche USB-Schaltung?
 3. Fehlerbild beim Kunden: nicht erkannt, COM-Port kommt und geht, Abbruch beim Update, Zeichensalat?
 4. Wird die Stick-Funktion (USB-A) beim Kunden benutzt? Wenn nicht, ist H1/H2 mit Bestueckung loesbar.
+   **Antwort Anwender 2026-11-26: ja, manche Kunden nutzen den Stick.** Folge: R134/R136 und R137/R132 bleiben
+   bestueckt (sonst Stick tot). H1 und H2 sind damit nur per Layout loesbar: USB-Umschalter Host/Geraet (Massnahme 8),
+   die 15-k-Pulldowns hinter den Umschalter auf die A-Seite. Fuer vorhandene Platinen bleiben nur H3 (C133/C134) und
+   H4 als Nacharbeit. Auftrennen am Bedienteil hilft kaum (offenes Stueck ab Verzweigung R134/R136 = ganzer Kabelbaum).
+   Bestueckungsvarianten je Kunde sind ausgeschlossen (Anwender 2026-11-26: jeder Kunde soll mit Stick **und** mit
+   Kabel arbeiten koennen). Der Umschalter (H1, Pulldowns H2 auf der A-Seite) ist damit Pflicht fuer die naechste
+   Platinenrevision.
 5. Eigene USB-PID beantragen (NXP-Programm) oder eigene VID?
