@@ -188,6 +188,7 @@ int sendblock (uchar typ, uchar blno, uchar get_C)	// Datenblock in cbuf ausgebe
   putb(typ);														// Ausgabe Blocktyp
   putb(blno);														// Blocknummer
   putb(~blno);													// Einer-Komplement Blocknummer
+  if (putbuf_usb ((uchar *)cbuf, blen+2)==0)	// 5.u25: nur USB -> Block am Stueck, sonst byteweise wie bisher
   for (i=0;i<blen+2;i++) 
 	{ 
 	 putb(cbuf[i]);												// Block + CRC senden

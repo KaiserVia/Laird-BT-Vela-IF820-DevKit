@@ -167,6 +167,7 @@ void USB_HostService (void const *argument)	// Initialisiert und startet ggf. US
 			   rbuf[(uchar)(rxi+1)]=(char)ch;
 			   __DMB();
 			   rxi++;
+			   rx_src=USB_LINK;										// 5.u24
 			  }
 			  else usb_rx_ovf++;											// verworfen (Puffer weiter voll)
 			 }

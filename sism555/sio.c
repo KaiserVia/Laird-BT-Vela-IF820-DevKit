@@ -43,6 +43,8 @@ volatile uchar bt_tx_stuck=0;    // Zaehler: TX-FIFO-Wait (THRE) lief in Timeout
 
 #define USB_WAIT_MS 50           // max. Wartezeit auf USB-CDC-Puffer je Byte (ms) - bounded, kein Dauerhang
 volatile uchar usb_tx_stuck=0;   // Zaehler: USB-CDC-Wait lief in Timeout -> Host holt nicht ab
+volatile uchar rx_src=0;               // 5.u24: Schnittstelle des letzten empfangenen Zeichens (UART0/UART1/USB_LINK)
+volatile uchar xfer_mask=0;            // 5.u24: waehrend X/Ymodem-Sendung nur an diese Schnittstelle (0 = an alle)
 static volatile uchar usb_stalled=0;   // 5.121: 1 = Host liest nicht (nach USB_WAIT_MS-Timeout), putb() wartet dann nicht mehr
 
 // Messzaehler BT-Durchsatz (5.53, NUR Diagnose - kein Eingriff ins Sendeverhalten).
@@ -63,12 +65,17 @@ int redirect_char_Out (int (*pchar_func)(int a)) // Umleitung Standard Ausgabe
 
 int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 {
- if (connect&UART0) 						// Schnittstelle UART 0 - Terminal aktiviert
+ // 5.u24: Waehrend einer X/Ymodem-Sendung (xfer_mask) nur an die Schnittstelle, die den Transfer angefordert hat.
+ // Vorher ging jeder Block zusaetzlich an alle anderen verbundenen Schnittstellen - ein steckendes RS232-Terminal
+ // (115200 Bd = 11,5 KB/s) bremste den USB-Download auf ca. 8,6 KB/s und zeigte dort nur Binaerdaten.
+ uint con=connect;
+ if (xfer_mask && (con&xfer_mask)) con&=(xfer_mask|~(UART0|UART1|UART2|USB_LINK));
+ if (con&UART0) 						// Schnittstelle UART 0 - Terminal aktiviert
  { 
   while (!(U0->LSR & THRE)) {};	// Warte UART0 Transmitter FIFO leer? 
   U0->THR = ch;									// dann sofort senden	 
  } 
- if (connect&UART1) 						// Schnittstelle UART 1 - Terminal aktiviert  	
+ if (con&UART1) 						// Schnittstelle UART 1 - Terminal aktiviert  	
  {
 	if (!cts_bypass)                         // Bring-up/Werksmodul (F=00): CTS-Handshake ueberspringen
 	{ uint _ct0=mstimer;                     // CTS-Wartezeit begrenzen (Flow-Control/Verdrahtung)
@@ -98,7 +105,7 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
   U1->THR = ch;									// dann sofort senden
 	bt_tx_bytes++;                                 // Diagnose (5.53): gesendete Bytes als Bezugsgroesse
  }
- if (connect&UART2)	// Schnittstelle UART 2 - GPS Ausgabe  	
+ if (con&UART2)	// Schnittstelle UART 2 - GPS Ausgabe  	
  {
 	if (PCONP&PCUART2) 							// Schnittstelle eingeschaltet?
 	{	
@@ -106,7 +113,7 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
    U2->THR = ch;									// dann sofort senden 
 	}	 
  }  
- if (connect&USB_LINK)					// USB Host angeschlossen
+ if (con&USB_LINK)					// USB Host angeschlossen
  {
 	// 5.53: begrenzt. Vorher lief die Wiederholung UNBEGRENZT und OHNE Taskwechsel - steckt ein
 	// USB-Kabel, ist das CDC-Interface enumeriert, holt aber niemand die Daten ab (kein Terminal
@@ -131,6 +138,29 @@ int putb(int ch)					// Sende Byte an UART/USB - Schnittstelle(n)
 	  osThreadYield();                                                   // CPU abgeben, ohne Zwangspause
 	 }
 	}
+ }
+ return(1);
+}
+
+// 5.u25: Block an USB als Ganzes uebergeben (USBD_CDC_ACM_WriteData), wenn die Ausgabe gerade NUR an USB geht.
+// putb() reicht jedes Byte einzeln per USBD_CDC_ACM_PutChar() durch - bei 24 MHz ca. 60 us je Byte, damit lief ein
+// Ymodem-Download ueber USB mit hoechstens ca. 12 KB/s (85 % der Zeit im Senden). Rueckgabe: 1 = an USB uebergeben,
+// 0 = nicht nur USB (Aufrufer sendet byteweise mit putb()), -1 = Host holt nicht ab / Fehler.
+int putbuf_usb (const uchar *p, uint n)
+{
+ uint con=connect, t;
+ int32_t w;
+ if (xfer_mask && (con&xfer_mask)) con&=(xfer_mask|~(UART0|UART1|UART2|USB_LINK));
+ if ((con&(UART0|UART1|UART2|USB_LINK))!=USB_LINK || usb_stalled) return(0);
+ t=mstimer;
+ while (n)
+ {
+  w=USBD_CDC_ACM_WriteData (0, p, (int32_t)n);           // nimmt so viel, wie im Sendepuffer frei ist
+  if (w<0) return(-1);
+  if (w>0) { p+=w; n-=(uint)w; t=mstimer; continue; }
+  if ((uint)(mstimer-t) >= USB_WAIT_MS) { usb_tx_stuck++; usb_stalled=1; return(-1); }  // wie putb()
+  if (WDTV<1000) { ResetWDT(); return(-1); }
+  osThreadYield();
  }
  return(1);
 }

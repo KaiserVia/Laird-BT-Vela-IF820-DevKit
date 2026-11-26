@@ -7475,3 +7475,22 @@ Build 0 Fehler/0 Warnungen, `non_init` wie 5.156. Pruefung auf 26SC9966:
 - **Offen: USB-Stick (Host-Treiber ist ebenfalls neu).**
 
 Info fuer Joachim: `Doku/Info_Joachim_USB.md`. Werkzeug-Umstieg (AC6/RTX5/Middleware 8): `Doku/Werkzeug_Umstieg_Aufwand.md`.
+
+## Update 5.u24/5.u25 (TEST, Branch usb-verbindung) - USB-Download zehnmal schneller
+
+Anwenderfrage 2026-11-26: warum ist der Download so langsam? Messung an 26SC9966 (5.u23): Ymodem ueber USB 8,6 KB/s.
+
+1. **5.u24:** `putb()` schickte jeden Ymodem-Block zusaetzlich an alle anderen verbundenen Schnittstellen. Am
+   Pruefplatz steckt das RS232-Terminal (115200 Bd = max. 11,5 KB/s) -> bremste USB und zeigte dort Binaerdaten.
+   Neu: `rx_src` (Schnittstelle des letzten empfangenen Zeichens, gesetzt in UART0-/UART1-ISR und USB-Empfang) und
+   `xfer_mask` (sio.c); `messdaten()` (sicom.c) setzt `xfer_mask=rx_src` um `send_vtf_file(...,1)`, `putb()` sendet
+   dann nur dorthin. Bewusst nicht allgemein in `sendblock()`: Matrix-Upload und Zertifikat-Uploads bekommen ihre
+   Antworten nicht ueber `rbuf`. Ergebnis 12,1 KB/s. Nicht einzeln committet (Zwischenschritt).
+2. Diagnose (nicht committet): je 1-KB-Block 64 ms Senden (85 %), 4 ms Warten auf ACK, 7 ms Flash lesen.
+   `USBD_CDC_ACM_PutChar()` je Byte kostet bei 24 MHz CPU-Takt ca. 60 us.
+3. **5.u25:** `putbuf_usb()` (sio.c) uebergibt den Block am Stueck per `USBD_CDC_ACM_WriteData()`, wenn die Ausgabe
+   gerade nur an USB geht (sonst byteweise wie bisher, Timeout/`usb_stalled` wie `putb()`); Aufruf in `sendblock()`.
+
+Ergebnis 5.u25: Download 20000 Messwerte (206 KB) in 2,4 s = **84-87 KB/s** (vorher 8,6), 0 Wiederholungen; 3/3
+Updates ueber USB ok; `non_init` wie 5.156. Jetzt bestimmen ACK-Wartezeit und Flash-Lesen den Rest. Ungeprueft:
+Download ueber BT mit gestecktem RS232 (xfer_mask gilt dort auch, sollte ebenfalls schneller werden).
