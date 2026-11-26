@@ -7422,3 +7422,21 @@ zaehlen (`usb_rx_ovf`) statt den USB-Empfang zu stauen (wie UART0 seit 5.111).
 **Ergebnis 5.u17/5.u18 (26SC9966):** 300x Schliessen waehrend der Ausgabe: **0 HardFault, 0 Watchdog-Reset**
 (vorher alle 3-20 Versuche). Es bleiben vereinzelt (ca. 0,7 %) sofortige Oeffnungsfehler auf Windows-Seite nach einem
 Schliessen mit laufender Ausgabe; das naechste Oeffnen klappt, das Geraet laeuft durch.
+
+## Update 5.u21 (TEST, 2026-11-26, Branch `usb-verbindung`): zweiter Treiberfehler - USB tot ohne Absturz
+
+**Symptom:** Mit 5.u18 im Ausloese-Test (300x Schliessen waehrend der Ausgabe, Lauf 2) antwortete das Geraet ab
+Versuch 145 nicht mehr auf USB: jedes Oeffnen ca. 3,5 min, dann "Zeitlimit fuer die Semaphore erreicht". Port bei
+Windows weiter angemeldet, Geraet ueber RS232 voll bedienbar - genau das Kundenbild "USB geht nicht mehr, sonst laeuft
+alles", nur Kabel ziehen oder Strom aus hilft.
+
+**Ursache (Keil-Treiber `USBD_ReadSetupPacket()`):** setzt `usbd_sie_busy` und sperrt den USB-Interrupt, kehrt aber
+bei "kein SETUP anstehend" mit Fehler zurueck, ohne beides freizugeben. Danach antwortet jede Treiberfunktion mit
+BUSY, USB-Interrupts kommen nicht mehr - USB tot bis zum Reset.
+
+**Fix:** in `USB_Driver_Patch/USBD_LPC17xx.c` Sperre und USB-IRQ auch in diesem Zweig freigeben.
+
+**Geprueft:** A/B 5.u21/5.u18 (je 2x300 Ausloeser, abwechselnd geflasht): 5.u21 0 Abstuerze, kein USB-Totalausfall,
+sofortige Oeffnungsfehler 5 bzw. 0 je 300; 5.u18 1 je 300 im ersten Lauf, im zweiten Lauf USB-Totalausfall ab Versuch
+145. Die Rate der sofortigen Windows-Oeffnungsfehler schwankt stark zwischen Laeufen (0-8 je 300) und haengt nur am
+schnellen Wiederoeffnen (mit 3 s Pause 0/300).

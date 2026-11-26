@@ -42,6 +42,8 @@
  *  address 0 -> imprecise bus fault -> HardFault -> watchdog reset. Seen when a
  *  PC closes/opens the virtual COM port while the device sends (approx. 5 % per
  *  close in the test).
+ *  5.u21: USBD_ReadSetupPacket() releases usbd_sie_busy and the USB IRQ also when
+ *  no SETUP packet is pending (original left both locked -> USB dead).
  *
  * History:
  *  Version 2.00
@@ -586,8 +588,13 @@ int32_t USBD_ReadSetupPacket (uint8_t *setup) {
   if (!check_and_set_var(&usbd_sie_busy))   return ARM_DRIVER_ERROR_BUSY;
   NVIC_DisableIRQ(USB_IRQn);
 
-  if (!usbd_ep0_setup_pending)          // if setup packet not received
+  if (!usbd_ep0_setup_pending) {        // if setup packet not received
+    // viaTraffic 5.u21: original returned here without releasing usbd_sie_busy and the USB IRQ ->
+    // every later driver call returned BUSY, USB dead until reset
+    usbd_sie_busy = 0;
+    NVIC_EnableIRQ(USB_IRQn);
     return ARM_DRIVER_ERROR;
+  }
 
   usbd_ep0_setup_pending = false;
   USBD_ReadEP(0, setup);
