@@ -85,6 +85,26 @@ https://git.ondrovo.com/gex/gex-thesis/raw/branch/master/references/USB/resistor
 https://www.nxp.com/docs/en/data-sheet/LPC1769_68_67_66_65_64_63.pdf (gelesen wurde Rev. 8 als Kopie unter
 https://www.ece.nus.edu.sg/ee3032/html/Common/lpc176x.pdf; Abbildungsnummern koennen in neueren Revisionen abweichen).
 
+**Abbildungen in der aktuellen Revision 9.10 (8.9.2020), Abschnitt 15.1, S. 70-73, und unser Aufbau:**
+
+| Fig. (Rev. 9.10) | Inhalt | bei uns |
+|---|---|---|
+| 30 | Geraet, bus-powered: 33 Ohm, 1,5 k fest an VDD, VBUS direkt | nein (wir sind selbstversorgt) |
+| 31 | Geraet, VBUS ueber Teiler R2/R3, weil VDD = 0 V moeglich ist | **so muesste unser VBUS-Pin sein** (H4) |
+| 32 | Geraet mit SoftConnect-Schalter (1,5 k ueber Schalter an D+) | **ja, USB-B-Zweig** (T15 BSS84 an P2.9 USB_CONNECT, R120 1,5 k) |
+| 33 | OTG: ein Mini-AB-Stecker, Umschaltung Host/Geraet im Transceiver ISP1302 | nein |
+| 34 | Host: 33 Ohm, **2 x 15 k nach GND**, Stromschalter (LM3526) an USB_PPWR/USB_OVRCR | **ja, USB-A-Zweig** (TPS2041B statt LM3526, R137/R132) |
+| 35 | Geraeteport mit USB_CONNECT und VBUS | wie 32 |
+
+Wir haben also **Fig. 32 (USB-B) und Fig. 34 (USB-A) gleichzeitig an denselben zwei LPC-Pins**. Eine solche
+Parallelschaltung zeigt NXP nirgends; fuer Host und Geraet an einem Pinpaar sieht NXP nur Fig. 33 vor (ein Stecker,
+Umschaltung im Transceiver). Die 15 k aus Fig. 34 liegen dadurch auch im Geraetebetrieb an D+/D- (H2), die Leitung zur
+USB-A-Buchse haengt offen am Geraetebus (H1).
+
+**Beleg H4 im selben Abschnitt (S. 70):** "For systems where VDD can be 0 V and VBUS is directly applied to the VBUS
+pin, precautions must be taken to reduce the voltage to below 3.6 V." Teiler so, dass der Pin ueber 0,7 x VDD und
+unter 3,6 V liegt (Rechnung mit VBUS 5,25 V, VDD 3,6 V). Unser R128 1 k / R122 47 k ergibt ca. 4,9 V.
+
 ### H3 - ESD-Baustein IC49 ungleich beschaltet, zusaetzlich 22 pF (mittel, erst pruefen)
 
 Laut Schaltplan liegen drei Kanaele des USBLC6-4SC6Y (I/O1, I/O3, I/O4) auf D+ und nur einer (I/O2) auf D-. D+
@@ -280,6 +300,12 @@ Geraet (Fehler 43)"? Gegenprobe: dasselbe mit gestecktem RS232-Kabel (kein Schla
   Terminal oeffnen, Menue, Ymodem-Download 4 MB, Firmware-Update ueber USB, Abziehen/Anstecken 10x.
 - Oszilloskop an D+/D- am LPC: Ruhepegel D+ (Ziel ca. 3,0 V), Flanken und Ueberschwinger, mit und ohne USB-A-Zweig.
 - Windows: Ereignisanzeige (Kernel-PnP), USBView fuer Deskriptor und Anmeldezeiten.
+
+**Pruefplatz 2026-11-26 (26SC9966, 5.u25, mit Bedienteil und Kabelbaum, USB-Kabel an der Bedienteil-Buchse):**
+an drei verschiedenen PC-Ports direkt (zuletzt Root-Hub Port 9, ohne Hub) je 30x Oeffnen, 30x Schliessen waehrend der
+Ausgabe, 3 Ymodem-Downloads 20000 Messwerte (ca. 3 s) - alles ohne Fehler. Das Kundenbild "nur mit aktivem Hub" ist
+damit an diesem Aufbau nicht nachzustellen; H1/H2 wirken hier also nicht als harter Fehler. Offen: anderer PC
+(Laptop, AMD), langes/billiges Kundenkabel, passiver Hub, Messung D+-Ruhepegel.
 
 ## 6. Offene Fragen an Anwender / HW-Kollegen
 
