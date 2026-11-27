@@ -1248,7 +1248,12 @@ uint messdaten (uchar ausgabe)		// Anzahl Messdaten berechnen und ggf. ausgeben
   if (c==1) put_ascii_data ();								// ASCII Messdaten ausgeben	
   else if (c=='C')
 	{
+	 // 5.u24: Daten nur an die Schnittstelle, ueber die der Download angefordert wurde (letztes empfangenes Zeichen).
+	 // Vorher ging jeder Ymodem-Block auch an alle anderen Verbindungen - ein steckendes RS232-Terminal (115200 Bd)
+	 // bremste den USB-Download auf ca. 8,6 KB/s und zeigte dort nur Binaerdaten.
+	 xfer_mask=rx_src;
 	 send_vtf_file (anzmw, 1);				// VTF Datei per ymodem senden
+	 xfer_mask=0;
 	 osDelay(100);										// warte 100 ms Ymodem Ende
 	}
   if (ja(T_delete)>0) delete_data();					// Abfrage Daten l�schen? Ja -> Messdaten im Speicher l�schen

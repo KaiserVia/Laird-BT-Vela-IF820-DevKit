@@ -2176,11 +2176,17 @@ async def run_download_test(args) -> int:
             log(f"Vorhandene Messwerte: {int(count_match.group(1))}.")
         if not await transport.rx.wait_for_marker(MARK_DAUS, args.menu_timeout):
             raise ConnectionError(f"'Daten ausgeben?'-Prompt nicht gesehen: {bytes(transport.rx.buf)!r}")
+        await transport.rx.wait_for_marker("?", args.menu_timeout)   # Ende der Abfrage, siehe 'Daten loeschen?'
+        await asyncio.sleep(0.3)
         transport.rx.clear()
         await wait_for_menu_step(args, "'Daten ausgeben?' sichtbar. Sende 'n'.")
         await transport.write(b"n")
         if not await transport.rx.wait_for_marker(MARK_DELETE_DATA, args.menu_timeout):
             raise ConnectionError(f"'Daten loeschen?'-Prompt nicht gesehen: {bytes(transport.rx.buf)!r}")
+        # Bis zum Ende der Abfrage "(j/n)?" warten und kurz Ruhe lassen: ja() (sicom.c) leert vor dem Lesen den
+        # Eingabepuffer. Ueber USB kam das 'y' sonst vor dem Leeren an und wurde verworfen (Nachtlauf 2026-11-25).
+        await transport.rx.wait_for_marker("?", args.menu_timeout)
+        await asyncio.sleep(0.3)
         transport.rx.clear()
         await wait_for_menu_step(args, "'Daten loeschen?' sichtbar. Sende 'y'.")
         await transport.write(b"y")
@@ -2194,8 +2200,13 @@ async def run_download_test(args) -> int:
         await transport.write(b"1")
         if not await transport.rx.wait_for_marker("Anzahl Messwerte", args.menu_timeout):
             raise ConnectionError(f"Messwertanzahl nach Datenloeschung nicht gesehen: {bytes(transport.rx.buf)!r}")
-        count_feedback = bytes(transport.rx.buf)
-        count_match = re.search(rb"Anzahl Messwerte\s*=\s*(\d+)", count_feedback)
+        # USB (CDC) liefert "Anzahl Messwerte" und die Zahl teils in getrennten Paketen: bis 3 s auf die Zahl warten
+        for _ in range(30):
+            count_feedback = bytes(transport.rx.buf)
+            count_match = re.search(rb"Anzahl Messwerte\s*=\s*(\d+)", count_feedback)
+            if count_match is not None:
+                break
+            await asyncio.sleep(0.1)
         if count_match is None:
             raise ConnectionError(f"Messwertanzahl nach Datenloeschung nicht lesbar: {count_feedback!r}")
         remaining_records = int(count_match.group(1))

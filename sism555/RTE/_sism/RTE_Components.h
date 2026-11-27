@@ -42,10 +42,6 @@
 #define RTE_Drivers_I2C0                /* Driver I2C0 */
         #define RTE_Drivers_I2C1                /* Driver I2C1 */
         #define RTE_Drivers_I2C2                /* Driver I2C2 */
-/*  Keil::CMSIS Driver:USB Device:2.00 */
-#define RTE_Drivers_USBD0               /* Driver USBD0 */
-/*  Keil::CMSIS Driver:USB Host:2.00 */
-#define RTE_Drivers_USBH0               /* Driver USBH0 */
 /*  Keil::Device:Startup:1.0.0 */
 #define RTE_DEVICE_STARTUP_LPC17XX      /* Device Startup for NXP17XX */
 

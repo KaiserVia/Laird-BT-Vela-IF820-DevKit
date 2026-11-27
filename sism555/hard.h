@@ -22,6 +22,8 @@
 #define UART2				(1<<2)			// Flag dritte serielle Schnittstelle GPS Ausgabe
 #define	GPS_LINK		(1<<2)			// 1 wenn GPS Schnittstelle installiert
 #define	USB_LINK		(1<<3)			// 1 wenn USB (Host) Schnittstelle aktiviert
+extern volatile unsigned char rx_src;		// 5.u24: Schnittstelle (UART0/UART1/USB_LINK), von der das letzte Zeichen in rbuf kam (sio.c)
+extern volatile unsigned char xfer_mask;	// 5.u24: !=0 waehrend X/Ymodem-Sendung: putb() nur an diese Schnittstelle (sio.c)
 #define RS232_LINK	(1<<4)			// 1 wenn RS232 Terminal angeschlossen (MAX3226 Invalid\ = 1)
 #define	MQTT_LINK		(1<<5)			// 1 wenn MQTT Verbindung aktiv
 #define	GSM_LINK		(1<<6)			// 1 wenn GSM Verbindung aktiv oder n.v

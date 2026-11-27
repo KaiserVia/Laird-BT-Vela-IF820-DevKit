@@ -51,6 +51,13 @@ int main (void)
  // an einer anderen Adresse (5.155: neue __noinit-Variablen davor) oder ist der RAM-Inhalt sonst ungueltig, waren die
  // Parameter verdreht, und das naechste Abschalten (EINT0) haette sie ins Flash geschrieben. Jetzt: Kennungen pruefen,
  // bei Fehler wie nach dem Einschalten neu laden (externes Flash, sonst Sicherungskopie im LPC-Flash).
+ // 5.u2: Der USB-Stack ist nach JEDEM Reset neu und nicht initialisiert, connect (__noinit) traegt USB_LINK aber
+ // ueber Firmware-Update und Watchdog-Reset hinweg. Die erste Ausgabe ging dann an USBD_CDC_ACM_PutChar() eines nicht
+ // initialisierten Stacks: Geraet stumm, nach dem Update ueber USB kein Neustart (Watchdog-Schleife bis zum
+ // Stromzyklus). USB_LINK setzt nur der USB-Dienst, sobald der PC das Geraet konfiguriert hat (USB_tools.c).
+ connect&=~USB_LINK;
+ concpy&=~USB_LINK;
+
  if (((i_reset==SLEEP_RES)||(i_reset==FIRM_UP_RES)) && ((fp.Kennung!=FLASHKENNUNG)||(fp.pKennung!=PARAKENNUNG)))
  {
   i_reset=0;													// wie Einschalten behandeln: auch die uebrigen __noinit-Variablen

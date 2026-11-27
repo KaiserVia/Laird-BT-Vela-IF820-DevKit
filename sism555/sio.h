@@ -28,6 +28,7 @@
 static const char HexChars[] = "0123456789ABCDEF";					// Hexadecimal conversion table
 
 extern int redirect_char_Out (int (*pchar_func)(int a)); 	// Umleitung Standard Ausgabe
+extern int putbuf_usb (const unsigned char *p, unsigned int n);		// 5.u25: Block nur-USB am Stueck senden
 extern int putb(int ch);																		// Sende Byte an UART - Schnittstelle(n)
 //extern void putb_t(int ch);																// Sende Byte an UART0/USB Terminal - Schnittstelle(n)
 extern void putc(int c);																		// Zeichen an aktuelle Ausgabeeinheit senden

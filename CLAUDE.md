@@ -24,6 +24,11 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
     RST beim LPC-Start, LP_MODE an GND, Tiefschlaf, Werksmodul-Einrichtung. Gepusht, **noch nicht in `main`**.
     Aktuell 5.r5 (Board A geflasht). Kapitel "Update 5.r1" bis "Update 5.r5" in `sism555/project-status.md` des
     Worktrees; Konzept `sism555/Doku/Energiesparmodus_Konzept.md` (nur dort).
+  - `usb-verbindung` -> `C:\viaTraffic\GitHub\Projects\USB-Verbindung` (Versionen **5.u1, 5.u2 ...**, Basis 5.156):
+    USB-Kabelanschluss (Kunden: geht nur mit aktivem Hub). Stand 5.u21, **nicht gepusht, nicht in `main`**.
+    Analyse `sism555/Doku/USB_Analyse_2026-11.md`, Nachttest `sism555/Doku/USB_Nachttest_2026-11-25.md`.
+    Enthaelt eine **gepatchte Kopie des Keil-USB-Treibers** (`sism555/USB_Driver_Patch/`, RTE-Komponente
+    "CMSIS Driver:USB Device" abgewaehlt) - beim Merge und bei Pack-Updates beachten.
 - **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
   (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen
   GND-Verbindung dafür aufgetrennt wurde) und dürfen nicht auf Boards ohne Draht (mit der Weiche auf 1,
@@ -72,6 +77,15 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 - `Zeitsync_Plan.md`, `Fehlerspeicher_Strategie.md`, `parameterspeicher.md`
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
+
+- **2026-11-25/26 - 5.u1 bis 5.u21 (TEST), Branch `usb-verbindung`:** USB-Kabelanschluss. Zwei Fehler im Keil-Treiber
+  `USBD_LPC17xx.c` gefunden und in einer lokalen Kopie behoben: (1) EP0-OUT-Paket in der Status-Phase wurde nach Adresse 0
+  geschrieben -> HardFault/Watchdog beim Schliessen des COM-Ports waehrend einer Ausgabe (ca. 5 % je Schliessen);
+  (2) `USBD_ReadSetupPacket()` liess Sperre und USB-IRQ gesetzt -> USB tot bis Reset. Dazu: kein Neustart nach Update
+  ueber USB (`USB_LINK` ueber Reset, 5.u2), Datenfehler im USB-Empfang, Tiefschlaf bei VBUS (5.u1), Seriennummer.
+  Mit 5.156 bleibt das Geraet nach (1) ganz tot - sehr wahrscheinlich die Kundenursache. Nachttest auf 26SC9966: 5.u21
+  129/129 Dauerlauf-Runden, 43 Downloads, 25 Updates ueber USB ohne Fehler. Offen: Hardware H1-H6, F10 (USB erst nach
+  35 s), Test an anderen PCs/Boards. Nicht gepusht.
 
 - **2026-11-19/23 - 5.r1 bis 5.r5 (TEST), Branch `rst-start`:** Ziel V2-Hardware: RST an P1.16 (R124 10k, kein T10),
   **LP_MODE fest an GND** (0-Ohm-Bruecke), CONNECTION an P0.19. Board A (99SC9923) so umgebaut, laeuft mit 5.r5.

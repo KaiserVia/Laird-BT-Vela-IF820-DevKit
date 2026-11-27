@@ -7331,3 +7331,204 @@ Uhr nach den Schlaftests wieder auf Ortszeit gestellt.
 
 Nebenbefund: Im Tiefschlaf ueberbrueckt 26SC9966 5 s stromlos (Relais) ohne Neustart (Zaehler lief weiter); erst ein
 laengerer Ausfall loeste den Einschalt-Reset aus. Fuer Stromzyklus-Tests bei schlafendem Geraet laenger abschalten.
+
+## Update 5.u1 (TEST, 2026-11-25, Branch `usb-verbindung`): USB-Kabelanschluss robuster
+
+Anlass: Viele Kunden haben Probleme mit dem USB-Kabelanschluss; mit aktivem Hub geht es, direkt am PC oder ueber einen
+passiven Hub nicht zuverlaessig. Analyse von Schaltplan (24.11.2026), Datenblatt und Code: `Doku/USB_Analyse_2026-11.md`
+(6 Hardware-, 7 Firmware-Befunde, Massnahmenliste, Pruefmatrix). Branch `usb-verbindung` (Worktree
+`Projects/USB-Verbindung`, Basis 5.156), Versionen 5.u1, 5.u2 ...
+
+Umgesetzt (Firmware-Punkte F1-F4 der Analyse):
+
+- **F1 kein Tiefschlaf bei USB-Kabel** (measure.c): Ohne RS232, Anzeige und Messergebnis ging das Geraet ca. 250 ms nach
+  dem Erkennen von VBUS in `DeepSleep()`. Das stoppt PLL0 und damit den 48-MHz-USB-Takt mitten in der Anmeldung; der
+  Watchdog-Reset meldet das Geraet ab, danach von vorn. Ob es klappte, hing daran, wie schnell PC/Hub das Geraet
+  einrichten. Am Pruefplatz nie aufgefallen, weil dort RS232 steckt (`connect` != 0). Jetzt kein Schlaf, solange
+  `fp.usb` gesetzt ist und VBUS anliegt.
+- **PCONP nach dem Aufwachen erhalten** (hard.c `DeepSleep()`): `SystemInit()` schrieb PCONP = 0x00C086CC, darin ist
+  PCUSB aus; bei Aufwachen ohne Reset blieb USB tot. Jetzt wird PCONP vor dem Schlaf gemerkt und danach zurueckgeschrieben.
+- **F2 VBUS entprellt** (USB_tools.c `usb_vbus_on()`): Sitzung endet erst nach 300 ms durchgehend LOW, nicht mehr beim
+  ersten LOW-Abtastwert.
+- **F3 neu anmelden**: Konfiguriert der PC nach 20 s nicht, `USBD_Disconnect`, 500 ms, `USBD_Connect` (Zaehler
+  `usb_enum_retries`). 20 s, weil die erste Treibereinrichtung unter Windows einige Sekunden dauert.
+- **F4 Deskriptor** (RTE/USB/USBD_Config_0.c, USB_tools.c `usb_serial_patch()`): Seriennummer eingeschaltet und gleich
+  der Geraete-Seriennummer `fp.serno` (nur Buchstaben/Ziffern, sonst `_`; leer -> "0"). MDK-Middleware 6.2 kann die
+  Seriennummer nicht zur Laufzeit setzen und legt die Strings konstant ins Flash; deshalb RAM-Kopie mit eingesetzter
+  Nummer, `usbd0_desc.string_descriptor` zeigt darauf. Hersteller "viaTraffic", Produkt "VIASIS" (vorher
+  "NXP"/"LPC USB VCom Port"), EP0 64 statt 16 Byte. VID/PID unveraendert (NXP 0x1FC9/0x80F7), eigene PID offen.
+
+Build ohne Fehler/Warnungen. Map-Vergleich mit 5.156: alle 400 `non_init`-Symbole (u. a. `fp` 0x2007C028) gleich.
+**Am Geraet noch nicht geprueft** (am Pruefplatz haengt kein Board per USB). Zu pruefen: Schnelltest aus der Analyse
+(Geraet ohne RS232, Anzeige aus, direkt an den PC; vorher 5.156 als Gegenprobe), COM-Nummer bleibt an anderem Port
+gleich, Firmware-Update ueber USB, USB-Stick (Host) unveraendert.
+
+Hinweis: Mit gestecktem USB-Kabel schlaeft das Geraet jetzt nie (auch an einem reinen Ladegeraet ohne Datenhost).
+Nicht umgesetzt (naechste Schritte): F5 DTR, F6 eigener USB-Zustand statt `USB_LINK` in `connect`, USB-Start
+unabhaengig von der Hauptschleife; Hardware H1-H6 (Analyse Abschnitt 4).
+
+## Update 5.u2 (TEST, 2026-11-25, Branch `usb-verbindung`): Neustart nach Firmware-Update ueber USB
+
+**Symptom (Nachttest 26SC9966):** Nach einem Firmware-Update **ueber USB** startete das Geraet nicht neu: kein Banner
+auf RS232, kein USB-Port, auch nach Minuten nicht. Nur ein Stromzyklus half (der erste Stromzyklus brachte teils einen
+USB-Port nach 3 s, der sofort "funktioniert nicht" meldete; erst der zweite gab einen normalen Hochlauf). Aufgetreten
+beim Update 5.157 -> 5.u1 und 5.u1 -> 5.u1, also schon vor 5.u1 vorhanden.
+
+**Ursache:** `connect` ist `__noinit` und traegt `USB_LINK` ueber den Reset (FIRM_UP_RES, Watchdog-Reset) hinweg. Der
+USB-Stack ist nach dem Reset aber neu und nicht initialisiert. Die erste Ausgabe im Hochlauf ging per `putb()` an
+`USBD_CDC_ACM_PutChar()` des nicht initialisierten Stacks; das Geraet hing, der Watchdog startete es neu, `connect`
+blieb erhalten (WDTR-Zweig setzt `connect` nicht), Schleife bis zum Stromzyklus. Ueber RS232 trat es nicht auf, weil
+dann `USB_LINK` nicht gesetzt ist. Gleiches gilt fuer jeden Watchdog-Reset waehrend einer USB-Sitzung.
+
+**Fix (main.c, ganz am Anfang):** `connect&=~USB_LINK; concpy&=~USB_LINK;` nach jedem Reset. `USB_LINK` setzt nur der
+USB-Dienst, sobald der PC das Geraet konfiguriert hat.
+
+**Geprueft:** Update 5.u1 -> 5.u2 ueber USB: 3 s nach "Reprogram" Banner 5.u2 auf RS232, USB-Port wieder da und
+konfiguriert. Map: `non_init`-Symbole gleich wie 5.156. (Das Update wird noch von der alten Firmware ausgefuehrt; der
+Fix wirkt, weil die NEUE Firmware im Hochlauf `USB_LINK` loescht - auch Kunden mit alter Firmware koennen also ueber
+USB auf 5.u2 und spaeter updaten.)
+
+Beobachtet, noch offen: Beim XMODEM-Empfang ueber USB lehnt das Geraet 10-24 von 179 Bloecken ab (NAK, Wiederholung
+klappt), ueber RS232 nicht. Ein erster Update-Versuch 5.u1 -> 5.u2 brach ohne Log ab (Geraet blieb auf 5.u1).
+
+## Update 5.u3 (TEST, 2026-11-25, Branch `usb-verbindung`): USB-Empfang ohne Datenfehler
+
+**Symptom:** Beim XMODEM-Empfang ueber USB (Firmware-Update) lehnte das Geraet 10-28 von 179 Bloecken ab (NAK, CRC
+falsch), ueber RS232 nie.
+
+**Ursache (USB_tools.c, Empfangsschleife im USB-Thread):** `rbuf[++rxi] = USBD_CDC_ACM_GetChar(0)`. Der Compiler darf
+`rxi` vor dem Speichern des Bytes erhoehen. Anders als die UART-ISRs laeuft der USB-Empfang als Thread und kann zwischen
+beiden Schritten verdraengt werden (Round-Robin 1 ms); die Hauptschleife liest dann ein altes Byte. Ausserdem fehlte der
+`(uchar)`-Cast bei der Voll-Pruefung (`bxi!=rxi+1` ist bei rxi==255 nie falsch; UART0-ISR hat den Cast seit 5.111).
+
+**Fix:** Byte erst lesen und in `rbuf[(uchar)(rxi+1)]` schreiben, danach `rxi++`; die zwei Befehle mit gesperrtem
+UART0-Interrupt (die ISR schreibt `rxi` ebenfalls).
+
+**Geprueft (26SC9966, Update ueber USB):** mit dem alten Empfang 16-28 NAK je Update (4 Laeufe), mit dem neuen 0 NAK
+(3 Laeufe), Update dauert 23 s statt 29-32 s. Alle Updates kamen nach 3 s mit USB zurueck (5.u2).
+
+## Update 5.u18 (TEST, 2026-11-25/26, Branch `usb-verbindung`): HardFault im USB-Treiber beim Schliessen des Ports
+
+**Symptom:** Im Nachttest liess sich der USB-COM-Port in 0,5-2 % der Oeffnungen nicht oeffnen ("Ein an das System
+angeschlossenes Geraet funktioniert nicht", sofort oder nach 32 s). Das Geraeteprotokoll zeigte zu jedem dieser Faelle
+**I31 Watchdog reset**. Gezielt ausgeloest durch Oeffnen, Taste senden, **sofort Schliessen** (Geraet gibt noch aus):
+ca. 5 % je Schliessen. Mit 5.156 (ohne den Fix aus 5.u2) bleibt das Geraet danach tot (USB und RS232), bis zum
+Stromzyklus - sehr wahrscheinlich ein grosser Teil der Kundenmeldungen "USB geht nicht".
+
+**Eingrenzung (Diagnose-Builds 5.u11-5.u16, nicht committet):**
+- 5.u11: Ringpuffer-Zaehler auf der Infoseite - Puffer laeuft nie voll, Ringpuffer ist nicht die Ursache.
+- 5.u12: 1-ms-ISR gibt bei 28 s unbedientem Watchdog den PC ueber UART0 aus - keine Ausgabe, also lief keine ISR mehr.
+- 5.u14: USB-IRQ unter Timer-Prioritaet - weiterhin keine Ausgabe, also kein USB-ISR-Sturm.
+- 5.u15/5.u16: eigener HardFault-Handler mit Ausgabe ueber UART0:
+  `[HARDFAULT] pc=0001BC0A psr=61000028 (IRQ 24 = USB) cfsr=00000400 (IMPRECISERR) r3=5000C000 (USB) r4=00000004
+  r5=00000008 r6=00000000` -> in `USBD_ReadEP()` (Keil-Treiber `USBD_LPC17xx.c`, LPC1700_DFP 2.0.0), Endpunkt 0 OUT,
+  8-Byte-Paket, Zielpuffer **NULL**.
+
+**Ursache:** Der Treiber hat fuer EP0 OUT einen Transfer ohne Puffer aktiv (Status-Phase, Laenge 0). Kommt in dieser
+Phase ein Datenpaket (Windows bricht beim Schliessen/Oeffnen Steuer-Transfers ab und beginnt neue), schreibt
+`USBD_IRQ()` das ganze Paket ohne Laengenpruefung nach `transfer_info.data + transferred` = Adresse 0 -> Bus-Fehler ->
+HardFault (Standard-Handler: Endlosschleife) -> Watchdog-Reset nach 32 s.
+
+**Fix:** Lokale, gepatchte Kopie des Treibers `USB_Driver_Patch/USBD_LPC17xx.c` (+ `.h`) im Projekt; die RTE-Komponente
+"CMSIS Driver:USB Device" ist dafuer abgewaehlt (`OTG_LPC17xx.c` mit `USB_IRQHandler` kommt weiter ueber "USB Host").
+`USBD_IRQ()` liest jedes OUT-Paket in einen 64-Byte-Zwischenpuffer und kopiert hoechstens den freien Rest des Transfers,
+bei NULL-Puffer nichts. Die Datei ist im Kopf als geaenderte Fassung gekennzeichnet (zlib-Lizenz von ARM verlangt das).
+**Achtung beim Pack-Update** (LPC1700_DFP): Patch nachziehen oder pruefen, ob Keil den Fehler behoben hat.
+
+**Ausserdem in 5.u18 (Ersatz fuer 5.u3):** USB-Empfang ohne UART0-Interruptsperre je Byte (5.u3 erhoehte die
+Haenger-Rate, Vergleich je 300-1500 Oeffnungen), Byte vor `rxi` schreiben, voller Ringpuffer nach 100 ms verwerfen und
+zaehlen (`usb_rx_ovf`) statt den USB-Empfang zu stauen (wie UART0 seit 5.111).
+
+**Ergebnis 5.u17/5.u18 (26SC9966):** 300x Schliessen waehrend der Ausgabe: **0 HardFault, 0 Watchdog-Reset**
+(vorher alle 3-20 Versuche). Es bleiben vereinzelt (ca. 0,7 %) sofortige Oeffnungsfehler auf Windows-Seite nach einem
+Schliessen mit laufender Ausgabe; das naechste Oeffnen klappt, das Geraet laeuft durch.
+
+## Update 5.u21 (TEST, 2026-11-26, Branch `usb-verbindung`): zweiter Treiberfehler - USB tot ohne Absturz
+
+**Symptom:** Mit 5.u18 im Ausloese-Test (300x Schliessen waehrend der Ausgabe, Lauf 2) antwortete das Geraet ab
+Versuch 145 nicht mehr auf USB: jedes Oeffnen ca. 3,5 min, dann "Zeitlimit fuer die Semaphore erreicht". Port bei
+Windows weiter angemeldet, Geraet ueber RS232 voll bedienbar - genau das Kundenbild "USB geht nicht mehr, sonst laeuft
+alles", nur Kabel ziehen oder Strom aus hilft.
+
+**Ursache (Keil-Treiber `USBD_ReadSetupPacket()`):** setzt `usbd_sie_busy` und sperrt den USB-Interrupt, kehrt aber
+bei "kein SETUP anstehend" mit Fehler zurueck, ohne beides freizugeben. Danach antwortet jede Treiberfunktion mit
+BUSY, USB-Interrupts kommen nicht mehr - USB tot bis zum Reset.
+
+**Fix:** in `USB_Driver_Patch/USBD_LPC17xx.c` Sperre und USB-IRQ auch in diesem Zweig freigeben.
+
+**Geprueft:** A/B 5.u21/5.u18 (je 2x300 Ausloeser, abwechselnd geflasht): 5.u21 0 Abstuerze, kein USB-Totalausfall,
+sofortige Oeffnungsfehler 5 bzw. 0 je 300; 5.u18 1 je 300 im ersten Lauf, im zweiten Lauf USB-Totalausfall ab Versuch
+145. Die Rate der sofortigen Windows-Oeffnungsfehler schwankt stark zwischen Laeufen (0-8 je 300) und haengt nur am
+schnellen Wiederoeffnen (mit 3 s Pause 0/300).
+
+### Nachttest 26SC9966 (2026-11-26, 02:50-06:30, 5.u21)
+
+Dauerlauf Phase A: 129/129 Runden ok (Stromzyklen 0,5-30 s, Menue/Info ueber USB vor und nach Leerlauf), 43/43
+Ymodem-Downloads (0 Wiederholungen), 25/25 Firmware-Updates ueber USB (0 NAK, USB nach 3 s zurueck), Tiefschlaf 0.
+Phase B (1 h ohne Stromzyklus, Menue alle 2 min): 30/30 ok. Vorher 600x Schliessen waehrend der Ausgabe: 1 sofortiger
+Windows-Oeffnungsfehler, kein Absturz. Bericht: `Doku/USB_Nachttest_2026-11-25.md`.
+
+## Update 5.u22 (TEST, Branch usb-verbindung) - USB-Strings
+
+Anwendervorgabe 2026-11-26: Hersteller-String "via traffic", Produkt-String "viasis" (vorher "viaTraffic"/"VIASIS",
+`RTE/USB/USBD_Config_0.c`). Sonst keine Aenderung, `non_init`-Layout wie 5.156 (97 Symbole). Ueber USB geflasht auf
+26SC9966: Version 5.u22, Seriennummer 26SC9966, Windows meldet als Produkt (BusReportedDeviceDesc) "viasis". Den
+Hersteller-String zeigt Windows im Geraete-Manager nicht an (dort steht der Treiberhersteller).
+
+## Update 5.u23 (TEST, Branch usb-verbindung) - USB-Treiber aus LPC1700_DFP 2.7.2
+
+Anwenderentscheidung 2026-11-26: statt unseres gepatchten Treibers V2.00 die USB-Treiber des letzten Keil-Packs
+(LPC1700_DFP 2.7.2, von Keil nicht mehr gepflegt) als lokale Kopie in `USB_Driver_Patch/`: Geraet `USBD_LPC17xx.c`
+V2.14, Host `USBH_LPC17xx.c` V2.6, gemeinsames Modul `OTG_LPC17xx.c` V1.3 (alle drei noetig, gemeinsame Variablen
+`usb_role`/`usb_state`). Pack-Komponenten CMSIS Driver USB Device und USB Host abgewaehlt, kein Pack-Update auf den PCs
+noetig. Keil hat F11 (V2.12, ReadEP mit NULL) und F12 (ReadSetupPacket) selbst behoben.
+
+Eigene Anpassungen (im Code `viasis 5.u23`): Ersatz `__UNALIGNED_UINT32_READ/WRITE` (fehlt in CMSIS 4.2.0), Host-
+Capabilities ohne zweites Feld (CMSIS 4.2.0), Schalter `RTE_Drivers_USBD0/USBH0` in den Dateien gesetzt, Lesen auf den
+freien Pufferplatz begrenzt (wie 5.u18). **Fehler im Keil-Pack:** `USB_IRQHandler` ruft fuer LPC175x_6x mit Host+Geraet
+`USBH0_IRQ`/`USBD0_IRQ` auf, die es nicht gibt (hat nie gebaut) -> `USBH_IRQ`/`USBD_IRQ`.
+
+Build 0 Fehler/0 Warnungen, `non_init` wie 5.156. Pruefung auf 26SC9966:
+- A/B-Schliess-Ausloeser je 2x300: 5.u23 0 Oeffnungsfehler, 0 Neustarts, 0 HardFault; 5.u21 1 Oeffnungsfehler.
+- 5/5 Firmware-Updates ueber USB (0 NAK, USB nach 3,3 s zurueck), 3/3 Ymodem-Downloads (5000 Messwerte), 6/6
+  Stromzyklen (0,5/2/10 s, Menue vor und nach Leerlauf).
+- **Offen: USB-Stick (Host-Treiber ist ebenfalls neu).**
+
+Info fuer Joachim: `Doku/Info_Joachim_USB.md`. Werkzeug-Umstieg (AC6/RTX5/Middleware 8): `Doku/Werkzeug_Umstieg_Aufwand.md`.
+
+## Update 5.u24/5.u25 (TEST, Branch usb-verbindung) - USB-Download zehnmal schneller
+
+Anwenderfrage 2026-11-26: warum ist der Download so langsam? Messung an 26SC9966 (5.u23): Ymodem ueber USB 8,6 KB/s.
+
+1. **5.u24:** `putb()` schickte jeden Ymodem-Block zusaetzlich an alle anderen verbundenen Schnittstellen. Am
+   Pruefplatz steckt das RS232-Terminal (115200 Bd = max. 11,5 KB/s) -> bremste USB und zeigte dort Binaerdaten.
+   Neu: `rx_src` (Schnittstelle des letzten empfangenen Zeichens, gesetzt in UART0-/UART1-ISR und USB-Empfang) und
+   `xfer_mask` (sio.c); `messdaten()` (sicom.c) setzt `xfer_mask=rx_src` um `send_vtf_file(...,1)`, `putb()` sendet
+   dann nur dorthin. Bewusst nicht allgemein in `sendblock()`: Matrix-Upload und Zertifikat-Uploads bekommen ihre
+   Antworten nicht ueber `rbuf`. Ergebnis 12,1 KB/s. Nicht einzeln committet (Zwischenschritt).
+2. Diagnose (nicht committet): je 1-KB-Block 64 ms Senden (85 %), 4 ms Warten auf ACK, 7 ms Flash lesen.
+   `USBD_CDC_ACM_PutChar()` je Byte kostet bei 24 MHz CPU-Takt ca. 60 us.
+3. **5.u25:** `putbuf_usb()` (sio.c) uebergibt den Block am Stueck per `USBD_CDC_ACM_WriteData()`, wenn die Ausgabe
+   gerade nur an USB geht (sonst byteweise wie bisher, Timeout/`usb_stalled` wie `putb()`); Aufruf in `sendblock()`.
+
+Ergebnis 5.u25: Download 20000 Messwerte (206 KB) in 2,4 s = **84-87 KB/s** (vorher 8,6), 0 Wiederholungen; 3/3
+Updates ueber USB ok; `non_init` wie 5.156. Jetzt bestimmen ACK-Wartezeit und Flash-Lesen den Rest. Ungeprueft:
+Download ueber BT mit gestecktem RS232 (xfer_mask gilt dort auch, sollte ebenfalls schneller werden).
+
+## Update 5.158 (TEST, 2026-11-27, `main`): Merge Branch `usb-verbindung` (5.u1-5.u25)
+
+Anwenderentscheidung 2026-11-27: USB-Branch nach `main`, Bootloader/Security-Arbeit in einen eigenen Branch
+`bootloader`. Inhalt aus `usb-verbindung` (Details in den Kapiteln 5.u1 bis 5.u25 oben):
+
+- USB-Kabelanschluss robust: kein Tiefschlaf bei gestecktem Kabel (F1), `USB_LINK` nach Reset geloescht (F8),
+  USB-Empfang ohne Datenfehler (F9), VBUS entprellt, Neuanmeldung nach 20 s, EP0 64 Byte.
+- USB-Treiber als lokale Kopie aus LPC1700_DFP 2.7.2 (`USB_Driver_Patch/`: Geraet V2.14, Host V2.6, OTG V1.3),
+  behebt HardFault beim Schliessen (F11) und Sperre im Treiber (F12). Pack-Komponenten USB Device/Host abgewaehlt.
+- USB-Kennung: Hersteller "via traffic", Produkt "viasis", Seriennummer = Geraete-Seriennummer (feste COM-Nummer).
+- Download ueber USB ca. 85 KB/s statt 8,6 KB/s (nur an die anfordernde Schnittstelle, Bloecke am Stueck).
+- Pruefung 2026-11-26 an 26SC9966 mit Bedienteil/Kabelbaum: drei PC-Ports direkt und eine Kette mit 5 Hubs +
+  Druckerkabel je ohne Fehler (`Doku/tools/usb_kombi.py`). Info fuer Joachim: `Doku/Info_Joachim_USB.md`.
+
+Konflikte beim Merge nur in `sictxt.c` (Version), `project-status.md` und den Binaerdateien; main.c (5.157 RS232-Wecken
+und 5.u2 `USB_LINK` loeschen) automatisch zusammengefuehrt, beide Stellen geprueft. Offen wie in 5.u25: USB-Stick
+nach dem Treiberwechsel ungetestet, Hardware-Punkte H1-H6 (`Doku/USB_Analyse_2026-11.md`).

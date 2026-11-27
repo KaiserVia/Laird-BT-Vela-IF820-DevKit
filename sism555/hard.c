@@ -193,7 +193,7 @@ void UART0_IRQHandler(void) 						// UART0 Sende- und Empfangsinterrupt
  switch (U0->IIR&0x000E)								// Verteile je nach Interruptquelle
  {	
   case 0x0002:	break;																	// Kein Puffer leer Sendeinterrupt
-  case 0x0004: 	if (!plustrans)	{ if (bxi!=(uchar)(rxi+1)) rbuf[++rxi]=U0->RBR; else { c=U0->RBR; u0_ovf++; } } /* 5.111: Ueberlaufschutz, neue Bytes verwerfen+zaehlen statt ungelesene zu ueberschreiben */ 		// Zeichen in allgemeinen Empfangspuffer, pr�inkrement									
+  case 0x0004: 	if (!plustrans)	{ if (bxi!=(uchar)(rxi+1)) { rbuf[++rxi]=U0->RBR; rx_src=UART0; } else { c=U0->RBR; u0_ovf++; } } /* 5.111: Ueberlaufschutz, neue Bytes verwerfen+zaehlen statt ungelesene zu ueberschreiben */ 		// Zeichen in allgemeinen Empfangspuffer, pr�inkrement									
 								else { if (bpi!=(uchar)(rpi+1)) pbuf[++rpi]=U0->RBR; else { c=U0->RBR; u0_ovf++; } }								// Zeichen in Plus Empfangspuffer, pr�inkrement
 								break;		
   default: 		c=U0->LSR;	 							// Dummy read Rx Fehlerstatus  
@@ -231,6 +231,7 @@ void UART1_IRQHandler(void) 						// UART1 Sende- und Empfangsinterrupt
 								}
 								else if (!(connect&MQTT_LINK) && (bxi!=(uchar)(rxi+1))) // BT gebrueckt, oder GSM (nicht MQTT)
 								{
+								 rx_src=UART1;						// 5.u24
 								 rbuf[++rxi]=U1->RBR; 		// Sonst Zeichen in Empfangspuffer, pr�inkrement
 								 bt_time=BT_TIMEOUT;			// Reset Bluetooth Verbindungstimeout
 								}
@@ -863,6 +864,7 @@ void wait_uarts_empty (void)	// Warte bis alle Zeichen auf uarts versendet
 // Der Schlafzaehler liegt deshalb in hftrack.c.
 void DeepSleep (void)										// Bringe CPU in Deep sleep mode
 {
+ uint pconp=PCONP;											// 5.u1: Peripherie-Versorgung merken (SystemInit schaltet u. a. USB/PCUSB ab)
  sleep_stat_count ();									// 5.155: Schlafphase zaehlen (hftrack.c)
  i_reset=SLEEP_RES;											// Setze Resetursache
  if (fp.pwm) SCB_SCR|=(1<<2);						// Deep sleep Bit setzen
@@ -881,6 +883,7 @@ void DeepSleep (void)										// Bringe CPU in Deep sleep mode
  ResetWDT ();														// Interrupt resume - Watchdog Timer reset	
  i_reset=0; 														// Interrupt Resume daher nullen		
  SystemInit();													// PLL neu starten
+ PCONP=pconp;														// 5.u1: Peripherie-Versorgung wie vor dem Schlaf
  InitWatchdog(LONG_WD_32);							// Watchdog Timeout 32 Sekunden setzen 
  SystemCoreClockUpdate ();							// Setze SystemCoreClock Information	
 }
