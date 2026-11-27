@@ -24,11 +24,13 @@ Das IF820 ist das dritte unterstützte BT-Modul neben Laird BT730 und RN4678.
     RST beim LPC-Start, LP_MODE an GND, Tiefschlaf, Werksmodul-Einrichtung. Gepusht, **noch nicht in `main`**.
     Aktuell 5.r5 (Board A geflasht). Kapitel "Update 5.r1" bis "Update 5.r5" in `sism555/project-status.md` des
     Worktrees; Konzept `sism555/Doku/Energiesparmodus_Konzept.md` (nur dort).
-  - `usb-verbindung` -> `C:\viaTraffic\GitHub\Projects\USB-Verbindung` (Versionen **5.u1, 5.u2 ...**, Basis 5.156):
-    USB-Kabelanschluss (Kunden: geht nur mit aktivem Hub). Stand 5.u21, **nicht gepusht, nicht in `main`**.
-    Analyse `sism555/Doku/USB_Analyse_2026-11.md`, Nachttest `sism555/Doku/USB_Nachttest_2026-11-25.md`.
-    Enthaelt eine **gepatchte Kopie des Keil-USB-Treibers** (`sism555/USB_Driver_Patch/`, RTE-Komponente
-    "CMSIS Driver:USB Device" abgewaehlt) - beim Merge und bei Pack-Updates beachten.
+  - `usb-verbindung` -> `C:\viaTraffic\GitHub\Projects\USB-Verbindung` (Versionen **5.u1 ... 5.u25**):
+    **2026-11-27 in `main` gemergt (5.158).** Seitdem enthaelt `main` eine **Kopie der Keil-USB-Treiber aus
+    LPC1700_DFP 2.7.2** (`sism555/USB_Driver_Patch/`: USBD, USBH, OTG; RTE-Komponenten "CMSIS Driver:USB Device/Host"
+    abgewaehlt) - bei Pack-Updates beachten. Analyse `sism555/Doku/USB_Analyse_2026-11.md`.
+  - `bootloader` -> `C:\viaTraffic\GitHub\Projects\Bootloader` (Versionen **5.b1, 5.b2 ...**, Basis 5.158, angelegt
+    2026-11-27): CRA/EN 18031, Bootloader mit signierten Updates, Parameter-Handling, Werkzeugumstieg. Bisher nur
+    Konzepte, Einstieg `sism555/Doku/Bootloader_Security_Uebersicht.md` (nur dort). Nicht gepusht.
 - **Branch `connection-pin` (ab 5.101):** Die Versionen **5.101-5.119** setzen eine Umverdrahtung voraus
   (IF820 `CONNECTION`-Pin direkt auf LPC-Pin **P0.19**; in 5.101-5.108 noch auf IC54/IC36-Pad `IO5`, dessen
   GND-Verbindung dafür aufgetrennt wurde) und dürfen nicht auf Boards ohne Draht (mit der Weiche auf 1,
@@ -78,6 +80,11 @@ zuerst diese Datei lesen**, bevor Änderungen gemacht werden.
 
 ## Aktueller Stand (Kurzfassung — Details in project-status.md)
 
+- **2026-11-27 - 5.158 (TEST), `main`:** Merge `usb-verbindung` (5.u1-5.u25). Gebaut ohne Fehler/Warnungen, non_init
+  wie 5.156; am Geraet noch nicht geflasht (USB-Geraete am Pruefplatz waren beim Merge nicht erreichbar). USB-Download
+  ca. 85 KB/s (5.u25), USB-Kennung "via traffic"/"viasis" + Seriennummer, an 26SC9966 mit Bedienteil an drei PC-Ports
+  und an einer Kette mit 5 Hubs ohne Fehler. Offen: USB-Stick nach Treiberwechsel, Hardware H1-H6 (Umschalter fuer
+  naechste Platine; Stick wird von Kunden genutzt).
 - **2026-11-25/26 - 5.u1 bis 5.u21 (TEST), Branch `usb-verbindung`:** USB-Kabelanschluss. Zwei Fehler im Keil-Treiber
   `USBD_LPC17xx.c` gefunden und in einer lokalen Kopie behoben: (1) EP0-OUT-Paket in der Status-Phase wurde nach Adresse 0
   geschrieben -> HardFault/Watchdog beim Schliessen des COM-Ports waehrend einer Ausgabe (ca. 5 % je Schliessen);
@@ -458,4 +465,4 @@ nicht gemacht, damit der Fix nicht mit den offenen BT-Themen vermischt wird.
 - Übergabe zwischen beiden läuft über **diese Datei plus die Doku unter `sism555/Doku/`**.
 
 ---
-*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-25.*
+*Angelegt am 2026-07-14 als dauerhafter Session-Kontext. Zuletzt aktualisiert 2026-11-27.*
